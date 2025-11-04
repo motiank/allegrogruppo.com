@@ -1,0 +1,37 @@
+{
+  "meal": {
+    "title": "בחרו ארוחה",
+    "hamburger": "המבורגר",
+    "schnitzel": "שניצל",
+    "chickenSalad": "סלט עוף",
+    "pasta": "פסטה"
+  },
+  "location": {
+    "title": "פרטי מיקום",
+    "building": "בניין",
+    "floor": "קומה",
+    "office": "משרד",
+    "phone": "טלפון",
+    "next": "הבא",
+    "selectBuilding": "בחרו בניין"
+  },
+  "payment": {
+    "title": "תשלום",
+    "comingSoon": "תשלום בקרוב"
+  },
+  "thankYou": {
+    "title": "תודה רבה!",
+    "orderSummary": "סיכום הזמנה",
+    "meal": "ארוחה",
+    "building": "בניין",
+    "floor": "קומה",
+    "office": "משרד",
+    "phone": "טלפון",
+    "restart": "התחלה מחדש"
+  },
+  "common": {
+    "select": "בחרו",
+    "play": "נגן"
+  }
+}
+

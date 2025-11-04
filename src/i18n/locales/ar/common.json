@@ -1,0 +1,37 @@
+{
+  "meal": {
+    "title": "اختر وجبة",
+    "hamburger": "هامبرجر",
+    "schnitzel": "شنتسل",
+    "chickenSalad": "سلطة دجاج",
+    "pasta": "باستا"
+  },
+  "location": {
+    "title": "تفاصيل الموقع",
+    "building": "المبنى",
+    "floor": "الطابق",
+    "office": "المكتب",
+    "phone": "الهاتف",
+    "next": "التالي",
+    "selectBuilding": "اختر المبنى"
+  },
+  "payment": {
+    "title": "الدفع",
+    "comingSoon": "الدفع قريباً"
+  },
+  "thankYou": {
+    "title": "شكراً لك!",
+    "orderSummary": "ملخص الطلب",
+    "meal": "الوجبة",
+    "building": "المبنى",
+    "floor": "الطابق",
+    "office": "المكتب",
+    "phone": "الهاتف",
+    "restart": "إعادة التشغيل"
+  },
+  "common": {
+    "select": "اختر",
+    "play": "تشغيل"
+  }
+}
+

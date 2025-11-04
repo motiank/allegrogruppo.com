@@ -1,0 +1,9 @@
+Do you offer a public API for online orders (create order, update status)?”
+
+“Do you provide a hosted checkout / iframe for card-not-present payments with a payment URL or token?”
+
+“Can we inject orders into the POS from an external web app?”
+
+“What are your webhooks for payment/fulfillment statuses?”
+
+“Do you support CORS and frame-ancestors for embedding from https://www.eatalia-market.co.il/?”

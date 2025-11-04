@@ -1,0 +1,173 @@
+
+
+> **Goal:** Build a new project named `allegrogruppo.com`
+>
+> **Tech stack (strict requirements):**
+>
+> * **Node.js + Express**
+> * **React**
+> * **JSS (react-jss)**
+> * **Vite using esbuild/SWC (NO Babel)**
+> * **JavaScript ONLY (NO TypeScript, NO babel config, NO TS config)**
+> * **JSX is written inside `.js` files** (do **NOT** create `.jsx` files)
+
+---
+
+### ✅ High-level requirements
+
+1. The site should serve:
+
+   * `index.html` — shows a simple list of available landing pages
+   * standalone landing pages (separate HTML files, NOT SPA routing)
+   * First landing page: `eatalia-bsr.html`
+
+2. The landing pages are loaded **inside an iframe on a remote site**:
+
+   ✅ `https://www.eatalia-market.co.il/`
+
+   Add CSP:
+
+   ```
+   Content-Security-Policy: frame-ancestors 'self' https://www.eatalia-market.co.il/ https://*.allegrogruppo.com;
+   ```
+
+3. Default language: **Hebrew (RTL)**
+   Support also: **English, Arabic**
+
+   * Use i18next + react-i18next
+   * Language chosen via `?lang=he|en|ar`
+   * If `he` or `ar` → set `<html dir="rtl">`, otherwise `ltr`
+   * Use JSS logical properties (`paddingInline`, `textAlign: start/end`)
+
+4. All components and pages must be `.js` files and use JSX syntax inside them.
+
+---
+
+### ✅ Landing page: `eatalia-bsr.html`
+
+Sections flow:
+
+1. **Meal Picking**
+
+   * 4 meals: hamburger, schnitzel, chicken salad, pasta
+   * Each shown as image tile
+   * A play button floats on the **left side** of the image
+   * Clicking a meal selects it and **grays out the others**
+   * Clicking play opens a video overlay (lazy load the video)
+
+2. **Location section**
+
+   * Fields: `building` (dropdown: C/I/T/Y), `floor`, `office`, `phone`
+   * “Next” enabled only when all inputs valid
+
+3. **Payment section**
+
+   * Placeholder screen: “Payment coming soon”
+
+4. **Thank You section**
+
+   * Shows order summary (meal, building, etc.)
+   * Restart button resets flow
+
+---
+
+### ✅ Analytics
+
+Send event payloads to:
+
+```
+POST /api/track
+```
+
+And also fire `window.parent.postMessage(...)` so the iframe host site can listen.
+
+Events required:
+
+```
+meal_selected
+video_opened
+location_completed
+flow_completed
+```
+
+Mask phone number (show only last 4 digits).
+
+---
+
+### ✅ Performance constraints
+
+* MUST use **Vite with esbuild/SWC** (zero Babel usage)
+* Separate HTML entry per landing page (multi-page build)
+* Tiny bundles → aim for < 90KB per landing page
+* Lazy load video
+* `loading="lazy"` images
+
+---
+
+### ✅ Project structure (Cursor must generate)
+
+```
+/server/server.js                  # Express server, serves dist + /api/track
+/src
+  /pages
+    index.js
+    eatalia-bsr.js
+  /components
+    MealCard.js
+    OfficeForm.js
+    ThankYou.js
+    VideoOverlay.js
+    LangSwitcher.js
+  /i18n
+    index.js
+    /locales
+       he/common.json
+       en/common.json
+       ar/common.json
+  /styles
+    theme.js
+    global.js
+  /utils
+    analytics.js
+    validations.js
+    dir.js
+index.html
+eatalia-bsr.html
+vite.config.js                     # multipage config — JS ONLY
+package.json
+README.md
+```
+
+---
+
+### ✅ Deliverables
+
+Cursor should:
+
+1. Create the project structure above
+2. Configure Vite for **multiple HTML entry outputs**
+3. Make React components in **`.js` files using JSX inside them**
+4. Implement i18next with 3 language JSON files
+5. Add Express `/api/track` endpoint
+6. Ensure CSP supports iframe embedding from `https://www.eatalia-market.co.il/`
+7. Ensure RTL/LTR changes dynamically based on selected language
+
+---
+
+### 🚨 Important rules (repeat to Cursor if needed)
+
+* **NO TypeScript**
+* **NO Babel config**
+* **NO `.jsx` files** — JSX must be inside `.js` files
+* **Use Vite (esbuild/SWC)**
+
+---
+
+### ✅ Final instruction to Cursor
+
+> **Generate the full project scaffold now.**
+> Create all required files and code.
+> After generating, show me how to run it (`npm install`, `npm run dev`).
+
+---
+

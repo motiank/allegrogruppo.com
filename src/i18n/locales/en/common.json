@@ -1,0 +1,37 @@
+{
+  "meal": {
+    "title": "Choose a Meal",
+    "hamburger": "Hamburger",
+    "schnitzel": "Schnitzel",
+    "chickenSalad": "Chicken Salad",
+    "pasta": "Pasta"
+  },
+  "location": {
+    "title": "Location Details",
+    "building": "Building",
+    "floor": "Floor",
+    "office": "Office",
+    "phone": "Phone",
+    "next": "Next",
+    "selectBuilding": "Select Building"
+  },
+  "payment": {
+    "title": "Payment",
+    "comingSoon": "Payment coming soon"
+  },
+  "thankYou": {
+    "title": "Thank You!",
+    "orderSummary": "Order Summary",
+    "meal": "Meal",
+    "building": "Building",
+    "floor": "Floor",
+    "office": "Office",
+    "phone": "Phone",
+    "restart": "Restart"
+  },
+  "common": {
+    "select": "Select",
+    "play": "Play"
+  }
+}
+
