@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { MealCard } from '../components/MealCard.js';
 import { OfficeForm } from '../components/OfficeForm.js';
 import { ThankYou } from '../components/ThankYou.js';
 import { LangSwitcher } from '../components/LangSwitcher.js';
+import { PolicyDialog } from '../components/PolicyDialog.js';
 import { trackEvent } from '../utils/analytics.js';
 import '../i18n/index.js';
 
@@ -17,6 +18,13 @@ const useStyles = createUseStyles({
     padding: theme.spacing.xl,
     maxWidth: '1200px',
     margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  mainContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
   },
   section: {
     marginBlockEnd: theme.spacing.xxl,
@@ -40,6 +48,30 @@ const useStyles = createUseStyles({
     borderRadius: theme.borderRadius.md,
     fontSize: '1.25rem',
     color: theme.colors.textSecondary,
+  },
+  footer: {
+    marginBlockStart: 'auto',
+    paddingBlockStart: theme.spacing.lg,
+    borderBlockStart: `1px solid ${theme.colors.border}`,
+    textAlign: 'center',
+    fontSize: '0.875rem',
+    color: theme.colors.textSecondary,
+  },
+  footerLink: {
+    color: theme.colors.primary,
+    textDecoration: 'none',
+    marginInline: theme.spacing.sm,
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    font: 'inherit',
+    '&:hover': {
+      textDecoration: 'underline',
+    },
+  },
+  footerSeparator: {
+    marginInline: theme.spacing.sm,
+    color: theme.colors.border,
   },
 });
 
@@ -73,11 +105,18 @@ const meals = [
 const EataliaBSRPage = () => {
   useGlobalStyles();
   const classes = useStyles();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [step, setStep] = useState('meal'); // meal, location, payment, thankYou
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
+  const [policyDialog, setPolicyDialog] = useState({
+    open: false,
+    type: null,
+    content: '',
+    loading: false,
+    error: null,
+  });
 
   const handleMealSelect = (mealId) => {
     setSelectedMeal(mealId);
@@ -119,76 +158,185 @@ const EataliaBSRPage = () => {
     return meal ? t(`meal.${meal.name}`) : '';
   };
 
+  const handlePolicyOpen = (type) => {
+    setPolicyDialog({
+      open: true,
+      type,
+      content: '',
+      loading: true,
+      error: null,
+    });
+  };
+
+  const handlePolicyClose = () => {
+    setPolicyDialog({
+      open: false,
+      type: null,
+      content: '',
+      loading: false,
+      error: null,
+    });
+  };
+
+  useEffect(() => {
+    if (!policyDialog.open || !policyDialog.type) {
+      return undefined;
+    }
+
+    const supportedLangs = ['he', 'en', 'ar'];
+    const lang = supportedLangs.includes(i18n.language) ? i18n.language : 'he';
+
+    const files = {
+      terms: {
+        he: '/policies/terms.he.html',
+        en: '/policies/terms.en.html',
+        ar: '/policies/terms.ar.html',
+      },
+      privacy: {
+        he: '/policies/privacy.he.html',
+        en: '/policies/privacy.en.html',
+        ar: '/policies/privacy.ar.html',
+      },
+    };
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    fetch(files[policyDialog.type][lang], { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch policy');
+        }
+        return response.text();
+      })
+      .then((html) => {
+        if (isActive) {
+          setPolicyDialog((prev) => ({
+            ...prev,
+            content: html,
+            loading: false,
+          }));
+        }
+      })
+      .catch(() => {
+        if (isActive && !controller.signal.aborted) {
+          setPolicyDialog((prev) => ({
+            ...prev,
+            loading: false,
+            error: i18n.t('policy.error'),
+          }));
+        }
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [policyDialog.open, policyDialog.type, i18n.language]);
+
   return (
     <div className={classes.container}>
       <LangSwitcher />
 
-      {step === 'meal' && (
-        <div className={classes.section}>
-          <h1 className={classes.title}>{t('meal.title')}</h1>
-          <div className={classes.mealGrid}>
-            {meals.map((meal) => (
-              <MealCard
-                key={meal.id}
-                meal={{
-                  ...meal,
-                  name: t(`meal.${meal.name}`),
-                }}
-                selected={selectedMeal === meal.id}
-                disabled={selectedMeal !== null && selectedMeal !== meal.id}
-                onSelect={handleMealSelect}
-                onInstagram={handleInstagramOpen}
-              />
-            ))}
-          </div>
-          {selectedMeal && (
-            <div style={{ textAlign: 'center', marginBlockStart: theme.spacing.lg }}>
-              <button
-                onClick={() => setStep('location')}
-                style={{
-                  padding: `${theme.spacing.md} ${theme.spacing.lg}`,
-                  backgroundColor: theme.colors.primary,
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: theme.borderRadius.sm,
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                }}
-              >
-                {t('location.next')}
-              </button>
+      <div className={classes.mainContent}>
+        {step === 'meal' && (
+          <div className={classes.section}>
+            <h1 className={classes.title}>{t('meal.title')}</h1>
+            <div className={classes.mealGrid}>
+              {meals.map((meal) => (
+                <MealCard
+                  key={meal.id}
+                  meal={{
+                    ...meal,
+                    name: t(`meal.${meal.name}`),
+                  }}
+                  selected={selectedMeal === meal.id}
+                  disabled={selectedMeal !== null && selectedMeal !== meal.id}
+                  onSelect={handleMealSelect}
+                  onInstagram={handleInstagramOpen}
+                />
+              ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {step === 'location' && (
-        <div className={classes.section}>
-          <h1 className={classes.title}>{t('location.title')}</h1>
-          <OfficeForm onSubmit={handleLocationSubmit} />
-        </div>
-      )}
-
-      {step === 'payment' && (
-        <div className={classes.section}>
-          <h1 className={classes.title}>{t('payment.title')}</h1>
-          <div className={classes.paymentPlaceholder}>
-            {t('payment.comingSoon')}
+            {selectedMeal && (
+              <div style={{ textAlign: 'center', marginBlockStart: theme.spacing.lg }}>
+                <button
+                  onClick={() => setStep('location')}
+                  style={{
+                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+                    backgroundColor: theme.colors.primary,
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: theme.borderRadius.sm,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('location.next')}
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {step === 'thankYou' && (
-        <ThankYou
-          orderData={{
-            meal: getMealName(selectedMeal),
-            ...locationData,
-          }}
-          onRestart={handleRestart}
-        />
-      )}
+        {step === 'location' && (
+          <div className={classes.section}>
+            <h1 className={classes.title}>{t('location.title')}</h1>
+            <OfficeForm onSubmit={handleLocationSubmit} />
+          </div>
+        )}
 
+        {step === 'payment' && (
+          <div className={classes.section}>
+            <h1 className={classes.title}>{t('payment.title')}</h1>
+            <div className={classes.paymentPlaceholder}>
+              {t('payment.comingSoon')}
+            </div>
+          </div>
+        )}
+
+        {step === 'thankYou' && (
+          <ThankYou
+            orderData={{
+              meal: getMealName(selectedMeal),
+              ...locationData,
+            }}
+            onRestart={handleRestart}
+          />
+        )}
+      </div>
+
+      <footer className={classes.footer}>
+        <button
+          type="button"
+          className={classes.footerLink}
+          onClick={() => handlePolicyOpen('terms')}
+        >
+          {t('footer.terms')}
+        </button>
+        <span className={classes.footerSeparator}>|</span>
+        <button
+          type="button"
+          className={classes.footerLink}
+          onClick={() => handlePolicyOpen('privacy')}
+        >
+          {t('footer.privacy')}
+        </button>
+      </footer>
+
+      <PolicyDialog
+        open={policyDialog.open}
+        title={
+          policyDialog.type === 'privacy'
+            ? t('policy.privacyTitle')
+            : t('policy.termsTitle')
+        }
+        content={policyDialog.content}
+        loading={policyDialog.loading ? t('policy.loading') : ''}
+        error={policyDialog.error}
+        onClose={handlePolicyClose}
+        closeLabel={t('policy.close')}
+      />
     </div>
   );
 };

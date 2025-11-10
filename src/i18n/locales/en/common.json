@@ -29,6 +29,17 @@
     "phone": "Phone",
     "restart": "Restart"
   },
+  "footer": {
+    "terms": "Terms of Use",
+    "privacy": "Privacy Policy"
+  },
+  "policy": {
+    "termsTitle": "Terms of Use",
+    "privacyTitle": "Privacy Policy",
+    "loading": "Loading content…",
+    "error": "We couldn’t load this content. Please try again later.",
+    "close": "Close dialog"
+  },
   "common": {
     "select": "Select",
     "play": "Play"
