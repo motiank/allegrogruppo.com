@@ -38,9 +38,33 @@ const useStyles = createUseStyles({
       borderBlockEnd: 'none',
     },
   },
+  summaryItemColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+    padding: theme.spacing.sm,
+    textAlign: 'start',
+    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    '&:last-child': {
+      borderBlockEnd: 'none',
+    },
+  },
   summaryLabel: {
     fontWeight: 'bold',
     marginInlineEnd: theme.spacing.md,
+  },
+  mealList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+  },
+  mealListItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '0.95rem',
   },
   button: {
     padding: `${theme.spacing.md} ${theme.spacing.lg}`,
@@ -67,10 +91,21 @@ export const ThankYou = ({ orderData, onRestart }) => {
       <h1 className={classes.title}>{t('thankYou.title')}</h1>
       <div className={classes.summary}>
         <h2 className={classes.summaryTitle}>{t('thankYou.orderSummary')}</h2>
-        <div className={classes.summaryItem}>
-          <span className={classes.summaryLabel}>{t('thankYou.meal')}:</span>
-          <span>{orderData.meal}</span>
-        </div>
+        {orderData.meals && orderData.meals.length > 0 && (
+          <div className={classes.summaryItemColumn}>
+            <span className={classes.summaryLabel}>{t('thankYou.meals')}:</span>
+            <ul className={classes.mealList}>
+              {orderData.meals.map((meal) => (
+                <li key={meal.id} className={classes.mealListItem}>
+                  <span>{meal.name}</span>
+                  <span>
+                    {t('thankYou.quantity')}: {meal.quantity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className={classes.summaryItem}>
           <span className={classes.summaryLabel}>{t('thankYou.building')}:</span>
           <span>{orderData.building}</span>

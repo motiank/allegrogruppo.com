@@ -123,6 +123,128 @@ const useStyles = createUseStyles({
     fontSize: '1.25rem',
     color: theme.colors.textSecondary,
   },
+  cartList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.md,
+    marginBlockEnd: theme.spacing.xl,
+  },
+  cartItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.06)',
+  },
+  cartItemHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  cartItemName: {
+    fontSize: '1.1rem',
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  cartItemActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    flexWrap: 'wrap',
+  },
+  quantityControl: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: '#ffffff',
+    borderRadius: theme.borderRadius.sm,
+    border: `1px solid ${theme.colors.border}`,
+    padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+  },
+  quantityButton: {
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontSize: '1.25rem',
+    lineHeight: 1,
+    padding: theme.spacing.xs,
+    color: theme.colors.primary,
+    '&:disabled': {
+      color: theme.colors.disabled,
+      cursor: 'not-allowed',
+    },
+  },
+  quantityValue: {
+    minWidth: '32px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  removeButton: {
+    border: 'none',
+    background: 'transparent',
+    color: theme.colors.error,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'opacity 0.2s',
+    '&:hover': {
+      opacity: 0.8,
+    },
+  },
+  cartSummary: {
+    color: theme.colors.textSecondary,
+    marginBlockEnd: theme.spacing.md,
+  },
+  cartEmpty: {
+    textAlign: 'center',
+    color: theme.colors.textSecondary,
+    marginBlockEnd: theme.spacing.xl,
+  },
+  cartFooter: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: theme.spacing.md,
+    justifyContent: 'center',
+  },
+  primaryButton: {
+    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+    backgroundColor: theme.colors.primary,
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: theme.borderRadius.sm,
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    minWidth: '200px',
+    '&:hover': {
+      backgroundColor: theme.colors.secondary,
+    },
+    '&:disabled': {
+      backgroundColor: theme.colors.disabled,
+      cursor: 'not-allowed',
+    },
+  },
+  secondaryButton: {
+    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.primary,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.sm,
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s, border-color 0.2s, color 0.2s',
+    minWidth: '200px',
+    '&:hover': {
+      backgroundColor: '#ffffff',
+      borderColor: theme.colors.primary,
+      color: theme.colors.primary,
+    },
+  },
   footer: {
     marginBlockStart: 'auto',
     paddingBlockStart: theme.spacing.lg,
@@ -168,6 +290,10 @@ const useStyles = createUseStyles({
     '&:hover': {
       backgroundColor: theme.colors.secondary,
     },
+    '&:disabled': {
+      backgroundColor: theme.colors.disabled,
+      cursor: 'not-allowed',
+    },
   },
   '@media (max-width: 768px)': {
     container: {
@@ -181,6 +307,18 @@ const useStyles = createUseStyles({
       bottom: theme.spacing.md,
     },
     nextButton: {
+      width: '100%',
+      minWidth: 'auto',
+    },
+    cartFooter: {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
+    primaryButton: {
+      width: '100%',
+      minWidth: 'auto',
+    },
+    secondaryButton: {
       width: '100%',
       minWidth: 'auto',
     },
@@ -219,10 +357,11 @@ const EataliaBSRPage = () => {
   const classes = useStyles();
   const { t, i18n } = useTranslation();
 
-  const [step, setStep] = useState('welcome'); // welcome, meal, location, payment, thankYou
+  const [step, setStep] = useState('welcome'); // welcome, cart, meal, location, payment, thankYou
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [groupName, setGroupName] = useState('');
+  const [cartItems, setCartItems] = useState([]);
   const [policyDialog, setPolicyDialog] = useState({
     open: false,
     type: null,
@@ -235,7 +374,6 @@ const EataliaBSRPage = () => {
     setSelectedMeal(mealId);
     const meal = meals.find((m) => m.id === mealId);
     trackEvent('meal_selected', { meal: mealId });
-    // Gray out others is handled by disabled prop
   };
 
   const handleInstagramOpen = (mealId) => {
@@ -246,6 +384,42 @@ const EataliaBSRPage = () => {
     }
   };
 
+  const handleAddMealToCart = () => {
+    if (!selectedMeal) {
+      return;
+    }
+
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.id === selectedMeal);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === selectedMeal ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { id: selectedMeal, quantity: 1 }];
+    });
+
+    const meal = meals.find((m) => m.id === selectedMeal);
+    trackEvent('meal_added_to_cart', { meal: selectedMeal });
+    setSelectedMeal(null);
+    setStep('cart');
+  };
+
+  const handleQuantityChange = (mealId, delta) => {
+    setCartItems((prev) =>
+      prev
+        .map((item) =>
+          item.id === mealId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const handleRemoveFromCart = (mealId) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== mealId));
+    trackEvent('meal_removed', { meal: mealId });
+  };
+
   const handleLocationSubmit = (data) => {
     setLocationData(data);
     trackEvent('location_completed', { ...data });
@@ -254,7 +428,7 @@ const EataliaBSRPage = () => {
     setTimeout(() => {
       setStep('thankYou');
       trackEvent('flow_completed', {
-        meal: selectedMeal,
+        cart: cartItems,
         ...data,
       });
     }, 2000);
@@ -265,6 +439,7 @@ const EataliaBSRPage = () => {
     setSelectedMeal(null);
     setLocationData(null);
     setGroupName('');
+    setCartItems([]);
   };
 
   const getMealName = (mealId) => {
@@ -386,11 +561,91 @@ const EataliaBSRPage = () => {
                 type="button"
                 className={classes.startButton}
                 onClick={() => {
-                  setStep('meal');
+                  setStep('cart');
                   trackEvent('welcome_started', { groupName: groupName || 'anonymous' });
                 }}
               >
                 {t('welcome.start')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'cart' && (
+          <div className={classes.section}>
+            <h1 className={classes.title}>{t('cart.title')}</h1>
+            {cartItems.length > 0 && (
+              <p className={classes.cartSummary}>
+                {t('cart.totalMeals', { count: cartItems.reduce((sum, item) => sum + item.quantity, 0) })}
+              </p>
+            )}
+            {cartItems.length === 0 ? (
+              <p className={classes.cartEmpty}>{t('cart.empty')}</p>
+            ) : (
+              <div className={classes.cartList}>
+                {cartItems.map((item) => {
+                  const meal = meals.find((m) => m.id === item.id);
+                  return (
+                    <div key={item.id} className={classes.cartItem}>
+                      <div className={classes.cartItemHeader}>
+                        <span className={classes.cartItemName}>{meal ? t(`meal.${meal.name}`) : item.id}</span>
+                        <button
+                          type="button"
+                          className={classes.removeButton}
+                          onClick={() => handleRemoveFromCart(item.id)}
+                        >
+                          {t('cart.remove')}
+                        </button>
+                      </div>
+                      <div className={classes.cartItemActions}>
+                        <div className={classes.quantityControl}>
+                          <button
+                            type="button"
+                            className={classes.quantityButton}
+                            onClick={() => handleQuantityChange(item.id, -1)}
+                            disabled={item.quantity <= 1}
+                            aria-label={`${t('cart.quantity')} -`}
+                          >
+                            –
+                          </button>
+                          <span className={classes.quantityValue}>{item.quantity}</span>
+                          <button
+                            type="button"
+                            className={classes.quantityButton}
+                            onClick={() => handleQuantityChange(item.id, 1)}
+                            aria-label={`${t('cart.quantity')} +`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className={classes.cartFooter}>
+              <button
+                type="button"
+                className={classes.secondaryButton}
+                onClick={() => {
+                  setSelectedMeal(null);
+                  setStep('meal');
+                  trackEvent('cart_add_meal_clicked', {});
+                }}
+              >
+                {t('cart.addMeal')}
+              </button>
+              <button
+                type="button"
+                className={classes.primaryButton}
+                disabled={cartItems.length === 0}
+                onClick={() => {
+                  trackEvent('cart_checkout_clicked', { cart: cartItems });
+                  setStep('location');
+                }}
+              >
+                {t('cart.checkout')}
               </button>
             </div>
           </div>
@@ -414,13 +669,15 @@ const EataliaBSRPage = () => {
                 />
               ))}
             </div>
-            {selectedMeal && (
-              <div className={classes.mealFooter}>
-                <button className={classes.nextButton} onClick={() => setStep('location')}>
-                  {t('location.next')}
-                </button>
-              </div>
-            )}
+            <div className={classes.mealFooter}>
+              <button
+                className={classes.nextButton}
+                onClick={handleAddMealToCart}
+                disabled={!selectedMeal}
+              >
+                {selectedMeal ? t('meal.addToCart') : t('meal.selectMeal')}
+              </button>
+            </div>
           </div>
         )}
 
@@ -443,7 +700,11 @@ const EataliaBSRPage = () => {
         {step === 'thankYou' && (
           <ThankYou
             orderData={{
-              meal: getMealName(selectedMeal),
+              meals: cartItems.map((item) => ({
+                id: item.id,
+                name: getMealName(item.id),
+                quantity: item.quantity,
+              })),
               ...locationData,
             }}
             onRestart={handleRestart}

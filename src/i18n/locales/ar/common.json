@@ -4,7 +4,9 @@
     "hamburger": "هامبرجر",
     "schnitzel": "شنتسل",
     "chickenSalad": "سلطة دجاج",
-    "pasta": "باستا"
+    "pasta": "باستا",
+    "addToCart": "أضف إلى السلة",
+    "selectMeal": "اختر وجبة لإضافتها"
   },
   "location": {
     "title": "تفاصيل الموقع",
@@ -22,7 +24,9 @@
   "thankYou": {
     "title": "شكراً لك!",
     "orderSummary": "ملخص الطلب",
+    "meals": "الوجبات",
     "meal": "الوجبة",
+    "quantity": "الكمية",
     "building": "المبنى",
     "floor": "الطابق",
     "office": "المكتب",
@@ -39,6 +43,16 @@
     "groupLabel": "اسم المجموعة",
     "groupPlaceholder": "أدخل اسم المجموعة (اختياري)",
     "start": "لنبدأ"
+  },
+  "cart": {
+    "title": "اختياراتك",
+    "empty": "لم تتم إضافة أي وجبات بعد. ابدأ بإضافة ما تفضله.",
+    "addMeal": "إضافة وجبة",
+    "checkout": "إتمام الطلب",
+    "quantity": "الكمية",
+    "remove": "حذف",
+    "totalMeals_one": "تمت إضافة {{count}} وجبة",
+    "totalMeals_other": "تمت إضافة {{count}} وجبات"
   },
   "footer": {
     "terms": "شروط الاستخدام",

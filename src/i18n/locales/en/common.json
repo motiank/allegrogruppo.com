@@ -4,7 +4,9 @@
     "hamburger": "Hamburger",
     "schnitzel": "Schnitzel",
     "chickenSalad": "Chicken Salad",
-    "pasta": "Pasta"
+    "pasta": "Pasta",
+    "addToCart": "Add to cart",
+    "selectMeal": "Select a meal to add it"
   },
   "location": {
     "title": "Location Details",
@@ -22,7 +24,9 @@
   "thankYou": {
     "title": "Thank You!",
     "orderSummary": "Order Summary",
+    "meals": "Meals",
     "meal": "Meal",
+    "quantity": "Qty",
     "building": "Building",
     "floor": "Floor",
     "office": "Office",
@@ -39,6 +43,16 @@
     "groupLabel": "Group name",
     "groupPlaceholder": "Enter your group name (optional)",
     "start": "Let’s Start"
+  },
+  "cart": {
+    "title": "Your selection",
+    "empty": "No meals added yet. Start by adding your favorites.",
+    "addMeal": "Add meal",
+    "checkout": "Checkout",
+    "quantity": "Quantity",
+    "remove": "Remove",
+    "totalMeals_one": "{{count}} meal added",
+    "totalMeals_other": "{{count}} meals added"
   },
   "footer": {
     "terms": "Terms of Use",

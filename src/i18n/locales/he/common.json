@@ -4,7 +4,9 @@
     "hamburger": "המבורגר",
     "schnitzel": "שניצל",
     "chickenSalad": "סלט עוף",
-    "pasta": "פסטה"
+    "pasta": "פסטה",
+    "addToCart": "הוספה לסל",
+    "selectMeal": "בחרו ארוחה כדי להוסיף אותה"
   },
   "location": {
     "title": "פרטי מיקום",
@@ -22,7 +24,9 @@
   "thankYou": {
     "title": "תודה רבה!",
     "orderSummary": "סיכום הזמנה",
+    "meals": "ארוחות",
     "meal": "ארוחה",
+    "quantity": "כמות",
     "building": "בניין",
     "floor": "קומה",
     "office": "משרד",
@@ -39,6 +43,16 @@
     "groupLabel": "שם קבוצה",
     "groupPlaceholder": "הכניסו שם קבוצה (לא חובה)",
     "start": "בואו נתחיל"
+  },
+  "cart": {
+    "title": "הבחירות שלכם",
+    "empty": "עדיין לא נוספו ארוחות. התחילו בהוספת המנות שאוהבים.",
+    "addMeal": "הוספת ארוחה",
+    "checkout": "לקופה",
+    "quantity": "כמות",
+    "remove": "הסרה",
+    "totalMeals_one": "נוספה {{count}} ארוחה",
+    "totalMeals_other": "נוספו {{count}} ארוחות"
   },
   "footer": {
     "terms": "תנאי שימוש",
