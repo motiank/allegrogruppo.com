@@ -107,6 +107,10 @@ export const ThankYou = ({ orderData, onRestart }) => {
           </div>
         )}
         <div className={classes.summaryItem}>
+          <span className={classes.summaryLabel}>{t('location.name')}:</span>
+          <span>{orderData.name}</span>
+        </div>
+        <div className={classes.summaryItem}>
           <span className={classes.summaryLabel}>{t('thankYou.building')}:</span>
           <span>{orderData.building}</span>
         </div>
@@ -122,6 +126,12 @@ export const ThankYou = ({ orderData, onRestart }) => {
           <span className={classes.summaryLabel}>{t('thankYou.phone')}:</span>
           <span>{maskPhone(orderData.phone)}</span>
         </div>
+        {orderData.notes && (
+          <div className={classes.summaryItemColumn}>
+            <span className={classes.summaryLabel}>{t('location.notes')}:</span>
+            <span>{orderData.notes}</span>
+          </div>
+        )}
       </div>
       <button className={classes.button} onClick={onRestart}>
         {t('thankYou.restart')}

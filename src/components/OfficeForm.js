@@ -43,6 +43,18 @@ const useStyles = createUseStyles({
       borderColor: theme.colors.primary,
     },
   },
+  textarea: {
+    minHeight: '120px',
+    padding: theme.spacing.md,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.sm,
+    fontSize: '1rem',
+    resize: 'vertical',
+    '&:focus': {
+      outline: 'none',
+      borderColor: theme.colors.primary,
+    },
+  },
   button: {
     padding: theme.spacing.md,
     backgroundColor: theme.colors.primary,
@@ -67,10 +79,12 @@ export const OfficeForm = ({ onSubmit }) => {
   const classes = useStyles();
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
+    name: '',
     building: '',
     floor: '',
     office: '',
     phone: '',
+    notes: '',
   });
 
   const isValid = validateLocationForm(formData);
@@ -88,6 +102,19 @@ export const OfficeForm = ({ onSubmit }) => {
 
   return (
     <form className={classes.form} onSubmit={handleSubmit}>
+      <div className={classes.field}>
+        <label className={classes.label} htmlFor="name">
+          {t('location.name')}
+        </label>
+        <input
+          id="name"
+          type="text"
+          className={classes.input}
+          value={formData.name}
+          onChange={(e) => handleChange('name', e.target.value)}
+        />
+      </div>
+
       <div className={classes.field}>
         <label className={classes.label} htmlFor="building">
           {t('location.building')}
@@ -144,6 +171,19 @@ export const OfficeForm = ({ onSubmit }) => {
           className={classes.input}
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
+        />
+      </div>
+
+      <div className={classes.field}>
+        <label className={classes.label} htmlFor="notes">
+          {t('location.notes')}
+        </label>
+        <textarea
+          id="notes"
+          className={classes.textarea}
+          value={formData.notes}
+          onChange={(e) => handleChange('notes', e.target.value)}
+          placeholder={t('location.notesPlaceholder')}
         />
       </div>
 

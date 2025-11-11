@@ -10,10 +10,13 @@
   },
   "location": {
     "title": "Location Details",
+    "name": "Name",
     "building": "Building",
     "floor": "Floor",
     "office": "Office",
     "phone": "Phone",
+    "notes": "Notes",
+    "notesPlaceholder": "Any delivery notes for the team? (optional)",
     "next": "Next",
     "selectBuilding": "Select Building"
   },

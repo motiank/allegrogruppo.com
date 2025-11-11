@@ -21,8 +21,13 @@ export const validatePhone = (phone) => {
   return cleaned.length >= 9 && cleaned.length <= 10;
 };
 
+export const validateName = (name) => {
+  return name && name.trim().length >= 2;
+};
+
 export const validateLocationForm = (formData) => {
   return (
+    validateName(formData.name) &&
     validateBuilding(formData.building) &&
     validateFloor(formData.floor) &&
     validateOffice(formData.office) &&

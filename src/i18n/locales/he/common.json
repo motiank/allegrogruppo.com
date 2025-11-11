@@ -10,10 +10,13 @@
   },
   "location": {
     "title": "פרטי מיקום",
+    "name": "שם",
     "building": "בניין",
     "floor": "קומה",
     "office": "משרד",
     "phone": "טלפון",
+    "notes": "הערות",
+    "notesPlaceholder": "הערות מיוחדות לצוות? (לא חובה)",
     "next": "הבא",
     "selectBuilding": "בחרו בניין"
   },

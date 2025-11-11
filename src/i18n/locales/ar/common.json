@@ -10,10 +10,13 @@
   },
   "location": {
     "title": "تفاصيل الموقع",
+    "name": "الاسم",
     "building": "المبنى",
     "floor": "الطابق",
     "office": "المكتب",
     "phone": "الهاتف",
+    "notes": "ملاحظات",
+    "notesPlaceholder": "أي ملاحظات خاصة للفريق؟ (اختياري)",
     "next": "التالي",
     "selectBuilding": "اختر المبنى"
   },
