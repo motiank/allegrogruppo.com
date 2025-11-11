@@ -29,6 +29,80 @@ const useStyles = createUseStyles({
   section: {
     marginBlockEnd: theme.spacing.xxl,
   },
+  welcomeSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xl,
+    alignItems: 'stretch',
+  },
+  welcomeCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    border: `1px solid ${theme.colors.border}`,
+    boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+  },
+  welcomeHeading: {
+    fontSize: '2.25rem',
+    lineHeight: 1.2,
+    marginBlockEnd: theme.spacing.md,
+    color: theme.colors.primary,
+    textAlign: 'start',
+  },
+  welcomeSubheading: {
+    fontSize: '1.25rem',
+    marginBlockEnd: theme.spacing.lg,
+    color: theme.colors.text,
+    textAlign: 'start',
+  },
+  welcomeText: {
+    fontSize: '1rem',
+    color: theme.colors.textSecondary,
+    marginBlockEnd: theme.spacing.md,
+    textAlign: 'start',
+  },
+  groupField: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.sm,
+  },
+  groupLabel: {
+    fontSize: '0.95rem',
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  groupInput: {
+    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+    borderRadius: theme.borderRadius.sm,
+    border: `1px solid ${theme.colors.border}`,
+    fontSize: '1rem',
+    color: theme.colors.text,
+    backgroundColor: '#ffffff',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    '&:focus': {
+      borderColor: theme.colors.primary,
+      boxShadow: `0 0 0 3px rgba(0, 112, 243, 0.15)`,
+      outline: 'none',
+    },
+  },
+  startButton: {
+    alignSelf: 'flex-start',
+    padding: `${theme.spacing.md} ${theme.spacing.xl}`,
+    backgroundColor: theme.colors.primary,
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: theme.borderRadius.md,
+    fontSize: '1.05rem',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s',
+    boxShadow: '0 10px 25px rgba(0, 112, 243, 0.25)',
+    '&:hover': {
+      backgroundColor: theme.colors.secondary,
+      transform: 'translateY(-2px)',
+      boxShadow: '0 14px 28px rgba(0, 112, 243, 0.3)',
+    },
+  },
   title: {
     fontSize: '2rem',
     marginBlockEnd: theme.spacing.lg,
@@ -73,6 +147,44 @@ const useStyles = createUseStyles({
     marginInline: theme.spacing.sm,
     color: theme.colors.border,
   },
+  mealFooter: {
+    position: 'sticky',
+    bottom: theme.spacing.lg,
+    marginInline: 'auto',
+    textAlign: 'center',
+    zIndex: 5,
+  },
+  nextButton: {
+    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
+    backgroundColor: theme.colors.primary,
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: theme.borderRadius.sm,
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    minWidth: '220px',
+    '&:hover': {
+      backgroundColor: theme.colors.secondary,
+    },
+  },
+  '@media (max-width: 768px)': {
+    container: {
+      padding: `${theme.spacing.lg} ${theme.spacing.md}`,
+    },
+    mealGrid: {
+      gridTemplateColumns: '1fr',
+      gap: theme.spacing.md,
+    },
+    mealFooter: {
+      bottom: theme.spacing.md,
+    },
+    nextButton: {
+      width: '100%',
+      minWidth: 'auto',
+    },
+  },
 });
 
 const meals = [
@@ -107,9 +219,10 @@ const EataliaBSRPage = () => {
   const classes = useStyles();
   const { t, i18n } = useTranslation();
 
-  const [step, setStep] = useState('meal'); // meal, location, payment, thankYou
+  const [step, setStep] = useState('welcome'); // welcome, meal, location, payment, thankYou
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
+  const [groupName, setGroupName] = useState('');
   const [policyDialog, setPolicyDialog] = useState({
     open: false,
     type: null,
@@ -148,9 +261,10 @@ const EataliaBSRPage = () => {
   };
 
   const handleRestart = () => {
-    setStep('meal');
+    setStep('welcome');
     setSelectedMeal(null);
     setLocationData(null);
+    setGroupName('');
   };
 
   const getMealName = (mealId) => {
@@ -239,6 +353,49 @@ const EataliaBSRPage = () => {
       <LangSwitcher />
 
       <div className={classes.mainContent}>
+        {step === 'welcome' && (
+          <div className={classes.section}>
+            <div className={classes.welcomeSection}>
+              <div className={classes.welcomeCard}>
+                <h1 className={classes.welcomeHeading}>
+                  {t('welcome.greeting')} {t('welcome.intro')}
+                </h1>
+                <p className={classes.welcomeText}>{t('welcome.exclusive')}</p>
+                <p className={classes.welcomeSubheading}>{t('welcome.question')}</p>
+                <p className={classes.welcomeText}>{t('welcome.instruction')}</p>
+                <p className={classes.welcomeText}>{t('welcome.signature')}</p>
+              </div>
+
+              <div className={classes.welcomeCard}>
+                <div className={classes.groupField}>
+                  <label className={classes.groupLabel} htmlFor="groupName">
+                    {t('welcome.groupLabel')}
+                  </label>
+                  <input
+                    id="groupName"
+                    className={classes.groupInput}
+                    type="text"
+                    value={groupName}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    placeholder={t('welcome.groupPlaceholder')}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={classes.startButton}
+                onClick={() => {
+                  setStep('meal');
+                  trackEvent('welcome_started', { groupName: groupName || 'anonymous' });
+                }}
+              >
+                {t('welcome.start')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {step === 'meal' && (
           <div className={classes.section}>
             <h1 className={classes.title}>{t('meal.title')}</h1>
@@ -258,20 +415,8 @@ const EataliaBSRPage = () => {
               ))}
             </div>
             {selectedMeal && (
-              <div style={{ textAlign: 'center', marginBlockStart: theme.spacing.lg }}>
-                <button
-                  onClick={() => setStep('location')}
-                  style={{
-                    padding: `${theme.spacing.md} ${theme.spacing.lg}`,
-                    backgroundColor: theme.colors.primary,
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: theme.borderRadius.sm,
-                    fontSize: '1rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                  }}
-                >
+              <div className={classes.mealFooter}>
+                <button className={classes.nextButton} onClick={() => setStep('location')}>
                   {t('location.next')}
                 </button>
               </div>
