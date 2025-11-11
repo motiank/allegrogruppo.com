@@ -63,8 +63,39 @@ const useStyles = createUseStyles({
   },
   mealListItem: {
     display: 'flex',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+    paddingBlock: theme.spacing.xs,
     fontSize: '0.95rem',
+  },
+  mealListItemHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  mealListItemMeta: {
+    fontSize: '0.85rem',
+    color: theme.colors.textSecondary,
+  },
+  mealPrice: {
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  mealOptionList: {
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+    color: theme.colors.textSecondary,
+    fontSize: '0.85rem',
+  },
+  mealOptionItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
   },
   button: {
     padding: `${theme.spacing.md} ${theme.spacing.lg}`,
@@ -85,6 +116,7 @@ const useStyles = createUseStyles({
 export const ThankYou = ({ orderData, onRestart }) => {
   const classes = useStyles();
   const { t } = useTranslation();
+  const formatPrice = (value) => (value ?? 0).toFixed(2);
 
   return (
     <div className={classes.container}>
@@ -97,13 +129,39 @@ export const ThankYou = ({ orderData, onRestart }) => {
             <ul className={classes.mealList}>
               {orderData.meals.map((meal) => (
                 <li key={meal.id} className={classes.mealListItem}>
-                  <span>{meal.name}</span>
-                  <span>
+                  <div className={classes.mealListItemHeader}>
+                    <span>{meal.name}</span>
+                    <span className={classes.mealPrice}>
+                      {t('thankYou.price')}: {formatPrice(meal.totalPrice ?? meal.unitPrice)}₪
+                    </span>
+                  </div>
+                  <div className={classes.mealListItemMeta}>
                     {t('thankYou.quantity')}: {meal.quantity}
-                  </span>
+                  </div>
+                  {meal.options && meal.options.length > 0 && (
+                    <ul className={classes.mealOptionList}>
+                      {meal.options.map((option) => (
+                        <li
+                          key={`${option.groupId}-${option.optionId}`}
+                          className={classes.mealOptionItem}
+                        >
+                          <span>
+                            {option.groupTitle}: {option.optionLabel}
+                          </span>
+                          {option.price > 0 && <span>+{formatPrice(option.price)}₪</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+        {orderData.groupName && (
+          <div className={classes.summaryItem}>
+            <span className={classes.summaryLabel}>{t('welcome.groupLabel')}:</span>
+            <span>{orderData.groupName}</span>
           </div>
         )}
         <div className={classes.summaryItem}>
@@ -130,6 +188,12 @@ export const ThankYou = ({ orderData, onRestart }) => {
           <div className={classes.summaryItemColumn}>
             <span className={classes.summaryLabel}>{t('location.notes')}:</span>
             <span>{orderData.notes}</span>
+          </div>
+        )}
+        {typeof orderData.total === 'number' && (
+          <div className={classes.summaryItem}>
+            <span className={classes.summaryLabel}>{t('thankYou.total')}:</span>
+            <span>{formatPrice(orderData.total)}₪</span>
           </div>
         )}
       </div>

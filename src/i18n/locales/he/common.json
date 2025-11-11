@@ -30,6 +30,8 @@
     "meals": "ארוחות",
     "meal": "ארוחה",
     "quantity": "כמות",
+    "price": "עלות",
+    "total": "סה\"כ",
     "building": "בניין",
     "floor": "קומה",
     "office": "משרד",
@@ -54,8 +56,23 @@
     "checkout": "לקופה",
     "quantity": "כמות",
     "remove": "הסרה",
+    "options": "בחירות",
+    "itemPrice": "{{price}}₪",
+    "total": "סה\"כ",
+    "totalMeals": "{{count}} ארוחות נוספו",
     "totalMeals_one": "נוספה {{count}} ארוחה",
     "totalMeals_other": "נוספו {{count}} ארוחות"
+  },
+  "mealOptions": {
+    "title": "התאימו את המנה",
+    "confirm": "הוספה לסל",
+    "cancel": "חזרה לסל",
+    "required": "חובה",
+    "optional": "לבחירה",
+    "limit": "בחרו עד {{count}}",
+    "mustChoose": "בחרו לפחות {{count}} אפשרות",
+    "price": "+{{amount}}₪",
+    "total": "סה\"כ"
   },
   "footer": {
     "terms": "תנאי שימוש",

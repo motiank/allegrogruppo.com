@@ -30,6 +30,8 @@
     "meals": "الوجبات",
     "meal": "الوجبة",
     "quantity": "الكمية",
+    "price": "السعر",
+    "total": "الإجمالي",
     "building": "المبنى",
     "floor": "الطابق",
     "office": "المكتب",
@@ -54,8 +56,23 @@
     "checkout": "إتمام الطلب",
     "quantity": "الكمية",
     "remove": "حذف",
+    "options": "الاختيارات",
+    "itemPrice": "{{price}}₪",
+    "total": "الإجمالي",
+    "totalMeals": "تمت إضافة {{count}} وجبات",
     "totalMeals_one": "تمت إضافة {{count}} وجبة",
     "totalMeals_other": "تمت إضافة {{count}} وجبات"
+  },
+  "mealOptions": {
+    "title": "خصّص وجبتك",
+    "confirm": "أضف إلى السلة",
+    "cancel": "عودة إلى السلة",
+    "required": "إلزامي",
+    "optional": "اختياري",
+    "limit": "اختر حتى {{count}}",
+    "mustChoose": "يرجى اختيار {{count}} عنصر على الأقل",
+    "price": "+{{amount}}₪",
+    "total": "الإجمالي"
   },
   "footer": {
     "terms": "شروط الاستخدام",

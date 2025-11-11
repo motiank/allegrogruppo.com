@@ -30,6 +30,8 @@
     "meals": "Meals",
     "meal": "Meal",
     "quantity": "Qty",
+    "price": "Price",
+    "total": "Total",
     "building": "Building",
     "floor": "Floor",
     "office": "Office",
@@ -54,8 +56,23 @@
     "checkout": "Checkout",
     "quantity": "Quantity",
     "remove": "Remove",
+    "options": "Options",
+    "itemPrice": "{{price}}₪",
+    "total": "Total",
+    "totalMeals": "{{count}} meals added",
     "totalMeals_one": "{{count}} meal added",
     "totalMeals_other": "{{count}} meals added"
+  },
+  "mealOptions": {
+    "title": "Customize your meal",
+    "confirm": "Add to cart",
+    "cancel": "Back to cart",
+    "required": "Required",
+    "optional": "Optional",
+    "limit": "Choose up to {{count}}",
+    "mustChoose": "Please select at least {{count}} option{{count, plural, one= '' other='s'}}",
+    "price": "+{{amount}}₪",
+    "total": "Total"
   },
   "footer": {
     "terms": "Terms of Use",

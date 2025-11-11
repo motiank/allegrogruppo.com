@@ -1,0 +1,115 @@
+{
+  "hamburger": {
+    "basePrice": 52,
+    "groups": [
+      {
+        "id": "doneness",
+        "type": "single",
+        "title": { "en": "Doneness", "he": "דרגת עשייה", "ar": "درجة النضج" },
+        "required": true,
+        "options": [
+          { "id": "medium", "price": 0, "label": { "en": "Medium", "he": "מידיום", "ar": "نصف استواء" } },
+          { "id": "medium_well", "price": 0, "label": { "en": "Medium Well", "he": "מידיום וול", "ar": "نصف استواء إلى جيد" } },
+          { "id": "well_done", "price": 0, "label": { "en": "Well Done", "he": "וול דאן", "ar": "ناضج تماماً" } }
+        ]
+      },
+      {
+        "id": "toppings",
+        "type": "multiple",
+        "title": { "en": "Extras", "he": "תוספות", "ar": "إضافات" },
+        "min": 0,
+        "max": 3,
+        "options": [
+          { "id": "cheddar", "price": 6, "label": { "en": "Cheddar", "he": "צ'דר", "ar": "جبنة تشيدر" } },
+          { "id": "avocado", "price": 8, "label": { "en": "Avocado", "he": "אבוקדו", "ar": "أفوكادو" } },
+          { "id": "fried_onion", "price": 4, "label": { "en": "Fried onion", "he": "בצל פריך", "ar": "بصل مقرمش" } }
+        ]
+      }
+    ]
+  },
+  "schnitzel": {
+    "basePrice": 46,
+    "groups": [
+      {
+        "id": "side",
+        "type": "single",
+        "title": { "en": "Side dish", "he": "תוספת צד", "ar": "طبق جانبي" },
+        "required": true,
+        "options": [
+          { "id": "fries", "price": 0, "label": { "en": "Fries", "he": "צ'יפס", "ar": "بطاطا مقلية" } },
+          { "id": "salad", "price": 0, "label": { "en": "Green salad", "he": "סלט ירוק", "ar": "سلطة خضراء" } },
+          { "id": "rice", "price": 0, "label": { "en": "Herb rice", "he": "אורז עשבים", "ar": "أرز بالأعشاب" } }
+        ]
+      },
+      {
+        "id": "sauces",
+        "type": "multiple",
+        "title": { "en": "Sauces", "he": "רטבים", "ar": "صلصات" },
+        "min": 0,
+        "max": 2,
+        "options": [
+          { "id": "aioli", "price": 3, "label": { "en": "Garlic aioli", "he": "איולי שום", "ar": "آيولي الثوم" } },
+          { "id": "mustard", "price": 0, "label": { "en": "Dijon mustard", "he": "חרדל דיז'ון", "ar": "خردل ديجون" } },
+          { "id": "spicy", "price": 2, "label": { "en": "Spicy harissa", "he": "חריסה חריפה", "ar": "هريسة حارة" } }
+        ]
+      }
+    ]
+  },
+  "chickenSalad": {
+    "basePrice": 44,
+    "groups": [
+      {
+        "id": "dressing",
+        "type": "single",
+        "title": { "en": "Dressing", "he": "רוטב", "ar": "صلصة" },
+        "required": true,
+        "options": [
+          { "id": "vinaigrette", "price": 0, "label": { "en": "Balsamic vinaigrette", "he": "וינגרט בלסמי", "ar": "صلصة البلسمك" } },
+          { "id": "tahini", "price": 0, "label": { "en": "Lemon tahini", "he": "טחינה לימונית", "ar": "طحينة بالليمون" } },
+          { "id": "yogurt", "price": 0, "label": { "en": "Herb yogurt", "he": "יוגורט עשבים", "ar": "لبن بالأعشاب" } }
+        ]
+      },
+      {
+        "id": "boosters",
+        "type": "multiple",
+        "title": { "en": "Boost it up", "he": "שדרוגים", "ar": "إضافات مميزة" },
+        "min": 0,
+        "max": 2,
+        "options": [
+          { "id": "croutons", "price": 3, "label": { "en": "Sourdough croutons", "he": "קרוטונים מחמצת", "ar": "خبز محمص" } },
+          { "id": "parmesan", "price": 4, "label": { "en": "Parmesan flakes", "he": "פתיתי פרמז'ן", "ar": "جبنة بارميزان" } },
+          { "id": "seeds", "price": 2, "label": { "en": "Seed mix", "he": "תערובת זרעים", "ar": "مزيج بذور" } }
+        ]
+      }
+    ]
+  },
+  "pasta": {
+    "basePrice": 48,
+    "groups": [
+      {
+        "id": "pastaType",
+        "type": "single",
+        "title": { "en": "Pasta type", "he": "סוג פסטה", "ar": "نوع الباستا" },
+        "required": true,
+        "options": [
+          { "id": "fettuccine", "price": 0, "label": { "en": "Fettuccine", "he": "פטוצ'יני", "ar": "فيتوتشيني" } },
+          { "id": "penne", "price": 0, "label": { "en": "Penne", "he": "פנה", "ar": "بيني" } },
+          { "id": "gluten_free", "price": 6, "label": { "en": "Gluten-free spaghetti", "he": "ספגטי ללא גלוטן", "ar": "سباغيتي خالية من الغلوتين" } }
+        ]
+      },
+      {
+        "id": "addons",
+        "type": "multiple",
+        "title": { "en": "Add-ons", "he": "תוספות", "ar": "إضافات" },
+        "min": 0,
+        "max": 2,
+        "options": [
+          { "id": "mushrooms", "price": 5, "label": { "en": "Portobello mushrooms", "he": "פטריות פורטובלו", "ar": "فطر بورتوبيلو" } },
+          { "id": "chili", "price": 2, "label": { "en": "Fresh chili", "he": "צ'ילי טרי", "ar": "فلفل حار طازج" } },
+          { "id": "truffle", "price": 12, "label": { "en": "Truffle cream", "he": "קרם כמהין", "ar": "كريمة الكمأ" } }
+        ]
+      }
+    ]
+  }
+}
+

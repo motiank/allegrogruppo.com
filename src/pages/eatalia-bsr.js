@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,10 @@ import { OfficeForm } from '../components/OfficeForm.js';
 import { ThankYou } from '../components/ThankYou.js';
 import { LangSwitcher } from '../components/LangSwitcher.js';
 import { PolicyDialog } from '../components/PolicyDialog.js';
+import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
 import { trackEvent } from '../utils/analytics.js';
 import '../i18n/index.js';
+import mealOptionsConfig from '../data/mealOptions.json';
 
 const useStyles = createUseStyles({
   container: {
@@ -145,6 +147,11 @@ const useStyles = createUseStyles({
     alignItems: 'center',
     gap: theme.spacing.md,
   },
+  cartItemHeaderLeft: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+  },
   cartItemName: {
     fontSize: '1.1rem',
     fontWeight: 'bold',
@@ -155,6 +162,18 @@ const useStyles = createUseStyles({
     alignItems: 'center',
     gap: theme.spacing.md,
     flexWrap: 'wrap',
+  },
+  cartItemOptions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.xs,
+    color: theme.colors.textSecondary,
+    fontSize: '0.9rem',
+  },
+  cartOption: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
   },
   quantityControl: {
     display: 'flex',
@@ -197,6 +216,18 @@ const useStyles = createUseStyles({
   cartSummary: {
     color: theme.colors.textSecondary,
     marginBlockEnd: theme.spacing.md,
+  },
+  cartTotals: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBlockEnd: theme.spacing.md,
+    fontSize: '1.05rem',
+  },
+  priceBadge: {
+    fontWeight: 'bold',
+    color: theme.colors.primary,
   },
   cartEmpty: {
     textAlign: 'center',
@@ -295,6 +326,10 @@ const useStyles = createUseStyles({
       cursor: 'not-allowed',
     },
   },
+  mealHint: {
+    color: theme.colors.textSecondary,
+    fontSize: '0.95rem',
+  },
   '@media (max-width: 768px)': {
     container: {
       padding: `${theme.spacing.lg} ${theme.spacing.md}`,
@@ -352,6 +387,8 @@ const meals = [
   },
 ];
 
+const formatCurrency = (value) => Number(value || 0).toFixed(2);
+
 const EataliaBSRPage = () => {
   useGlobalStyles();
   const classes = useStyles();
@@ -362,6 +399,7 @@ const EataliaBSRPage = () => {
   const [locationData, setLocationData] = useState(null);
   const [groupName, setGroupName] = useState('');
   const [cartItems, setCartItems] = useState([]);
+  const [optionsDialog, setOptionsDialog] = useState({ open: false, mealId: null });
   const [policyDialog, setPolicyDialog] = useState({
     open: false,
     type: null,
@@ -370,10 +408,112 @@ const EataliaBSRPage = () => {
     error: null,
   });
 
+  const getMealConfig = (mealId) => mealOptionsConfig[mealId] || null;
+
+  const getMealDisplayName = (mealId) => {
+    const meal = meals.find((m) => m.id === mealId);
+    return meal ? t(`meal.${meal.name}`) : mealId;
+  };
+
+  const serializeSelections = (selections) =>
+    Object.entries(selections)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([groupId, optionIds]) => `${groupId}:${optionIds.slice().sort().join('|')}`)
+      .join(';');
+
+  const cloneSelections = (selections) =>
+    Object.fromEntries(Object.entries(selections).map(([groupId, optionIds]) => [groupId, [...optionIds]]));
+
+  const calculateItemPrice = (mealId, selections) => {
+    const config = getMealConfig(mealId);
+    const base = config?.basePrice ?? 0;
+    if (!config) {
+      return { base, options: 0, total: base };
+    }
+    const optionsTotal = config.groups.reduce((sum, group) => {
+      const selected = selections[group.id] || [];
+      const groupSum = selected.reduce((acc, optionId) => {
+        const option = group.options.find((opt) => opt.id === optionId);
+        return option ? acc + (option.price || 0) : acc;
+      }, 0);
+      return sum + groupSum;
+    }, 0);
+    return {
+      base,
+      options: optionsTotal,
+      total: base + optionsTotal,
+    };
+  };
+
+  const getSelectionDetails = (mealId, selections) => {
+    const config = getMealConfig(mealId);
+    if (!config) return [];
+    return config.groups.flatMap((group) => {
+      const selectedIds = selections[group.id] || [];
+      if (!selectedIds.length) {
+        return [];
+      }
+      return selectedIds
+        .map((optionId) => {
+          const option = group.options.find((opt) => opt.id === optionId);
+          if (!option) {
+            return null;
+          }
+          return {
+            groupId: group.id,
+            optionId,
+            groupTitle: group.title[i18n.language] || group.title.en,
+            optionLabel: option.label[i18n.language] || option.label.en,
+            price: option.price || 0,
+          };
+        })
+        .filter(Boolean);
+    });
+  };
+
+  const totalMealsCount = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems]
+  );
+
+  const cartTotal = useMemo(
+    () =>
+      cartItems.reduce((sum, item) => {
+        const priceInfo = calculateItemPrice(item.id, item.selections || {});
+        const unitPrice = item.unitPrice ?? priceInfo.total;
+        return sum + unitPrice * item.quantity;
+      }, 0),
+    [cartItems]
+  );
+
+  const mealOptionsTexts = useMemo(
+    () => ({
+      title: t('mealOptions.title'),
+      confirm: t('mealOptions.confirm'),
+      cancel: t('mealOptions.cancel'),
+      required: t('mealOptions.required'),
+      optional: t('mealOptions.optional'),
+      limit: (count) => t('mealOptions.limit', { count }),
+      price: (amount) => t('mealOptions.price', { amount: formatCurrency(amount) }),
+      total: t('mealOptions.total'),
+    }),
+    [t]
+  );
+
   const handleMealSelect = (mealId) => {
     setSelectedMeal(mealId);
-    const meal = meals.find((m) => m.id === mealId);
     trackEvent('meal_selected', { meal: mealId });
+    const config = getMealConfig(mealId);
+    if (!config) {
+      handleMealOptionsConfirm({
+        mealId,
+        selections: {},
+        price: calculateItemPrice(mealId, {}),
+        key: '',
+      });
+      return;
+    }
+    setOptionsDialog({ open: true, mealId });
   };
 
   const handleInstagramOpen = (mealId) => {
@@ -384,52 +524,89 @@ const EataliaBSRPage = () => {
     }
   };
 
-  const handleAddMealToCart = () => {
-    if (!selectedMeal) {
-      return;
-    }
-
+  const handleMealOptionsConfirm = ({ mealId, selections, price, key }) => {
+    const itemKey = `${mealId}::${key}`;
+    const selectionCopy = cloneSelections(selections);
+    const priceInfo = price || calculateItemPrice(mealId, selections);
     setCartItems((prev) => {
-      const existing = prev.find((item) => item.id === selectedMeal);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === selectedMeal ? { ...item, quantity: item.quantity + 1 } : item
-        );
+      const existingIndex = prev.findIndex((item) => item.key === itemKey);
+      if (existingIndex !== -1) {
+        const next = [...prev];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          quantity: next[existingIndex].quantity + 1,
+        };
+        return next;
       }
-      return [...prev, { id: selectedMeal, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          key: itemKey,
+          id: mealId,
+          quantity: 1,
+          selections: selectionCopy,
+          unitPrice: priceInfo.total,
+          basePrice: priceInfo.base,
+          optionsPrice: priceInfo.options,
+        },
+      ];
     });
-
-    const meal = meals.find((m) => m.id === selectedMeal);
-    trackEvent('meal_added_to_cart', { meal: selectedMeal });
+    setOptionsDialog({ open: false, mealId: null });
     setSelectedMeal(null);
     setStep('cart');
+    trackEvent('meal_added_to_cart', { meal: mealId, selections, price: priceInfo.total });
   };
 
-  const handleQuantityChange = (mealId, delta) => {
+  const handleMealOptionsCancel = () => {
+    const { mealId } = optionsDialog;
+    setOptionsDialog({ open: false, mealId: null });
+    setSelectedMeal(null);
+    setStep('cart');
+    if (mealId) {
+      trackEvent('meal_customization_cancelled', { meal: mealId });
+    }
+  };
+
+  const handleQuantityChange = (itemKey, delta) => {
+    const currentItem = cartItems.find((item) => item.key === itemKey);
+    if (!currentItem) {
+      return;
+    }
+    const nextQuantity = currentItem.quantity + delta;
     setCartItems((prev) =>
       prev
         .map((item) =>
-          item.id === mealId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
+          item.key === itemKey ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
         )
         .filter((item) => item.quantity > 0)
     );
+    trackEvent(delta > 0 ? 'cart_quantity_increased' : 'cart_quantity_decreased', {
+      itemKey,
+      meal: currentItem.id,
+      quantity: Math.max(nextQuantity, 0),
+    });
   };
 
-  const handleRemoveFromCart = (mealId) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== mealId));
-    trackEvent('meal_removed', { meal: mealId });
+  const handleRemoveFromCart = (itemKey) => {
+    const currentItem = cartItems.find((item) => item.key === itemKey);
+    setCartItems((prev) => prev.filter((item) => item.key !== itemKey));
+    if (currentItem) {
+      trackEvent('meal_removed', { meal: currentItem.id, itemKey });
+    }
   };
 
   const handleLocationSubmit = (data) => {
-    setLocationData(data);
-    trackEvent('location_completed', { ...data });
+    const payload = { ...data, groupName };
+    setLocationData(payload);
+    trackEvent('location_completed', { ...payload });
     setStep('payment');
     // Auto-advance to thank you after a short delay (simulating payment)
     setTimeout(() => {
       setStep('thankYou');
       trackEvent('flow_completed', {
         cart: cartItems,
-        ...data,
+        total: cartTotal,
+        ...payload,
       });
     }, 2000);
   };
@@ -440,6 +617,7 @@ const EataliaBSRPage = () => {
     setLocationData(null);
     setGroupName('');
     setCartItems([]);
+    setOptionsDialog({ open: false, mealId: null });
   };
 
   const getMealName = (mealId) => {
@@ -575,9 +753,15 @@ const EataliaBSRPage = () => {
           <div className={classes.section}>
             <h1 className={classes.title}>{t('cart.title')}</h1>
             {cartItems.length > 0 && (
-              <p className={classes.cartSummary}>
-                {t('cart.totalMeals', { count: cartItems.reduce((sum, item) => sum + item.quantity, 0) })}
-              </p>
+              <>
+                <p className={classes.cartSummary}>
+                  {t('cart.totalMeals', { count: totalMealsCount })}
+                </p>
+                <div className={classes.cartTotals}>
+                  <span>{t('cart.total')}</span>
+                  <span>{formatCurrency(cartTotal)}₪</span>
+                </div>
+              </>
             )}
             {cartItems.length === 0 ? (
               <p className={classes.cartEmpty}>{t('cart.empty')}</p>
@@ -585,24 +769,51 @@ const EataliaBSRPage = () => {
               <div className={classes.cartList}>
                 {cartItems.map((item) => {
                   const meal = meals.find((m) => m.id === item.id);
+                  const selectionDetails = getSelectionDetails(item.id, item.selections || {});
+                  const priceInfo = calculateItemPrice(item.id, item.selections || {});
+                  const unitPrice = item.unitPrice ?? priceInfo.total;
+                  const itemTotal = unitPrice * item.quantity;
                   return (
-                    <div key={item.id} className={classes.cartItem}>
+                    <div key={item.key} className={classes.cartItem}>
                       <div className={classes.cartItemHeader}>
-                        <span className={classes.cartItemName}>{meal ? t(`meal.${meal.name}`) : item.id}</span>
+                        <div className={classes.cartItemHeaderLeft}>
+                          <span className={classes.cartItemName}>
+                            {meal ? t(`meal.${meal.name}`) : item.id}
+                          </span>
+                          <span className={classes.priceBadge}>
+                            {t('cart.itemPrice', { price: formatCurrency(itemTotal) })}
+                          </span>
+                        </div>
                         <button
                           type="button"
                           className={classes.removeButton}
-                          onClick={() => handleRemoveFromCart(item.id)}
+                          onClick={() => handleRemoveFromCart(item.key)}
                         >
                           {t('cart.remove')}
                         </button>
                       </div>
+                      {selectionDetails.length > 0 && (
+                        <div className={classes.cartItemOptions}>
+                          <span className={classes.priceBadge}>{t('cart.options')}</span>
+                          {selectionDetails.map((detail) => (
+                            <div
+                              key={`${detail.groupId}-${detail.optionId}`}
+                              className={classes.cartOption}
+                            >
+                              <span>
+                                {detail.groupTitle}: {detail.optionLabel}
+                              </span>
+                              {detail.price > 0 && <span>+{formatCurrency(detail.price)}₪</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className={classes.cartItemActions}>
                         <div className={classes.quantityControl}>
                           <button
                             type="button"
                             className={classes.quantityButton}
-                            onClick={() => handleQuantityChange(item.id, -1)}
+                            onClick={() => handleQuantityChange(item.key, -1)}
                             disabled={item.quantity <= 1}
                             aria-label={`${t('cart.quantity')} -`}
                           >
@@ -612,7 +823,7 @@ const EataliaBSRPage = () => {
                           <button
                             type="button"
                             className={classes.quantityButton}
-                            onClick={() => handleQuantityChange(item.id, 1)}
+                            onClick={() => handleQuantityChange(item.key, 1)}
                             aria-label={`${t('cart.quantity')} +`}
                           >
                             +
@@ -641,7 +852,7 @@ const EataliaBSRPage = () => {
                 className={classes.primaryButton}
                 disabled={cartItems.length === 0}
                 onClick={() => {
-                  trackEvent('cart_checkout_clicked', { cart: cartItems });
+                  trackEvent('cart_checkout_clicked', { cart: cartItems, total: cartTotal });
                   setStep('location');
                 }}
               >
@@ -670,13 +881,7 @@ const EataliaBSRPage = () => {
               ))}
             </div>
             <div className={classes.mealFooter}>
-              <button
-                className={classes.nextButton}
-                onClick={handleAddMealToCart}
-                disabled={!selectedMeal}
-              >
-                {selectedMeal ? t('meal.addToCart') : t('meal.selectMeal')}
-              </button>
+              <span className={classes.mealHint}>{t('meal.selectMeal')}</span>
             </div>
           </div>
         )}
@@ -693,6 +898,9 @@ const EataliaBSRPage = () => {
             <h1 className={classes.title}>{t('payment.title')}</h1>
             <div className={classes.paymentPlaceholder}>
               {t('payment.comingSoon')}
+              <div style={{ marginTop: theme.spacing.md, fontWeight: 'bold' }}>
+                {t('cart.total')}: {formatCurrency(cartTotal)}₪
+              </div>
             </div>
           </div>
         )}
@@ -700,11 +908,20 @@ const EataliaBSRPage = () => {
         {step === 'thankYou' && (
           <ThankYou
             orderData={{
-              meals: cartItems.map((item) => ({
-                id: item.id,
-                name: getMealName(item.id),
-                quantity: item.quantity,
-              })),
+              meals: cartItems.map((item) => {
+                const priceInfo = calculateItemPrice(item.id, item.selections || {});
+                const unitPrice = item.unitPrice ?? priceInfo.total;
+                return {
+                  id: item.id,
+                  name: getMealName(item.id),
+                  quantity: item.quantity,
+                  unitPrice,
+                  totalPrice: unitPrice * item.quantity,
+                  options: getSelectionDetails(item.id, item.selections || {}),
+                };
+              }),
+              total: cartTotal,
+              groupName,
               ...locationData,
             }}
             onRestart={handleRestart}
@@ -729,6 +946,20 @@ const EataliaBSRPage = () => {
           {t('footer.privacy')}
         </button>
       </footer>
+
+      <MealOptionsDialog
+        open={optionsDialog.open}
+        meal={
+          optionsDialog.open
+            ? { id: optionsDialog.mealId, displayName: getMealDisplayName(optionsDialog.mealId) }
+            : null
+        }
+        config={optionsDialog.open ? getMealConfig(optionsDialog.mealId) : null}
+        language={i18n.language}
+        texts={mealOptionsTexts}
+        onConfirm={handleMealOptionsConfirm}
+        onCancel={handleMealOptionsCancel}
+      />
 
       <PolicyDialog
         open={policyDialog.open}
