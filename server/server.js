@@ -1,15 +1,28 @@
 import express from 'express';
+import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Load environment variables from .env or .envtest depending on NODE_ENV
+const envFileName = process.env.NODE_ENV === 'test' ? '.envtest' : '.env';
+dotenv.config({ path: join(__dirname, '..', envFileName) });
+
+// Import routers after env variables are loaded
+const { default: pelecardRouter } = await import('./pelecard.js');
+
 const app = express();
 const PORT = process.env.PORT || 3020;
 
 // Parse JSON bodies
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Pelecard routes
+app.use('/pelecard', pelecardRouter);
+
 
 // Serve static files from dist
 app.use(express.static(join(__dirname, '../dist')));

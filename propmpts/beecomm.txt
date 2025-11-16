@@ -7,3 +7,15 @@ Do you offer a public API for online orders (create order, update status)?”
 “What are your webhooks for payment/fulfillment statuses?”
 
 “Do you support CORS and frame-ancestors for embedding from https://www.eatalia-market.co.il/?”
+
+
+Use the beecom api readme file and create a router named beecomm  in a file named beecomm.js.
+the router will provide the following entry points:
+post /beecomm/pelecard/placeorder : this entry point will be called by pelecard servers 
+(it will be the ServerSideGoodFeedbackURL) it will validate with pelecard  that the order is good 
+(add the validate function to pelecard.js and export it) and the struct the order and push it to beecomm.
+get /beecomm/getmenu : this entry points wil return a pretty json html of the complete menu with all neccassry details.
+
+all credentials , and ids (like restreuant id etc) will be set in the .env files.
+
+

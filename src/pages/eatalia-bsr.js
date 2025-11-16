@@ -10,6 +10,7 @@ import { ThankYou } from '../components/ThankYou.js';
 import { LangSwitcher } from '../components/LangSwitcher.js';
 import { PolicyDialog } from '../components/PolicyDialog.js';
 import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
+import PelecardIframe from '../components/pelecardIframe.js';
 import { trackEvent } from '../utils/analytics.js';
 import '../i18n/index.js';
 import mealOptionsConfig from '../data/mealOptions.json';
@@ -118,12 +119,38 @@ const useStyles = createUseStyles({
     marginBlockEnd: theme.spacing.xl,
   },
   paymentPlaceholder: {
-    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing.lg,
     padding: theme.spacing.xxl,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.md,
-    fontSize: '1.25rem',
+    boxShadow: '0 10px 28px rgba(15, 23, 42, 0.08)',
+  },
+  paymentSummary: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    color: theme.colors.primary,
+    fontSize: '1.15rem',
+    fontWeight: 'bold',
+  },
+  paymentDetails: {
     color: theme.colors.textSecondary,
+    fontSize: '0.95rem',
+    lineHeight: 1.5,
+  },
+  paymentIframeWrapper: {
+    width: '100%',
+  },
+  paymentFallback: {
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.sm,
+    border: `1px dashed ${theme.colors.border}`,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
   cartList: {
     display: 'flex',
@@ -389,6 +416,14 @@ const meals = [
 
 const formatCurrency = (value) => Number(value || 0).toFixed(2);
 
+const createOrderId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const random = Math.floor(Math.random() * 1_000_000);
+  return `order-${Date.now()}-${random}`;
+};
+
 const EataliaBSRPage = () => {
   useGlobalStyles();
   const classes = useStyles();
@@ -407,6 +442,7 @@ const EataliaBSRPage = () => {
     loading: false,
     error: null,
   });
+  const [orderId, setOrderId] = useState(null);
 
   const getMealConfig = (mealId) => mealOptionsConfig[mealId] || null;
 
@@ -486,6 +522,11 @@ const EataliaBSRPage = () => {
     [cartItems]
   );
 
+  const totalInAgorot = useMemo(
+    () => Math.max(0, Math.round(Number(cartTotal || 0) * 100)),
+    [cartTotal]
+  );
+
   const mealOptionsTexts = useMemo(
     () => ({
       title: t('mealOptions.title'),
@@ -499,6 +540,11 @@ const EataliaBSRPage = () => {
     }),
     [t]
   );
+
+  const pelecardLanguage = useMemo(() => {
+    const lang = (i18n.language || 'he').toString();
+    return lang.slice(0, 2).toUpperCase();
+  }, [i18n.language]);
 
   const handleMealSelect = (mealId) => {
     setSelectedMeal(mealId);
@@ -595,20 +641,32 @@ const EataliaBSRPage = () => {
     }
   };
 
+  const handleIframeReady = (url) => {
+    if (!orderId) {
+      return;
+    }
+    trackEvent('pelecard_iframe_ready', { orderId, url });
+  };
+
+  const handleIframeError = (err) => {
+    trackEvent('pelecard_iframe_error', {
+      orderId,
+      message: err?.message || 'unknown',
+    });
+  };
+
   const handleLocationSubmit = (data) => {
     const payload = { ...data, groupName };
+    const newOrderId = createOrderId();
+    setOrderId(newOrderId);
     setLocationData(payload);
-    trackEvent('location_completed', { ...payload });
+    trackEvent('location_completed', { ...payload, orderId: newOrderId });
     setStep('payment');
-    // Auto-advance to thank you after a short delay (simulating payment)
-    setTimeout(() => {
-      setStep('thankYou');
-      trackEvent('flow_completed', {
-        cart: cartItems,
-        total: cartTotal,
-        ...payload,
-      });
-    }, 2000);
+    trackEvent('payment_step_opened', {
+      orderId: newOrderId,
+      cart: cartItems,
+      total: cartTotal,
+    });
   };
 
   const handleRestart = () => {
@@ -618,6 +676,7 @@ const EataliaBSRPage = () => {
     setGroupName('');
     setCartItems([]);
     setOptionsDialog({ open: false, mealId: null });
+    setOrderId(null);
   };
 
   const getMealName = (mealId) => {
@@ -897,10 +956,32 @@ const EataliaBSRPage = () => {
           <div className={classes.section}>
             <h1 className={classes.title}>{t('payment.title')}</h1>
             <div className={classes.paymentPlaceholder}>
-              {t('payment.comingSoon')}
-              <div style={{ marginTop: theme.spacing.md, fontWeight: 'bold' }}>
-                {t('cart.total')}: {formatCurrency(cartTotal)}₪
+              <div className={classes.paymentSummary}>
+                <span>{t('cart.total')}</span>
+                <span>{`${formatCurrency(cartTotal)}₪`}</span>
               </div>
+              <div className={classes.paymentDetails}>
+                {t('payment.secureCheckout', {
+                  defaultValue: 'Complete your payment securely below.',
+                })}
+              </div>
+              {orderId ? (
+                <PelecardIframe
+                  orderId={orderId}
+                  total={totalInAgorot}
+                  currency="1"
+                  language={pelecardLanguage}
+                  className={classes.paymentIframeWrapper}
+                  onReady={handleIframeReady}
+                  onError={handleIframeError}
+                />
+              ) : (
+                <div className={classes.paymentFallback}>
+                  {t('payment.missingOrder', {
+                    defaultValue: 'Please complete the previous steps to generate a payment session.',
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

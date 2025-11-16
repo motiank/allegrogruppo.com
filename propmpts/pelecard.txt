@@ -1,0 +1,6 @@
+Follow the guide lines on the README_pelecard_iframe_J4_handshake.md file to implement the following:
+1. create iframe on the client - create a component named pelecardIframe on the client in a file name pelecardiframe.js 
+2. add file name pelecard.js on the server folder that expose the router for the pelecard. 
+Add to the pelecard router entry point : getIframeUrl with the necassery parameters from the client . 
+Add entry points for the good and bad urls
+Add entry point for the server feedbacks. for now just throw the feedback to the consiole and returns 200 ok.
