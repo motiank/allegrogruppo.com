@@ -2,7 +2,6 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,7 +12,8 @@ dotenv.config({ path: join(__dirname, '..', envFileName) });
 
 // Import routers after env variables are loaded
 const { default: pelecardRouter } = await import('./pelecard.js');
-const { default: beecommRouter } = await import('./beecomm.js');
+const { default: beecommRouter, menuApiRouter } = await import('./beecomm.js');
+const { default: analyticsRouter } = await import('./analytics.js');
 
 const app = express();
 const PORT = process.env.PORT || 3020;
@@ -28,6 +28,11 @@ app.use('/pelecard', pelecardRouter);
 // Beecomm routes
 app.use('/beecomm', beecommRouter);
 
+// Menu API routes (from beecomm module)
+app.use('/api', menuApiRouter);
+
+// Analytics routes
+app.use('/api', analyticsRouter);
 
 // Serve static files from dist
 app.use(express.static(join(__dirname, '../dist')));
@@ -39,51 +44,6 @@ app.use((req, res, next) => {
     "frame-ancestors 'self' https://www.eatalia-market.co.il/ https://*.allegrogruppo.com;"
   );
   next();
-});
-
-// Analytics endpoint
-app.post('/api/track', (req, res) => {
-  const { event, data } = req.body;
-  console.log('Analytics event:', event, data);
-  // In production, you would save this to a database or analytics service
-  res.json({ success: true });
-});
-
-// Meal options endpoint
-app.get('/api/meal-options', (req, res) => {
-  try {
-    let menuPath;
-    if (process.env.MENU_PATH) {
-      // If MENU_PATH is absolute, use it as is; otherwise resolve relative to project root
-      menuPath = process.env.MENU_PATH.startsWith('/')
-        ? process.env.MENU_PATH
-        : join(__dirname, '..', process.env.MENU_PATH);
-    } else {
-      menuPath = join(__dirname, '..', 'menu', 'mealOptions.json');
-    }
-    const mealOptions = JSON.parse(readFileSync(menuPath, 'utf8'));
-    res.json(mealOptions);
-  } catch (error) {
-    console.error('Error loading meal options:', error);
-    res.status(500).json({ error: 'Failed to load meal options' });
-  }
-});
-
-// Beecomm metadata endpoint
-app.get('/api/beecomm-metadata', (req, res) => {
-  try {
-    const metadataPath = join(__dirname, '..', 'menu', 'beecomm_metadata.json');
-    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
-    res.json(metadata);
-  } catch (error) {
-    console.error('Error loading beecomm metadata:', error);
-    // Return empty metadata if file doesn't exist (for backward compatibility)
-    res.json({
-      menuRevision: '',
-      source: 'beecomm',
-      dishMappings: {},
-    });
-  }
 });
 
 // Fallback to index.html for SPA routes (if needed)

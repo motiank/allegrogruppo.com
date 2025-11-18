@@ -2,6 +2,38 @@ import express from 'express';
 
 const router = express.Router();
 
+// Map to store orders: ConfirmationKey => order info
+// Also temporarily store by orderId until ConfirmationKey is available
+const orderStorage = new Map();
+
+/**
+ * Retrieve order data by ConfirmationKey or orderId (UserKey/ParamX)
+ * @param {string} confirmationKey - ConfirmationKey from Pelecard
+ * @param {string} orderId - UserKey or ParamX (orderId)
+ * @returns {Object|null} Order data or null if not found
+ */
+export function getOrderData(confirmationKey, orderId) {
+  // Try ConfirmationKey first
+  if (confirmationKey) {
+    const order = orderStorage.get(`confirmationKey:${confirmationKey}`);
+    if (order) {
+      return order;
+    }
+  }
+
+  // Fallback to orderId
+  if (orderId) {
+    const order = orderStorage.get(`orderId:${orderId}`);
+    if (order && confirmationKey) {
+      // Store with ConfirmationKey for future reference
+      orderStorage.set(`confirmationKey:${confirmationKey}`, order);
+    }
+    return order;
+  }
+
+  return null;
+}
+
 
 
 const {
@@ -68,6 +100,7 @@ router.post('/get-iframe-url', async (req, res) => {
     errorUrl,
     cancelUrl,
     qaResultStatus,
+    orderData, // Full order data to store for later use
   } = req.body ?? {};
 
   if (!orderId || total === undefined || total === null) {
@@ -106,7 +139,8 @@ router.post('/get-iframe-url', async (req, res) => {
   }
 
   const feedbackBase = PELECARD_FEEDBACK_BASE_URL;
-  const feedbackGoodUrl = buildUrl(feedbackBase, '/pelecard/feedback/good');
+  // ServerSideGoodFeedbackURL should point to beecomm endpoint that processes the order
+  const feedbackGoodUrl = buildUrl(feedbackBase, '/beecomm/pelecard/placeorder');
   const feedbackErrorUrl = buildUrl(feedbackBase, '/pelecard/feedback/error');
 
   if (!feedbackGoodUrl || !feedbackErrorUrl) {
@@ -181,11 +215,43 @@ console.log('initPayload', initPayload);
       });
     }
 
-    res.json({
+    // Check if ConfirmationKey is in the response (unlikely but possible)
+    const confirmationKey = result.ConfirmationKey || result.ResultData?.ConfirmationKey;
+
+    // Store order data temporarily with orderId
+    // If ConfirmationKey is available, also store with ConfirmationKey
+    if (orderData) {
+      const orderInfo = {
+        ...orderData,
+        orderId: `${orderId}`,
+        total,
+        currency,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Store with orderId for retrieval via UserKey/ParamX
+      orderStorage.set(`orderId:${orderId}`, orderInfo);
+
+      // If ConfirmationKey is available in init response, store with it too
+      if (confirmationKey) {
+        orderStorage.set(`confirmationKey:${confirmationKey}`, orderInfo);
+        console.log('[pelecard] Stored order with ConfirmationKey from init:', confirmationKey);
+      } else {
+        console.log('[pelecard] Stored order with orderId (ConfirmationKey will come in feedback):', orderId);
+      }
+    }
+
+    const responseData = {
       iframeUrl,
-      // transactionId: result.ResultData?.TransactionId,
       orderId: `${orderId}`,
-    });
+    };
+
+    // Include ConfirmationKey if available
+    if (confirmationKey) {
+      responseData.confirmationKey = confirmationKey;
+    }
+
+    res.json(responseData);
   } catch (error) {
     console.error('[pelecard] Unexpected error during init:', error);
     res.status(500).json({
@@ -220,6 +286,46 @@ router.get('/cancel', (req, res) => {
 
 router.post('/feedback/good', (req, res) => {
   console.log('[pelecard] Server-side good feedback received:', req.body);
+  
+  // Extract ConfirmationKey and UserKey/ParamX from feedback
+  let pelecardData = req.body;
+  if (req.body.resultDataKeyName && req.body[req.body.resultDataKeyName]) {
+    pelecardData = JSON.parse(req.body[req.body.resultDataKeyName]);
+  }
+
+  const confirmationKey = pelecardData.ConfirmationKey;
+  const userKey = pelecardData.UserKey || pelecardData.ParamX;
+
+  // Try to retrieve order data using ConfirmationKey first, then fallback to orderId
+  let orderInfo = null;
+  if (confirmationKey) {
+    orderInfo = orderStorage.get(`confirmationKey:${confirmationKey}`);
+    if (orderInfo) {
+      console.log('[pelecard] Retrieved order using ConfirmationKey:', confirmationKey);
+    }
+  }
+
+  // If not found by ConfirmationKey, try by orderId (UserKey/ParamX)
+  if (!orderInfo && userKey) {
+    orderInfo = orderStorage.get(`orderId:${userKey}`);
+    if (orderInfo) {
+      console.log('[pelecard] Retrieved order using orderId (UserKey):', userKey);
+      // Now store it with ConfirmationKey for future reference
+      if (confirmationKey) {
+        orderStorage.set(`confirmationKey:${confirmationKey}`, orderInfo);
+        console.log('[pelecard] Stored order with ConfirmationKey from feedback:', confirmationKey);
+      }
+    }
+  }
+
+  if (!orderInfo) {
+    console.warn('[pelecard] Order data not found for ConfirmationKey:', confirmationKey, 'UserKey:', userKey);
+  }
+
+  // Store the order info in req for the beecomm router to use
+  req.orderInfo = orderInfo;
+  req.pelecardData = pelecardData;
+
   res.status(200).json({ received: true });
 });
 

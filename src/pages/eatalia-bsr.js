@@ -1071,6 +1071,21 @@ const EataliaBSRPage = () => {
                   className={classes.paymentIframeWrapper}
                   onReady={handleIframeReady}
                   onError={handleIframeError}
+                  orderData={{
+                    cartItems: cartItems.map((item) => ({
+                      id: item.id,
+                      key: item.key,
+                      quantity: item.quantity,
+                      selections: item.selections || {},
+                      unitPrice: item.unitPrice || 0,
+                      basePrice: item.basePrice || 0,
+                      optionsPrice: item.optionsPrice || 0,
+                    })),
+                    locationData: locationData || {},
+                    menuRevision: beecommMetadata?.menuRevision || '',
+                    total: cartTotal,
+                    orderId: orderId,
+                  }}
                 />
               ) : (
                 <div className={classes.paymentFallback}>

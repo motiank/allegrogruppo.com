@@ -180,4 +180,8 @@ I want to create a new menu file from the bc_sandbox_menu.json under the prompts
  to use it when we push the order into bee com- so please make sure all data is there.
 
 
- 
+ after recieiving the iframe url and ConfirmationKey
+ the order should be submit to the server. on the server side the order should be pushed into a map of ConfirmationKey => order info.
+ and only then Iframe url should be set. once pelecard call our server  (the ServerSideGoodFeedbackURL )
+ the order info should be extracted from the map and construct the beecom push order payload. 
+ Then use the push order beecom api

@@ -18,6 +18,7 @@ const DEFAULT_IFRAME_HEIGHT = 600;
  * - iframeHeight: overrides the default iframe height.
  * - onReady(url): callback when iframe URL is ready.
  * - onError(error): callback when an error occurs.
+ * - orderData: full order data to store on server (cartItems, locationData, menuRevision, etc.)
  *
  * The component expects the backend endpoint `/pelecard/get-iframe-url`
  * implemented by `server/pelecard.js` to return `{ iframeUrl: string }`.
@@ -32,6 +33,7 @@ export default function PelecardIframe({
   iframeHeight = DEFAULT_IFRAME_HEIGHT,
   onReady,
   onError,
+  orderData,
 }) {
   const [iframeUrl, setIframeUrl] = useState('');
   const [status, setStatus] = useState('idle'); // idle | loading | ready | error
@@ -51,8 +53,9 @@ export default function PelecardIframe({
       currency,
       language,
       qaResultStatus,
+      orderData, // Include full order data
     };
-  }, [currency, language, orderId, qaResultStatus, total]);
+  }, [currency, language, orderId, qaResultStatus, total, orderData]);
 
   useEffect(() => {
     async function fetchIframeUrl() {

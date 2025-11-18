@@ -1,6 +1,12 @@
 import express from 'express';
 import axios from 'axios';
-import { validateTransaction } from './pelecard.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { validateTransaction, getOrderData } from './pelecard.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const router = express.Router();
 
@@ -296,20 +302,83 @@ router.post('/pelecard/placeorder', async (req, res) => {
 
     console.log('[beecomm] Pelecard transaction validated successfully');
 
+    // Retrieve order data from storage using ConfirmationKey and orderId
+    const storedOrderData = getOrderData(ConfirmationKey, uniqueKey);
+
+    if (!storedOrderData) {
+      console.error('[beecomm] Order data not found in storage for ConfirmationKey:', ConfirmationKey, 'orderId:', uniqueKey);
+      return res.status(404).json({
+        error: 'Order data not found',
+        message: 'Order information was not found in storage. It may have expired or was never stored.',
+      });
+    }
+
+    console.log('[beecomm] Retrieved order data from storage:', storedOrderData);
+
     // Get access token
     const accessToken = await getAccessToken();
 
-    // TODO: Retrieve your internal order data based on UserKey or ParamX
-    // For now, this is a placeholder - you'll need to fetch from your database
+    // Extract location data for customer info and delivery
+    const locationData = storedOrderData.locationData || {};
+    const cartItems = storedOrderData.cartItems || [];
+
+    // Convert cartItems to Beecomm items format
+    const items = cartItems.map((cartItem) => {
+      // Calculate total price for this item
+      const unitPrice = cartItem.unitPrice || 0;
+      const totalPrice = unitPrice * (cartItem.quantity || 1);
+
+      // Convert selections to toppings format
+      // Note: This is a simplified conversion - you may need to adjust based on your menu structure
+      const toppings = [];
+      if (cartItem.selections) {
+        Object.entries(cartItem.selections).forEach(([groupId, optionIds]) => {
+          if (Array.isArray(optionIds)) {
+            optionIds.forEach((optionId) => {
+              toppings.push({
+                toppingGroupId: groupId,
+                toppingId: optionId,
+              });
+            });
+          }
+        });
+      }
+
+      return {
+        dishId: cartItem.id, // Use the meal/dish ID
+        itemName: cartItem.name || cartItem.id, // Use name if available, fallback to ID
+        isCombo: false, // Set based on your menu structure
+        quantity: cartItem.quantity || 1,
+        dishPrice: unitPrice,
+        totalPrice: totalPrice,
+        preparationComments: '', // Can be added from cartItem if available
+        remarks: [],
+        toppings: toppings,
+        subItems: [], // For combo items
+      };
+    });
+
+    // Use stored order data, merging with any additional data from Pelecard
     const orderData = {
-      menuRevision: '', // Fetch from your stored order
-      customerFirstName: pelecardData.CardHolderName?.split(' ')[0] || '',
-      customerLastName: pelecardData.CardHolderName?.split(' ').slice(1).join(' ') || '',
-      phoneNumber: pelecardData.CardHolderPhone || '',
-      emailAddress: pelecardData.CardHolderEmail || '',
-      items: [], // Fetch from your stored order
-      deliveryInfo: {}, // Fetch from your stored order
-      comments: `Pelecard transaction: ${PelecardTransactionId}`,
+      menuRevision: storedOrderData.menuRevision || '',
+      customerFirstName: locationData.firstName || pelecardData.CardHolderName?.split(' ')[0] || '',
+      customerLastName: locationData.lastName || pelecardData.CardHolderName?.split(' ').slice(1).join(' ') || '',
+      phoneNumber: locationData.phone || pelecardData.CardHolderPhone || '',
+      emailAddress: locationData.email || pelecardData.CardHolderEmail || '',
+      items: items,
+      deliveryInfo: {
+        firstName: locationData.firstName || '',
+        lastName: locationData.lastName || '',
+        phoneNumber: locationData.phone || '',
+        cellular: locationData.phone || '',
+        building: locationData.building || '',
+        floor: locationData.floor || '',
+        office: locationData.office || '',
+        // Add other delivery fields as needed
+      },
+      comments: storedOrderData.comments || `Pelecard transaction: ${PelecardTransactionId}`,
+      locationData: locationData,
+      cartItems: cartItems,
     };
 
     // Structure order for Beecomm
@@ -410,4 +479,44 @@ router.get('/getmenu', async (req, res) => {
 });
 
 export default router;
+
+// Export a separate router for API endpoints
+export const menuApiRouter = express.Router();
+
+// GET /api/meal-options
+menuApiRouter.get('/meal-options', (req, res) => {
+  try {
+    let menuPath;
+    if (process.env.MENU_PATH) {
+      // If MENU_PATH is absolute, use it as is; otherwise resolve relative to project root
+      menuPath = process.env.MENU_PATH.startsWith('/')
+        ? process.env.MENU_PATH
+        : join(__dirname, '..', process.env.MENU_PATH);
+    } else {
+      menuPath = join(__dirname, '..', 'menu', 'mealOptions.json');
+    }
+    const mealOptions = JSON.parse(readFileSync(menuPath, 'utf8'));
+    res.json(mealOptions);
+  } catch (error) {
+    console.error('Error loading meal options:', error);
+    res.status(500).json({ error: 'Failed to load meal options' });
+  }
+});
+
+// GET /api/beecomm-metadata
+menuApiRouter.get('/beecomm-metadata', (req, res) => {
+  try {
+    const metadataPath = join(__dirname, '..', 'menu', 'beecomm_metadata.json');
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error loading beecomm metadata:', error);
+    // Return empty metadata if file doesn't exist (for backward compatibility)
+    res.json({
+      menuRevision: '',
+      source: 'beecomm',
+      dishMappings: {},
+    });
+  }
+});
 
