@@ -13,7 +13,6 @@ import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
 import PelecardIframe from '../components/pelecardIframe.js';
 import { trackEvent } from '../utils/analytics.js';
 import '../i18n/index.js';
-import mealOptionsConfig from '../data/mealOptions.json';
 
 const useStyles = createUseStyles({
   container: {
@@ -443,6 +442,9 @@ const EataliaBSRPage = () => {
     error: null,
   });
   const [orderId, setOrderId] = useState(null);
+  const [mealOptionsConfig, setMealOptionsConfig] = useState({});
+  const [mealOptionsLoading, setMealOptionsLoading] = useState(true);
+  const [mealOptionsError, setMealOptionsError] = useState(null);
 
   const getMealConfig = (mealId) => mealOptionsConfig[mealId] || null;
 
@@ -703,6 +705,29 @@ const EataliaBSRPage = () => {
       error: null,
     });
   };
+
+  useEffect(() => {
+    // Load meal options on component mount
+    const loadMealOptions = async () => {
+      try {
+        setMealOptionsLoading(true);
+        setMealOptionsError(null);
+        const response = await fetch('/api/meal-options');
+        if (!response.ok) {
+          throw new Error('Failed to load meal options');
+        }
+        const data = await response.json();
+        setMealOptionsConfig(data);
+      } catch (error) {
+        console.error('Error loading meal options:', error);
+        setMealOptionsError(error.message);
+      } finally {
+        setMealOptionsLoading(false);
+      }
+    };
+
+    loadMealOptions();
+  }, []);
 
   useEffect(() => {
     if (!policyDialog.open || !policyDialog.type) {

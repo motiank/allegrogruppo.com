@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,6 +13,7 @@ dotenv.config({ path: join(__dirname, '..', envFileName) });
 
 // Import routers after env variables are loaded
 const { default: pelecardRouter } = await import('./pelecard.js');
+const { default: beecommRouter } = await import('./beecomm.js');
 
 const app = express();
 const PORT = process.env.PORT || 3020;
@@ -22,6 +24,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Pelecard routes
 app.use('/pelecard', pelecardRouter);
+
+// Beecomm routes
+app.use('/beecomm', beecommRouter);
 
 
 // Serve static files from dist
@@ -42,6 +47,26 @@ app.post('/api/track', (req, res) => {
   console.log('Analytics event:', event, data);
   // In production, you would save this to a database or analytics service
   res.json({ success: true });
+});
+
+// Meal options endpoint
+app.get('/api/meal-options', (req, res) => {
+  try {
+    let menuPath;
+    if (process.env.MENU_PATH) {
+      // If MENU_PATH is absolute, use it as is; otherwise resolve relative to project root
+      menuPath = process.env.MENU_PATH.startsWith('/')
+        ? process.env.MENU_PATH
+        : join(__dirname, '..', process.env.MENU_PATH);
+    } else {
+      menuPath = join(__dirname, '..', 'menu', 'mealOptions.json');
+    }
+    const mealOptions = JSON.parse(readFileSync(menuPath, 'utf8'));
+    res.json(mealOptions);
+  } catch (error) {
+    console.error('Error loading meal options:', error);
+    res.status(500).json({ error: 'Failed to load meal options' });
+  }
 });
 
 // Fallback to index.html for SPA routes (if needed)

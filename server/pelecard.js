@@ -228,6 +228,60 @@ router.post('/feedback/error', (req, res) => {
   res.status(200).json({ received: true });
 });
 
+/**
+ * Validate a Pelecard transaction using ValidateByUniqueKey
+ * @param {string} confirmationKey - ConfirmationKey from Pelecard feedback/landing
+ * @param {string} uniqueKey - UserKey or TransactionId
+ * @param {string|number} totalX100 - Total amount in agorot (cents)
+ * @returns {Promise<boolean>} - true if valid, false otherwise
+ */
+export async function validateTransaction(confirmationKey, uniqueKey, totalX100) {
+  if (!confirmationKey || !uniqueKey || totalX100 === undefined || totalX100 === null) {
+    console.error('[pelecard] validateTransaction: missing required parameters');
+    return false;
+  }
+
+  if (!PELECARD_TERMINAL || !PELECARD_USER || !PELECARD_PASSWORD) {
+    console.error('[pelecard] validateTransaction: Pelecard credentials not configured');
+    return false;
+  }
+
+  const VALIDATE_ENDPOINT = new URL('/PaymentGW/ValidateByUniqueKey', PELECARD_BASE_URL).toString();
+
+  const payload = {
+    ConfirmationKey: confirmationKey,
+    UniqueKey: uniqueKey,
+    TotalX100: `${totalX100}`,
+  };
+
+  try {
+    const response = await globalThis.fetch(VALIDATE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[pelecard] ValidateByUniqueKey request failed:', response.status, text);
+      return false;
+    }
+
+    const result = await response.text();
+    // Response is "1" for valid, "0" for invalid
+    const isValid = result.trim() === '1';
+    
+    if (!isValid) {
+      console.warn('[pelecard] ValidateByUniqueKey returned invalid:', result);
+    }
+
+    return isValid;
+  } catch (error) {
+    console.error('[pelecard] Unexpected error during ValidateByUniqueKey:', error);
+    return false;
+  }
+}
+
 export default router;
 
 
