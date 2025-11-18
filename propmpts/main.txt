@@ -171,3 +171,13 @@ Cursor should:
 
 ---
 
+
+
+
+I want to create a new menu file from the bc_sandbox_menu.json under the prompts folder. 
+ since our menu is flat please ignore the categories and sub categories. But it is very 
+ important to add the different ids  other neccassy fields into our menu . we would like 
+ to use it when we push the order into bee com- so please make sure all data is there.
+
+
+ 

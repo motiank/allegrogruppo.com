@@ -445,10 +445,29 @@ const EataliaBSRPage = () => {
   const [mealOptionsConfig, setMealOptionsConfig] = useState({});
   const [mealOptionsLoading, setMealOptionsLoading] = useState(true);
   const [mealOptionsError, setMealOptionsError] = useState(null);
+  const [beecommMetadata, setBeecommMetadata] = useState(null);
+  const [dynamicMeals, setDynamicMeals] = useState([]);
 
   const getMealConfig = (mealId) => mealOptionsConfig[mealId] || null;
 
+  // Helper to find meal in either dynamic or hardcoded meals
+  const findMeal = (mealId) => {
+    const allMeals = dynamicMeals.length > 0 ? dynamicMeals : meals;
+    return allMeals.find((m) => m.id === mealId);
+  };
+
   const getMealDisplayName = (mealId) => {
+    // First try to find in dynamic meals (from beecomm menu)
+    const dynamicMeal = dynamicMeals.find((m) => m.id === mealId);
+    if (dynamicMeal) {
+      const metadata = beecommMetadata?.dishMappings?.[mealId];
+      if (metadata) {
+        const lang = i18n.language || 'he';
+        return metadata.nameTranslate?.[lang] || metadata.dishName || mealId;
+      }
+      return mealId;
+    }
+    // Fallback to hardcoded meals
     const meal = meals.find((m) => m.id === mealId);
     return meal ? t(`meal.${meal.name}`) : mealId;
   };
@@ -565,7 +584,7 @@ const EataliaBSRPage = () => {
   };
 
   const handleInstagramOpen = (mealId) => {
-    const meal = meals.find((m) => m.id === mealId);
+    const meal = findMeal(mealId);
     if (meal && meal.instagramUrl) {
       window.open(meal.instagramUrl, '_blank', 'noopener,noreferrer');
       trackEvent('instagram_opened', { meal: mealId });
@@ -682,8 +701,18 @@ const EataliaBSRPage = () => {
   };
 
   const getMealName = (mealId) => {
-    const meal = meals.find((m) => m.id === mealId);
-    return meal ? t(`meal.${meal.name}`) : '';
+    const meal = findMeal(mealId);
+    if (meal) {
+      // Check if it's a dynamic meal with metadata
+      const metadata = beecommMetadata?.dishMappings?.[mealId];
+      if (metadata) {
+        const lang = i18n.language || 'he';
+        return metadata.nameTranslate?.[lang] || metadata.dishName || '';
+      }
+      // Fallback to translation
+      return t(`meal.${meal.name}`);
+    }
+    return '';
   };
 
   const handlePolicyOpen = (type) => {
@@ -718,6 +747,45 @@ const EataliaBSRPage = () => {
         }
         const data = await response.json();
         setMealOptionsConfig(data);
+        
+        // Generate dynamic meals from menu keys
+        const menuKeys = Object.keys(data);
+        const generatedMeals = menuKeys.map((key) => {
+          // Try to load beecomm metadata for this dish
+          return {
+            id: key,
+            name: key, // Will be updated when metadata loads
+            image: null, // Will be updated when metadata loads
+            instagramUrl: null,
+          };
+        });
+        setDynamicMeals(generatedMeals);
+        
+        // Try to load beecomm metadata for names and images
+        try {
+          const metadataResponse = await fetch('/api/beecomm-metadata');
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            setBeecommMetadata(metadata);
+            
+            // Update meals with metadata
+            const updatedMeals = generatedMeals.map((meal) => {
+              const dishData = metadata.dishMappings?.[meal.id];
+              if (dishData) {
+                return {
+                  ...meal,
+                  name: dishData.dishName || meal.id,
+                  image: dishData.imagePath || meal.image,
+                };
+              }
+              return meal;
+            });
+            setDynamicMeals(updatedMeals);
+          }
+        } catch (metadataError) {
+          console.warn('Could not load beecomm metadata:', metadataError);
+          // Continue without metadata
+        }
       } catch (error) {
         console.error('Error loading meal options:', error);
         setMealOptionsError(error.message);
@@ -852,17 +920,18 @@ const EataliaBSRPage = () => {
             ) : (
               <div className={classes.cartList}>
                 {cartItems.map((item) => {
-                  const meal = meals.find((m) => m.id === item.id);
+                  const meal = findMeal(item.id);
                   const selectionDetails = getSelectionDetails(item.id, item.selections || {});
                   const priceInfo = calculateItemPrice(item.id, item.selections || {});
                   const unitPrice = item.unitPrice ?? priceInfo.total;
                   const itemTotal = unitPrice * item.quantity;
+                  const mealDisplayName = getMealDisplayName(item.id);
                   return (
                     <div key={item.key} className={classes.cartItem}>
                       <div className={classes.cartItemHeader}>
                         <div className={classes.cartItemHeaderLeft}>
                           <span className={classes.cartItemName}>
-                            {meal ? t(`meal.${meal.name}`) : item.id}
+                            {mealDisplayName}
                           </span>
                           <span className={classes.priceBadge}>
                             {t('cart.itemPrice', { price: formatCurrency(itemTotal) })}
@@ -950,19 +1019,22 @@ const EataliaBSRPage = () => {
           <div className={classes.section}>
             <h1 className={classes.title}>{t('meal.title')}</h1>
             <div className={classes.mealGrid}>
-              {meals.map((meal) => (
-                <MealCard
-                  key={meal.id}
-                  meal={{
-                    ...meal,
-                    name: t(`meal.${meal.name}`),
-                  }}
-                  selected={selectedMeal === meal.id}
-                  disabled={selectedMeal !== null && selectedMeal !== meal.id}
-                  onSelect={handleMealSelect}
-                  onInstagram={handleInstagramOpen}
-                />
-              ))}
+              {(dynamicMeals.length > 0 ? dynamicMeals : meals).map((meal) => {
+                const displayName = getMealDisplayName(meal.id);
+                return (
+                  <MealCard
+                    key={meal.id}
+                    meal={{
+                      ...meal,
+                      name: displayName,
+                    }}
+                    selected={selectedMeal === meal.id}
+                    disabled={selectedMeal !== null && selectedMeal !== meal.id}
+                    onSelect={handleMealSelect}
+                    onInstagram={handleInstagramOpen}
+                  />
+                );
+              })}
             </div>
             <div className={classes.mealFooter}>
               <span className={classes.mealHint}>{t('meal.selectMeal')}</span>

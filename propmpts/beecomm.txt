@@ -9,6 +9,7 @@ Do you offer a public API for online orders (create order, update status)?”
 “Do you support CORS and frame-ancestors for embedding from https://www.eatalia-market.co.il/?”
 
 
+
 Use the beecom api readme file and create a router named beecomm  in a file named beecomm.js.
 the router will provide the following entry points:
 post /beecomm/pelecard/placeorder : this entry point will be called by pelecard servers 
@@ -19,3 +20,6 @@ get /beecomm/getmenu : this entry points wil return a pretty json html of the co
 all credentials , and ids (like restreuant id etc) will be set in the .env files.
 
 
+
+
+in the beecomm menu file values are not translated . it is only in hebrew - please translate it properly

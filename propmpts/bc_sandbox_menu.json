@@ -1,0 +1,3642 @@
+{
+  "result": true,
+  "request_id": "c3a648d8-b700-4bf6-a178-9df4db1b497a",
+  "menuRevision": "691b061dca26f100029a6794",
+  "deliveryMenu": {
+    "categories": [
+      {
+        "_id": "68b534465b25a7142b29b184",
+        "name": "אוכל",
+        "nameTranslate": {
+          "en": "Food"
+        },
+        "icon": "icon-brief",
+        "schedule": {
+          "active": false,
+          "sun": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "mon": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "tue": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "wed": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "thu": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "fri": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "sat": {
+            "active": false,
+            "on": null,
+            "off": null
+          }
+        },
+        "sortIndex": 0,
+        "subCategories": [
+          {
+            "_id": "68b534f15b25a7142b29b18f",
+            "name": "STARTERS",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 0,
+            "dishes": [
+              {
+                "name": "תירס צלוי ",
+                "nameTranslate": {
+                  "en": "תירס צלוי "
+                },
+                "price": 5,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "תירס צלוי ",
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "69032aeedff0f5c7e947be70",
+                    "name": "תוספות לתירס צלוי",
+                    "indexName": null,
+                    "nameTranslate": {
+                      "en": "תוספות לתירס צלוי"
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 2,
+                    "allowAboveLimit": true,
+                    "costAboveLimit": 3,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "allowToppingMultiplication": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "irrelevantForExternalCompanies": null,
+                    "irrelevantForOrdersSite": null,
+                    "toppings": [
+                      {
+                        "_id": "69032afedff0f5c7e947be71",
+                        "dishId": "60fea71c61bf4ffca750e6a7",
+                        "name": "פרמז׳ן",
+                        "kitchenName": "פרמז׳ן",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "69032b03dff0f5c7e947be72",
+                        "dishId": "649c232668f4532ddf5c8178",
+                        "name": "קוקוס",
+                        "kitchenName": "קוקוס",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "69032b07dff0f5c7e947be73",
+                        "dishId": "5e5547303e74b41a44cbb604",
+                        "name": "צ׳ילי טרי",
+                        "kitchenName": "צ׳ילי טרי",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "69032b0bdff0f5c7e947be74",
+                        "dishId": "6183d94ee55186a72ce0aef2",
+                        "name": "חלפיניו",
+                        "kitchenName": "חלפיניו",
+                        "nameTranslate": {
+                          "en": "חלפיניו"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [
+                  "חדש!"
+                ],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e6784ecc71636f55da44656.JPG",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": "טעים",
+                "noDiscounts": null,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "5e6784ecc71636f55da44656"
+              },
+              {
+                "name": "פסטה בהרכבה ",
+                "nameTranslate": {},
+                "price": 1,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "פסטה בהרכבה ",
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "60feaee861bf4ffca750e711",
+                    "name": "סוג פסטה",
+                    "nameTranslate": {
+                      "en": " סוג פסטה"
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 1,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": false,
+                    "indexName": null,
+                    "toppings": [
+                      {
+                        "_id": "6662cc621048565e2d7301fc",
+                        "dishId": "60fea91c61bf4ffca750e6c3-a750e711",
+                        "name": "פטוצ׳יני",
+                        "kitchenName": "פטוצ׳יני",
+                        "nameTranslate": {
+                          "en": "פטוצ׳יני",
+                          "ar": "פטוצ׳יני"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": true,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "6662cc641048565e2d7301fd",
+                        "dishId": "62cfcef065ccb4fd8abe12a9-a750e711",
+                        "name": "פנה",
+                        "kitchenName": "פנה",
+                        "nameTranslate": {
+                          "en": "פנה",
+                          "ar": "פנה"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": true,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "6662cc6a1048565e2d7301ff",
+                        "dishId": "62513dd7ee6beddf9782417b-a750e711",
+                        "name": "ספגטי",
+                        "kitchenName": "ספגטי",
+                        "nameTranslate": {
+                          "en": "ספגטי",
+                          "ar": "ספגטי"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": true,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "6662cc661048565e2d7301fe",
+                        "dishId": "60fea92c61bf4ffca750e6c4-a750e711",
+                        "name": "ספגטי ללא גלוטן",
+                        "kitchenName": "ספגטי ללא גלוטן",
+                        "nameTranslate": {
+                          "en": "ספגטי ללא גלוטן",
+                          "ar": "ספגטי ללא גלוטן"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": true,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "62513e6cee6beddf97824182",
+                    "name": "בחירת רוטב ",
+                    "nameTranslate": {
+                      "en": " "
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 1,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": null,
+                    "indexName": "בחירת רוטב - פסטות",
+                    "toppings": [
+                      {
+                        "_id": "62513e7cee6beddf97824183",
+                        "dishId": "60fea61861bf4ffca750e69c-97824182",
+                        "name": "רוזה",
+                        "kitchenName": "רוזה",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "62513e82ee6beddf97824184",
+                        "dishId": "62513e44ee6beddf9782417f-97824182",
+                        "name": "פסטה בולונז  מ",
+                        "kitchenName": "*בולונז*",
+                        "nameTranslate": {
+                          "en": "פסטה בולונז  מ"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "62513e85ee6beddf97824185",
+                        "dishId": "62513e52ee6beddf97824180-97824182",
+                        "name": "אלפרדו",
+                        "kitchenName": "אלפרדו",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [
+                  "חדש!"
+                ],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 1,
+                "spicyRating": null,
+                "oneLiner": "חדש!",
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "685a8a7495b09cb13a9bb229"
+              },
+              {
+                "name": "سلمون كريمي סלמון שמנת",
+                "nameTranslate": {
+                  "en": "Creamy salmon sandwich"
+                },
+                "price": 1,
+                "icon": "icon-misc",
+                "description": "סלמון, שמנת בצל כבוש רוקט וצנונית.\n",
+                "barcode": null,
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "67058fd53cfc4b562b621296",
+                    "name": "שינויים אפשריים בכריך",
+                    "indexName": "שינויים אפשריים בכריך",
+                    "nameTranslate": {
+                      "en": "possible changes in the sandwich"
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "allowToppingMultiplication": true,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "toppings": [
+                      {
+                        "_id": "670591523cfc4b562b621297",
+                        "dishId": "6363bc107739ff671c96ae72",
+                        "name": "חסה",
+                        "kitchenName": "חסה",
+                        "nameTranslate": {
+                          "en": "חסה"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "additionalCost": 0,
+                        "toppingId": "6363bc107739ff671c96ae72",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "670591593cfc4b562b621298",
+                        "dishId": "5e384843a7a00adaf9cfea1c",
+                        "name": "עגבנייה",
+                        "kitchenName": " עגבנייה",
+                        "nameTranslate": {
+                          "en": "עגבנייה"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "5e384843a7a00adaf9cfea1c",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "670591ba3cfc4b562b621299",
+                        "dishId": "5e5547553e74b41a44cbb607",
+                        "name": "בצל ירוק",
+                        "kitchenName": "בצל ירוק",
+                        "nameTranslate": {
+                          "en": "בצל ירוק"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "5e5547553e74b41a44cbb607",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67220d9acb237c15b6a11f4f",
+                        "dishId": "5e385a95a316d8c127b7b24e",
+                        "name": "מלפפון",
+                        "kitchenName": "מלפפון",
+                        "nameTranslate": {
+                          "en": "מלפפון"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "5e385a95a316d8c127b7b24e",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67220da0cb237c15b6a11f51",
+                        "dishId": "6720a56212071a9ed7814ab9",
+                        "name": "פלפל שיפקה",
+                        "kitchenName": "שיפקה",
+                        "nameTranslate": {
+                          "en": "שיפקה"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "additionalCost": 0,
+                        "toppingId": "6720a56212071a9ed7814ab9",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67220dcbcb237c15b6a11f55",
+                        "dishId": "5e385b37a316d8c127b7b254",
+                        "name": "גזר",
+                        "kitchenName": "גזר",
+                        "nameTranslate": {
+                          "en": "גזר"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "5e385b37a316d8c127b7b254",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67220e07cb237c15b6a11f57",
+                        "dishId": "63639cfff0ac56de1bd6da08",
+                        "name": "בצל",
+                        "kitchenName": "בצל",
+                        "nameTranslate": {
+                          "en": "בצל"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "additionalCost": 0,
+                        "toppingId": "63639cfff0ac56de1bd6da08",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67220e1acb237c15b6a11f5a",
+                        "dishId": "6363bc1c7739ff671c96ae74",
+                        "name": "חמוצים",
+                        "kitchenName": "חמוצים",
+                        "nameTranslate": {
+                          "en": null
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "additionalCost": 0,
+                        "toppingId": "6363bc1c7739ff671c96ae74",
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "61d588a917ffa28a282a7db2",
+                    "name": "ירקות בפנים או בצד?",
+                    "nameTranslate": {
+                      "en": " "
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": null,
+                    "indexName": null,
+                    "irrelevantForExternalCompanies": null,
+                    "irrelevantForOrdersSite": null,
+                    "toppings": [
+                      {
+                        "_id": "6544933479ab71355d49e23a",
+                        "dishId": "63be9722d615baa7cee62a21",
+                        "name": "ירקות בפנים",
+                        "kitchenName": "ירקות בפנים",
+                        "nameTranslate": {
+                          "en": null
+                        },
+                        "costAddition": 5,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 5,
+                        "toppingId": "63be9722d615baa7cee62a21",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "6544933779ab71355d49e23b",
+                        "dishId": "5feaf43419c5942e73341434",
+                        "name": "ירקות בצד",
+                        "kitchenName": "ירקות בצד",
+                        "nameTranslate": {
+                          "en": null
+                        },
+                        "costAddition": 10.5,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 10.5,
+                        "toppingId": "5feaf43419c5942e73341434",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "6544933a79ab71355d49e23c",
+                        "dishId": "619bca2ea8beaf5f4a3b4db1",
+                        "name": "בלי ירקות בכלל",
+                        "kitchenName": "בלי ירקות בכלל",
+                        "nameTranslate": {
+                          "en": null
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "619bca2ea8beaf5f4a3b4db1",
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "625d49249ba2cb9ae0713d47",
+                    "name": "תוספת סלמון",
+                    "nameTranslate": {
+                      "ar": "תוספת סלמון"
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": null,
+                    "indexName": null,
+                    "toppings": [
+                      {
+                        "_id": "6662bf976f1b6f80a0dec3e1",
+                        "dishId": "5e385e6ea316d8c127b7b26f",
+                        "name": "סלמון לסלט",
+                        "kitchenName": "סלמון לסלט",
+                        "nameTranslate": {
+                          "ar": "סלמון לסלט"
+                        },
+                        "costAddition": 10,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 10,
+                        "toppingId": "5e385e6ea316d8c127b7b26f",
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "67f8f7efa7f91ebe2abe6866",
+                        "dishId": "635e8f42d17477dd5cd4aba9",
+                        "name": "תוספת בקר",
+                        "kitchenName": "תוספת בקר",
+                        "nameTranslate": {
+                          "ar": "תוספת בקר"
+                        },
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "additionalCost": 0,
+                        "toppingId": "635e8f42d17477dd5cd4aba9",
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67051af93cfc4b562b6210d9.png",
+                "isCombo": false,
+                "comboSubs": [],
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "67051af93cfc4b562b6210d9"
+              },
+              {
+                "name": "טורטייה עוף של עמית ",
+                "nameTranslate": {
+                  "en": " "
+                },
+                "price": 45,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "טורטייה עוף של עמית ",
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "61b9cd1ce4fb140e3a931f62",
+                    "name": "להוסיף לטורטייה עוף של עמית",
+                    "nameTranslate": {
+                      "en": " "
+                    },
+                    "minQuantity": 1,
+                    "maxQuantity": 1,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": null,
+                    "indexName": null,
+                    "irrelevantForExternalCompanies": null,
+                    "irrelevantForOrdersSite": null,
+                    "toppings": [
+                      {
+                        "_id": "61b9cd28e4fb140e3a931f63",
+                        "dishId": "5e385a95a316d8c127b7b24e",
+                        "name": "מלפפון",
+                        "kitchenName": "מלפפון",
+                        "nameTranslate": {
+                          "en": "מלפפון",
+                          "ar": "מלפפון"
+                        },
+                        "isDish": true,
+                        "costAddition": 6,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "61b9cd2ae4fb140e3a931f64",
+                        "dishId": "5e385e7ea316d8c127b7b270",
+                        "name": "סלט קיסר",
+                        "kitchenName": "Caesar salad",
+                        "nameTranslate": {
+                          "en": "סלט קיסר"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "63beca62598d00b84a0cdc9c"
+              }
+            ]
+          },
+          {
+            "_id": "68b53abfec0fe3a917631981",
+            "name": "קינוחים",
+            "nameTranslate": {
+              "en": "Desserts"
+            },
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 0,
+            "dishes": [
+              {
+                "name": "Banana  בננה",
+                "nameTranslate": {
+                  "en": "banana loti"
+                },
+                "price": 2,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "בננה לוטי ",
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "5e3863dea316d8c127b7b2d8",
+                    "name": "להוסיף קצפת?",
+                    "nameTranslate": {},
+                    "minQuantity": 0,
+                    "maxQuantity": 0,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "allowToppingMultiplication": null,
+                    "indexName": "",
+                    "isNotAllowedOnAllCategories": false,
+                    "isNotAllowedOnAllMenus": false,
+                    "isNotAllowedOnAllSubCategories": false,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "irrelevantForExternalCompanies": null,
+                    "irrelevantForOrdersSite": false,
+                    "toppings": [
+                      {
+                        "_id": "6799248a66d55502d0a3133d",
+                        "dishId": "6705b1a23cfc4b562b6212d5",
+                        "name": "תוספת קצפת",
+                        "kitchenName": "תוספת קצפת",
+                        "nameTranslate": {
+                          "en": "תוספת קצפת",
+                          "ar": "תוספת קצפת"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "68c1300f6baf172be22db254",
+                        "dishId": "60fea82461bf4ffca750e6b4",
+                        "name": "תותים",
+                        "kitchenName": "תותים",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "68c130126baf172be22db255",
+                        "dishId": "60fea6e561bf4ffca750e6a4",
+                        "name": "אגוזים",
+                        "kitchenName": "אגוזים",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "printOnSeparatePrintLocation": false,
+                        "separateLabel": false,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e395472c9781e0adf439252.JPG",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "5e395472c9781e0adf439252"
+              },
+              {
+                "name": "ארוחת המבורגר",
+                "nameTranslate": {
+                  "en": "ארוחת המבורגר"
+                },
+                "price": 0,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "ארוחת המבורגר",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": true,
+                "comboSubs": [
+                  {
+                    "_id": "65e5a374bf52b5671cbc9bd2",
+                    "name": "המבורגר לבחירה",
+                    "nameTranslate": {
+                      "en": "."
+                    },
+                    "minQuantity": 1,
+                    "maxQuantity": 1,
+                    "defaultDishId": null,
+                    "sortIndex": 0,
+                    "builtIn": false,
+                    "dishes": [
+                      {
+                        "name": "המבורגר ילדים ",
+                        "nameTranslate": {
+                          "en": "."
+                        },
+                        "price": 40,
+                        "icon": "icon-misc",
+                        "description": "אני בכלל שניצל לא המבורגר",
+                        "barcode": null,
+                        "kitchenName": "המבורגר ילדים ",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5ece33479fbf960373b69fbf",
+                            "name": "תוספות בורגר ילדים",
+                            "nameTranslate": {
+                              "en": " "
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "toppings": [
+                              {
+                                "_id": "5ece33579fbf960373b69fc0",
+                                "dishId": "5ece329f9fbf960373b69fb8",
+                                "name": "שעועית ירוקה",
+                                "kitchenName": "שעועית ירוקה",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 10,
+                                "automaticSelection": null,
+                                "backgroundSelection": null,
+                                "noPrint": null,
+                                "separateLabel": null,
+                                "printOnSeparatePrintLocation": true,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "5ece335a9fbf960373b69fc1",
+                                "dishId": "5ece328f9fbf960373b69fb7",
+                                "name": "פירה",
+                                "kitchenName": "פירה",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": null,
+                                "backgroundSelection": null,
+                                "noPrint": null,
+                                "separateLabel": null,
+                                "printOnSeparatePrintLocation": null,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "5ece335d9fbf960373b69fc2",
+                                "dishId": "5e385ad5a316d8c127b7b250",
+                                "name": "אורז גדול",
+                                "kitchenName": " rice",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": null,
+                                "backgroundSelection": null,
+                                "noPrint": null,
+                                "separateLabel": null,
+                                "printOnSeparatePrintLocation": null,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          },
+                          {
+                            "_id": "5ee655f2b7de3a86b9b20303",
+                            "name": "מידת עשייה",
+                            "nameTranslate": {
+                              "en": "מידת עשייה",
+                              "ar": "מידת עשייה"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": null,
+                            "toppings": [
+                              {
+                                "_id": "6662ace4e1ab0965675b3fd6",
+                                "dishId": "6363bbdb7739ff671c96ae6c",
+                                "name": "M",
+                                "kitchenName": "M",
+                                "nameTranslate": {
+                                  "en": "M",
+                                  "ar": "M"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ace8e1ab0965675b3fd7",
+                                "dishId": "6363bbee7739ff671c96ae6d",
+                                "name": "MW",
+                                "kitchenName": "MW",
+                                "nameTranslate": {
+                                  "en": "MW",
+                                  "ar": "MW"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ad07e1ab0965675b3fd8",
+                                "dishId": "6363bbf57739ff671c96ae6e",
+                                "name": "WD",
+                                "kitchenName": "WD",
+                                "nameTranslate": {
+                                  "en": "WD",
+                                  "ar": "WD"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [
+                          {
+                            "_id": "5ece32279fbf960373b69fb1",
+                            "name": "מידת עשייה.",
+                            "nameTranslate": {
+                              "ar": "מידת עשייה."
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "indexName": null,
+                            "remarks": [
+                              {
+                                "_id": "5ece322e9fbf960373b69fb2",
+                                "groupId": "5ece32279fbf960373b69fb1",
+                                "name": "M",
+                                "nameTranslate": {
+                                  "ar": "בבב"
+                                },
+                                "printIndex": null
+                              },
+                              {
+                                "_id": "5ece32309fbf960373b69fb3",
+                                "groupId": "5ece32279fbf960373b69fb1",
+                                "name": "MW",
+                                "nameTranslate": {
+                                  "ar": "בב"
+                                },
+                                "printIndex": null
+                              },
+                              {
+                                "_id": "5ece32339fbf960373b69fb4",
+                                "groupId": "5ece32279fbf960373b69fb1",
+                                "name": "WD",
+                                "nameTranslate": {
+                                  "ar": "בבב"
+                                },
+                                "printIndex": null
+                              }
+                            ]
+                          }
+                        ],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5ece33629fbf960373b69fc3.jpeg",
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": null,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "en": null
+                        },
+                        "postOptions": [],
+                        "dishId": "5ece33629fbf960373b69fc3",
+                        "costAddition": 40
+                      },
+                      {
+                        "name": "המבורגר המעושן",
+                        "nameTranslate": {},
+                        "price": 50,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "המבורגר המעושן",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5ee655f2b7de3a86b9b20303",
+                            "name": "מידת עשייה",
+                            "nameTranslate": {
+                              "en": "מידת עשייה",
+                              "ar": "מידת עשייה"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": null,
+                            "toppings": [
+                              {
+                                "_id": "6662ace4e1ab0965675b3fd6",
+                                "dishId": "6363bbdb7739ff671c96ae6c",
+                                "name": "M",
+                                "kitchenName": "M",
+                                "nameTranslate": {
+                                  "en": "M",
+                                  "ar": "M"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ace8e1ab0965675b3fd7",
+                                "dishId": "6363bbee7739ff671c96ae6d",
+                                "name": "MW",
+                                "kitchenName": "MW",
+                                "nameTranslate": {
+                                  "en": "MW",
+                                  "ar": "MW"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ad07e1ab0965675b3fd8",
+                                "dishId": "6363bbf57739ff671c96ae6e",
+                                "name": "WD",
+                                "kitchenName": "WD",
+                                "nameTranslate": {
+                                  "en": "WD",
+                                  "ar": "WD"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          },
+                          {
+                            "_id": "612c9b3511ecc93bbc67ee00",
+                            "name": "תוספות להמבורגר ראשון",
+                            "nameTranslate": {},
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllMenus": false,
+                            "isNotAllowedOnAllCategories": false,
+                            "isNotAllowedOnAllSubCategories": false,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": null,
+                            "indexName": null,
+                            "toppings": [
+                              {
+                                "_id": "68b575e3f836647230cf1b35",
+                                "dishId": "5ee656b109b3d96880abcbae",
+                                "name": "צ׳יפס 1",
+                                "kitchenName": "צ׳יפס 1",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "68b575e6f836647230cf1b36",
+                                "dishId": "612c9b2811ecc93bbc67edff",
+                                "name": "צ'יפס בטטה 1",
+                                "kitchenName": "צ'יפס בטטה 1",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          },
+                          {
+                            "_id": "61484430f53780cee87e370f",
+                            "name": "ניתן להוריד מההמבורגר",
+                            "nameTranslate": {},
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllMenus": false,
+                            "isNotAllowedOnAllCategories": false,
+                            "isNotAllowedOnAllSubCategories": false,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "toppings": [
+                              {
+                                "_id": "6148445bf53780cee87e3710",
+                                "dishId": "5e384843a7a00adaf9cfea1c",
+                                "name": "עגבנייה",
+                                "kitchenName": " עגבנייה",
+                                "nameTranslate": {
+                                  "en": "Tomato"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6148445ef53780cee87e3711",
+                                "dishId": "5e385a95a316d8c127b7b24e",
+                                "name": "מלפפון",
+                                "kitchenName": "מלפפון",
+                                "nameTranslate": {
+                                  "en": "מלפפון",
+                                  "ar": "מלפפון"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "61484461f53780cee87e3712",
+                                "dishId": "5e3847cca7a00adaf9cfea17",
+                                "name": "בצל לבן",
+                                "kitchenName": "בצל לבן",
+                                "nameTranslate": {
+                                  "en": " "
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": false,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": false,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "dishId": "614843eaf53780cee87e370d",
+                        "costAddition": 50
+                      },
+                      {
+                        "name": "המבורגר פיטריות",
+                        "nameTranslate": {},
+                        "price": 50,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "המבורגר פיטריות",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5ee655f2b7de3a86b9b20303",
+                            "name": "מידת עשייה",
+                            "nameTranslate": {
+                              "en": "מידת עשייה",
+                              "ar": "מידת עשייה"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": null,
+                            "toppings": [
+                              {
+                                "_id": "6662ace4e1ab0965675b3fd6",
+                                "dishId": "6363bbdb7739ff671c96ae6c",
+                                "name": "M",
+                                "kitchenName": "M",
+                                "nameTranslate": {
+                                  "en": "M",
+                                  "ar": "M"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ace8e1ab0965675b3fd7",
+                                "dishId": "6363bbee7739ff671c96ae6d",
+                                "name": "MW",
+                                "kitchenName": "MW",
+                                "nameTranslate": {
+                                  "en": "MW",
+                                  "ar": "MW"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6662ad07e1ab0965675b3fd8",
+                                "dishId": "6363bbf57739ff671c96ae6e",
+                                "name": "WD",
+                                "kitchenName": "WD",
+                                "nameTranslate": {
+                                  "en": "WD",
+                                  "ar": "WD"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          },
+                          {
+                            "_id": "612c9b3511ecc93bbc67ee00",
+                            "name": "תוספות להמבורגר ראשון",
+                            "nameTranslate": {},
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllMenus": false,
+                            "isNotAllowedOnAllCategories": false,
+                            "isNotAllowedOnAllSubCategories": false,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": null,
+                            "indexName": null,
+                            "toppings": [
+                              {
+                                "_id": "68b575e3f836647230cf1b35",
+                                "dishId": "5ee656b109b3d96880abcbae",
+                                "name": "צ׳יפס 1",
+                                "kitchenName": "צ׳יפס 1",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "68b575e6f836647230cf1b36",
+                                "dishId": "612c9b2811ecc93bbc67edff",
+                                "name": "צ'יפס בטטה 1",
+                                "kitchenName": "צ'יפס בטטה 1",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          },
+                          {
+                            "_id": "61484430f53780cee87e370f",
+                            "name": "ניתן להוריד מההמבורגר",
+                            "nameTranslate": {},
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllMenus": false,
+                            "isNotAllowedOnAllCategories": false,
+                            "isNotAllowedOnAllSubCategories": false,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "toppings": [
+                              {
+                                "_id": "6148445bf53780cee87e3710",
+                                "dishId": "5e384843a7a00adaf9cfea1c",
+                                "name": "עגבנייה",
+                                "kitchenName": " עגבנייה",
+                                "nameTranslate": {
+                                  "en": "Tomato"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "6148445ef53780cee87e3711",
+                                "dishId": "5e385a95a316d8c127b7b24e",
+                                "name": "מלפפון",
+                                "kitchenName": "מלפפון",
+                                "nameTranslate": {
+                                  "en": "מלפפון",
+                                  "ar": "מלפפון"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "61484461f53780cee87e3712",
+                                "dishId": "5e3847cca7a00adaf9cfea17",
+                                "name": "בצל לבן",
+                                "kitchenName": "בצל לבן",
+                                "nameTranslate": {
+                                  "en": " "
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": false,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": false,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "dishId": "614843d2f53780cee87e370c",
+                        "costAddition": 50
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "65e5a40fbf52b5671cbc9bd4",
+                    "name": "קינוח לבחיארה",
+                    "nameTranslate": {
+                      "en": "."
+                    },
+                    "minQuantity": 1,
+                    "maxQuantity": 1,
+                    "defaultDishId": null,
+                    "sortIndex": 3,
+                    "builtIn": false,
+                    "dishes": [
+                      {
+                        "name": "טארט גבינה שוקולד",
+                        "nameTranslate": {
+                          "ar": "טארט גבינה שוקולד"
+                        },
+                        "price": 0,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "טארט גבינה שוקולד",
+                        "prepareTime": 0,
+                        "toppingsGroups": [],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": "#f9b4ff",
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/60d30986d3ea1bbf6457b4b3.jpg",
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8",
+                          "5e3833c90e0d4b0000b14922"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": false,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": false,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "ar": null
+                        },
+                        "postOptions": [],
+                        "dishId": "60d30986d3ea1bbf6457b4b3",
+                        "costAddition": 0
+                      },
+                      {
+                        "name": "מרגז פיקנטי",
+                        "nameTranslate": {
+                          "en": "מרגז פיקנטי"
+                        },
+                        "price": 0,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "מרגז פיקנטי",
+                        "prepareTime": 0,
+                        "toppingsGroups": [],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [
+                          {
+                            "name": "סלט תאילנדי",
+                            "nameTranslate": {
+                              "en": "3"
+                            },
+                            "price": null,
+                            "icon": "icon-food-weight",
+                            "description": "מלפפון, גזר, פלפל אדום, צנון ועוף ברוטב בוטנים וחלב קוקוס ",
+                            "barcode": null,
+                            "kitchenName": "thai salad",
+                            "prepareTime": 0,
+                            "toppingsGroups": [
+                              {
+                                "_id": "5e385f53a316d8c127b7b277",
+                                "name": "שינויים לרול",
+                                "nameTranslate": {
+                                  "en": "Roll changes"
+                                },
+                                "minQuantity": 0,
+                                "maxQuantity": 0,
+                                "allowAboveLimit": false,
+                                "costAboveLimit": 0,
+                                "builtin": false,
+                                "isVariableGroup": true,
+                                "allowToppingMultiplication": null,
+                                "isNotAllowedOnAllCategories": null,
+                                "isNotAllowedOnAllMenus": null,
+                                "isNotAllowedOnAllSubCategories": null,
+                                "showOnCategories": [],
+                                "showOnSubCategories": [],
+                                "indexName": "שינויים לרול",
+                                "toppings": [
+                                  {
+                                    "_id": "6783b472ab882df40aad9c10",
+                                    "dishId": "60ab61e6374f7762f8a12a51",
+                                    "name": "בצלחת",
+                                    "kitchenName": "בצלחת",
+                                    "nameTranslate": {
+                                      "en": "Plate"
+                                    },
+                                    "isDish": true,
+                                    "costAddition": 0,
+                                    "automaticSelection": false,
+                                    "backgroundSelection": false,
+                                    "noPrint": false,
+                                    "printOnSeparatePrintLocation": false,
+                                    "separateLabel": false,
+                                    "builtin": false,
+                                    "isVariable": true
+                                  },
+                                  {
+                                    "_id": "6783b476ab882df40aad9c11",
+                                    "dishId": "612c9aae11ecc93bbc67edf9",
+                                    "name": "בצק כפול",
+                                    "kitchenName": "בצק כפול",
+                                    "nameTranslate": {
+                                      "en": "Double dough"
+                                    },
+                                    "isDish": true,
+                                    "costAddition": 4,
+                                    "automaticSelection": false,
+                                    "backgroundSelection": false,
+                                    "noPrint": false,
+                                    "printOnSeparatePrintLocation": false,
+                                    "separateLabel": false,
+                                    "builtin": false,
+                                    "isVariable": true
+                                  }
+                                ]
+                              }
+                            ],
+                            "remarksGroups": [],
+                            "minToppings": null,
+                            "maxToppings": null,
+                            "tags": [],
+                            "toppingsPopup": false,
+                            "remarksPopup": false,
+                            "color": null,
+                            "saleUnit": "unit",
+                            "unitMeasure": "unit",
+                            "unitQuantity": 1,
+                            "hideInBill": false,
+                            "trackStock": false,
+                            "inStock": null,
+                            "requireQuantity": false,
+                            "requirePrice": false,
+                            "requireAuth": false,
+                            "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/giraffe_DoImWQrhgj/images/dishes/5e3952efc9781e0adf439243.jpg",
+                            "printLocations": [
+                              "5b483fd5d0e6961917977fb8"
+                            ],
+                            "cancelPrintLocations": [],
+                            "disallowQuantityChange": null,
+                            "isCombo": false,
+                            "comboSubs": [],
+                            "defaultCourse": 2,
+                            "recommendations": [],
+                            "isPizza": false,
+                            "printOrderIndex": 9999999,
+                            "noLabel": null,
+                            "irrelevantForExCompanies": null,
+                            "spicyRating": 2,
+                            "oneLiner": "מנת הדגל",
+                            "noDiscounts": null,
+                            "functionTags": [
+                              "קטגוריה: בשרי"
+                            ],
+                            "descriptionTranslate": {
+                              "en": null
+                            },
+                            "postOptions": []
+                          }
+                        ],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": null,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "en": null
+                        },
+                        "postOptions": [],
+                        "dishId": "5e395ca1c9781e0adf439281",
+                        "costAddition": 0
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "65e5a3f7bf52b5671cbc9bd3",
+                    "name": "שתייה לבחירה",
+                    "nameTranslate": {
+                      "en": "."
+                    },
+                    "minQuantity": 0,
+                    "maxQuantity": 1,
+                    "defaultDishId": null,
+                    "sortIndex": 2,
+                    "builtIn": false,
+                    "dishes": [
+                      {
+                        "name": "קולה",
+                        "nameTranslate": {
+                          "en": " "
+                        },
+                        "price": 5,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "קולה",
+                        "prepareTime": 0,
+                        "toppingsGroups": [],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": false,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": false,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "en": null
+                        },
+                        "postOptions": [],
+                        "dishId": "60901cb934f3e33f270a5182",
+                        "costAddition": 5
+                      },
+                      {
+                        "name": "אספרסו ארוך",
+                        "nameTranslate": {
+                          "en": "אספרסו ארוך"
+                        },
+                        "price": 0,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "אספרסו ארוך",
+                        "prepareTime": 0,
+                        "toppingsGroups": [],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e6539151650c436c39726bf.png",
+                        "printLocations": [
+                          "5bf6d277c41fa80c3ab10714"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": null,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "coffeeMachineId": "Coffee_2",
+                        "descriptionTranslate": {
+                          "en": null
+                        },
+                        "postOptions": [],
+                        "dishId": "5e6539151650c436c39726bf",
+                        "costAddition": 0
+                      },
+                      {
+                        "name": "תפוזים",
+                        "nameTranslate": {
+                          "en": "ש",
+                          "ar": "ש"
+                        },
+                        "price": 0,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "תפוזים",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5e6a1e421b06c33467dec035",
+                            "name": "הערות ללימונענע גרוס",
+                            "nameTranslate": {
+                              "ar": "הערות ללימונענע גרוס"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": false,
+                            "indexName": "הערות ללימונענע גרוס",
+                            "toppings": [
+                              {
+                                "_id": "64e1ac2309475083f231e09a",
+                                "dishId": "5e385963a316d8c127b7b243",
+                                "name": "לימון",
+                                "kitchenName": "lemon",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "printOnSeparatePrintLocation": null,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "66bc74d5e48fd41a0216a61c",
+                                "dishId": "5e4e2e35cb51a4e9a62de57a",
+                                "name": "*כוס קרח*",
+                                "kitchenName": "*כוס קרח*",
+                                "nameTranslate": {
+                                  "en": " ",
+                                  "ar": "כוס קרח*"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "66bc74e4e48fd41a0216a61d",
+                                "dishId": "5e552497aadf431dec68455f",
+                                "name": "נענע",
+                                "kitchenName": "נענע",
+                                "nameTranslate": {
+                                  "en": "נענע",
+                                  "ar": "נענע"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5bf6d277c41fa80c3ab10714"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": null,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "en": null,
+                          "ar": null
+                        },
+                        "postOptions": [],
+                        "dishId": "5e395c34c9781e0adf43927b",
+                        "costAddition": 0
+                      },
+                      {
+                        "name": "צ קוארבו גולד",
+                        "nameTranslate": {},
+                        "price": 10,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "צ קוארבו גולד",
+                        "prepareTime": 0,
+                        "toppingsGroups": [],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "5bf6d277c41fa80c3ab10714"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": null,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "dishId": "5e3989c28669802f2935af43",
+                        "costAddition": 10
+                      },
+                      {
+                        "name": "מים מינרליים",
+                        "nameTranslate": {
+                          "en": "Water",
+                          "ar": "1מים מינרליים"
+                        },
+                        "price": 10,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "מים מינרליים",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5e6a1e421b06c33467dec035",
+                            "name": "הערות ללימונענע גרוס",
+                            "nameTranslate": {
+                              "ar": "הערות ללימונענע גרוס"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 0,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 0,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": false,
+                            "indexName": "הערות ללימונענע גרוס",
+                            "toppings": [
+                              {
+                                "_id": "64e1ac2309475083f231e09a",
+                                "dishId": "5e385963a316d8c127b7b243",
+                                "name": "לימון",
+                                "kitchenName": "lemon",
+                                "nameTranslate": {},
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "separateLabel": false,
+                                "printOnSeparatePrintLocation": null,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "66bc74d5e48fd41a0216a61c",
+                                "dishId": "5e4e2e35cb51a4e9a62de57a",
+                                "name": "*כוס קרח*",
+                                "kitchenName": "*כוס קרח*",
+                                "nameTranslate": {
+                                  "en": " ",
+                                  "ar": "כוס קרח*"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "66bc74e4e48fd41a0216a61d",
+                                "dishId": "5e552497aadf431dec68455f",
+                                "name": "נענע",
+                                "kitchenName": "נענע",
+                                "nameTranslate": {
+                                  "en": "נענע",
+                                  "ar": "נענע"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5ee65909816febc0630e529d.jpg",
+                        "printLocations": [
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": null,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 1,
+                        "noLabel": null,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": null,
+                        "descriptionTranslate": {
+                          "en": null,
+                          "ar": null
+                        },
+                        "postOptions": [],
+                        "activeBySchedule": true,
+                        "dishId": "5ee65909816febc0630e529d",
+                        "costAddition": 10
+                      },
+                      {
+                        "name": "אמריקנו גדול RO ",
+                        "nameTranslate": {
+                          "en": "אמריקנו גדול RO ",
+                          "ar": "אמריקנו גדול RO "
+                        },
+                        "price": 10,
+                        "icon": "icon-misc",
+                        "description": null,
+                        "barcode": null,
+                        "kitchenName": "אמריקנו גדול RO ",
+                        "prepareTime": 0,
+                        "toppingsGroups": [
+                          {
+                            "_id": "5e39797d35dddd23ae885c5c",
+                            "name": "תרצה/י לשנות את סוג חלב?",
+                            "nameTranslate": {
+                              "en": "Choose a type of milk"
+                            },
+                            "minQuantity": 0,
+                            "maxQuantity": 1,
+                            "allowAboveLimit": false,
+                            "costAboveLimit": 5,
+                            "builtin": false,
+                            "isVariableGroup": true,
+                            "isNotAllowedOnAllMenus": null,
+                            "isNotAllowedOnAllCategories": null,
+                            "isNotAllowedOnAllSubCategories": null,
+                            "showOnCategories": [],
+                            "showOnSubCategories": [],
+                            "allowToppingMultiplication": false,
+                            "indexName": "",
+                            "toppings": [
+                              {
+                                "_id": "67991d6166d55502d0a31322",
+                                "dishId": "5e395512c9781e0adf439257",
+                                "name": "חלב רגיל 3%",
+                                "kitchenName": "חלב רגיל 3%",
+                                "nameTranslate": {
+                                  "en": "חלב רגיל 3%",
+                                  "ar": "חלב רגיל 3%"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": true,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "67991d6466d55502d0a31323",
+                                "dishId": "605b1590fd38a25eb71e5801",
+                                "name": "חלב דל 1%",
+                                "kitchenName": "חלב דל 1%",
+                                "nameTranslate": {
+                                  "en": "חלב דל 1%",
+                                  "ar": "חלב דל 1%"
+                                },
+                                "isDish": true,
+                                "costAddition": 0,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "67991d6866d55502d0a31324",
+                                "dishId": "60d826e5bc6667b4ed34cd0c",
+                                "name": "חלב סויה",
+                                "kitchenName": "חלב סויה",
+                                "nameTranslate": {
+                                  "en": "חלב סויה",
+                                  "ar": "חלב סויה"
+                                },
+                                "isDish": true,
+                                "costAddition": 5,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "67991dd566d55502d0a31327",
+                                "dishId": "60d826c4bc6667b4ed34cd0a",
+                                "name": "חלב שקדים",
+                                "kitchenName": "חלב שקדים",
+                                "nameTranslate": {
+                                  "en": " ",
+                                  "ar": "חלב שקדים"
+                                },
+                                "isDish": true,
+                                "costAddition": 3,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              },
+                              {
+                                "_id": "67991dd766d55502d0a31328",
+                                "dishId": "60d826dabc6667b4ed34cd0b",
+                                "name": "חלב שיבולת שועל",
+                                "kitchenName": "חלב שיבולת שועל",
+                                "nameTranslate": {
+                                  "en": "חלב שיבולת שועל"
+                                },
+                                "isDish": true,
+                                "costAddition": 4,
+                                "automaticSelection": false,
+                                "backgroundSelection": false,
+                                "noPrint": false,
+                                "printOnSeparatePrintLocation": false,
+                                "separateLabel": false,
+                                "builtin": false,
+                                "isVariable": true
+                              }
+                            ]
+                          }
+                        ],
+                        "remarksGroups": [],
+                        "minToppings": null,
+                        "maxToppings": null,
+                        "tags": [
+                          "מוגש בכוס חד פעמית"
+                        ],
+                        "toppingsPopup": false,
+                        "remarksPopup": false,
+                        "color": null,
+                        "saleUnit": "unit",
+                        "unitMeasure": "unit",
+                        "unitQuantity": 1,
+                        "hideInBill": false,
+                        "trackStock": false,
+                        "inStock": null,
+                        "requireQuantity": false,
+                        "requirePrice": false,
+                        "requireAuth": false,
+                        "imagePath": null,
+                        "printLocations": [
+                          "61b60457e4fb140e3a931f0a",
+                          "5b483fd5d0e6961917977fb8"
+                        ],
+                        "cancelPrintLocations": [],
+                        "disallowQuantityChange": false,
+                        "isCombo": false,
+                        "comboSubs": [],
+                        "defaultCourse": null,
+                        "recommendations": [],
+                        "isPizza": false,
+                        "printOrderIndex": 9999999,
+                        "noLabel": false,
+                        "irrelevantForExCompanies": false,
+                        "spicyRating": null,
+                        "oneLiner": null,
+                        "noDiscounts": true,
+                        "descriptionTranslate": {
+                          "en": null,
+                          "ar": null
+                        },
+                        "postOptions": [],
+                        "dishId": "6151f0d0faad0eb804eb275b",
+                        "costAddition": 10
+                      }
+                    ]
+                  }
+                ],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "65e59f47bf52b5671cbc9bc6"
+              },
+              {
+                "name": "קרמו",
+                "nameTranslate": {},
+                "price": 2,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "קרמו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "time",
+                "unitMeasure": "halfAnHour",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/625ef0c9696c5748a698a3bf.JPG",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "625ef0c9696c5748a698a3bf"
+              }
+            ]
+          },
+          {
+            "_id": "68b536135b25a7142b29b196",
+            "name": "INSIDE OUT",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 1,
+            "dishes": [
+              {
+                "name": "פוטומאקי דג I/O מטוגן",
+                "nameTranslate": {},
+                "price": 5,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "פוטומאקי דג I/O מטוגן",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e39722d1c5ae45b19191f85.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "5e39722d1c5ae45b19191f85"
+              },
+              {
+                "name": "I/O טונה",
+                "nameTranslate": {},
+                "price": 8,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "I/O טונה",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/667a9e5bb01b7fffd7002672.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "667a9e5bb01b7fffd7002672"
+              },
+              {
+                "name": "I/O סלמון אפוי",
+                "nameTranslate": {},
+                "price": 8,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "I/O סלמון אפוי",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/66dd4a5df26ae5b828cd8f30.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "66dd4a5df26ae5b828cd8f30"
+              }
+            ]
+          },
+          {
+            "_id": "68b535a05b25a7142b29b192",
+            "name": "ילדים",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 2,
+            "dishes": [
+              {
+                "name": "שניצלונים",
+                "nameTranslate": {},
+                "price": 2,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "schnizelonim",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e396a181c5ae45b19191ed8.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "5e396a181c5ae45b19191ed8"
+              },
+              {
+                "name": "שניצלונים עובדים ",
+                "nameTranslate": {
+                  "en": "שניצלונים עובדים "
+                },
+                "price": 0,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "schnizelonim",
+                "prepareTime": 0,
+                "toppingsGroups": [
+                  {
+                    "_id": "5e3968a31c5ae45b19191eae",
+                    "name": "הערות מנות ילדים",
+                    "nameTranslate": {},
+                    "minQuantity": 0,
+                    "maxQuantity": 0,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": true,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllCategories": null,
+                    "isNotAllowedOnAllMenus": null,
+                    "isNotAllowedOnAllSubCategories": null,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "toppings": [
+                      {
+                        "_id": "64ec50dcbf00b5bf7f5a93ef",
+                        "dishId": "5e385b37a316d8c127b7b254",
+                        "name": "גזר",
+                        "kitchenName": "גזר",
+                        "nameTranslate": {
+                          "en": "גזר",
+                          "ar": "גזר"
+                        },
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": true,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": true,
+                        "builtin": true,
+                        "isVariable": true
+                      }
+                    ]
+                  },
+                  {
+                    "_id": "5e3968e21c5ae45b19191eb8",
+                    "name": "אורז או נודלס",
+                    "nameTranslate": {
+                      "en": "ש"
+                    },
+                    "minQuantity": 1,
+                    "maxQuantity": 2,
+                    "allowAboveLimit": false,
+                    "costAboveLimit": 0,
+                    "builtin": false,
+                    "isVariableGroup": true,
+                    "isNotAllowedOnAllCategories": null,
+                    "isNotAllowedOnAllMenus": null,
+                    "isNotAllowedOnAllSubCategories": null,
+                    "showOnCategories": [],
+                    "showOnSubCategories": [],
+                    "allowToppingMultiplication": null,
+                    "indexName": null,
+                    "irrelevantForExternalCompanies": null,
+                    "irrelevantForOrdersSite": null,
+                    "toppings": [
+                      {
+                        "_id": "5e3968f51c5ae45b19191eba",
+                        "dishId": "5e385b9ca316d8c127b7b258",
+                        "name": "אורז מטוגן ",
+                        "nameTranslate": {
+                          "en": "אורז מטוגן ",
+                          "ar": "אורז מטוגן "
+                        },
+                        "isDish": true,
+                        "costAddition": 5,
+                        "automaticSelection": null,
+                        "backgroundSelection": null,
+                        "kitchenName": "fried rice",
+                        "noPrint": null,
+                        "separateLabel": null,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "5e3968f71c5ae45b19191ebb",
+                        "dishId": "5e3847dca7a00adaf9cfea18",
+                        "name": "נודלס",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": true,
+                        "backgroundSelection": null,
+                        "kitchenName": "noodles",
+                        "noPrint": null,
+                        "separateLabel": null,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      },
+                      {
+                        "_id": "627137163758bf98117a8541",
+                        "dishId": "5e385ad5a316d8c127b7b250",
+                        "name": "אורז גדול",
+                        "kitchenName": " rice",
+                        "nameTranslate": {},
+                        "isDish": true,
+                        "costAddition": 0,
+                        "automaticSelection": false,
+                        "backgroundSelection": false,
+                        "noPrint": false,
+                        "separateLabel": false,
+                        "printOnSeparatePrintLocation": null,
+                        "builtin": false,
+                        "isVariable": true
+                      }
+                    ]
+                  }
+                ],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {
+                  "en": null
+                },
+                "postOptions": [],
+                "dishId": "5e6784d3c71636f55da44655"
+              },
+              {
+                "name": "סושי ילדים",
+                "nameTranslate": {},
+                "price": 3,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "kids sushi",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e396a881c5ae45b19191eda.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "5e396a881c5ae45b19191eda"
+              },
+              {
+                "name": "אורז מטוגן עוף ילדים",
+                "nameTranslate": {},
+                "price": 4,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "fried rice chicken baby",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "5e396a531c5ae45b19191ed9"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "_id": "68b5343c5b25a7142b29b183",
+        "name": "שתיה",
+        "nameTranslate": {
+          "en": "Drinks"
+        },
+        "icon": "icon-brief",
+        "schedule": {
+          "active": false,
+          "sun": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "mon": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "tue": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "wed": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "thu": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "fri": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "sat": {
+            "active": false,
+            "on": null,
+            "off": null
+          }
+        },
+        "sortIndex": 1,
+        "subCategories": [
+          {
+            "_id": "68b534655b25a7142b29b187",
+            "name": "שתיה קלה",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 0,
+            "dishes": [
+              {
+                "name": "סודה",
+                "nameTranslate": {},
+                "price": 10,
+                "icon": "icon-misc",
+                "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+                "barcode": null,
+                "kitchenName": "סודה",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054b293cfc4b562b621127.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "67054b293cfc4b562b621127"
+              },
+              {
+                "name": "מים מינרלים",
+                "nameTranslate": {},
+                "price": 10,
+                "icon": "icon-misc",
+                "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+                "barcode": null,
+                "kitchenName": "מים מינרלים",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/670549eb3cfc4b562b621125.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "670549eb3cfc4b562b621125"
+              },
+              {
+                "name": "קוקה קולה",
+                "nameTranslate": {},
+                "price": 8,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "קוקה קולה",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054d5a3cfc4b562b621131.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "67054d5a3cfc4b562b621131"
+              },
+              {
+                "name": "זירו",
+                "nameTranslate": {
+                  "en": "זירו",
+                  "ar": "זירו"
+                },
+                "price": 8,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": "5449000131805",
+                "kitchenName": "זירו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "en": null,
+                  "ar": null
+                },
+                "postOptions": [],
+                "dishId": "67054d333cfc4b562b62112e"
+              },
+              {
+                "name": "מיץ ענבים",
+                "nameTranslate": {
+                  "en": "מיץ ענבים",
+                  "ar": "מיץ ענבים"
+                },
+                "price": 7,
+                "icon": "icon-misc",
+                "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+                "barcode": null,
+                "kitchenName": "מיץ ענבים",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": null,
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "en": null,
+                  "ar": null
+                },
+                "postOptions": [],
+                "dishId": "67054b4d3cfc4b562b62112b"
+              },
+              {
+                "name": "פיוזטי",
+                "nameTranslate": {
+                  "ar": "פיוזטי"
+                },
+                "price": 9,
+                "icon": "icon-misc",
+                "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+                "barcode": null,
+                "kitchenName": "פיוזטי",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054b323cfc4b562b621128.jpg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {
+                  "ar": null
+                },
+                "postOptions": [],
+                "dishId": "67054b323cfc4b562b621128"
+              },
+              {
+                "name": "קרמו",
+                "nameTranslate": {},
+                "price": 2,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "קרמו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "time",
+                "unitMeasure": "halfAnHour",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/625ef0c9696c5748a698a3bf.JPG",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "625ef0c9696c5748a698a3bf"
+              }
+            ]
+          },
+          {
+            "_id": "68b5362e5b25a7142b29b198",
+            "name": "יין",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 1,
+            "dishes": [
+              {
+                "name": "בק. לופז דה הארו",
+                "nameTranslate": {},
+                "price": 5,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "בק. לופז דה הארו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054f383cfc4b562b62113c.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "67054f383cfc4b562b62113c"
+              },
+              {
+                "name": "בק. אסרטיקו",
+                "nameTranslate": {},
+                "price": 5,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "בק. אסרטיקו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/6705509b3cfc4b562b621150.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "6705509b3cfc4b562b621150"
+              },
+              {
+                "name": "בק. דאנז'ו",
+                "nameTranslate": {},
+                "price": 5,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "בק. דאנז'ו",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054fee3cfc4b562b621146.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": false,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "67054fee3cfc4b562b621146"
+              }
+            ]
+          }
+        ],
+        "iros": true
+      },
+      {
+        "_id": "68b534515b25a7142b29b185",
+        "name": "סכו\"ם \\ צ'ופסטיקס",
+        "nameTranslate": {},
+        "icon": "icon-brief",
+        "schedule": {
+          "active": false,
+          "sun": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "mon": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "tue": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "wed": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "thu": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "fri": {
+            "active": false,
+            "on": null,
+            "off": null
+          },
+          "sat": {
+            "active": false,
+            "on": null,
+            "off": null
+          }
+        },
+        "sortIndex": 2,
+        "subCategories": [
+          {
+            "_id": "68b5345a5b25a7142b29b186",
+            "name": "סכו\"ם \\ צ'ופסטיקס",
+            "nameTranslate": {},
+            "icon": "icon-brief",
+            "schedule": {
+              "active": false,
+              "sun": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "mon": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "tue": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "wed": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "thu": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "fri": {
+                "active": false,
+                "on": null,
+                "off": null
+              },
+              "sat": {
+                "active": false,
+                "on": null,
+                "off": null
+              }
+            },
+            "description": null,
+            "sortIndex": 0,
+            "dishes": [
+              {
+                "name": "סכו\"ם \\ צ'ופסטיקס",
+                "nameTranslate": {},
+                "price": 0.1,
+                "icon": "icon-misc",
+                "description": null,
+                "barcode": null,
+                "kitchenName": "סכו\"ם \\ צ'ופסטיקס",
+                "prepareTime": 0,
+                "toppingsGroups": [],
+                "remarksGroups": [],
+                "minToppings": null,
+                "maxToppings": null,
+                "tags": [],
+                "saleUnit": "unit",
+                "unitMeasure": "unit",
+                "unitQuantity": 1,
+                "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e3845eba7a00adaf9cfea07.jpeg",
+                "isCombo": false,
+                "comboSubs": [],
+                "printOrderIndex": 9999999,
+                "spicyRating": null,
+                "oneLiner": null,
+                "noDiscounts": null,
+                "descriptionTranslate": {},
+                "postOptions": [],
+                "dishId": "5e3845eba7a00adaf9cfea07"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "lastUpdate": "2025-11-17T11:25:04.605Z",
+  "message": "success",
+  "status": 1
+}

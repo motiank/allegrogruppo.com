@@ -1,0 +1,535 @@
+{
+  "5e6784ecc71636f55da44656": {
+    "basePrice": 5,
+    "groups": [
+      {
+        "id": "69032aeedff0f5c7e947be70",
+        "type": "multiple",
+        "title": {
+          "he": "תוספות לתירס צלוי",
+          "en": "Extras for Grilled Corn",
+          "ar": "إضافات للذرة المشوية"
+        },
+        "required": false,
+        "min": 0,
+        "max": 2,
+        "options": [
+          {
+            "id": "69032afedff0f5c7e947be71",
+            "price": 0,
+            "label": {
+              "he": "פרמז׳ן",
+              "en": "Parmesan",
+              "ar": "بارميزان"
+            }
+          },
+          {
+            "id": "69032b03dff0f5c7e947be72",
+            "price": 0,
+            "label": {
+              "he": "קוקוס",
+              "en": "Coconut",
+              "ar": "جوز الهند"
+            }
+          },
+          {
+            "id": "69032b07dff0f5c7e947be73",
+            "price": 0,
+            "label": {
+              "he": "צ׳ילי טרי",
+              "en": "Fresh Chili",
+              "ar": "فلفل حار طازج"
+            }
+          },
+          {
+            "id": "69032b0bdff0f5c7e947be74",
+            "price": 0,
+            "label": {
+              "he": "חלפיניו",
+              "en": "Jalapeño",
+              "ar": "هالبينو"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "685a8a7495b09cb13a9bb229": {
+    "basePrice": 1,
+    "groups": [
+      {
+        "id": "60feaee861bf4ffca750e711",
+        "type": "single",
+        "title": {
+          "he": "סוג פסטה",
+          "en": "Pasta Type",
+          "ar": "نوع الباستا"
+        },
+        "required": false,
+        "options": [
+          {
+            "id": "6662cc621048565e2d7301fc",
+            "price": 0,
+            "label": {
+              "he": "פטוצ׳יני",
+              "en": "Fettuccine",
+              "ar": "فيتوتشيني"
+            }
+          },
+          {
+            "id": "6662cc641048565e2d7301fd",
+            "price": 0,
+            "label": {
+              "he": "פנה",
+              "en": "Penne",
+              "ar": "بيني"
+            }
+          },
+          {
+            "id": "6662cc6a1048565e2d7301ff",
+            "price": 0,
+            "label": {
+              "he": "ספגטי",
+              "en": "Spaghetti",
+              "ar": "سباغيتي"
+            }
+          },
+          {
+            "id": "6662cc661048565e2d7301fe",
+            "price": 0,
+            "label": {
+              "he": "ספגטי ללא גלוטן",
+              "en": "Gluten-free Spaghetti",
+              "ar": "سباغيتي خالية من الغلوتين"
+            }
+          }
+        ]
+      },
+      {
+        "id": "62513e6cee6beddf97824182",
+        "type": "single",
+        "title": {
+          "he": "בחירת רוטב ",
+          "en": "בחירת רוטב ",
+          "ar": "בחירת רוטב "
+        },
+        "required": false,
+        "options": [
+          {
+            "id": "62513e7cee6beddf97824183",
+            "price": 0,
+            "label": {
+              "he": "רוזה",
+              "en": "Rosa",
+              "ar": "روزا"
+            }
+          },
+          {
+            "id": "62513e82ee6beddf97824184",
+            "price": 0,
+            "label": {
+              "he": "פסטה בולונז  מ",
+              "en": "פסטה בולונז  מ",
+              "ar": "פסטה בולונז  מ"
+            }
+          },
+          {
+            "id": "62513e85ee6beddf97824185",
+            "price": 0,
+            "label": {
+              "he": "אלפרדו",
+              "en": "Alfredo",
+              "ar": "ألفريدو"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "67051af93cfc4b562b6210d9": {
+    "basePrice": 1,
+    "groups": [
+      {
+        "id": "67058fd53cfc4b562b621296",
+        "type": "multiple",
+        "title": {
+          "he": "שינויים אפשריים בכריך",
+          "en": "possible changes in the sandwich",
+          "ar": "تغييرات محتملة في الساندويتش"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "670591523cfc4b562b621297",
+            "price": 0,
+            "label": {
+              "he": "חסה",
+              "en": "Lettuce",
+              "ar": "خس"
+            }
+          },
+          {
+            "id": "670591593cfc4b562b621298",
+            "price": 0,
+            "label": {
+              "he": "עגבנייה",
+              "en": "Tomato",
+              "ar": "طماطم"
+            }
+          },
+          {
+            "id": "670591ba3cfc4b562b621299",
+            "price": 0,
+            "label": {
+              "he": "בצל ירוק",
+              "en": "בצל ירוק",
+              "ar": "בצל ירוק"
+            }
+          },
+          {
+            "id": "67220d9acb237c15b6a11f4f",
+            "price": 0,
+            "label": {
+              "he": "מלפפון",
+              "en": "Cucumber",
+              "ar": "خيار"
+            }
+          },
+          {
+            "id": "67220da0cb237c15b6a11f51",
+            "price": 0,
+            "label": {
+              "he": "פלפל שיפקה",
+              "en": "פלפל שיפקה",
+              "ar": "פלפל שיפקה"
+            }
+          },
+          {
+            "id": "67220dcbcb237c15b6a11f55",
+            "price": 0,
+            "label": {
+              "he": "גזר",
+              "en": "גזר",
+              "ar": "גזר"
+            }
+          },
+          {
+            "id": "67220e07cb237c15b6a11f57",
+            "price": 0,
+            "label": {
+              "he": "בצל",
+              "en": "Onion",
+              "ar": "بصل"
+            }
+          },
+          {
+            "id": "67220e1acb237c15b6a11f5a",
+            "price": 0,
+            "label": {
+              "he": "חמוצים",
+              "en": "חמוצים",
+              "ar": "חמוצים"
+            }
+          }
+        ]
+      },
+      {
+        "id": "61d588a917ffa28a282a7db2",
+        "type": "multiple",
+        "title": {
+          "he": "ירקות בפנים או בצד?",
+          "en": "ירקות בפנים או בצד?",
+          "ar": "ירקות בפנים או בצד?"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6544933479ab71355d49e23a",
+            "price": 5,
+            "label": {
+              "he": "ירקות בפנים",
+              "en": "ירקות בפנים",
+              "ar": "ירקות בפנים"
+            }
+          },
+          {
+            "id": "6544933779ab71355d49e23b",
+            "price": 10.5,
+            "label": {
+              "he": "ירקות בצד",
+              "en": "ירקות בצד",
+              "ar": "ירקות בצד"
+            }
+          },
+          {
+            "id": "6544933a79ab71355d49e23c",
+            "price": 0,
+            "label": {
+              "he": "בלי ירקות בכלל",
+              "en": "בלי ירקות בכלל",
+              "ar": "בלי ירקות בכלל"
+            }
+          }
+        ]
+      },
+      {
+        "id": "625d49249ba2cb9ae0713d47",
+        "type": "multiple",
+        "title": {
+          "he": "תוספת סלמון",
+          "en": "Extra Salmon",
+          "ar": "إضافة سلمون"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6662bf976f1b6f80a0dec3e1",
+            "price": 10,
+            "label": {
+              "he": "סלמון לסלט",
+              "en": "סלמון לסלט",
+              "ar": "סלמון לסלט"
+            }
+          },
+          {
+            "id": "67f8f7efa7f91ebe2abe6866",
+            "price": 0,
+            "label": {
+              "he": "תוספת בקר",
+              "en": "תוספת בקר",
+              "ar": "תוספת בקר"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "63beca62598d00b84a0cdc9c": {
+    "basePrice": 45,
+    "groups": [
+      {
+        "id": "61b9cd1ce4fb140e3a931f62",
+        "type": "single",
+        "title": {
+          "he": "להוסיף לטורטייה עוף של עמית",
+          "en": "להוסיף לטורטייה עוף של עמית",
+          "ar": "להוסיף לטורטייה עוף של עמית"
+        },
+        "required": true,
+        "options": [
+          {
+            "id": "61b9cd28e4fb140e3a931f63",
+            "price": 6,
+            "label": {
+              "he": "מלפפון",
+              "en": "Cucumber",
+              "ar": "خيار"
+            }
+          },
+          {
+            "id": "61b9cd2ae4fb140e3a931f64",
+            "price": 0,
+            "label": {
+              "he": "סלט קיסר",
+              "en": "סלט קיסר",
+              "ar": "סלט קיסר"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "5e395472c9781e0adf439252": {
+    "basePrice": 2,
+    "groups": [
+      {
+        "id": "5e3863dea316d8c127b7b2d8",
+        "type": "multiple",
+        "title": {
+          "he": "להוסיף קצפת?",
+          "en": "להוסיף קצפת?",
+          "ar": "להוסיף קצפת?"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6799248a66d55502d0a3133d",
+            "price": 0,
+            "label": {
+              "he": "תוספת קצפת",
+              "en": "תוספת קצפת",
+              "ar": "תוספת קצפת"
+            }
+          },
+          {
+            "id": "68c1300f6baf172be22db254",
+            "price": 0,
+            "label": {
+              "he": "תותים",
+              "en": "תותים",
+              "ar": "תותים"
+            }
+          },
+          {
+            "id": "68c130126baf172be22db255",
+            "price": 0,
+            "label": {
+              "he": "אגוזים",
+              "en": "אגוזים",
+              "ar": "אגוזים"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "65e59f47bf52b5671cbc9bc6": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "625ef0c9696c5748a698a3bf": {
+    "basePrice": 2,
+    "groups": []
+  },
+  "5e39722d1c5ae45b19191f85": {
+    "basePrice": 5,
+    "groups": []
+  },
+  "667a9e5bb01b7fffd7002672": {
+    "basePrice": 8,
+    "groups": []
+  },
+  "66dd4a5df26ae5b828cd8f30": {
+    "basePrice": 8,
+    "groups": []
+  },
+  "5e396a181c5ae45b19191ed8": {
+    "basePrice": 2,
+    "groups": []
+  },
+  "5e6784d3c71636f55da44655": {
+    "basePrice": 0,
+    "groups": [
+      {
+        "id": "5e3968a31c5ae45b19191eae",
+        "type": "multiple",
+        "title": {
+          "he": "הערות מנות ילדים",
+          "en": "הערות מנות ילדים",
+          "ar": "הערות מנות ילדים"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "64ec50dcbf00b5bf7f5a93ef",
+            "price": 0,
+            "label": {
+              "he": "גזר",
+              "en": "גזר",
+              "ar": "גזר"
+            }
+          }
+        ]
+      },
+      {
+        "id": "5e3968e21c5ae45b19191eb8",
+        "type": "multiple",
+        "title": {
+          "he": "אורז או נודלס",
+          "en": "אורז או נודלס",
+          "ar": "אורז או נודלס"
+        },
+        "required": true,
+        "min": 1,
+        "max": 2,
+        "options": [
+          {
+            "id": "5e3968f51c5ae45b19191eba",
+            "price": 5,
+            "label": {
+              "he": "אורז מטוגן ",
+              "en": "אורז מטוגן ",
+              "ar": "אורז מטוגן "
+            }
+          },
+          {
+            "id": "5e3968f71c5ae45b19191ebb",
+            "price": 0,
+            "label": {
+              "he": "נודלס",
+              "en": "נודלס",
+              "ar": "נודלס"
+            }
+          },
+          {
+            "id": "627137163758bf98117a8541",
+            "price": 0,
+            "label": {
+              "he": "אורז גדול",
+              "en": "אורז גדול",
+              "ar": "אורז גדול"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "5e396a881c5ae45b19191eda": {
+    "basePrice": 3,
+    "groups": []
+  },
+  "5e396a531c5ae45b19191ed9": {
+    "basePrice": 4,
+    "groups": []
+  },
+  "67054b293cfc4b562b621127": {
+    "basePrice": 10,
+    "groups": []
+  },
+  "670549eb3cfc4b562b621125": {
+    "basePrice": 10,
+    "groups": []
+  },
+  "67054d5a3cfc4b562b621131": {
+    "basePrice": 8,
+    "groups": []
+  },
+  "67054d333cfc4b562b62112e": {
+    "basePrice": 8,
+    "groups": []
+  },
+  "67054b4d3cfc4b562b62112b": {
+    "basePrice": 7,
+    "groups": []
+  },
+  "67054b323cfc4b562b621128": {
+    "basePrice": 9,
+    "groups": []
+  },
+  "67054f383cfc4b562b62113c": {
+    "basePrice": 5,
+    "groups": []
+  },
+  "6705509b3cfc4b562b621150": {
+    "basePrice": 5,
+    "groups": []
+  },
+  "67054fee3cfc4b562b621146": {
+    "basePrice": 5,
+    "groups": []
+  },
+  "5e3845eba7a00adaf9cfea07": {
+    "basePrice": 0.1,
+    "groups": []
+  }
+}

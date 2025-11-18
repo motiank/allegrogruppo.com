@@ -69,6 +69,23 @@ app.get('/api/meal-options', (req, res) => {
   }
 });
 
+// Beecomm metadata endpoint
+app.get('/api/beecomm-metadata', (req, res) => {
+  try {
+    const metadataPath = join(__dirname, '..', 'menu', 'beecomm_metadata.json');
+    const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error loading beecomm metadata:', error);
+    // Return empty metadata if file doesn't exist (for backward compatibility)
+    res.json({
+      menuRevision: '',
+      source: 'beecomm',
+      dishMappings: {},
+    });
+  }
+});
+
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));

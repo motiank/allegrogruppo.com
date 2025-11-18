@@ -1,5 +1,5 @@
 NODE_ENV=test
-
+; 5742719
 PELECARD_TERMINAL=0882577012
 PELECARD_USER=toolyTEST
 PELECARD_PASSWORD=B0BnKOnB
@@ -14,6 +14,11 @@ BEECOMM_API_BASE_URL=https://api.beecommcloud.com/v1
 BEECOMM_RESTAURANT_ID=5c20b5e4890b96000070283d
 BEECOMM_BRANCH_ID=5c21c431f953ba0000fca85a
 
-MENU_PATH=menu/mealOptions.json
+MENU_PATH=menu/beecomm_menu.json
+
+
+5742719
+
+# MENU_PATH=menu/mealOptions.json
 
 #{"result":true,"request_id":"1ea1d6b5-10e4-4868-a95e-1e8170951e29","access_list":[{"restaurantId":"5c20b5e4890b96000070283d","restaurantName":"The SandBox","branches":[{"id":"5c21c431f953ba0000fca85a","name":"בדיקות"}]}]}

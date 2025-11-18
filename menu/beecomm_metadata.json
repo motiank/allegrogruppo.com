@@ -1,0 +1,757 @@
+{
+  "menuRevision": "691b061dca26f100029a6794",
+  "source": "beecomm",
+  "generatedAt": "2025-11-18T12:11:48.212Z",
+  "totalDishes": 25,
+  "dishMappings": {
+    "5e6784ecc71636f55da44656": {
+      "dishId": "5e6784ecc71636f55da44656",
+      "dishName": "תירס צלוי ",
+      "kitchenName": "תירס צלוי ",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e6784ecc71636f55da44656.JPG",
+      "description": null,
+      "oneLiner": "טעים",
+      "tags": [
+        "חדש!"
+      ],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "תירס צלוי ",
+        "en": "Grilled Corn",
+        "ar": "ذرة مشوية"
+      },
+      "groupMappings": [
+        {
+          "groupId": "69032aeedff0f5c7e947be70",
+          "groupName": "תוספות לתירס צלוי",
+          "minQuantity": 0,
+          "maxQuantity": 2,
+          "allowAboveLimit": true,
+          "costAboveLimit": 3,
+          "optionMappings": [
+            {
+              "optionId": "69032afedff0f5c7e947be71",
+              "dishId": "60fea71c61bf4ffca750e6a7",
+              "kitchenName": "פרמז׳ן",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "69032b03dff0f5c7e947be72",
+              "dishId": "649c232668f4532ddf5c8178",
+              "kitchenName": "קוקוס",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "69032b07dff0f5c7e947be73",
+              "dishId": "5e5547303e74b41a44cbb604",
+              "kitchenName": "צ׳ילי טרי",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "69032b0bdff0f5c7e947be74",
+              "dishId": "6183d94ee55186a72ce0aef2",
+              "kitchenName": "חלפיניו",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "685a8a7495b09cb13a9bb229": {
+      "dishId": "685a8a7495b09cb13a9bb229",
+      "dishName": "פסטה בהרכבה ",
+      "kitchenName": "פסטה בהרכבה ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": "חדש!",
+      "tags": [
+        "חדש!"
+      ],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פסטה בהרכבה ",
+        "en": "Custom Pasta",
+        "ar": "باستا مخصصة"
+      },
+      "groupMappings": [
+        {
+          "groupId": "60feaee861bf4ffca750e711",
+          "groupName": "סוג פסטה",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6662cc621048565e2d7301fc",
+              "dishId": "60fea91c61bf4ffca750e6c3-a750e711",
+              "kitchenName": "פטוצ׳יני",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6662cc641048565e2d7301fd",
+              "dishId": "62cfcef065ccb4fd8abe12a9-a750e711",
+              "kitchenName": "פנה",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6662cc6a1048565e2d7301ff",
+              "dishId": "62513dd7ee6beddf9782417b-a750e711",
+              "kitchenName": "ספגטי",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6662cc661048565e2d7301fe",
+              "dishId": "60fea92c61bf4ffca750e6c4-a750e711",
+              "kitchenName": "ספגטי ללא גלוטן",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        },
+        {
+          "groupId": "62513e6cee6beddf97824182",
+          "groupName": "בחירת רוטב ",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "62513e7cee6beddf97824183",
+              "dishId": "60fea61861bf4ffca750e69c-97824182",
+              "kitchenName": "רוזה",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "62513e82ee6beddf97824184",
+              "dishId": "62513e44ee6beddf9782417f-97824182",
+              "kitchenName": "*בולונז*",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "62513e85ee6beddf97824185",
+              "dishId": "62513e52ee6beddf97824180-97824182",
+              "kitchenName": "אלפרדו",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "67051af93cfc4b562b6210d9": {
+      "dishId": "67051af93cfc4b562b6210d9",
+      "dishName": "سلمون كريمي סלמון שמנת",
+      "kitchenName": "سلمون كريمي סלמון שמנת",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67051af93cfc4b562b6210d9.png",
+      "description": "סלמון, שמנת בצל כבוש רוקט וצנונית.\n",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "سلمون كريمي סלמון שמנת",
+        "en": "Creamy salmon sandwich",
+        "ar": "سلمون كريمي سلمون كريمة"
+      },
+      "groupMappings": [
+        {
+          "groupId": "67058fd53cfc4b562b621296",
+          "groupName": "שינויים אפשריים בכריך",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "670591523cfc4b562b621297",
+              "dishId": "6363bc107739ff671c96ae72",
+              "kitchenName": "חסה",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "670591593cfc4b562b621298",
+              "dishId": "5e384843a7a00adaf9cfea1c",
+              "kitchenName": " עגבנייה",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "670591ba3cfc4b562b621299",
+              "dishId": "5e5547553e74b41a44cbb607",
+              "kitchenName": "בצל ירוק",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67220d9acb237c15b6a11f4f",
+              "dishId": "5e385a95a316d8c127b7b24e",
+              "kitchenName": "מלפפון",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67220da0cb237c15b6a11f51",
+              "dishId": "6720a56212071a9ed7814ab9",
+              "kitchenName": "שיפקה",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67220dcbcb237c15b6a11f55",
+              "dishId": "5e385b37a316d8c127b7b254",
+              "kitchenName": "גזר",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67220e07cb237c15b6a11f57",
+              "dishId": "63639cfff0ac56de1bd6da08",
+              "kitchenName": "בצל",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67220e1acb237c15b6a11f5a",
+              "dishId": "6363bc1c7739ff671c96ae74",
+              "kitchenName": "חמוצים",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        },
+        {
+          "groupId": "61d588a917ffa28a282a7db2",
+          "groupName": "ירקות בפנים או בצד?",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6544933479ab71355d49e23a",
+              "dishId": "63be9722d615baa7cee62a21",
+              "kitchenName": "ירקות בפנים",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "6544933779ab71355d49e23b",
+              "dishId": "5feaf43419c5942e73341434",
+              "kitchenName": "ירקות בצד",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "6544933a79ab71355d49e23c",
+              "dishId": "619bca2ea8beaf5f4a3b4db1",
+              "kitchenName": "בלי ירקות בכלל",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        },
+        {
+          "groupId": "625d49249ba2cb9ae0713d47",
+          "groupName": "תוספת סלמון",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6662bf976f1b6f80a0dec3e1",
+              "dishId": "5e385e6ea316d8c127b7b26f",
+              "kitchenName": "סלמון לסלט",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "67f8f7efa7f91ebe2abe6866",
+              "dishId": "635e8f42d17477dd5cd4aba9",
+              "kitchenName": "תוספת בקר",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "63beca62598d00b84a0cdc9c": {
+      "dishId": "63beca62598d00b84a0cdc9c",
+      "dishName": "טורטייה עוף של עמית ",
+      "kitchenName": "טורטייה עוף של עמית ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "טורטייה עוף של עמית ",
+        "en": "טורטייה עוף של עמית ",
+        "ar": "טורטייה עוף של עמית "
+      },
+      "groupMappings": [
+        {
+          "groupId": "61b9cd1ce4fb140e3a931f62",
+          "groupName": "להוסיף לטורטייה עוף של עמית",
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "61b9cd28e4fb140e3a931f63",
+              "dishId": "5e385a95a316d8c127b7b24e",
+              "kitchenName": "מלפפון",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "61b9cd2ae4fb140e3a931f64",
+              "dishId": "5e385e7ea316d8c127b7b270",
+              "kitchenName": "Caesar salad",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "5e395472c9781e0adf439252": {
+      "dishId": "5e395472c9781e0adf439252",
+      "dishName": "Banana  בננה",
+      "kitchenName": "בננה לוטי ",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e395472c9781e0adf439252.JPG",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "Banana  בננה",
+        "en": "banana loti",
+        "ar": "Banana  בננה"
+      },
+      "groupMappings": [
+        {
+          "groupId": "5e3863dea316d8c127b7b2d8",
+          "groupName": "להוסיף קצפת?",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6799248a66d55502d0a3133d",
+              "dishId": "6705b1a23cfc4b562b6212d5",
+              "kitchenName": "תוספת קצפת",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "68c1300f6baf172be22db254",
+              "dishId": "60fea82461bf4ffca750e6b4",
+              "kitchenName": "תותים",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "68c130126baf172be22db255",
+              "dishId": "60fea6e561bf4ffca750e6a4",
+              "kitchenName": "אגוזים",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "65e59f47bf52b5671cbc9bc6": {
+      "dishId": "65e59f47bf52b5671cbc9bc6",
+      "dishName": "ארוחת המבורגר",
+      "kitchenName": "ארוחת המבורגר",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": true,
+      "nameTranslate": {
+        "he": "ארוחת המבורגר",
+        "en": "ארוחת המבורגר",
+        "ar": "ארוחת המבורגר"
+      },
+      "groupMappings": []
+    },
+    "625ef0c9696c5748a698a3bf": {
+      "dishId": "625ef0c9696c5748a698a3bf",
+      "dishName": "קרמו",
+      "kitchenName": "קרמו",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/625ef0c9696c5748a698a3bf.JPG",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קרמו",
+        "en": "קרמו",
+        "ar": "קרמו"
+      },
+      "groupMappings": []
+    },
+    "5e39722d1c5ae45b19191f85": {
+      "dishId": "5e39722d1c5ae45b19191f85",
+      "dishName": "פוטומאקי דג I/O מטוגן",
+      "kitchenName": "פוטומאקי דג I/O מטוגן",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e39722d1c5ae45b19191f85.jpg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פוטומאקי דג I/O מטוגן",
+        "en": "פוטומאקי דג I/O מטוגן",
+        "ar": "פוטומאקי דג I/O מטוגן"
+      },
+      "groupMappings": []
+    },
+    "667a9e5bb01b7fffd7002672": {
+      "dishId": "667a9e5bb01b7fffd7002672",
+      "dishName": "I/O טונה",
+      "kitchenName": "I/O טונה",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/667a9e5bb01b7fffd7002672.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "I/O טונה",
+        "en": "I/O טונה",
+        "ar": "I/O טונה"
+      },
+      "groupMappings": []
+    },
+    "66dd4a5df26ae5b828cd8f30": {
+      "dishId": "66dd4a5df26ae5b828cd8f30",
+      "dishName": "I/O סלמון אפוי",
+      "kitchenName": "I/O סלמון אפוי",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/66dd4a5df26ae5b828cd8f30.jpg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "I/O סלמון אפוי",
+        "en": "I/O סלמון אפוי",
+        "ar": "I/O סלמון אפוי"
+      },
+      "groupMappings": []
+    },
+    "5e396a181c5ae45b19191ed8": {
+      "dishId": "5e396a181c5ae45b19191ed8",
+      "dishName": "שניצלונים",
+      "kitchenName": "schnizelonim",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e396a181c5ae45b19191ed8.jpg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שניצלונים",
+        "en": "שניצלונים",
+        "ar": "שניצלונים"
+      },
+      "groupMappings": []
+    },
+    "5e6784d3c71636f55da44655": {
+      "dishId": "5e6784d3c71636f55da44655",
+      "dishName": "שניצלונים עובדים ",
+      "kitchenName": "schnizelonim",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שניצלונים עובדים ",
+        "en": "שניצלונים עובדים ",
+        "ar": "שניצלונים עובדים "
+      },
+      "groupMappings": [
+        {
+          "groupId": "5e3968a31c5ae45b19191eae",
+          "groupName": "הערות מנות ילדים",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "64ec50dcbf00b5bf7f5a93ef",
+              "dishId": "5e385b37a316d8c127b7b254",
+              "kitchenName": "גזר",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        },
+        {
+          "groupId": "5e3968e21c5ae45b19191eb8",
+          "groupName": "אורז או נודלס",
+          "minQuantity": 1,
+          "maxQuantity": 2,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "5e3968f51c5ae45b19191eba",
+              "dishId": "5e385b9ca316d8c127b7b258",
+              "kitchenName": "fried rice",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "5e3968f71c5ae45b19191ebb",
+              "dishId": "5e3847dca7a00adaf9cfea18",
+              "kitchenName": "noodles",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "627137163758bf98117a8541",
+              "dishId": "5e385ad5a316d8c127b7b250",
+              "kitchenName": " rice",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "5e396a881c5ae45b19191eda": {
+      "dishId": "5e396a881c5ae45b19191eda",
+      "dishName": "סושי ילדים",
+      "kitchenName": "kids sushi",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e396a881c5ae45b19191eda.jpg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סושי ילדים",
+        "en": "סושי ילדים",
+        "ar": "סושי ילדים"
+      },
+      "groupMappings": []
+    },
+    "5e396a531c5ae45b19191ed9": {
+      "dishId": "5e396a531c5ae45b19191ed9",
+      "dishName": "אורז מטוגן עוף ילדים",
+      "kitchenName": "fried rice chicken baby",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "אורז מטוגן עוף ילדים",
+        "en": "אורז מטוגן עוף ילדים",
+        "ar": "אורז מטוגן עוף ילדים"
+      },
+      "groupMappings": []
+    },
+    "67054b293cfc4b562b621127": {
+      "dishId": "67054b293cfc4b562b621127",
+      "dishName": "סודה",
+      "kitchenName": "סודה",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054b293cfc4b562b621127.jpg",
+      "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סודה",
+        "en": "סודה",
+        "ar": "סודה"
+      },
+      "groupMappings": []
+    },
+    "670549eb3cfc4b562b621125": {
+      "dishId": "670549eb3cfc4b562b621125",
+      "dishName": "מים מינרלים",
+      "kitchenName": "מים מינרלים",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/670549eb3cfc4b562b621125.jpeg",
+      "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מים מינרלים",
+        "en": "מים מינרלים",
+        "ar": "מים מינרלים"
+      },
+      "groupMappings": []
+    },
+    "67054d5a3cfc4b562b621131": {
+      "dishId": "67054d5a3cfc4b562b621131",
+      "dishName": "קוקה קולה",
+      "kitchenName": "קוקה קולה",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054d5a3cfc4b562b621131.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קוקה קולה",
+        "en": "קוקה קולה",
+        "ar": "קוקה קולה"
+      },
+      "groupMappings": []
+    },
+    "67054d333cfc4b562b62112e": {
+      "dishId": "67054d333cfc4b562b62112e",
+      "dishName": "זירו",
+      "kitchenName": "זירו",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "זירו",
+        "en": "זירו",
+        "ar": "זירו"
+      },
+      "groupMappings": []
+    },
+    "67054b4d3cfc4b562b62112b": {
+      "dishId": "67054b4d3cfc4b562b62112b",
+      "dishName": "מיץ ענבים",
+      "kitchenName": "מיץ ענבים",
+      "imagePath": null,
+      "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מיץ ענבים",
+        "en": "מיץ ענבים",
+        "ar": "מיץ ענבים"
+      },
+      "groupMappings": []
+    },
+    "67054b323cfc4b562b621128": {
+      "dishId": "67054b323cfc4b562b621128",
+      "dishName": "פיוזטי",
+      "kitchenName": "פיוזטי",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054b323cfc4b562b621128.jpg",
+      "description": "מוגש עם מלפפון ועגבניה פרוסים\n",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פיוזטי",
+        "en": "פיוזטי",
+        "ar": "פיוזטי"
+      },
+      "groupMappings": []
+    },
+    "67054f383cfc4b562b62113c": {
+      "dishId": "67054f383cfc4b562b62113c",
+      "dishName": "בק. לופז דה הארו",
+      "kitchenName": "בק. לופז דה הארו",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054f383cfc4b562b62113c.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בק. לופז דה הארו",
+        "en": "בק. לופז דה הארו",
+        "ar": "בק. לופז דה הארו"
+      },
+      "groupMappings": []
+    },
+    "6705509b3cfc4b562b621150": {
+      "dishId": "6705509b3cfc4b562b621150",
+      "dishName": "בק. אסרטיקו",
+      "kitchenName": "בק. אסרטיקו",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/6705509b3cfc4b562b621150.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בק. אסרטיקו",
+        "en": "בק. אסרטיקו",
+        "ar": "בק. אסרטיקו"
+      },
+      "groupMappings": []
+    },
+    "67054fee3cfc4b562b621146": {
+      "dishId": "67054fee3cfc4b562b621146",
+      "dishName": "בק. דאנז'ו",
+      "kitchenName": "בק. דאנז'ו",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/67054fee3cfc4b562b621146.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בק. דאנז'ו",
+        "en": "בק. דאנז'ו",
+        "ar": "בק. דאנז'ו"
+      },
+      "groupMappings": []
+    },
+    "5e3845eba7a00adaf9cfea07": {
+      "dishId": "5e3845eba7a00adaf9cfea07",
+      "dishName": "סכו\"ם \\ צ'ופסטיקס",
+      "kitchenName": "סכו\"ם \\ צ'ופסטיקס",
+      "imagePath": "https://beecomm-cloud-bucket.s3.eu-west-1.amazonaws.com/theSandBox_LepyDVho2H/images/dishes/5e3845eba7a00adaf9cfea07.jpeg",
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סכו\"ם \\ צ'ופסטיקס",
+        "en": "סכו\"ם \\ צ'ופסטיקס",
+        "ar": "סכו\"ם \\ צ'ופסטיקס"
+      },
+      "groupMappings": []
+    }
+  }
+}

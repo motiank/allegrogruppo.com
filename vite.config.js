@@ -38,7 +38,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/pelecard': 'http://localhost:3020'
+      '/pelecard': 'http://localhost:3020',
+      '/api': 'http://localhost:3020'
     }
   }
 });
