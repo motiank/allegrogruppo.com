@@ -323,14 +323,18 @@ For both good and error feedback URLs:
 
 3. **Extract key fields**, such as:
 
-   - `PelecardStatusCode`
-   - `PelecardTransactionId`
+   - `PelecardTransactionId` or `TransactionId`
    - `ConfirmationKey`
    - `UserKey`
    - `ParamX`
    - `Total` / `DebitTotal`
    - `Currency`
+   - `ApprovalNo`
+   - `Token` (if `CreateToken` was set)
+   - Card holder information (`CardHolderName`, `CardHolderEmail`, `CardHolderPhone`, etc.)
    - etc.
+
+   **Important:** `PelecardStatusCode` is **NOT** included in server-side feedback payloads. It is only sent to landing pages (`GoodURL`/`ErrorURL`). Since `ServerSideGoodFeedbackURL` is only called for successful transactions, there's no need for a status code.
 
 4. **Log everything**.
 
@@ -378,13 +382,25 @@ The response is a simple indicator:
 
 When your server receives landing or feedback data:
 
-1. Verify `PelecardStatusCode === "000"`.
+**For server-side feedback (`ServerSideGoodFeedbackURL`):**
+1. Extract `ConfirmationKey`, `UserKey`, `ParamX`, `Total`/`DebitTotal` from the feedback payload.
+   - **Note:** `PelecardStatusCode` is NOT in server-side feedback - it's only sent to landing pages.
 2. Call `ValidateByUniqueKey` with:
    - `ConfirmationKey` from Pelecard.
    - `UniqueKey` = your `UserKey` or transaction ID.
    - `TotalX100` = the order amount in agorot.
-3. If the result is `"1"` and status is `"000"`, mark the order as **paid**.
+3. If the result is `"1"`, mark the order as **paid** (status is implicit - only successful transactions trigger `ServerSideGoodFeedbackURL`).
 4. Otherwise, treat it as an error or suspicious and log for manual investigation.
+
+**For landing pages (`GoodURL`/`ErrorURL`):**
+1. Extract `PelecardStatusCode` and verify it equals `"000"`.
+2. Extract `ConfirmationKey`, `UserKey`, `ParamX` from landing parameters.
+3. Call `ValidateByUniqueKey` with:
+   - `ConfirmationKey` from Pelecard.
+   - `UniqueKey` = your `UserKey` or transaction ID.
+   - `TotalX100` = the order amount in agorot.
+4. If the result is `"1"` and status is `"000"`, mark the order as **paid**.
+5. Otherwise, treat it as an error or suspicious and log for manual investigation.
 
 ---
 
@@ -450,13 +466,14 @@ The response is JSON with many fields about the transaction (status, totals, car
 For both:
 
 1. Parse request according to `resultDataKeyName` and `ServerSideFeedbackContentType`.
-2. Extract `PelecardStatusCode`, `ConfirmationKey`, `UserKey`, `ParamX`, `DebitTotal`/`Total`, etc.
+2. Extract `ConfirmationKey`, `UserKey`, `ParamX`, `DebitTotal`/`Total`, `PelecardTransactionId`, etc.
+   **Note:** `PelecardStatusCode` is NOT in server-side feedback - it's only in landing page parameters. `ServerSideGoodFeedbackURL` is only called for successful transactions.
 3. Match to your local order using `UserKey` or `ParamX`.
 4. Call `ValidateByUniqueKey`:
    - `ConfirmationKey`: from feedback.
    - `UniqueKey`: `UserKey` (or `TransactionId` if no `UserKey`).
    - `TotalX100`: your stored order amount.
-5. If status is `"000"` and validation returns `"1"`:
+5. If validation returns `"1"`:
    - Mark order as `paid` in your DB.
 6. Respond with `HTTP 200`.
 
@@ -491,8 +508,8 @@ Use this list when implementing:
 - [ ] Implement `ServerSideGoodFeedbackURL` / `ServerSideErrorFeedbackURL` endpoints.
 - [ ] In feedback and/or landing handler, call `ValidateByUniqueKey` with `ConfirmationKey`, `UserKey`, `TotalX100`.
 - [ ] Only mark orders as **paid** when:
-  - `PelecardStatusCode === "000"`, **and**
-  - `ValidateByUniqueKey` returns `1`.
+  - For server-side feedback (`ServerSideGoodFeedbackURL`): `ValidateByUniqueKey` returns `1` (status is implicit - only successful transactions trigger this URL).
+  - For landing pages (`GoodURL`): `PelecardStatusCode === "000"` **and** `ValidateByUniqueKey` returns `1`.
 - [ ] (Optional) Use `GetTransaction` for reconciliation / admin views.
 
 Once you have this flow in place, you have a robust, server-verified checkout using Pelecard’s iframe with regular debit (`J4`) transactions.

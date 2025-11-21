@@ -261,24 +261,17 @@ router.post('/pelecard/placeorder', async (req, res) => {
     }
 
     // Extract key fields
+    // Note: ServerSideGoodFeedbackURL is only called for successful transactions,
+    // so PelecardStatusCode is NOT included in the payload (it's only in landing page parameters)
     const {
-      PelecardStatusCode,
       ConfirmationKey,
       UserKey,
       ParamX,
       PelecardTransactionId,
+      TransactionId,
       DebitTotal,
       Total,
     } = pelecardData;
-
-    // Check if transaction was successful
-    if (PelecardStatusCode !== '000') {
-      console.warn('[beecomm] Pelecard transaction not successful:', PelecardStatusCode);
-      return res.status(400).json({
-        error: 'Transaction not successful',
-        statusCode: PelecardStatusCode,
-      });
-    }
 
     // Validate transaction with Pelecard
     const totalInAgorot = parseInt(DebitTotal || Total || '0', 10);

@@ -228,6 +228,8 @@ console.log('initPayload', initPayload);
         currency,
         timestamp: new Date().toISOString(),
       };
+      
+      console.log('orderInfo', orderInfo);
 
       // Store with orderId for retrieval via UserKey/ParamX
       orderStorage.set(`orderId:${orderId}`, orderInfo);
