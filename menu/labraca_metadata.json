@@ -14,11 +14,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "שיפוד פילה בקר",
-        "en": "שיפוד פילה בקר",
-        "ar": "שיפוד פילה בקר"
-      },
       "groupMappings": []
     },
     "64de0e7ba0f1c485d8934dda": {
@@ -31,11 +26,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "אנטריקוט ",
-        "en": "אנטריקוט ",
-        "ar": "אנטריקוט "
-      },
       "groupMappings": []
     },
     "660ec2803d2e76e16a1089d5": {
@@ -48,11 +38,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קרפציו פילה בקר",
-        "en": "קרפציו פילה בקר",
-        "ar": "קרפציו פילה בקר"
-      },
       "groupMappings": []
     },
     "65d1bb4214ed0ca1e102f828": {
@@ -65,11 +50,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "לחם ",
-        "en": "Bread",
-        "ar": "خبز"
-      },
       "groupMappings": []
     },
     "668e2181ff9c99b7862ec36e": {
@@ -82,11 +62,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סאלסיצ׳ה",
-        "en": "סאלסיצ׳ה",
-        "ar": "סאלסיצ׳ה"
-      },
       "groupMappings": []
     },
     "6489f728f8a3b2458b430cd9": {
@@ -99,11 +74,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פנצנלה ",
-        "en": "פנצנלה ",
-        "ar": "פנצנלה "
-      },
       "groupMappings": [
         {
           "groupId": "64e5b12a77bbc52eff34d0e6",
@@ -141,11 +111,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קפונטה ",
-        "en": "קפונטה ",
-        "ar": "קפונטה "
-      },
       "groupMappings": []
     },
     "64ff4f502a73c76c505f67c4": {
@@ -158,11 +123,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "רוסטביף",
-        "en": "רוסטביף",
-        "ar": "רוסטביף"
-      },
       "groupMappings": []
     },
     "65fc31d58d90fd8cac172c4d": {
@@ -175,11 +135,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סיגר שורט ריב",
-        "en": "סיגר שורט ריב",
-        "ar": "סיגר שורט ריב"
-      },
       "groupMappings": []
     },
     "65d1bc0a14ed0ca1e102f82e": {
@@ -192,11 +147,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "צלחת נקניקים",
-        "en": "צלחת נקניקים",
-        "ar": "צלחת נקניקים"
-      },
       "groupMappings": []
     },
     "660ebf1da852926749de7d6f": {
@@ -209,11 +159,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "הסופרנוס",
-        "en": "הסופרנוס",
-        "ar": "הסופרנוס"
-      },
       "groupMappings": []
     },
     "660ebf28a852926749de7d70": {
@@ -226,11 +171,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "שורט ריבס",
-        "en": "שורט ריבס",
-        "ar": "שורט ריבס"
-      },
       "groupMappings": [
         {
           "groupId": "66014510b12c2493b272d071",
@@ -275,11 +215,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כריך אנטריקוט",
-        "en": "כריך אנטריקוט",
-        "ar": "כריך אנטריקוט"
-      },
       "groupMappings": []
     },
     "668e21afff9c99b7862ec370": {
@@ -292,11 +227,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "המבורגר קלאסי ",
-        "en": "המבורגר קלאסי ",
-        "ar": "המבורגר קלאסי "
-      },
       "groupMappings": [
         {
           "groupId": "66014510b12c2493b272d071",
@@ -341,11 +271,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "המבורגר פיאמונטה",
-        "en": "המבורגר פיאמונטה",
-        "ar": "המבורגר פיאמונטה"
-      },
       "groupMappings": [
         {
           "groupId": "66014510b12c2493b272d071",
@@ -390,11 +315,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קריספי צ'יקן",
-        "en": "קריספי צ'יקן",
-        "ar": "קריספי צ'יקן"
-      },
       "groupMappings": []
     },
     "65fc32348d90fd8cac172c51": {
@@ -407,11 +327,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "בולונז",
-        "en": "Bolognese",
-        "ar": "بولونيز"
-      },
       "groupMappings": []
     },
     "647da360f8e3ff1b09ab84d3": {
@@ -424,11 +339,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סלט ברזל",
-        "en": "סלט ברזל",
-        "ar": "סלט ברזל"
-      },
       "groupMappings": [
         {
           "groupId": "66939b8bba0a71e331249415",
@@ -459,11 +369,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "שניצל",
-        "en": "שניצל",
-        "ar": "שניצל"
-      },
       "groupMappings": []
     },
     "65d1bca414ed0ca1e102f83b": {
@@ -476,11 +381,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "שניצל סציליאני",
-        "en": "שניצל סציליאני",
-        "ar": "שניצל סציליאני"
-      },
       "groupMappings": []
     },
     "6501e9eea0c92ecbc95cc496": {
@@ -493,11 +393,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סינטה עגלה",
-        "en": "סינטה עגלה",
-        "ar": "סינטה עגלה"
-      },
       "groupMappings": [
         {
           "groupId": "66a63a1c540e67d86069916e",
@@ -549,11 +444,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "מנת ספיישל",
-        "en": "מנת ספיישל",
-        "ar": "מנת ספיישל"
-      },
       "groupMappings": []
     },
     "6631e0f554a92a0d5ffbac3a": {
@@ -566,11 +456,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "עוף משקולות ",
-        "en": "עוף משקולות ",
-        "ar": "עוף משקולות "
-      },
       "groupMappings": []
     },
     "65fc32748d90fd8cac172c54": {
@@ -583,11 +468,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "רבע עוף",
-        "en": "רבע עוף",
-        "ar": "רבע עוף"
-      },
       "groupMappings": []
     },
     "65d1bc8d14ed0ca1e102f838": {
@@ -600,11 +480,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קבב טלה ",
-        "en": "קבב טלה ",
-        "ar": "קבב טלה "
-      },
       "groupMappings": []
     },
     "6562ff3ce3409544eabd9228": {
@@ -617,11 +492,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "תפוחי אדמה",
-        "en": "תפוחי אדמה",
-        "ar": "תפוחי אדמה"
-      },
       "groupMappings": []
     },
     "647d8f5cf8e3ff1b09ab84bf": {
@@ -634,11 +504,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פריט כללי",
-        "en": "פריט כללי",
-        "ar": "פריט כללי"
-      },
       "groupMappings": []
     },
     "676bf7a436841fa1ff5f40ee": {
@@ -651,11 +516,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סכו\"ם",
-        "en": "סכו\"ם",
-        "ar": "סכו\"ם"
-      },
       "groupMappings": []
     },
     "64ff4e082a73c76c505f67c1": {
@@ -668,11 +528,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סלט ירוק  תוספת",
-        "en": "סלט ירוק  תוספת",
-        "ar": "סלט ירוק  תוספת"
-      },
       "groupMappings": []
     },
     "64c6560596a81609a40e62f9": {
@@ -685,11 +540,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "הערה למטבח",
-        "en": "הערה למטבח",
-        "ar": "הערה למטבח"
-      },
       "groupMappings": []
     },
     "66446cf7af3115a985711907": {
@@ -702,11 +552,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "בראוניז טבעוני",
-        "en": "בראוניז טבעוני",
-        "ar": "בראוניז טבעוני"
-      },
       "groupMappings": []
     },
     "6602b12f2964a4b41f97cad4": {
@@ -719,11 +564,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סורבה",
-        "en": "סורבה",
-        "ar": "סורבה"
-      },
       "groupMappings": []
     },
     "64e896bdcbb7fb92afbe49f2": {
@@ -736,11 +576,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "ג'סמין ",
-        "en": "ג'סמין ",
-        "ar": "ג'סמין "
-      },
       "groupMappings": []
     },
     "64beb40aff9e34eb7a79af4d": {
@@ -753,11 +588,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "תפוזים*",
-        "en": "תפוזים*",
-        "ar": "תפוזים*"
-      },
       "groupMappings": []
     },
     "64c655b096a81609a40e62f7": {
@@ -770,11 +600,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "הערה בר",
-        "en": "הערה בר",
-        "ar": "הערה בר"
-      },
       "groupMappings": []
     },
     "64be9c704d58c3aa744f53d6": {
@@ -787,11 +612,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קולה*",
-        "en": "קולה*",
-        "ar": "קולה*"
-      },
       "groupMappings": []
     },
     "64be9c944d58c3aa744f53d7": {
@@ -804,11 +624,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קולה זירו*",
-        "en": "קולה זירו*",
-        "ar": "קולה זירו*"
-      },
       "groupMappings": []
     },
     "64be9cc34d58c3aa744f53d9": {
@@ -821,11 +636,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "ספרייט*",
-        "en": "ספרייט*",
-        "ar": "ספרייט*"
-      },
       "groupMappings": []
     },
     "656837455ee01e8474ff83de": {
@@ -838,11 +648,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "ספרייט זירו*",
-        "en": "ספרייט זירו*",
-        "ar": "ספרייט זירו*"
-      },
       "groupMappings": []
     },
     "64beadb43e9e0f501953c630": {
@@ -855,11 +660,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פיוזטי*",
-        "en": "פיוזטי*",
-        "ar": "פיוזטי*"
-      },
       "groupMappings": []
     },
     "64be9cad4d58c3aa744f53d8": {
@@ -872,11 +672,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "מינרלים זכוכית*",
-        "en": "מינרלים זכוכית*",
-        "ar": "מינרלים זכוכית*"
-      },
       "groupMappings": []
     },
     "6485c361c45b0b48c44b912a": {
@@ -889,11 +684,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פרללה גדול",
-        "en": "פרללה גדול",
-        "ar": "פרללה גדול"
-      },
       "groupMappings": []
     },
     "64db6941a32250c51437fcad": {
@@ -906,11 +696,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פרללה קטן",
-        "en": "פרללה קטן",
-        "ar": "פרללה קטן"
-      },
       "groupMappings": []
     },
     "65534fb27810fb7ed12de8bc": {
@@ -923,11 +708,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "ענבים",
-        "en": "ענבים",
-        "ar": "ענבים"
-      },
       "groupMappings": []
     },
     "64ecd0f31f6bd785b2ede47c": {
@@ -940,11 +720,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "גסמין גאז",
-        "en": "גסמין גאז",
-        "ar": "גסמין גאז"
-      },
       "groupMappings": []
     },
     "645bb568045fd900cbe7c91b": {
@@ -957,11 +732,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "אספרסו",
-        "en": "אספרסו",
-        "ar": "אספרסו"
-      },
       "groupMappings": [
         {
           "groupId": "645cc87b2bbdf869f5e4cc2f",
@@ -1006,11 +776,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "אספרסו ארוך",
-        "en": "אספרסו ארוך",
-        "ar": "אספרסו ארוך"
-      },
       "groupMappings": [
         {
           "groupId": "645cc87b2bbdf869f5e4cc2f",
@@ -1055,11 +820,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "תה",
-        "en": "תה",
-        "ar": "תה"
-      },
       "groupMappings": []
     },
     "645bb624045fd900cbe7c933": {
@@ -1072,11 +832,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "קפה שחור",
-        "en": "קפה שחור",
-        "ar": "קפה שחור"
-      },
       "groupMappings": [
         {
           "groupId": "645cc87b2bbdf869f5e4cc2f",
@@ -1121,11 +876,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "מורטי בקבוק ",
-        "en": "מורטי בקבוק ",
-        "ar": "מורטי בקבוק "
-      },
       "groupMappings": []
     },
     "65fc431f8d90fd8cac172c6d": {
@@ -1138,11 +888,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סטלה בקבוק",
-        "en": "סטלה בקבוק",
-        "ar": "סטלה בקבוק"
-      },
       "groupMappings": []
     },
     "64be8a3e973b29b0c0251ec2": {
@@ -1155,11 +900,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כוס סירה ירדן אדום",
-        "en": "כוס סירה ירדן אדום",
-        "ar": "כוס סירה ירדן אדום"
-      },
       "groupMappings": []
     },
     "650aed767d805e4c166b939e": {
@@ -1172,11 +912,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "סירה ירדן",
-        "en": "סירה ירדן",
-        "ar": "סירה ירדן"
-      },
       "groupMappings": []
     },
     "65e0923309336ffe9267743c": {
@@ -1189,11 +924,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פטיט סירה כוס ",
-        "en": "פטיט סירה כוס ",
-        "ar": "פטיט סירה כוס "
-      },
       "groupMappings": []
     },
     "65e092df09336ffe9267743d": {
@@ -1206,11 +936,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "פטיט סירה בקבוק ",
-        "en": "פטיט סירה בקבוק ",
-        "ar": "פטיט סירה בקבוק "
-      },
       "groupMappings": []
     },
     "64be89c8973b29b0c0251ebf": {
@@ -1223,11 +948,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "בקבוק קיאנטי",
-        "en": "בקבוק קיאנטי",
-        "ar": "בקבוק קיאנטי"
-      },
       "groupMappings": []
     },
     "64be8a2b973b29b0c0251ec0": {
@@ -1240,11 +960,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כוס קיאנטי",
-        "en": "כוס קיאנטי",
-        "ar": "כוס קיאנטי"
-      },
       "groupMappings": []
     },
     "65437cb60d76535f3b55e0e7": {
@@ -1257,11 +972,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "בקבוק שרדונה תל פארס לבן, רקאנטי",
-        "en": "בקבוק שרדונה תל פארס לבן, רקאנטי",
-        "ar": "בקבוק שרדונה תל פארס לבן, רקאנטי"
-      },
       "groupMappings": []
     },
     "65437d540d76535f3b55e0e8": {
@@ -1274,11 +984,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כוס שרדונה תל פארס לבן, רקאנטי",
-        "en": "כוס שרדונה תל פארס לבן, רקאנטי",
-        "ar": "כוס שרדונה תל פארס לבן, רקאנטי"
-      },
       "groupMappings": []
     },
     "65e88ef43188f8e0e6e13c3e": {
@@ -1291,11 +996,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "ירדן גוורץ ",
-        "en": "ירדן גוורץ ",
-        "ar": "ירדן גוורץ "
-      },
       "groupMappings": []
     },
     "66014472b12c2493b272d065": {
@@ -1308,11 +1008,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כוס ירדן גוורץ",
-        "en": "כוס ירדן גוורץ",
-        "ar": "כוס ירדן גוורץ"
-      },
       "groupMappings": []
     },
     "64e61b803632739c4c0d7ca7": {
@@ -1325,11 +1020,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "כוס יראון רוזה הרי גליל ",
-        "en": "כוס יראון רוזה הרי גליל ",
-        "ar": "כוס יראון רוזה הרי גליל "
-      },
       "groupMappings": []
     },
     "65e88d323188f8e0e6e13c24": {
@@ -1342,11 +1032,6 @@
       "tags": [],
       "prepareTime": 0,
       "isCombo": false,
-      "nameTranslate": {
-        "he": "יראון רוזה",
-        "en": "יראון רוזה",
-        "ar": "יראון רוזה"
-      },
       "groupMappings": []
     }
   }
