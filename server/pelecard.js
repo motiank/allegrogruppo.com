@@ -7,6 +7,44 @@ const router = express.Router();
 const orderStorage = new Map();
 
 /**
+ * only for test purposes
+ * 
+
+
+let order_info_test={
+   cartItems: [
+     {
+       id: '5e6784ecc71636f55da44656',
+       key: '5e6784ecc71636f55da44656::69032aeedff0f5c7e947be70:',
+       quantity: 1,
+       selections: [Object],
+       unitPrice: 5,
+       basePrice: 5,
+       optionsPrice: 0
+     }
+   ],
+   locationData: {
+     name: 'Moti Ankonina',
+     building: 'I',
+     floor: '2',
+     office: 'דניאל ושות',
+     phone: '0526611747',
+     notes: '',
+     groupName: ''
+   },
+   menuRevision: '691b061dca26f100029a6794',
+   total: '500',
+   orderId: '78ec967b-c01c-43c5-9a76-bcd5eb6d7c91',
+   currency: '1',
+   timestamp: '2025-11-21T21:14:47.904Z'
+ }
+
+
+  orderStorage.set(`confirmationKey:e43449e4b4fe37e4e84bb1a79f5b4547`, order_info_test);
+
+  */
+
+/**
  * Retrieve order data by ConfirmationKey or orderId (UserKey/ParamX)
  * @param {string} confirmationKey - ConfirmationKey from Pelecard
  * @param {string} orderId - UserKey or ParamX (orderId)
@@ -162,6 +200,7 @@ router.post('/get-iframe-url', async (req, res) => {
     user: PELECARD_USER,
     password: PELECARD_PASSWORD,
     ActionType: 'J4',
+    CardHolderName: 'Must',
     Currency: `${currency}`,
     Total: normalizedTotal,
     Language: language,

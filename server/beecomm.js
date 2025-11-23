@@ -231,7 +231,7 @@ function structureOrderForBeecomm(pelecardData, orderData) {
           paymentSum: orderTotal,
           tip: 0,
           cardInfo: {
-            approvalNumber: pelecardData.ApprovalNo || '',
+            approvalNumber: pelecardData.ApprovalNo || pelecardData.DebitApproveNumber || '',
             cardNumber: pelecardData.CreditCardNumber || '',
             cardExpirationDate: pelecardData.CreditCardExpDate || '',
             cardHolderName: pelecardData.CardHolderName || '',
@@ -366,7 +366,13 @@ router.post('/pelecard/placeorder', async (req, res) => {
         cellular: locationData.phone || '',
         building: locationData.building || '',
         floor: locationData.floor || '',
-        office: locationData.office || '',
+        companyName: locationData.office || '',
+        cityName: "Petch Tikva",
+        streetName: "Tozert Haaretz",
+        homeNumber: "3",
+        formattedAddress: "Formatted :Tozert Haaretz 3, Petch Tikva",
+        deliveryCost:0,
+
         // Add other delivery fields as needed
       },
       comments: storedOrderData.comments || `Pelecard transaction: ${PelecardTransactionId}`,
@@ -376,7 +382,9 @@ router.post('/pelecard/placeorder', async (req, res) => {
 
     // Structure order for Beecomm
     const beecommOrder = structureOrderForBeecomm(pelecardData, orderData);
+    // console.log('[beecomm] beecommOrder data:', beecommOrder.orderInfo.payments);
 
+    console.log('[beecomm] beecommOrder:', beecommOrder);
     // Push order to Beecomm
     const result = await pushOrder(accessToken, beecommOrder);
 
