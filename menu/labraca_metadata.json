@@ -1,0 +1,1353 @@
+{
+  "menuRevision": "6921bf9b1dc5f400023dbe6b",
+  "source": "beecomm",
+  "generatedAt": "2025-11-23T21:58:51.919Z",
+  "totalDishes": 63,
+  "dishMappings": {
+    "64de0e52a0f1c485d8934dd5": {
+      "dishId": "64de0e52a0f1c485d8934dd5",
+      "dishName": "שיפוד פילה בקר",
+      "kitchenName": "שיפוד פילה בקר",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שיפוד פילה בקר",
+        "en": "שיפוד פילה בקר",
+        "ar": "שיפוד פילה בקר"
+      },
+      "groupMappings": []
+    },
+    "64de0e7ba0f1c485d8934dda": {
+      "dishId": "64de0e7ba0f1c485d8934dda",
+      "dishName": "אנטריקוט ",
+      "kitchenName": "אנטריקוט ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "אנטריקוט ",
+        "en": "אנטריקוט ",
+        "ar": "אנטריקוט "
+      },
+      "groupMappings": []
+    },
+    "660ec2803d2e76e16a1089d5": {
+      "dishId": "660ec2803d2e76e16a1089d5",
+      "dishName": "קרפציו פילה בקר",
+      "kitchenName": "קרפציו פילה בקר",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קרפציו פילה בקר",
+        "en": "קרפציו פילה בקר",
+        "ar": "קרפציו פילה בקר"
+      },
+      "groupMappings": []
+    },
+    "65d1bb4214ed0ca1e102f828": {
+      "dishId": "65d1bb4214ed0ca1e102f828",
+      "dishName": "לחם ",
+      "kitchenName": "לחם ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "לחם ",
+        "en": "Bread",
+        "ar": "خبز"
+      },
+      "groupMappings": []
+    },
+    "668e2181ff9c99b7862ec36e": {
+      "dishId": "668e2181ff9c99b7862ec36e",
+      "dishName": "סאלסיצ׳ה",
+      "kitchenName": "סאלסיצ׳ה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סאלסיצ׳ה",
+        "en": "סאלסיצ׳ה",
+        "ar": "סאלסיצ׳ה"
+      },
+      "groupMappings": []
+    },
+    "6489f728f8a3b2458b430cd9": {
+      "dishId": "6489f728f8a3b2458b430cd9",
+      "dishName": "פנצנלה ",
+      "kitchenName": "פנצנלה ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פנצנלה ",
+        "en": "פנצנלה ",
+        "ar": "פנצנלה "
+      },
+      "groupMappings": [
+        {
+          "groupId": "64e5b12a77bbc52eff34d0e6",
+          "groupName": "חריף / חריף בצד",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6784d4634ed95df298cdb415",
+              "dishId": "6784d4514ed95df298cdb414",
+              "kitchenName": "בלי חריף",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6784d4664ed95df298cdb416",
+              "dishId": "6784d4404ed95df298cdb413",
+              "kitchenName": "חריף בצד",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "65d1bbf614ed0ca1e102f82c": {
+      "dishId": "65d1bbf614ed0ca1e102f82c",
+      "dishName": "קפונטה ",
+      "kitchenName": "קפונטה ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קפונטה ",
+        "en": "קפונטה ",
+        "ar": "קפונטה "
+      },
+      "groupMappings": []
+    },
+    "64ff4f502a73c76c505f67c4": {
+      "dishId": "64ff4f502a73c76c505f67c4",
+      "dishName": "רוסטביף",
+      "kitchenName": "רוסטביף",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "רוסטביף",
+        "en": "רוסטביף",
+        "ar": "רוסטביף"
+      },
+      "groupMappings": []
+    },
+    "65fc31d58d90fd8cac172c4d": {
+      "dishId": "65fc31d58d90fd8cac172c4d",
+      "dishName": "סיגר שורט ריב",
+      "kitchenName": "סיגר שורט ריב",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סיגר שורט ריב",
+        "en": "סיגר שורט ריב",
+        "ar": "סיגר שורט ריב"
+      },
+      "groupMappings": []
+    },
+    "65d1bc0a14ed0ca1e102f82e": {
+      "dishId": "65d1bc0a14ed0ca1e102f82e",
+      "dishName": "צלחת נקניקים",
+      "kitchenName": "צלחת נקניקים",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "צלחת נקניקים",
+        "en": "צלחת נקניקים",
+        "ar": "צלחת נקניקים"
+      },
+      "groupMappings": []
+    },
+    "660ebf1da852926749de7d6f": {
+      "dishId": "660ebf1da852926749de7d6f",
+      "dishName": "הסופרנוס",
+      "kitchenName": "הסופרנוס",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "הסופרנוס",
+        "en": "הסופרנוס",
+        "ar": "הסופרנוס"
+      },
+      "groupMappings": []
+    },
+    "660ebf28a852926749de7d70": {
+      "dishId": "660ebf28a852926749de7d70",
+      "dishName": "שורט ריבס",
+      "kitchenName": "שורט ריבס",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שורט ריבס",
+        "en": "שורט ריבס",
+        "ar": "שורט ריבס"
+      },
+      "groupMappings": [
+        {
+          "groupId": "66014510b12c2493b272d071",
+          "groupName": "מידת עשייה",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66014519b12c2493b272d072",
+              "dishId": "660144f0b12c2493b272d06e",
+              "kitchenName": "M",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451bb12c2493b272d073",
+              "dishId": "660144f8b12c2493b272d06f",
+              "kitchenName": "MW",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451db12c2493b272d074",
+              "dishId": "660144feb12c2493b272d070",
+              "kitchenName": "WD",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "668e21cfff9c99b7862ec372": {
+      "dishId": "668e21cfff9c99b7862ec372",
+      "dishName": "כריך אנטריקוט",
+      "kitchenName": "כריך אנטריקוט",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כריך אנטריקוט",
+        "en": "כריך אנטריקוט",
+        "ar": "כריך אנטריקוט"
+      },
+      "groupMappings": []
+    },
+    "668e21afff9c99b7862ec370": {
+      "dishId": "668e21afff9c99b7862ec370",
+      "dishName": "המבורגר קלאסי ",
+      "kitchenName": "המבורגר קלאסי ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "המבורגר קלאסי ",
+        "en": "המבורגר קלאסי ",
+        "ar": "המבורגר קלאסי "
+      },
+      "groupMappings": [
+        {
+          "groupId": "66014510b12c2493b272d071",
+          "groupName": "מידת עשייה",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66014519b12c2493b272d072",
+              "dishId": "660144f0b12c2493b272d06e",
+              "kitchenName": "M",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451bb12c2493b272d073",
+              "dishId": "660144f8b12c2493b272d06f",
+              "kitchenName": "MW",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451db12c2493b272d074",
+              "dishId": "660144feb12c2493b272d070",
+              "kitchenName": "WD",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "668e21c4ff9c99b7862ec371": {
+      "dishId": "668e21c4ff9c99b7862ec371",
+      "dishName": "המבורגר פיאמונטה",
+      "kitchenName": "המבורגר פיאמונטה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "המבורגר פיאמונטה",
+        "en": "המבורגר פיאמונטה",
+        "ar": "המבורגר פיאמונטה"
+      },
+      "groupMappings": [
+        {
+          "groupId": "66014510b12c2493b272d071",
+          "groupName": "מידת עשייה",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66014519b12c2493b272d072",
+              "dishId": "660144f0b12c2493b272d06e",
+              "kitchenName": "M",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451bb12c2493b272d073",
+              "dishId": "660144f8b12c2493b272d06f",
+              "kitchenName": "MW",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451db12c2493b272d074",
+              "dishId": "660144feb12c2493b272d070",
+              "kitchenName": "WD",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "65fc32108d90fd8cac172c4f": {
+      "dishId": "65fc32108d90fd8cac172c4f",
+      "dishName": "קריספי צ'יקן",
+      "kitchenName": "קריספי צ'יקן",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קריספי צ'יקן",
+        "en": "קריספי צ'יקן",
+        "ar": "קריספי צ'יקן"
+      },
+      "groupMappings": []
+    },
+    "65fc32348d90fd8cac172c51": {
+      "dishId": "65fc32348d90fd8cac172c51",
+      "dishName": "בולונז",
+      "kitchenName": "בולונז",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בולונז",
+        "en": "Bolognese",
+        "ar": "بولونيز"
+      },
+      "groupMappings": []
+    },
+    "647da360f8e3ff1b09ab84d3": {
+      "dishId": "647da360f8e3ff1b09ab84d3",
+      "dishName": "סלט ברזל",
+      "kitchenName": "סלט ברזל",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סלט ברזל",
+        "en": "סלט ברזל",
+        "ar": "סלט ברזל"
+      },
+      "groupMappings": [
+        {
+          "groupId": "66939b8bba0a71e331249415",
+          "groupName": "תוספת עוף לסלט ברזל",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66939b9aba0a71e331249416",
+              "dishId": "64de0e60a0f1c485d8934dd6",
+              "kitchenName": "חזה עוף",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "65d1bc9314ed0ca1e102f839": {
+      "dishId": "65d1bc9314ed0ca1e102f839",
+      "dishName": "שניצל",
+      "kitchenName": "שניצל",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שניצל",
+        "en": "שניצל",
+        "ar": "שניצל"
+      },
+      "groupMappings": []
+    },
+    "65d1bca414ed0ca1e102f83b": {
+      "dishId": "65d1bca414ed0ca1e102f83b",
+      "dishName": "שניצל סציליאני",
+      "kitchenName": "שניצל סציליאני",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שניצל סציליאני",
+        "en": "שניצל סציליאני",
+        "ar": "שניצל סציליאני"
+      },
+      "groupMappings": []
+    },
+    "6501e9eea0c92ecbc95cc496": {
+      "dishId": "6501e9eea0c92ecbc95cc496",
+      "dishName": "סינטה עגלה",
+      "kitchenName": "סינטה עגלה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סינטה עגלה",
+        "en": "סינטה עגלה",
+        "ar": "סינטה עגלה"
+      },
+      "groupMappings": [
+        {
+          "groupId": "66a63a1c540e67d86069916e",
+          "groupName": "מידות עשייה לה בראצה secondi",
+          "minQuantity": 1,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66a63a7e540e67d860699173",
+              "dishId": "66a63a66540e67d860699172",
+              "kitchenName": "MR",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "66a63a3d540e67d86069916f",
+              "dishId": "660144f0b12c2493b272d06e",
+              "kitchenName": "M",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "66a63a45540e67d860699170",
+              "dishId": "660144f8b12c2493b272d06f",
+              "kitchenName": "MW",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "66a63a4e540e67d860699171",
+              "dishId": "660144feb12c2493b272d070",
+              "kitchenName": "WD",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "6602d642530f8e96c766c66b": {
+      "dishId": "6602d642530f8e96c766c66b",
+      "dishName": "מנת ספיישל",
+      "kitchenName": "מנת ספיישל",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מנת ספיישל",
+        "en": "מנת ספיישל",
+        "ar": "מנת ספיישל"
+      },
+      "groupMappings": []
+    },
+    "6631e0f554a92a0d5ffbac3a": {
+      "dishId": "6631e0f554a92a0d5ffbac3a",
+      "dishName": "עוף משקולות ",
+      "kitchenName": "עוף משקולות ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "עוף משקולות ",
+        "en": "עוף משקולות ",
+        "ar": "עוף משקולות "
+      },
+      "groupMappings": []
+    },
+    "65fc32748d90fd8cac172c54": {
+      "dishId": "65fc32748d90fd8cac172c54",
+      "dishName": "רבע עוף",
+      "kitchenName": "רבע עוף",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "רבע עוף",
+        "en": "רבע עוף",
+        "ar": "רבע עוף"
+      },
+      "groupMappings": []
+    },
+    "65d1bc8d14ed0ca1e102f838": {
+      "dishId": "65d1bc8d14ed0ca1e102f838",
+      "dishName": "קבב טלה ",
+      "kitchenName": "קבב טלה ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קבב טלה ",
+        "en": "קבב טלה ",
+        "ar": "קבב טלה "
+      },
+      "groupMappings": []
+    },
+    "6562ff3ce3409544eabd9228": {
+      "dishId": "6562ff3ce3409544eabd9228",
+      "dishName": "תפוחי אדמה",
+      "kitchenName": "תפוחי אדמה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "תפוחי אדמה",
+        "en": "תפוחי אדמה",
+        "ar": "תפוחי אדמה"
+      },
+      "groupMappings": []
+    },
+    "647d8f5cf8e3ff1b09ab84bf": {
+      "dishId": "647d8f5cf8e3ff1b09ab84bf",
+      "dishName": "פריט כללי",
+      "kitchenName": "פריט כללי",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פריט כללי",
+        "en": "פריט כללי",
+        "ar": "פריט כללי"
+      },
+      "groupMappings": []
+    },
+    "676bf7a436841fa1ff5f40ee": {
+      "dishId": "676bf7a436841fa1ff5f40ee",
+      "dishName": "סכו\"ם",
+      "kitchenName": "סכו\"ם",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סכו\"ם",
+        "en": "סכו\"ם",
+        "ar": "סכו\"ם"
+      },
+      "groupMappings": []
+    },
+    "64ff4e082a73c76c505f67c1": {
+      "dishId": "64ff4e082a73c76c505f67c1",
+      "dishName": "סלט ירוק  תוספת",
+      "kitchenName": "סלט ירוק  תוספת",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סלט ירוק  תוספת",
+        "en": "סלט ירוק  תוספת",
+        "ar": "סלט ירוק  תוספת"
+      },
+      "groupMappings": []
+    },
+    "64c6560596a81609a40e62f9": {
+      "dishId": "64c6560596a81609a40e62f9",
+      "dishName": "הערה למטבח",
+      "kitchenName": "הערה למטבח",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "הערה למטבח",
+        "en": "הערה למטבח",
+        "ar": "הערה למטבח"
+      },
+      "groupMappings": []
+    },
+    "66446cf7af3115a985711907": {
+      "dishId": "66446cf7af3115a985711907",
+      "dishName": "בראוניז טבעוני",
+      "kitchenName": "בראוניז טבעוני",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בראוניז טבעוני",
+        "en": "בראוניז טבעוני",
+        "ar": "בראוניז טבעוני"
+      },
+      "groupMappings": []
+    },
+    "6602b12f2964a4b41f97cad4": {
+      "dishId": "6602b12f2964a4b41f97cad4",
+      "dishName": "סורבה",
+      "kitchenName": "סורבה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סורבה",
+        "en": "סורבה",
+        "ar": "סורבה"
+      },
+      "groupMappings": []
+    },
+    "64e896bdcbb7fb92afbe49f2": {
+      "dishId": "64e896bdcbb7fb92afbe49f2",
+      "dishName": "ג'סמין ",
+      "kitchenName": "ג'סמין",
+      "imagePath": null,
+      "description": "ג'ין, קמפרי, פסיפלורה, לימון",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "ג'סמין ",
+        "en": "ג'סמין ",
+        "ar": "ג'סמין "
+      },
+      "groupMappings": []
+    },
+    "64beb40aff9e34eb7a79af4d": {
+      "dishId": "64beb40aff9e34eb7a79af4d",
+      "dishName": "תפוזים*",
+      "kitchenName": "תפוזים*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "תפוזים*",
+        "en": "תפוזים*",
+        "ar": "תפוזים*"
+      },
+      "groupMappings": []
+    },
+    "64c655b096a81609a40e62f7": {
+      "dishId": "64c655b096a81609a40e62f7",
+      "dishName": "הערה בר",
+      "kitchenName": "הערה בר",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "הערה בר",
+        "en": "הערה בר",
+        "ar": "הערה בר"
+      },
+      "groupMappings": []
+    },
+    "64be9c704d58c3aa744f53d6": {
+      "dishId": "64be9c704d58c3aa744f53d6",
+      "dishName": "קולה*",
+      "kitchenName": "קולה*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קולה*",
+        "en": "קולה*",
+        "ar": "קולה*"
+      },
+      "groupMappings": []
+    },
+    "64be9c944d58c3aa744f53d7": {
+      "dishId": "64be9c944d58c3aa744f53d7",
+      "dishName": "קולה זירו*",
+      "kitchenName": "קולה זירו*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קולה זירו*",
+        "en": "קולה זירו*",
+        "ar": "קולה זירו*"
+      },
+      "groupMappings": []
+    },
+    "64be9cc34d58c3aa744f53d9": {
+      "dishId": "64be9cc34d58c3aa744f53d9",
+      "dishName": "ספרייט*",
+      "kitchenName": "ספרייט*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "ספרייט*",
+        "en": "ספרייט*",
+        "ar": "ספרייט*"
+      },
+      "groupMappings": []
+    },
+    "656837455ee01e8474ff83de": {
+      "dishId": "656837455ee01e8474ff83de",
+      "dishName": "ספרייט זירו*",
+      "kitchenName": "ספרייט זירו*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "ספרייט זירו*",
+        "en": "ספרייט זירו*",
+        "ar": "ספרייט זירו*"
+      },
+      "groupMappings": []
+    },
+    "64beadb43e9e0f501953c630": {
+      "dishId": "64beadb43e9e0f501953c630",
+      "dishName": "פיוזטי*",
+      "kitchenName": "פיוזטי*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פיוזטי*",
+        "en": "פיוזטי*",
+        "ar": "פיוזטי*"
+      },
+      "groupMappings": []
+    },
+    "64be9cad4d58c3aa744f53d8": {
+      "dishId": "64be9cad4d58c3aa744f53d8",
+      "dishName": "מינרלים זכוכית*",
+      "kitchenName": "מינרלים זכוכית*",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מינרלים זכוכית*",
+        "en": "מינרלים זכוכית*",
+        "ar": "מינרלים זכוכית*"
+      },
+      "groupMappings": []
+    },
+    "6485c361c45b0b48c44b912a": {
+      "dishId": "6485c361c45b0b48c44b912a",
+      "dishName": "פרללה גדול",
+      "kitchenName": "פרללה גדול",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פרללה גדול",
+        "en": "פרללה גדול",
+        "ar": "פרללה גדול"
+      },
+      "groupMappings": []
+    },
+    "64db6941a32250c51437fcad": {
+      "dishId": "64db6941a32250c51437fcad",
+      "dishName": "פרללה קטן",
+      "kitchenName": "פרללה קטן",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פרללה קטן",
+        "en": "פרללה קטן",
+        "ar": "פרללה קטן"
+      },
+      "groupMappings": []
+    },
+    "65534fb27810fb7ed12de8bc": {
+      "dishId": "65534fb27810fb7ed12de8bc",
+      "dishName": "ענבים",
+      "kitchenName": "ענבים",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "ענבים",
+        "en": "ענבים",
+        "ar": "ענבים"
+      },
+      "groupMappings": []
+    },
+    "64ecd0f31f6bd785b2ede47c": {
+      "dishId": "64ecd0f31f6bd785b2ede47c",
+      "dishName": "גסמין גאז",
+      "kitchenName": "גסמין גאז",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "גסמין גאז",
+        "en": "גסמין גאז",
+        "ar": "גסמין גאז"
+      },
+      "groupMappings": []
+    },
+    "645bb568045fd900cbe7c91b": {
+      "dishId": "645bb568045fd900cbe7c91b",
+      "dishName": "אספרסו",
+      "kitchenName": "אספרסו",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "אספרסו",
+        "en": "אספרסו",
+        "ar": "אספרסו"
+      },
+      "groupMappings": [
+        {
+          "groupId": "645cc87b2bbdf869f5e4cc2f",
+          "groupName": "הערות לקפה",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6565ff91a27950616ddffd10",
+              "dishId": "6565ff91a27950616ddffd0f",
+              "kitchenName": "חלב שיבולת",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "6565ff96a27950616ddffd12",
+              "dishId": "6565ff96a27950616ddffd11",
+              "kitchenName": "חלב דל",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "65660008a27950616ddffd16",
+              "dishId": "65660008a27950616ddffd15",
+              "kitchenName": "קצף",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "645bb5f5045fd900cbe7c929": {
+      "dishId": "645bb5f5045fd900cbe7c929",
+      "dishName": "אספרסו ארוך",
+      "kitchenName": "אספרסו ארוך",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "אספרסו ארוך",
+        "en": "אספרסו ארוך",
+        "ar": "אספרסו ארוך"
+      },
+      "groupMappings": [
+        {
+          "groupId": "645cc87b2bbdf869f5e4cc2f",
+          "groupName": "הערות לקפה",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6565ff91a27950616ddffd10",
+              "dishId": "6565ff91a27950616ddffd0f",
+              "kitchenName": "חלב שיבולת",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "6565ff96a27950616ddffd12",
+              "dishId": "6565ff96a27950616ddffd11",
+              "kitchenName": "חלב דל",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "65660008a27950616ddffd16",
+              "dishId": "65660008a27950616ddffd15",
+              "kitchenName": "קצף",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "645bb637045fd900cbe7c936": {
+      "dishId": "645bb637045fd900cbe7c936",
+      "dishName": "תה",
+      "kitchenName": "תה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "תה",
+        "en": "תה",
+        "ar": "תה"
+      },
+      "groupMappings": []
+    },
+    "645bb624045fd900cbe7c933": {
+      "dishId": "645bb624045fd900cbe7c933",
+      "dishName": "קפה שחור",
+      "kitchenName": "קפה שחור",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קפה שחור",
+        "en": "קפה שחור",
+        "ar": "קפה שחור"
+      },
+      "groupMappings": [
+        {
+          "groupId": "645cc87b2bbdf869f5e4cc2f",
+          "groupName": "הערות לקפה",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "6565ff91a27950616ddffd10",
+              "dishId": "6565ff91a27950616ddffd0f",
+              "kitchenName": "חלב שיבולת",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "6565ff96a27950616ddffd12",
+              "dishId": "6565ff96a27950616ddffd11",
+              "kitchenName": "חלב דל",
+              "isDish": false,
+              "isVariable": true
+            },
+            {
+              "optionId": "65660008a27950616ddffd16",
+              "dishId": "65660008a27950616ddffd15",
+              "kitchenName": "קצף",
+              "isDish": false,
+              "isVariable": true
+            }
+          ]
+        }
+      ]
+    },
+    "64788885530074b02566742e": {
+      "dishId": "64788885530074b02566742e",
+      "dishName": "מורטי בקבוק ",
+      "kitchenName": "בירה מורטי",
+      "imagePath": null,
+      "description": "בירה בהירה משעורה",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מורטי בקבוק ",
+        "en": "מורטי בקבוק ",
+        "ar": "מורטי בקבוק "
+      },
+      "groupMappings": []
+    },
+    "65fc431f8d90fd8cac172c6d": {
+      "dishId": "65fc431f8d90fd8cac172c6d",
+      "dishName": "סטלה בקבוק",
+      "kitchenName": "סטלה בקבוק",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סטלה בקבוק",
+        "en": "סטלה בקבוק",
+        "ar": "סטלה בקבוק"
+      },
+      "groupMappings": []
+    },
+    "64be8a3e973b29b0c0251ec2": {
+      "dishId": "64be8a3e973b29b0c0251ec2",
+      "dishName": "כוס סירה ירדן אדום",
+      "kitchenName": "כוס סירה ירדן אדום",
+      "imagePath": null,
+      "description": "יבש, יקב רמת הגולן, 100אחוז זן סירה, גוף מלא, ארומה של פירות אדומים וריכוז טעמים גבוהה",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כוס סירה ירדן אדום",
+        "en": "כוס סירה ירדן אדום",
+        "ar": "כוס סירה ירדן אדום"
+      },
+      "groupMappings": []
+    },
+    "650aed767d805e4c166b939e": {
+      "dishId": "650aed767d805e4c166b939e",
+      "dishName": "סירה ירדן",
+      "kitchenName": "סירה ירדן",
+      "imagePath": null,
+      "description": "יבש, יקב רמת הגולן, 100אחוז זן סירה, גוף מלא, ארומה של פירות אדומים וריכוז טעמים גבוהה",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סירה ירדן",
+        "en": "סירה ירדן",
+        "ar": "סירה ירדן"
+      },
+      "groupMappings": []
+    },
+    "65e0923309336ffe9267743c": {
+      "dishId": "65e0923309336ffe9267743c",
+      "dishName": "פטיט סירה כוס ",
+      "kitchenName": "פטיט סירה כוס ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פטיט סירה כוס ",
+        "en": "פטיט סירה כוס ",
+        "ar": "פטיט סירה כוס "
+      },
+      "groupMappings": []
+    },
+    "65e092df09336ffe9267743d": {
+      "dishId": "65e092df09336ffe9267743d",
+      "dishName": "פטיט סירה בקבוק ",
+      "kitchenName": "פטיט סירה בקבוק ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פטיט סירה בקבוק ",
+        "en": "פטיט סירה בקבוק ",
+        "ar": "פטיט סירה בקבוק "
+      },
+      "groupMappings": []
+    },
+    "64be89c8973b29b0c0251ebf": {
+      "dishId": "64be89c8973b29b0c0251ebf",
+      "dishName": "בקבוק קיאנטי",
+      "kitchenName": "בקבוק קיאנטי",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בקבוק קיאנטי",
+        "en": "בקבוק קיאנטי",
+        "ar": "בקבוק קיאנטי"
+      },
+      "groupMappings": []
+    },
+    "64be8a2b973b29b0c0251ec0": {
+      "dishId": "64be8a2b973b29b0c0251ec0",
+      "dishName": "כוס קיאנטי",
+      "kitchenName": "כוס קיאנטי",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כוס קיאנטי",
+        "en": "כוס קיאנטי",
+        "ar": "כוס קיאנטי"
+      },
+      "groupMappings": []
+    },
+    "65437cb60d76535f3b55e0e7": {
+      "dishId": "65437cb60d76535f3b55e0e7",
+      "dishName": "בקבוק שרדונה תל פארס לבן, רקאנטי",
+      "kitchenName": "שרדונה תל פארס לבן, רקאנטי",
+      "imagePath": null,
+      "description": "יבש, יקב רקנטי רמת הגולן תל פארס, 100 אחוז זן שרדונה, יין עשיר בטעמים",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "בקבוק שרדונה תל פארס לבן, רקאנטי",
+        "en": "בקבוק שרדונה תל פארס לבן, רקאנטי",
+        "ar": "בקבוק שרדונה תל פארס לבן, רקאנטי"
+      },
+      "groupMappings": []
+    },
+    "65437d540d76535f3b55e0e8": {
+      "dishId": "65437d540d76535f3b55e0e8",
+      "dishName": "כוס שרדונה תל פארס לבן, רקאנטי",
+      "kitchenName": "כוס שרדונה תל פארס לבן, רקאנטי",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כוס שרדונה תל פארס לבן, רקאנטי",
+        "en": "כוס שרדונה תל פארס לבן, רקאנטי",
+        "ar": "כוס שרדונה תל פארס לבן, רקאנטי"
+      },
+      "groupMappings": []
+    },
+    "65e88ef43188f8e0e6e13c3e": {
+      "dishId": "65e88ef43188f8e0e6e13c3e",
+      "dishName": "ירדן גוורץ ",
+      "kitchenName": "ירדן גוורץ ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "ירדן גוורץ ",
+        "en": "ירדן גוורץ ",
+        "ar": "ירדן גוורץ "
+      },
+      "groupMappings": []
+    },
+    "66014472b12c2493b272d065": {
+      "dishId": "66014472b12c2493b272d065",
+      "dishName": "כוס ירדן גוורץ",
+      "kitchenName": "כוס ירדן גוורץ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כוס ירדן גוורץ",
+        "en": "כוס ירדן גוורץ",
+        "ar": "כוס ירדן גוורץ"
+      },
+      "groupMappings": []
+    },
+    "64e61b803632739c4c0d7ca7": {
+      "dishId": "64e61b803632739c4c0d7ca7",
+      "dishName": "כוס יראון רוזה הרי גליל ",
+      "kitchenName": "כוס יראון רוזה הרי גליל ",
+      "imagePath": null,
+      "description": "יבש, יין רענן, מורכב משלוש זנים (גרנאש, סירה, ברברה),",
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "כוס יראון רוזה הרי גליל ",
+        "en": "כוס יראון רוזה הרי גליל ",
+        "ar": "כוס יראון רוזה הרי גליל "
+      },
+      "groupMappings": []
+    },
+    "65e88d323188f8e0e6e13c24": {
+      "dishId": "65e88d323188f8e0e6e13c24",
+      "dishName": "יראון רוזה",
+      "kitchenName": "יראון רוזה",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "יראון רוזה",
+        "en": "יראון רוזה",
+        "ar": "יראון רוזה"
+      },
+      "groupMappings": []
+    }
+  }
+}

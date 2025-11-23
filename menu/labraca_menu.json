@@ -1,0 +1,606 @@
+{
+  "64de0e52a0f1c485d8934dd5": {
+    "basePrice": 158,
+    "groups": []
+  },
+  "64de0e7ba0f1c485d8934dda": {
+    "basePrice": 158,
+    "groups": []
+  },
+  "660ec2803d2e76e16a1089d5": {
+    "basePrice": 68,
+    "groups": []
+  },
+  "65d1bb4214ed0ca1e102f828": {
+    "basePrice": 24,
+    "groups": []
+  },
+  "668e2181ff9c99b7862ec36e": {
+    "basePrice": 62,
+    "groups": []
+  },
+  "6489f728f8a3b2458b430cd9": {
+    "basePrice": 52,
+    "groups": [
+      {
+        "id": "64e5b12a77bbc52eff34d0e6",
+        "type": "multiple",
+        "title": {
+          "he": "חריף / חריף בצד",
+          "en": "Spicy / Spicy on the side",
+          "ar": "حار / حار على الجانب"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6784d4634ed95df298cdb415",
+            "price": 0,
+            "label": {
+              "he": "בלי חריף",
+              "en": "Without spicy",
+              "ar": "بدون حار"
+            }
+          },
+          {
+            "id": "6784d4664ed95df298cdb416",
+            "price": 0,
+            "label": {
+              "he": "חריף בצד",
+              "en": "Spicy on the side",
+              "ar": "حار على الجانب"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "65d1bbf614ed0ca1e102f82c": {
+    "basePrice": 38,
+    "groups": []
+  },
+  "64ff4f502a73c76c505f67c4": {
+    "basePrice": 64,
+    "groups": []
+  },
+  "65fc31d58d90fd8cac172c4d": {
+    "basePrice": 58,
+    "groups": []
+  },
+  "65d1bc0a14ed0ca1e102f82e": {
+    "basePrice": 98,
+    "groups": []
+  },
+  "660ebf1da852926749de7d6f": {
+    "basePrice": 98,
+    "groups": []
+  },
+  "660ebf28a852926749de7d70": {
+    "basePrice": 58,
+    "groups": [
+      {
+        "id": "66014510b12c2493b272d071",
+        "type": "single",
+        "title": {
+          "he": "מידת עשייה",
+          "en": "Doneness level",
+          "ar": "مستوى النضج"
+        },
+        "required": false,
+        "options": [
+          {
+            "id": "66014519b12c2493b272d072",
+            "price": 0,
+            "label": {
+              "he": "M",
+              "en": "M",
+              "ar": "M"
+            }
+          },
+          {
+            "id": "6601451bb12c2493b272d073",
+            "price": 0,
+            "label": {
+              "he": "MW",
+              "en": "MW",
+              "ar": "MW"
+            }
+          },
+          {
+            "id": "6601451db12c2493b272d074",
+            "price": 0,
+            "label": {
+              "he": "WD",
+              "en": "WD",
+              "ar": "WD"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "668e21cfff9c99b7862ec372": {
+    "basePrice": 88,
+    "groups": []
+  },
+  "668e21afff9c99b7862ec370": {
+    "basePrice": 78,
+    "groups": [
+      {
+        "id": "66014510b12c2493b272d071",
+        "type": "single",
+        "title": {
+          "he": "מידת עשייה",
+          "en": "Doneness level",
+          "ar": "مستوى النضج"
+        },
+        "required": false,
+        "options": [
+          {
+            "id": "66014519b12c2493b272d072",
+            "price": 0,
+            "label": {
+              "he": "M",
+              "en": "M",
+              "ar": "M"
+            }
+          },
+          {
+            "id": "6601451bb12c2493b272d073",
+            "price": 0,
+            "label": {
+              "he": "MW",
+              "en": "MW",
+              "ar": "MW"
+            }
+          },
+          {
+            "id": "6601451db12c2493b272d074",
+            "price": 0,
+            "label": {
+              "he": "WD",
+              "en": "WD",
+              "ar": "WD"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "668e21c4ff9c99b7862ec371": {
+    "basePrice": 86,
+    "groups": [
+      {
+        "id": "66014510b12c2493b272d071",
+        "type": "single",
+        "title": {
+          "he": "מידת עשייה",
+          "en": "Doneness level",
+          "ar": "مستوى النضج"
+        },
+        "required": false,
+        "options": [
+          {
+            "id": "66014519b12c2493b272d072",
+            "price": 0,
+            "label": {
+              "he": "M",
+              "en": "M",
+              "ar": "M"
+            }
+          },
+          {
+            "id": "6601451bb12c2493b272d073",
+            "price": 0,
+            "label": {
+              "he": "MW",
+              "en": "MW",
+              "ar": "MW"
+            }
+          },
+          {
+            "id": "6601451db12c2493b272d074",
+            "price": 0,
+            "label": {
+              "he": "WD",
+              "en": "WD",
+              "ar": "WD"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "65fc32108d90fd8cac172c4f": {
+    "basePrice": 74,
+    "groups": []
+  },
+  "65fc32348d90fd8cac172c51": {
+    "basePrice": 76,
+    "groups": []
+  },
+  "647da360f8e3ff1b09ab84d3": {
+    "basePrice": 48,
+    "groups": [
+      {
+        "id": "66939b8bba0a71e331249415",
+        "type": "multiple",
+        "title": {
+          "he": "תוספת עוף לסלט ברזל",
+          "en": "Extra chicken for iron salad",
+          "ar": "إضافة دجاج لسلطة الحديد"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "66939b9aba0a71e331249416",
+            "price": 18,
+            "label": {
+              "he": "חזה עוף",
+              "en": "Chicken breast",
+              "ar": "صدر دجاج"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "65d1bc9314ed0ca1e102f839": {
+    "basePrice": 78,
+    "groups": []
+  },
+  "65d1bca414ed0ca1e102f83b": {
+    "basePrice": 84,
+    "groups": []
+  },
+  "6501e9eea0c92ecbc95cc496": {
+    "basePrice": 112,
+    "groups": [
+      {
+        "id": "66a63a1c540e67d86069916e",
+        "type": "single",
+        "title": {
+          "he": "מידות עשייה לה בראצה secondi",
+          "en": "Doneness levels for la brace secondi",
+          "ar": "مستويات النضج للبراسي الثانية"
+        },
+        "required": true,
+        "options": [
+          {
+            "id": "66a63a7e540e67d860699173",
+            "price": 0,
+            "label": {
+              "he": "MR",
+              "en": "MR",
+              "ar": "MR"
+            }
+          },
+          {
+            "id": "66a63a3d540e67d86069916f",
+            "price": 0,
+            "label": {
+              "he": "M",
+              "en": "M",
+              "ar": "M"
+            }
+          },
+          {
+            "id": "66a63a45540e67d860699170",
+            "price": 0,
+            "label": {
+              "he": "MW",
+              "en": "MW",
+              "ar": "MW"
+            }
+          },
+          {
+            "id": "66a63a4e540e67d860699171",
+            "price": 0,
+            "label": {
+              "he": "WD",
+              "en": "WD",
+              "ar": "WD"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "6602d642530f8e96c766c66b": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "6631e0f554a92a0d5ffbac3a": {
+    "basePrice": 88,
+    "groups": []
+  },
+  "65fc32748d90fd8cac172c54": {
+    "basePrice": 76,
+    "groups": []
+  },
+  "65d1bc8d14ed0ca1e102f838": {
+    "basePrice": 98,
+    "groups": []
+  },
+  "6562ff3ce3409544eabd9228": {
+    "basePrice": 28,
+    "groups": []
+  },
+  "647d8f5cf8e3ff1b09ab84bf": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "676bf7a436841fa1ff5f40ee": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "64ff4e082a73c76c505f67c1": {
+    "basePrice": 28,
+    "groups": []
+  },
+  "64c6560596a81609a40e62f9": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "66446cf7af3115a985711907": {
+    "basePrice": 46,
+    "groups": []
+  },
+  "6602b12f2964a4b41f97cad4": {
+    "basePrice": 36,
+    "groups": []
+  },
+  "64e896bdcbb7fb92afbe49f2": {
+    "basePrice": 48,
+    "groups": []
+  },
+  "64beb40aff9e34eb7a79af4d": {
+    "basePrice": 16,
+    "groups": []
+  },
+  "64c655b096a81609a40e62f7": {
+    "basePrice": 0,
+    "groups": []
+  },
+  "64be9c704d58c3aa744f53d6": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "64be9c944d58c3aa744f53d7": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "64be9cc34d58c3aa744f53d9": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "656837455ee01e8474ff83de": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "64beadb43e9e0f501953c630": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "64be9cad4d58c3aa744f53d8": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "6485c361c45b0b48c44b912a": {
+    "basePrice": 28,
+    "groups": []
+  },
+  "64db6941a32250c51437fcad": {
+    "basePrice": 16,
+    "groups": []
+  },
+  "65534fb27810fb7ed12de8bc": {
+    "basePrice": 12,
+    "groups": []
+  },
+  "64ecd0f31f6bd785b2ede47c": {
+    "basePrice": 48,
+    "groups": []
+  },
+  "645bb568045fd900cbe7c91b": {
+    "basePrice": 9,
+    "groups": [
+      {
+        "id": "645cc87b2bbdf869f5e4cc2f",
+        "type": "multiple",
+        "title": {
+          "he": "הערות לקפה",
+          "en": "Coffee notes",
+          "ar": "ملاحظات القهوة"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6565ff91a27950616ddffd10",
+            "price": 0,
+            "label": {
+              "he": "חלב שיבולת",
+              "en": "Oat milk",
+              "ar": "حليب الشوفان"
+            }
+          },
+          {
+            "id": "6565ff96a27950616ddffd12",
+            "price": 0,
+            "label": {
+              "he": "חלב דל",
+              "en": "Low-fat milk",
+              "ar": "حليب قليل الدسم"
+            }
+          },
+          {
+            "id": "65660008a27950616ddffd16",
+            "price": 0,
+            "label": {
+              "he": "קצף",
+              "en": "Foam",
+              "ar": "رغوة"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "645bb5f5045fd900cbe7c929": {
+    "basePrice": 9,
+    "groups": [
+      {
+        "id": "645cc87b2bbdf869f5e4cc2f",
+        "type": "multiple",
+        "title": {
+          "he": "הערות לקפה",
+          "en": "Coffee notes",
+          "ar": "ملاحظات القهوة"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6565ff91a27950616ddffd10",
+            "price": 0,
+            "label": {
+              "he": "חלב שיבולת",
+              "en": "Oat milk",
+              "ar": "حليب الشوفان"
+            }
+          },
+          {
+            "id": "6565ff96a27950616ddffd12",
+            "price": 0,
+            "label": {
+              "he": "חלב דל",
+              "en": "Low-fat milk",
+              "ar": "حليب قليل الدسم"
+            }
+          },
+          {
+            "id": "65660008a27950616ddffd16",
+            "price": 0,
+            "label": {
+              "he": "קצף",
+              "en": "Foam",
+              "ar": "رغوة"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "645bb637045fd900cbe7c936": {
+    "basePrice": 14,
+    "groups": []
+  },
+  "645bb624045fd900cbe7c933": {
+    "basePrice": 10,
+    "groups": [
+      {
+        "id": "645cc87b2bbdf869f5e4cc2f",
+        "type": "multiple",
+        "title": {
+          "he": "הערות לקפה",
+          "en": "Coffee notes",
+          "ar": "ملاحظات القهوة"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "6565ff91a27950616ddffd10",
+            "price": 0,
+            "label": {
+              "he": "חלב שיבולת",
+              "en": "Oat milk",
+              "ar": "حليب الشوفان"
+            }
+          },
+          {
+            "id": "6565ff96a27950616ddffd12",
+            "price": 0,
+            "label": {
+              "he": "חלב דל",
+              "en": "Low-fat milk",
+              "ar": "حليب قليل الدسم"
+            }
+          },
+          {
+            "id": "65660008a27950616ddffd16",
+            "price": 0,
+            "label": {
+              "he": "קצף",
+              "en": "Foam",
+              "ar": "رغوة"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "64788885530074b02566742e": {
+    "basePrice": 24,
+    "groups": []
+  },
+  "65fc431f8d90fd8cac172c6d": {
+    "basePrice": 24,
+    "groups": []
+  },
+  "64be8a3e973b29b0c0251ec2": {
+    "basePrice": 54,
+    "groups": []
+  },
+  "650aed767d805e4c166b939e": {
+    "basePrice": 218,
+    "groups": []
+  },
+  "65e0923309336ffe9267743c": {
+    "basePrice": 48,
+    "groups": []
+  },
+  "65e092df09336ffe9267743d": {
+    "basePrice": 198,
+    "groups": []
+  },
+  "64be89c8973b29b0c0251ebf": {
+    "basePrice": 176,
+    "groups": []
+  },
+  "64be8a2b973b29b0c0251ec0": {
+    "basePrice": 46,
+    "groups": []
+  },
+  "65437cb60d76535f3b55e0e7": {
+    "basePrice": 209,
+    "groups": []
+  },
+  "65437d540d76535f3b55e0e8": {
+    "basePrice": 50,
+    "groups": []
+  },
+  "65e88ef43188f8e0e6e13c3e": {
+    "basePrice": 188,
+    "groups": []
+  },
+  "66014472b12c2493b272d065": {
+    "basePrice": 46,
+    "groups": []
+  },
+  "64e61b803632739c4c0d7ca7": {
+    "basePrice": 46,
+    "groups": []
+  },
+  "65e88d323188f8e0e6e13c24": {
+    "basePrice": 160,
+    "groups": []
+  }
+}

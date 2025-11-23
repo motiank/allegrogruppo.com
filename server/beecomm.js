@@ -507,7 +507,7 @@ menuApiRouter.get('/meal-options', (req, res) => {
 // GET /api/beecomm-metadata
 menuApiRouter.get('/beecomm-metadata', (req, res) => {
   try {
-    const metadataPath = join(__dirname, '..', 'menu', 'beecomm_metadata.json');
+    const metadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
     const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
     res.json(metadata);
   } catch (error) {

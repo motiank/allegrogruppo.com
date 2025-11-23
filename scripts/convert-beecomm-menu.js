@@ -155,8 +155,8 @@ function getTranslation(hebrewText, nameTranslate, lang) {
 }
 
 // Read the beecomm menu file
-const beecommMenuPath = join(__dirname, '..', 'propmpts', 'bc_sandbox_menu.json');
-const outputPath = join(__dirname, '..', 'menu', 'beecomm_menu.json');
+const beecommMenuPath = join(__dirname, '..', 'propmpts', 'labraca.json');
+const outputPath = join(__dirname, '..', 'menu', 'labraca_menu.json');
 
 console.log('Reading beecomm menu from:', beecommMenuPath);
 const beecommMenu = JSON.parse(readFileSync(beecommMenuPath, 'utf8'));
@@ -318,8 +318,8 @@ console.log('Writing menu to:', outputPath);
 writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf8');
 
 // Write beecomm metadata separately for order submission
-const beecommMetadataPath = join(__dirname, '..', 'menu', 'beecomm_metadata.json');
-console.log('Writing beecomm metadata to:', beecommMetadataPath);
+const beecommMetadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
+console.log('Writing labraca metadata to:', beecommMetadataPath);
 writeFileSync(beecommMetadataPath, JSON.stringify(beecommMetadata, null, 2), 'utf8');
 
 console.log(`✅ Successfully converted ${allDishes.length} dishes to ${outputPath}`);
