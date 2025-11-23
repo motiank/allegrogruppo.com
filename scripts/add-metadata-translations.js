@@ -11,8 +11,7 @@ function isHebrew(text) {
   return /[\u0590-\u05FF]/.test(text);
 }
 
-// Import translation dictionary from the menu translation script
-// This uses the same comprehensive dictionary
+// Comprehensive translation dictionary for all dish names
 const translationDict = {
   en: {
     'שיפוד פילה בקר': 'Beef Fillet Skewer',
@@ -35,18 +34,49 @@ const translationDict = {
     'סלט ברזל': 'Iron Salad',
     'שניצל': 'Schnitzel',
     'שניצל סציליאני': 'Sicilian Schnitzel',
-    'פילה בקר': 'Beef Fillet',
-    'שיפוד': 'Skewer',
-    'קרפציו': 'Carpaccio',
-    'פיצה': 'Pizza',
-    'פסטה': 'Pasta',
-    'סלט': 'Salad',
-    'המבורגר': 'Hamburger',
-    'עוף': 'Chicken',
-    'בקר': 'Beef',
-    'דג': 'Fish',
-    'סלמון': 'Salmon',
-    'טונה': 'Tuna',
+    'סינטה עגלה': 'Veal Sirloin',
+    'מנת ספיישל': 'Special Dish',
+    'עוף משקולות': 'Chicken Weights',
+    'רבע עוף': 'Quarter Chicken',
+    'קבב טלה': 'Lamb Kebab',
+    'תפוחי אדמה': 'Potatoes',
+    'פריט כללי': 'General Item',
+    'סכו"ם': 'Cutlery',
+    'סלט ירוק  תוספת': 'Green Salad Extra',
+    'הערה למטבח': 'Kitchen Note',
+    'בראוניז טבעוני': 'Vegan Brownies',
+    'סורבה': 'Sorbet',
+    'ג\'סמין': 'Jasmine',
+    'תפוזים': 'Oranges',
+    'הערה בר': 'Bar Note',
+    'קולה': 'Cola',
+    'קולה זירו': 'Coke Zero',
+    'ספרייט': 'Sprite',
+    'ספרייט זירו': 'Sprite Zero',
+    'פיוזטי': 'Fusetti',
+    'מינרלים זכוכית': 'Mineral Water Glass',
+    'פרללה גדול': 'Large Perella',
+    'פרללה קטן': 'Small Perella',
+    'ענבים': 'Grapes',
+    'גסמין גאז': 'Jasmine Gaz',
+    'אספרסו': 'Espresso',
+    'אספרסו ארוך': 'Long Espresso',
+    'תה': 'Tea',
+    'קפה שחור': 'Black Coffee',
+    'מורטי בקבוק': 'Moretti Bottle',
+    'סטלה בקבוק': 'Stella Bottle',
+    'כוס סירה ירדן אדום': 'Glass Syrah Jordan Red',
+    'סירה ירדן': 'Syrah Jordan',
+    'פטיט סירה כוס': 'Petit Syrah Glass',
+    'פטיט סירה בקבוק': 'Petit Syrah Bottle',
+    'בקבוק קיאנטי': 'Chianti Bottle',
+    'כוס קיאנטי': 'Chianti Glass',
+    'בקבוק שרדונה תל פארס לבן, רקאנטי': 'Chardonnay Tel Farès White Bottle, Recanti',
+    'כוס שרדונה תל פארס לבן, רקאנטי': 'Chardonnay Tel Farès White Glass, Recanti',
+    'ירדן גוורץ': 'Jordan Gewürztraminer',
+    'כוס ירדן גוורץ': 'Jordan Gewürztraminer Glass',
+    'כוס יראון רוזה הרי גליל': 'Yiron Rosé Galilee Mountains Glass',
+    'יראון רוזה': 'Yiron Rosé',
   },
   ar: {
     'שיפוד פילה בקר': 'سيخ فيليه لحم بقري',
@@ -69,18 +99,49 @@ const translationDict = {
     'סלט ברזל': 'سلطة الحديد',
     'שניצל': 'شنتسل',
     'שניצל סציליאני': 'شنتسل صقلي',
-    'פילה בקר': 'فيليه لحم بقري',
-    'שיפוד': 'سيخ',
-    'קרפציו': 'كارباتشيو',
-    'פיצה': 'بيتزا',
-    'פסטה': 'باستا',
-    'סלט': 'سلطة',
-    'המבורגר': 'هامبرجر',
-    'עוף': 'دجاج',
-    'בקר': 'لحم بقري',
-    'דג': 'سمك',
-    'סלמון': 'سلمون',
-    'טונה': 'تونة',
+    'סינטה עגלה': 'لحم عجل سيرلون',
+    'מנת ספיישל': 'طبق خاص',
+    'עוף משקולות': 'دجاج بأوزان',
+    'רבע עוף': 'ربع دجاج',
+    'קבב טלה': 'كباب خروف',
+    'תפוחי אדמה': 'بطاطا',
+    'פריט כללי': 'عنصر عام',
+    'סכו"ם': 'أدوات المائدة',
+    'סלט ירוק  תוספת': 'سلطة خضراء إضافية',
+    'הערה למטבח': 'ملاحظة للمطبخ',
+    'בראוניז טבעוני': 'براونيز نباتي',
+    'סורבה': 'سوربيت',
+    'ג\'סמין': 'ياسمين',
+    'תפוזים': 'برتقال',
+    'הערה בר': 'ملاحظة للبار',
+    'קולה': 'كولا',
+    'קולה זירו': 'كولا زيرو',
+    'ספרייט': 'سبرايت',
+    'ספרייט זירו': 'سبرايت زيرو',
+    'פיוזטי': 'فوزيتي',
+    'מינרלים זכוכית': 'مياه معدنية كوب',
+    'פרללה גדול': 'بيريلا كبير',
+    'פרללה קטן': 'بيريلا صغير',
+    'ענבים': 'عنب',
+    'גסמין גאז': 'ياسمين غاز',
+    'אספרסו': 'إسبرسو',
+    'אספרסו ארוך': 'إسبرسو طويل',
+    'תה': 'شاي',
+    'קפה שחור': 'قهوة سوداء',
+    'מורטי בקבוק': 'موريتي زجاجة',
+    'סטלה בקבוק': 'ستيلا زجاجة',
+    'כוס סירה ירדן אדום': 'كوب سيراه الأردن الأحمر',
+    'סירה ירדן': 'سيراه الأردن',
+    'פטיט סירה כוס': 'بيتي سيراه كوب',
+    'פטיט סירה בקבוק': 'بيتي سيراه زجاجة',
+    'בקבוק קיאנטי': 'كيانتي زجاجة',
+    'כוס קיאנטי': 'كيانتي كوب',
+    'בקבוק שרדונה תל פארס לבן, רקאנטי': 'شاردونيه تل فارس أبيض زجاجة، ريكانتي',
+    'כוס שרדונה תל פארס לבן, רקאנטי': 'شاردونيه تل فارس أبيض كوب، ريكانتي',
+    'ירדן גוורץ': 'الأردن جيفورزترامينر',
+    'כוס ירדן גוורץ': 'الأردن جيفورزترامينر كوب',
+    'כוס יראון רוזה הרי גליל': 'يرون روزيه جبال الجليل كوب',
+    'יראון רוזה': 'يرون روزيه',
   },
 };
 
@@ -116,19 +177,29 @@ const metadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
 console.log('Reading metadata from:', metadataPath);
 const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
 
-// Add nameTranslate to each dish
+// Add or update nameTranslate for each dish
 let translatedCount = 0;
 if (metadata.dishMappings) {
   for (const dishId in metadata.dishMappings) {
     const dish = metadata.dishMappings[dishId];
-    if (dish.dishName && !dish.nameTranslate) {
+    if (dish.dishName) {
       const hebrewName = dish.dishName.trim();
-      dish.nameTranslate = {
-        he: hebrewName,
-        en: translateDishName(hebrewName, 'en'),
-        ar: translateDishName(hebrewName, 'ar'),
-      };
-      translatedCount++;
+      const currentEn = dish.nameTranslate?.en || '';
+      const currentAr = dish.nameTranslate?.ar || '';
+      
+      // Check if translation is needed (missing or contains Hebrew)
+      const needsTranslation = !dish.nameTranslate || 
+                               isHebrew(currentEn) || 
+                               isHebrew(currentAr);
+      
+      if (needsTranslation) {
+        dish.nameTranslate = {
+          he: hebrewName,
+          en: translateDishName(hebrewName, 'en'),
+          ar: translateDishName(hebrewName, 'ar'),
+        };
+        translatedCount++;
+      }
     }
   }
 }
@@ -137,5 +208,4 @@ if (metadata.dishMappings) {
 console.log('Writing updated metadata to:', metadataPath);
 writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
 
-console.log(`✅ Added nameTranslate to ${translatedCount} dishes in labraca_metadata.json`);
-
+console.log(`✅ Updated nameTranslate for ${translatedCount} dishes in labraca_metadata.json`);
