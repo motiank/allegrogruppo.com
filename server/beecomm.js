@@ -254,7 +254,6 @@ function structureOrderForBeecomm(pelecardData, orderData) {
 // 3. Application/json (if ServerSideFeedbackContentType is application/json)
 router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'] }), async (req, res) => {
   console.log('[beecomm] Pelecard placeorder received - raw body type:', typeof req.body);
-  console.log('[beecomm] Pelecard placeorder received 1 - body:', req.body);
 
   try {
     // Parse Pelecard feedback data
@@ -267,53 +266,12 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     let pelecardData = null;
     
     // Case 1: Body is a raw string (JSON string) - needs parsing
-    if (typeof req.body === 'string') {
-      try {
-        const parsed = JSON.parse(req.body);
-        console.log('[beecomm] JSON parsed:', parsed);
-        // Check if parsed result has ResultData wrapper (Pelecard response structure)
-        if (parsed && typeof parsed === 'object' && parsed.ResultData) {
-          pelecardData = parsed.ResultData;
-          console.log('[beecomm] Parsed JSON from string body and extracted ResultData');
-        } else {
-          pelecardData = parsed;
-          console.log('[beecomm] Parsed JSON from string body');
-        }
-      } catch (parseError) {
-        console.error('[beecomm] Failed to parse string body as JSON:', parseError.message);
-        // Try to fix common JSON issues (like trailing commas, unescaped quotes)
-        try {
-          // Remove any trailing commas before closing braces/brackets
-          let cleanedBody = req.body.replace(/,(\s*[}\]])/g, '$1');
-          const parsed = JSON.parse(cleanedBody);
-          // Check for ResultData wrapper after cleaning too
-          if (parsed && typeof parsed === 'object' && parsed.ResultData) {
-            pelecardData = parsed.ResultData;
-            console.log('[beecomm] Parsed JSON after cleaning and extracted ResultData');
-          } else {
-            pelecardData = parsed;
-            console.log('[beecomm] Parsed JSON after cleaning string body');
-          }
-        } catch (cleanError) {
-          console.error('[beecomm] Failed to parse even after cleaning:', cleanError.message);
-          return res.status(400).json({
-            error: 'Invalid JSON format in request body',
-            message: parseError.message,
-          });
-        }
-      }
-    }
-    // Case 2: Body is an object with resultDataKeyName (form-encoded with JSON in field)
-    
-    else if (req.body && typeof req.body === 'object' && ( req.body.eatalia_res || req.body.resultDataKeyName)) {
+    if (req.body && typeof req.body === 'object' && ( req.body.eatalia_res || req.body.resultDataKeyName)) {
 
       const jsonField = req.body[ "eatalia_res" || req.body.resultDataKeyName ];
-      console.log('[beecomm] type of JSON field:', typeof jsonField);
-      console.log('[beecomm] JSON field:', jsonField);
-
+    
       if (typeof jsonField === 'string') {
         try {
-          console.log('[beecomm] JSON string:', jsonField);
           const parsed = JSON.parse(jsonField);
           // Check if parsed result has ResultData wrapper
           console.log('[beecomm] Parsed JSON:', parsed);
@@ -332,32 +290,13 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
             message: parseError.message,
           });
         }
-      } else if (typeof jsonField === 'object') {
-         console.log('[beecomm] JSON object:', jsonField);
-        // Already parsed - check for ResultData wrapper
-        if (jsonField.ResultData) {
-          pelecardData = jsonField.ResultData;
-          console.log('[beecomm] Using ResultData from already parsed JSON in resultDataKeyName field');
-        } else {
-          pelecardData = jsonField;
-          console.log('[beecomm] Using already parsed JSON from resultDataKeyName field');
-        }
-      }
-    }
-    // Case 3: Body is already a parsed object (application/json content-type)
-    else if (req.body && typeof req.body === 'object') {
-      // Check if it has ResultData wrapper (from Pelecard response structure)
-      if (req.body.ResultData) {
-        pelecardData = req.body.ResultData;
-        console.log('[beecomm] Using ResultData from parsed object');
-      } else if (req.body.StatusCode !== undefined || req.body.ConfirmationKey !== undefined) {
-        // Direct Pelecard feedback structure
-        pelecardData = req.body;
-        console.log('[beecomm] Using direct parsed object');
-      } else {
-        // Fallback: use body as-is
-        pelecardData = req.body;
-        console.log('[beecomm] Using body as-is (fallback)');
+      } 
+      else {
+        console.error('[beecomm] Failed to parse JSON from resultDataKeyName fields eatalia_res or:', parseError.message);
+        return res.status(400).json({
+          error: 'Invalid JSON format in resultDataKeyName field',
+          message: parseError.message,
+        });
       }
     }
     

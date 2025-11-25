@@ -196,6 +196,12 @@ export const ThankYou = ({ orderData, onRestart }) => {
             <span>{formatPrice(orderData.total)}₪</span>
           </div>
         )}
+        {orderData.approvalNo && (
+          <div className={classes.summaryItem}>
+            <span className={classes.summaryLabel}>{t('thankYou.approvalNumber')}:</span>
+            <span>{orderData.approvalNo}</span>
+          </div>
+        )}
       </div>
       <button className={classes.button} onClick={onRestart}>
         {t('thankYou.restart')}

@@ -304,10 +304,106 @@ console.log('initPayload', initPayload);
 
 router.get('/good', (req, res) => {
   console.log('[pelecard] Landing good URL hit:', req.query);
-  res.json({
-    message: 'Payment completed. Validate server-side before marking as paid.',
-    query: req.query,
-  });
+  
+  // Extract approval number from query parameters
+  const approvalNo = req.query.ApprovalNo || req.query.DebitApproveNumber || '';
+  const statusCode = req.query.PelecardStatusCode || '';
+  const userKey = req.query.UserKey || req.query.ParamX || '';
+  
+  // Return HTML that notifies parent window and closes iframe
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin: 0 0 20px 0;
+      font-size: 2rem;
+    }
+    p {
+      margin: 10px 0;
+      font-size: 1.1rem;
+    }
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✓ Payment Successful</h1>
+    <p>Processing your order...</p>
+    <div class="spinner"></div>
+  </div>
+  <script>
+    (function() {
+      // Extract approval number and status from URL parameters
+      const approvalNo = ${JSON.stringify(approvalNo)};
+      const statusCode = ${JSON.stringify(statusCode)};
+      const userKey = ${JSON.stringify(userKey)};
+      
+      // Notify parent window to close iframe and proceed
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({
+            type: 'pelecard_payment_success',
+            approvalNo: approvalNo,
+            statusCode: statusCode,
+            userKey: userKey,
+            timestamp: Date.now()
+          }, '*');
+          
+          console.log('[pelecard/good] Sent success message to parent:', {
+            approvalNo: approvalNo,
+            statusCode: statusCode,
+            userKey: userKey
+          });
+        } catch (error) {
+          console.error('[pelecard/good] Error sending message to parent:', error);
+        }
+      } else {
+        console.warn('[pelecard/good] No parent window found');
+      }
+    })();
+  </script>
+</body>
+</html>
+  `.trim();
+  
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 router.get('/bad', (req, res) => {

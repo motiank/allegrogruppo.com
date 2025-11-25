@@ -442,6 +442,7 @@ const EataliaBSRPage = () => {
     error: null,
   });
   const [orderId, setOrderId] = useState(null);
+  const [approvalNo, setApprovalNo] = useState(null);
   const [mealOptionsConfig, setMealOptionsConfig] = useState({});
   const [mealOptionsLoading, setMealOptionsLoading] = useState(true);
   const [mealOptionsError, setMealOptionsError] = useState(null);
@@ -698,6 +699,7 @@ const EataliaBSRPage = () => {
     setCartItems([]);
     setOptionsDialog({ open: false, mealId: null });
     setOrderId(null);
+    setApprovalNo(null);
   };
 
   const getMealName = (mealId) => {
@@ -852,6 +854,47 @@ const EataliaBSRPage = () => {
       controller.abort();
     };
   }, [policyDialog.open, policyDialog.type, i18n.language]);
+
+  // Listen for payment success messages from Pelecard iframe
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Accept messages from any origin (since iframe is from Pelecard domain)
+      // In production, you might want to validate event.origin
+      if (event.data && event.data.type === 'pelecard_payment_success') {
+        console.log('[eatalia-bsr] Received payment success message:', event.data);
+        
+        const { approvalNo: receivedApprovalNo, statusCode, userKey } = event.data;
+        
+        // Verify status code is success (000)
+        if (statusCode === '000' || !statusCode) {
+          // Store approval number
+          setApprovalNo(receivedApprovalNo || '');
+          
+          // Move to thank you step
+          setStep('thankYou');
+          
+          // Track the completion
+          trackEvent('payment_completed', {
+            orderId: userKey || orderId,
+            approvalNo: receivedApprovalNo,
+            statusCode: statusCode,
+          });
+        } else {
+          console.warn('[eatalia-bsr] Payment status code indicates failure:', statusCode);
+          trackEvent('payment_failed', {
+            orderId: userKey || orderId,
+            statusCode: statusCode,
+          });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [orderId]);
 
   return (
     <div className={classes.container}>
@@ -1115,6 +1158,7 @@ const EataliaBSRPage = () => {
               }),
               total: cartTotal,
               groupName,
+              approvalNo: approvalNo,
               ...locationData,
             }}
             onRestart={handleRestart}

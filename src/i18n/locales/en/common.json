@@ -36,6 +36,7 @@
     "floor": "Floor",
     "office": "Office",
     "phone": "Phone",
+    "approvalNumber": "Approval Number",
     "restart": "Restart"
   },
   "welcome": {

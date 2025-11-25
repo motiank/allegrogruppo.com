@@ -5,8 +5,8 @@ PELECARD_USER=motitest11
 PELECARD_PASSWORD=E54V0QcG
 PELECARD_BASE_URL=https://gateway21.pelecard.biz
 
-#PELECARD_PUBLIC_BASE_URL=http://localhost:5173
-#PELECARD_FEEDBACK_BASE_URL=http://localhost:3020
+# PELECARD_PUBLIC_BASE_URL=http://localhost:5173
+# PELECARD_FEEDBACK_BASE_URL=http://localhost:3020
 
 PELECARD_PUBLIC_BASE_URL=https://allegrogruppo.com/
 PELECARD_FEEDBACK_BASE_URL=https://allegrogruppo.com/
