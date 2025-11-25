@@ -248,16 +248,115 @@ function structureOrderForBeecomm(pelecardData, orderData) {
 
 // POST /beecomm/pelecard/placeorder
 // This endpoint is called by Pelecard servers (ServerSideGoodFeedbackURL)
-router.post('/pelecard/placeorder', async (req, res) => {
-  console.log('[beecomm] Pelecard placeorder received:', req.body);
+// Pelecard may send the body as:
+// 1. Raw JSON string (if ServerSideFeedbackContentType is not set or is text/plain)
+// 2. Form-encoded with JSON in a field (if resultDataKeyName is set)
+// 3. Application/json (if ServerSideFeedbackContentType is application/json)
+router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'] }), async (req, res) => {
+  console.log('[beecomm] Pelecard placeorder received - raw body type:', typeof req.body);
+  console.log('[beecomm] Pelecard placeorder received - body:', req.body);
 
   try {
     // Parse Pelecard feedback data
-    // Pelecard may send JSON directly or wrapped in a form field
-    let pelecardData = req.body;
-    if (req.body.resultDataKeyName && req.body[req.body.resultDataKeyName]) {
-      // If wrapped in a form field, parse it
-      pelecardData = JSON.parse(req.body[req.body.resultDataKeyName]);
+    // According to Pelecard docs:
+    // - If resultDataKeyName is empty: entire request body is JSON
+    // - If resultDataKeyName is set: form POST with field containing JSON string
+    // - Default Content-Type is application/x-www-form-urlencoded
+    // - Can be set to application/json via ServerSideFeedbackContentType
+    
+    let pelecardData = null;
+    
+    // Case 1: Body is a raw string (JSON string) - needs parsing
+    if (typeof req.body === 'string') {
+      try {
+        const parsed = JSON.parse(req.body);
+        // Check if parsed result has ResultData wrapper (Pelecard response structure)
+        if (parsed && typeof parsed === 'object' && parsed.ResultData) {
+          pelecardData = parsed.ResultData;
+          console.log('[beecomm] Parsed JSON from string body and extracted ResultData');
+        } else {
+          pelecardData = parsed;
+          console.log('[beecomm] Parsed JSON from string body');
+        }
+      } catch (parseError) {
+        console.error('[beecomm] Failed to parse string body as JSON:', parseError.message);
+        // Try to fix common JSON issues (like trailing commas, unescaped quotes)
+        try {
+          // Remove any trailing commas before closing braces/brackets
+          let cleanedBody = req.body.replace(/,(\s*[}\]])/g, '$1');
+          const parsed = JSON.parse(cleanedBody);
+          // Check for ResultData wrapper after cleaning too
+          if (parsed && typeof parsed === 'object' && parsed.ResultData) {
+            pelecardData = parsed.ResultData;
+            console.log('[beecomm] Parsed JSON after cleaning and extracted ResultData');
+          } else {
+            pelecardData = parsed;
+            console.log('[beecomm] Parsed JSON after cleaning string body');
+          }
+        } catch (cleanError) {
+          console.error('[beecomm] Failed to parse even after cleaning:', cleanError.message);
+          return res.status(400).json({
+            error: 'Invalid JSON format in request body',
+            message: parseError.message,
+          });
+        }
+      }
+    }
+    // Case 2: Body is an object with resultDataKeyName (form-encoded with JSON in field)
+    else if (req.body && typeof req.body === 'object' && req.body.resultDataKeyName) {
+      const jsonField = req.body[req.body.resultDataKeyName];
+      if (typeof jsonField === 'string') {
+        try {
+          const parsed = JSON.parse(jsonField);
+          // Check if parsed result has ResultData wrapper
+          if (parsed && typeof parsed === 'object' && parsed.ResultData) {
+            pelecardData = parsed.ResultData;
+            console.log('[beecomm] Parsed JSON from resultDataKeyName field and extracted ResultData:', req.body.resultDataKeyName);
+          } else {
+            pelecardData = parsed;
+            console.log('[beecomm] Parsed JSON from resultDataKeyName field:', req.body.resultDataKeyName);
+          }
+        } catch (parseError) {
+          console.error('[beecomm] Failed to parse JSON from resultDataKeyName field:', parseError.message);
+          return res.status(400).json({
+            error: 'Invalid JSON format in resultDataKeyName field',
+            message: parseError.message,
+          });
+        }
+      } else if (typeof jsonField === 'object') {
+        // Already parsed - check for ResultData wrapper
+        if (jsonField.ResultData) {
+          pelecardData = jsonField.ResultData;
+          console.log('[beecomm] Using ResultData from already parsed JSON in resultDataKeyName field');
+        } else {
+          pelecardData = jsonField;
+          console.log('[beecomm] Using already parsed JSON from resultDataKeyName field');
+        }
+      }
+    }
+    // Case 3: Body is already a parsed object (application/json content-type)
+    else if (req.body && typeof req.body === 'object') {
+      // Check if it has ResultData wrapper (from Pelecard response structure)
+      if (req.body.ResultData) {
+        pelecardData = req.body.ResultData;
+        console.log('[beecomm] Using ResultData from parsed object');
+      } else if (req.body.StatusCode !== undefined || req.body.ConfirmationKey !== undefined) {
+        // Direct Pelecard feedback structure
+        pelecardData = req.body;
+        console.log('[beecomm] Using direct parsed object');
+      } else {
+        // Fallback: use body as-is
+        pelecardData = req.body;
+        console.log('[beecomm] Using body as-is (fallback)');
+      }
+    }
+    
+    if (!pelecardData) {
+      console.error('[beecomm] Could not parse pelecardData from request body');
+      return res.status(400).json({
+        error: 'Could not parse Pelecard feedback data',
+        message: 'Request body format is not recognized',
+      });
     }
 
     // Extract key fields
