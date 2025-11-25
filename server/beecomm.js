@@ -254,7 +254,7 @@ function structureOrderForBeecomm(pelecardData, orderData) {
 // 3. Application/json (if ServerSideFeedbackContentType is application/json)
 router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'] }), async (req, res) => {
   console.log('[beecomm] Pelecard placeorder received - raw body type:', typeof req.body);
-  console.log('[beecomm] Pelecard placeorder received - body:', req.body);
+  console.log('[beecomm] Pelecard placeorder received 1 - body:', req.body);
 
   try {
     // Parse Pelecard feedback data
