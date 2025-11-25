@@ -307,7 +307,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     
     else if (req.body && typeof req.body === 'object' && ( req.body.eatalia_res || req.body.resultDataKeyName)) {
 
-      const jsonField = req.body[ req.body.eatalia_res || req.body.resultDataKeyName ];
+      const jsonField = req.body[ "eatalia_res" || req.body.resultDataKeyName ];
       console.log('[beecomm] type of JSON field:', typeof jsonField);
       console.log('[beecomm] JSON field:', jsonField);
 
