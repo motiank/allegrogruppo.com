@@ -308,8 +308,11 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       const jsonField = req.body[ req.body.eatalia_res || req.body.resultDataKeyName ];
       if (typeof jsonField === 'string') {
         try {
+          console.log('[beecomm] JSON string:', jsonField);
           const parsed = JSON.parse(jsonField);
           // Check if parsed result has ResultData wrapper
+          console.log('[beecomm] Parsed JSON:', parsed);
+          
           if (parsed && typeof parsed === 'object' && parsed.ResultData) {
             pelecardData = parsed.ResultData;
             console.log('[beecomm] Parsed JSON from resultDataKeyName field and extracted ResultData:', req.body.resultDataKeyName);
