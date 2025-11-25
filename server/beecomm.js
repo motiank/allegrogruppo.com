@@ -303,8 +303,9 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       }
     }
     // Case 2: Body is an object with resultDataKeyName (form-encoded with JSON in field)
-    else if (req.body && typeof req.body === 'object' && req.body.resultDataKeyName) {
-      const jsonField = req.body[req.body.resultDataKeyName];
+    
+    else if (req.body && typeof req.body === 'object' && ( req.body.eatalia_res || req.body.resultDataKeyName)) {
+      const jsonField = req.body[ req.body.eatalia_res || req.body.resultDataKeyName ];
       if (typeof jsonField === 'string') {
         try {
           const parsed = JSON.parse(jsonField);

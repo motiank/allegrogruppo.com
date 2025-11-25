@@ -211,6 +211,7 @@ router.post('/get-iframe-url', async (req, res) => {
     ParamX: `${orderId}`,
     ServerSideGoodFeedbackURL: feedbackGoodUrl,
     ServerSideErrorFeedbackURL: feedbackErrorUrl,
+    resultDataKeyName: 'eatalia_res',
   };
 
   if (qaResultStatus) {
