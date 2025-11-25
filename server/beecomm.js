@@ -328,6 +328,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
           });
         }
       } else if (typeof jsonField === 'object') {
+         console.log('[beecomm] JSON object:', jsonField);
         // Already parsed - check for ResultData wrapper
         if (jsonField.ResultData) {
           pelecardData = jsonField.ResultData;
