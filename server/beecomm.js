@@ -270,6 +270,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     if (typeof req.body === 'string') {
       try {
         const parsed = JSON.parse(req.body);
+        console.log('[beecomm] JSON parsed:', parsed);
         // Check if parsed result has ResultData wrapper (Pelecard response structure)
         if (parsed && typeof parsed === 'object' && parsed.ResultData) {
           pelecardData = parsed.ResultData;
