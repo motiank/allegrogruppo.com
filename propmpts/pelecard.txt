@@ -4,3 +4,26 @@ Follow the guide lines on the README_pelecard_iframe_J4_handshake.md file to imp
 Add to the pelecard router entry point : getIframeUrl with the necassery parameters from the client . 
 Add entry points for the good and bad urls
 Add entry point for the server feedbacks. for now just throw the feedback to the consiole and returns 200 ok.
+
+
+
+
+
+
+
+כרטיסי טסט:
+
+4557430402053381  Dec-25  870
+4557430402053431  Dec-25  200
+
+
+
+motitest11
+
+:Password / סיסמה
+
+E54V0QcG
+
+:Terminal / מסוף
+
+0880578011

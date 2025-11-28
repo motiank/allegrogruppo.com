@@ -555,7 +555,18 @@ menuApiRouter.get('/meal-options', (req, res) => {
 // GET /api/beecomm-metadata
 menuApiRouter.get('/beecomm-metadata', (req, res) => {
   try {
-    const metadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
+    // Determine which metadata file to use based on MENU_PATH
+    let metadataPath;
+    if (process.env.MENU_PATH) {
+      // Extract the menu name from MENU_PATH (e.g., "menu/tower_menu.json" -> "tower")
+      const menuPath = process.env.MENU_PATH;
+      const menuName = menuPath.replace(/^.*\/(\w+)_menu\.json$/, '$1');
+      metadataPath = join(__dirname, '..', 'menu', `${menuName}_metadata.json`);
+    } else {
+      // Default to labraca if MENU_PATH is not set
+      metadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
+    }
+    
     const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
     res.json(metadata);
   } catch (error) {

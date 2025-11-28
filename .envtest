@@ -22,7 +22,8 @@ BEECOMM_RESTAURANT_ID=64251a17042cbcc5928813fd
 BEECOMM_BRANCH_ID=65cda80518611cc1cab248ca
 
 
-MENU_PATH=menu/labraca_menu.json
+# MENU_PATH=menu/labraca_menu.json
+MENU_PATH=menu/tower_menu.json
 
 
 

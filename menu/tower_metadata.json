@@ -1,0 +1,157 @@
+{
+  "menuRevision": "69270a8205b2dc0002585d90",
+  "source": "beecomm",
+  "generatedAt": "2025-11-28T09:26:46.091Z",
+  "totalDishes": 4,
+  "dishMappings": {
+    "668e21afff9c99b7862ec370": {
+      "dishId": "668e21afff9c99b7862ec370",
+      "dishName": "המבורגר קלאסי ",
+      "kitchenName": "המבורגר קלאסי ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "המבורגר קלאסי ",
+        "en": "Classic Hamburger",
+        "ar": "هامبرجر كلاسيكي"
+      },
+      "groupMappings": [
+        {
+          "groupId": "66014510b12c2493b272d071",
+          "groupName": "מידת עשייה",
+          "minQuantity": 0,
+          "maxQuantity": 1,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "66014519b12c2493b272d072",
+              "dishId": "660144f0b12c2493b272d06e",
+              "kitchenName": "M",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451bb12c2493b272d073",
+              "dishId": "660144f8b12c2493b272d06f",
+              "kitchenName": "MW",
+              "isDish": true,
+              "isVariable": true
+            },
+            {
+              "optionId": "6601451db12c2493b272d074",
+              "dishId": "660144feb12c2493b272d070",
+              "kitchenName": "WD",
+              "isDish": true,
+              "isVariable": true
+            }
+          ]
+        },
+        {
+          "groupId": "tower_side_dishes_1764322006092",
+          "groupName": "תוספות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "64ff4e082a73c76c505f67c1",
+              "dishId": "64ff4e082a73c76c505f67c1",
+              "kitchenName": "סלט ירוק  תוספת",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "668e22d0ff9c99b7862ec379",
+              "dishId": "668e22d0ff9c99b7862ec379",
+              "kitchenName": "תפוח אדמה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        }
+      ]
+    },
+    "65d1bc9314ed0ca1e102f839": {
+      "dishId": "65d1bc9314ed0ca1e102f839",
+      "dishName": "שניצל",
+      "kitchenName": "שניצל",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "שניצל",
+        "en": "Schnitzel",
+        "ar": "شنتسل"
+      },
+      "groupMappings": [
+        {
+          "groupId": "tower_side_dishes_1764322006092",
+          "groupName": "תוספות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "64ff4e082a73c76c505f67c1",
+              "dishId": "64ff4e082a73c76c505f67c1",
+              "kitchenName": "סלט ירוק  תוספת",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "668e22d0ff9c99b7862ec379",
+              "dishId": "668e22d0ff9c99b7862ec379",
+              "kitchenName": "תפוח אדמה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        }
+      ]
+    },
+    "691decf7c8aa7786f3fd0770": {
+      "dishId": "691decf7c8aa7786f3fd0770",
+      "dishName": "פסטה בולונז ",
+      "kitchenName": "פסטה בולונז ",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "פסטה בולונז ",
+        "en": "Bolognese Pasta",
+        "ar": "باستا بولونيز"
+      },
+      "groupMappings": []
+    },
+    "66e2bc8d96e41facc5121f4c": {
+      "dishId": "66e2bc8d96e41facc5121f4c",
+      "dishName": "סלט ברזל",
+      "kitchenName": "סלט ברזל",
+      "imagePath": null,
+      "description": null,
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "סלט ברזל",
+        "en": "Iron Salad",
+        "ar": "سلطة الحديد"
+      },
+      "groupMappings": []
+    }
+  }
+}
