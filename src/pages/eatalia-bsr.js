@@ -1142,6 +1142,9 @@ const EataliaBSRPage = () => {
                 // Resolve image using 3-layer system: menu image -> images map (by dish ID) -> default
                 // The images map should be keyed by API dish IDs
                 const resolvedImage = resolveDishImage(meal.id, meal.image, dishImagesMap);
+                // Get base price for the meal
+                const priceInfo = calculateItemPrice(meal.id, {});
+                const basePrice = priceInfo.base;
                 // Debug: Log image resolution for all meals
                 console.log(`🍽️ Image resolution for DISH ID: "${meal.id}" (Display Name: "${displayName}"):`, {
                   dishId: meal.id,
@@ -1166,6 +1169,7 @@ const EataliaBSRPage = () => {
                     onSelect={handleMealSelect}
                     onInstagram={handleInstagramOpen}
                     imagesMap={dishImagesMap}
+                    price={basePrice}
                   />
                 );
               })}

@@ -28,29 +28,6 @@ const useStyles = createUseStyles({
     objectFit: 'cover',
     display: 'block',
   },
-  instagramButton: {
-    position: 'absolute',
-    insetInlineStart: theme.spacing.md,
-    top: '50%',
-    transform: 'translateY(-50%)',
-    width: '48px',
-    height: '48px',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'background-color 0.2s',
-    '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 1)',
-    },
-    '& svg': {
-      width: '24px',
-      height: '24px',
-    },
-  },
   label: {
     position: 'absolute',
     bottom: 0,
@@ -61,12 +38,25 @@ const useStyles = createUseStyles({
     color: '#ffffff',
     textAlign: 'start',
     fontWeight: 'bold',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  labelName: {
+    flex: 1,
+    textAlign: 'start',
+  },
+  labelPrice: {
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
   },
 });
 
-export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram, imagesMap }) => {
+export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram, imagesMap, price }) => {
   const classes = useStyles();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [imageSrc, setImageSrc] = useState(meal.image || DEFAULT_DISH_IMAGE);
   const [hasTriedFallback, setHasTriedFallback] = useState(false);
 
@@ -76,11 +66,13 @@ export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram, imag
     }
   };
 
-  const handleInstagramClick = (e) => {
-    e.stopPropagation();
-    if (!disabled && onInstagram) {
-      onInstagram(meal.id);
-    }
+  // Determine price alignment based on language
+  // Right aligned for English (LTR), left aligned for Hebrew/Arabic (RTL)
+  const isRTL = i18n.language === 'he' || i18n.language === 'ar';
+  const priceAlignStyle = {
+    textAlign: isRTL ? 'start' : 'end',
+    marginInlineStart: isRTL ? 'auto' : 0,
+    marginInlineEnd: isRTL ? 0 : 'auto',
   };
 
   // Update image source when meal.image changes
@@ -114,16 +106,14 @@ export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram, imag
           }
         }}
       />
-      <button
-        className={classes.instagramButton}
-        onClick={handleInstagramClick}
-        aria-label="Open Instagram"
-      >
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-        </svg>
-      </button>
-      <div className={classes.label}>{meal.name}</div>
+      <div className={classes.label}>
+        <span className={classes.labelName}>{meal.name}</span>
+        {price !== null && price !== undefined && (
+          <span className={classes.labelPrice} style={priceAlignStyle}>
+            {typeof price === 'number' ? `${price.toFixed(2)}₪` : price}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
