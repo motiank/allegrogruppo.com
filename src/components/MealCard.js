@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/theme.js';
+import { DEFAULT_DISH_IMAGE } from '../utils/imageResolver.js';
 
 const useStyles = createUseStyles({
   card: {
@@ -63,9 +64,11 @@ const useStyles = createUseStyles({
   },
 });
 
-export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram }) => {
+export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram, imagesMap }) => {
   const classes = useStyles();
   const { t } = useTranslation();
+  const [imageSrc, setImageSrc] = useState(meal.image || DEFAULT_DISH_IMAGE);
+  const [hasTriedFallback, setHasTriedFallback] = useState(false);
 
   const handleClick = () => {
     if (!disabled && onSelect) {
@@ -80,16 +83,36 @@ export const MealCard = ({ meal, selected, disabled, onSelect, onInstagram }) =>
     }
   };
 
+  // Update image source when meal.image changes
+  useEffect(() => {
+    setImageSrc(meal.image || DEFAULT_DISH_IMAGE);
+    setHasTriedFallback(false);
+  }, [meal.image]);
+
   return (
     <div
       className={`${classes.card} ${disabled ? classes.cardDisabled : ''}`}
       onClick={handleClick}
     >
       <img
-        src={meal.image}
+        src={imageSrc}
         alt={meal.name}
         className={classes.image}
         loading="lazy"
+        onError={(e) => {
+          // Try Layer 2 (images map) if Layer 1 (menu image) fails
+          if (!hasTriedFallback && imagesMap && imagesMap[meal.id]) {
+            console.log(`🔄 Layer 1 image failed for ${meal.id}, trying Layer 2 (images map):`, imagesMap[meal.id]);
+            setImageSrc(imagesMap[meal.id]);
+            setHasTriedFallback(true);
+          } else {
+            // Fallback to default (Layer 3)
+            console.warn(`⚠️ All images failed for ${meal.id}, using default. Last tried:`, e.target.src);
+            if (e.target.src !== DEFAULT_DISH_IMAGE) {
+              setImageSrc(DEFAULT_DISH_IMAGE);
+            }
+          }
+        }}
       />
       <button
         className={classes.instagramButton}

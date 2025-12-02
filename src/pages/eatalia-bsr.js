@@ -12,6 +12,7 @@ import { PolicyDialog } from '../components/PolicyDialog.js';
 import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
 import PelecardIframe from '../components/pelecardIframe.js';
 import { trackEvent } from '../utils/analytics.js';
+import { resolveDishImage } from '../utils/imageResolver.js';
 import '../i18n/index.js';
 
 const useStyles = createUseStyles({
@@ -408,7 +409,7 @@ const meals = [
   {
     id: 'pasta',
     name: 'pasta',
-    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop',
+    image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=400&h=300&fit=crop',
     instagramUrl: 'https://www.instagram.com/reel/DNxrviKXmm5/?igsh=MW9kM3Y1MTJqbHViNw==',
   },
 ];
@@ -448,6 +449,39 @@ const EataliaBSRPage = () => {
   const [mealOptionsError, setMealOptionsError] = useState(null);
   const [beecommMetadata, setBeecommMetadata] = useState(null);
   const [dynamicMeals, setDynamicMeals] = useState([]);
+  const [dishImagesMap, setDishImagesMap] = useState({});
+  
+  // Load dish images map from public folder
+  useEffect(() => {
+    const loadDishImagesMap = async () => {
+      try {
+        const response = await fetch('/dish-images-map.json');
+        console.log('Fetch response status:', response.status, response.statusText);
+        if (response.ok) {
+          const text = await response.text();
+          console.log('Raw JSON text:', text);
+          try {
+            const imagesMap = JSON.parse(text);
+            console.log('✅ Dish Images Map loaded:', imagesMap);
+            console.log('Number of entries:', Object.keys(imagesMap).length);
+            console.log('Keys:', Object.keys(imagesMap));
+            setDishImagesMap(imagesMap);
+          } catch (parseError) {
+            console.error('❌ JSON parse error:', parseError);
+            setDishImagesMap({});
+          }
+        } else {
+          console.warn('⚠️ Could not load dish images map, status:', response.status);
+          setDishImagesMap({});
+        }
+      } catch (error) {
+        console.error('❌ Error loading dish images map:', error);
+        setDishImagesMap({});
+      }
+    };
+    
+    loadDishImagesMap();
+  }, []);
 
   const getMealConfig = (mealId) => mealOptionsConfig[mealId] || null;
 
@@ -757,7 +791,7 @@ const EataliaBSRPage = () => {
           return {
             id: key,
             name: key, // Will be updated when metadata loads
-            image: null, // Will be updated when metadata loads
+            image: null, // Will be resolved using 3-layer system
             instagramUrl: null,
           };
         });
@@ -773,14 +807,19 @@ const EataliaBSRPage = () => {
             // Update meals with metadata
             const updatedMeals = generatedMeals.map((meal) => {
               const dishData = metadata.dishMappings?.[meal.id];
+              const menuImage = dishData?.imagePath || null;
+              // Image will be resolved in render using resolveDishImage
               if (dishData) {
                 return {
                   ...meal,
                   name: dishData.dishName || meal.id,
-                  image: dishData.imagePath || meal.image,
+                  image: menuImage, // Menu image (Layer 1), will be resolved with imagesMap (Layer 2) and default (Layer 3) in component
                 };
               }
-              return meal;
+              return {
+                ...meal,
+                image: null, // Will be resolved using imagesMap (Layer 2) and default (Layer 3)
+              };
             });
             setDynamicMeals(updatedMeals);
           }
@@ -1062,19 +1101,71 @@ const EataliaBSRPage = () => {
           <div className={classes.section}>
             <h1 className={classes.title}>{t('meal.title')}</h1>
             <div className={classes.mealGrid}>
+              {(() => {
+                // Log all dish IDs that need to be added to images map
+                const allMeals = dynamicMeals.length > 0 ? dynamicMeals : meals;
+                const allMealIds = allMeals.map(m => m.id);
+                const missingIds = allMealIds.filter(id => !dishImagesMap[id]);
+                if (missingIds.length > 0) {
+                  console.group('📋 MISSING DISH IDs - Add these to public/dish-images-map.json:');
+                  missingIds.forEach(id => {
+                    const meal = allMeals.find(m => m.id === id);
+                    const displayName = meal ? getMealDisplayName(id) : id;
+                    console.log(`  "${id}": "IMAGE_URL_HERE", // ${displayName}`);
+                  });
+                  console.groupEnd();
+                  
+                  // Generate example JSON
+                  const exampleJson = missingIds.reduce((acc, id) => {
+                    const meal = allMeals.find(m => m.id === id);
+                    const displayName = meal ? getMealDisplayName(id) : id;
+                    // Use appropriate default image based on dish type
+                    let defaultImage = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=600&fit=crop&q=80';
+                    if (displayName.toLowerCase().includes('schnitzel')) {
+                      defaultImage = 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&h=600&fit=crop&q=80';
+                    } else if (displayName.toLowerCase().includes('salad')) {
+                      defaultImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80';
+                    } else if (displayName.toLowerCase().includes('pasta')) {
+                      defaultImage = 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop&q=80';
+                    }
+                    acc[id] = defaultImage;
+                    return acc;
+                  }, {});
+                  console.log('💡 Copy this JSON and add to dish-images-map.json:', JSON.stringify(exampleJson, null, 2));
+                } else {
+                  console.log('✅ All dish IDs are in the images map!');
+                }
+                return null;
+              })()}
               {(dynamicMeals.length > 0 ? dynamicMeals : meals).map((meal) => {
                 const displayName = getMealDisplayName(meal.id);
+                // Resolve image using 3-layer system: menu image -> images map (by dish ID) -> default
+                // The images map should be keyed by API dish IDs
+                const resolvedImage = resolveDishImage(meal.id, meal.image, dishImagesMap);
+                // Debug: Log image resolution for all meals
+                console.log(`🍽️ Image resolution for DISH ID: "${meal.id}" (Display Name: "${displayName}"):`, {
+                  dishId: meal.id,
+                  displayName: displayName,
+                  isDynamicMeal: dynamicMeals.length > 0,
+                  mealImage: meal.image,
+                  imagesMapHasKey: !!dishImagesMap[meal.id],
+                  imagesMapValue: dishImagesMap[meal.id],
+                  resolvedImage: resolvedImage,
+                  needsToBeAdded: !dishImagesMap[meal.id] ? `⚠️ ADD THIS ID TO dish-images-map.json: "${meal.id}"` : '✅ ID exists in map'
+                });
                 return (
                   <MealCard
                     key={meal.id}
                     meal={{
                       ...meal,
                       name: displayName,
+                      image: resolvedImage,
                     }}
                     selected={selectedMeal === meal.id}
                     disabled={selectedMeal !== null && selectedMeal !== meal.id}
                     onSelect={handleMealSelect}
                     onInstagram={handleInstagramOpen}
+                    imagesMap={dishImagesMap}
                   />
                 );
               })}
