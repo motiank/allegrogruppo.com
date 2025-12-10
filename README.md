@@ -54,30 +54,31 @@ The server will run on `http://localhost:3000`
 ## Project Structure
 
 ```
-/server/server.js                  # Express server, serves dist + /api/track
-/src
-  /pages
-    index.js                       # Index page listing landing pages
-    eatalia-bsr.js                # Eatalia BSR landing page
-  /components
-    MealCard.js                    # Meal selection card component
-    OfficeForm.js                  # Location form component
-    ThankYou.js                    # Thank you page component
-    VideoOverlay.js                # Video overlay component
-    LangSwitcher.js                # Language switcher component
-  /i18n
-    index.js                       # i18next configuration
-    /locales
-       he/common.json              # Hebrew translations
-       en/common.json              # English translations
-       ar/common.json              # Arabic translations
-  /styles
-    theme.js                       # Theme configuration
-    global.js                      # Global styles
-  /utils
-    analytics.js                   # Analytics tracking utilities
-    validations.js                 # Form validation utilities
-    dir.js                         # RTL/LTR direction utilities
+/order_sys
+  /server/server.js                # Express server, serves dist + /api/track
+  /src
+    /pages
+      index.js                     # Index page listing landing pages
+      eatalia-bsr.js              # Eatalia BSR landing page
+    /components
+      MealCard.js                  # Meal selection card component
+      OfficeForm.js                # Location form component
+      ThankYou.js                  # Thank you page component
+      VideoOverlay.js              # Video overlay component
+      LangSwitcher.js              # Language switcher component
+    /i18n
+      index.js                     # i18next configuration
+      /locales
+         he/common.json            # Hebrew translations
+         en/common.json            # English translations
+         ar/common.json            # Arabic translations
+    /styles
+      theme.js                     # Theme configuration
+      global.js                    # Global styles
+    /utils
+      analytics.js                 # Analytics tracking utilities
+      validations.js               # Form validation utilities
+      dir.js                       # RTL/LTR direction utilities
 index.html                         # Index page entry point
 eatalia-bsr.html                   # Eatalia BSR page entry point
 vite.config.js                     # Vite configuration
@@ -103,6 +104,68 @@ The following events are tracked:
 Events are sent to:
 - `POST /api/track` endpoint
 - `window.parent.postMessage()` for iframe host communication
+
+## Admin Panel Development
+
+The admin panel consists of two parts that need to run simultaneously:
+
+### 1. Admin Server (Backend)
+The Express server that handles authentication and API endpoints.
+
+**Run in development mode:**
+```bash
+npm run adminDev
+```
+
+This starts the admin server on `http://localhost:3021`
+
+### 2. Vite Dev Server (Frontend)
+The React client (login screen) served by Vite.
+
+**Run the Vite dev server:**
+```bash
+npm run dev
+```
+
+This starts Vite on `http://localhost:5173`
+
+### Running Both Together
+
+You need **two terminal windows**:
+
+**Terminal 1 - Admin Server:**
+```bash
+npm run adminDev
+```
+
+**Terminal 2 - Vite Dev Server:**
+```bash
+npm run dev
+```
+
+Then open your browser to: `http://localhost:5173/admin.html`
+
+The Vite dev server will:
+- Serve the React login screen
+- Proxy API requests to the admin server:
+  - `/auth/*` → `http://localhost:3021`
+  - `/admin/*` → `http://localhost:3021`
+  - `/health` → `http://localhost:3021`
+
+### Admin Server Ports
+
+- **Development:** Port 3021 (`npm run adminDev`)
+- **Test:** Port 3022 (`npm run admin:test`)
+- **Production:** Port 3021 or `ADMIN_PORT` env variable (`npm run admin`)
+
+### Admin API Endpoints
+
+- `POST /auth/login` - Login with username and password
+- `GET /auth/login` - Check login status
+- `GET /auth/logout` - Logout
+- `POST /auth/register` - Register new user
+- `GET /health` - Health check
+- `/admin/*` - Protected admin routes (requires authentication)
 
 ## License
 

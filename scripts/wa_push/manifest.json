@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp Auto Sender (Eatalia)",
+  "version": "0.1.0",
+  "description": "Send a series of pre-defined messages on WhatsApp Web with a 20s interval.",
+  "icons": {
+    
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": []
+}

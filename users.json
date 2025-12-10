@@ -1,0 +1,11 @@
+[
+  {
+    "user_id": 1,
+    "id": 1,
+    "email": "eatalia",
+    "password": "1635",
+    "authKey": "c089988d45acbe1b43a53b693590d76a",
+    "role": "admin",
+    "status": "active"
+  }
+]

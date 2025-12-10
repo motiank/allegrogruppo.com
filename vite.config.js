@@ -1,12 +1,19 @@
 import { defineConfig, transformWithEsbuild } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync, statSync } from 'fs';
+import { resolve } from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@admin': resolve(__dirname, 'admin/client/src'),
+    },
+  },
   plugins: [
     {
       name: 'treat-js-files-as-jsx',
       async transform(code, id) {
-        if (!id.match(/src\/.*\.js$/)) return null;
+        if (!id.match(/(order_sys\/src|admin\/client\/src)\/.*\.js$/)) return null;
 
         return transformWithEsbuild(code, id, {
           loader: 'jsx',
@@ -18,6 +25,80 @@ export default defineConfig({
       include: /\.(js|jsx)$/,
       jsxRuntime: 'automatic',
     }),
+    {
+      name: 'serve-admin-files',
+      configureServer(server) {
+        // This middleware runs EARLY, before Vite's middleware
+        // We need to intercept requests before Vite tries to serve them
+        server.middlewares.use(async (req, res, next) => {
+          const url = req.url || '';
+          
+          // Debug: Log ALL requests (not just admin) to see what's happening
+          console.log(`[DEBUG MIDDLEWARE] Incoming request: ${url}`);
+          
+          // Serve admin.html
+          if (url === '/admin.html') {
+            console.log(`[DEBUG] Serving admin.html`);
+            const htmlFile = resolve(process.cwd(), 'admin.html');
+            try {
+              const content = readFileSync(htmlFile, 'utf-8');
+              res.setHeader('Content-Type', 'text/html');
+              res.end(content);
+              return;
+            } catch (e) {
+              console.log(`[DEBUG] Error serving admin.html:`, e.message);
+              next();
+              return;
+            }
+          }
+          
+          // For /admin/client/* files, use Vite's transform API
+          if (url.startsWith('/admin/client/')) {
+            console.log(`[DEBUG] /admin/client/* request detected: ${url}`);
+            const filePath = resolve(process.cwd(), url.slice(1));
+            console.log(`[DEBUG] Resolved path: ${filePath}`);
+            
+            try {
+              const stats = statSync(filePath);
+              if (stats.isFile()) {
+                console.log(`[DEBUG] File exists, using Vite transform`);
+                
+                // Use Vite's transformRequest to transform the file
+                try {
+                  const result = await server.transformRequest(url, { ssr: false });
+                  if (result) {
+                    console.log(`[DEBUG] Transform successful, serving transformed content`);
+                    res.setHeader('Content-Type', 'application/javascript');
+                    res.end(result.code);
+                    return;
+                  } else {
+                    console.log(`[DEBUG] Transform returned null/undefined`);
+                  }
+                } catch (transformError) {
+                  console.log(`[DEBUG] Transform error: ${transformError.message}`);
+                  console.log(`[DEBUG] Transform error stack:`, transformError.stack);
+                  // Fall back to serving raw file
+                  const content = readFileSync(filePath, 'utf-8');
+                  res.setHeader('Content-Type', 'application/javascript');
+                  res.end(content);
+                  return;
+                }
+              } else {
+                console.log(`[DEBUG] Path exists but is not a file`);
+              }
+            } catch (e) {
+              console.log(`[DEBUG] File check error: ${e.message}`);
+              console.log(`[DEBUG] File check error stack:`, e.stack);
+              // Don't return 404 here - let Vite handle it
+              next();
+              return;
+            }
+          }
+          
+          next();
+        });
+      },
+    },
   ],
   optimizeDeps: {
     esbuildOptions: {
@@ -32,14 +113,65 @@ export default defineConfig({
       input: {
         main: './index.html',
         'eatalia-bsr': './eatalia-bsr.html',
+        admin: './admin.html',
       },
     },
   },
+  root: process.cwd(),
+  publicDir: 'public',
   server: {
     port: 5173,
     proxy: {
-      '/pelecard': 'http://localhost:3020',
-      '/api': 'http://localhost:3020'
+      '/auth': {
+        target: 'http://localhost:3021',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy /admin API routes, but exclude /admin.html and /admin/client/*
+      '/admin': {
+        target: 'http://localhost:3021',
+        changeOrigin: true,
+        secure: false,
+        // Only proxy API routes, exclude /admin.html and /admin/client/*
+        bypass: function(req, res, options) {
+          const url = req.url || '';
+          console.log(`[DEBUG PROXY] Bypass check for: ${url}`);
+          
+          // Don't proxy /admin.html - skip proxy, let Vite serve it
+          if (url === '/admin.html') {
+            console.log(`[DEBUG PROXY] Bypassing /admin.html - returning false`);
+            return false;
+          }
+          // Don't proxy /admin/client/* paths - skip proxy, let Vite serve these
+          if (url.startsWith('/admin/client/')) {
+            console.log(`[DEBUG PROXY] Bypassing /admin/client/* - returning false`);
+            return false;
+          }
+          // Don't proxy static files - skip proxy, let Vite serve them
+          if (url.match(/\.(html|js|jsx|css|png|jpg|jpeg|gif|svg|webp|ico)$/)) {
+            console.log(`[DEBUG PROXY] Bypassing static file - returning false`);
+            return false;
+          }
+          // Proxy API routes (everything else under /admin)
+          console.log(`[DEBUG PROXY] Proxying request: ${url}`);
+          return null; // Use proxy
+        },
+      },
+      '/health': {
+        target: 'http://localhost:3021',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/pelecard': {
+        target: 'http://localhost:3020',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api': {
+        target: 'http://localhost:3020',
+        changeOrigin: true,
+        secure: false,
+      },
     }
   }
 });

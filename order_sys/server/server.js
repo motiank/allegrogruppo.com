@@ -8,7 +8,7 @@ const __dirname = dirname(__filename);
 
 // Load environment variables from .env or .envtest depending on NODE_ENV
 const envFileName = process.env.NODE_ENV === 'test' ? '.envtest' : '.env';
-dotenv.config({ path: join(__dirname, '..', envFileName) });
+dotenv.config({ path: join(__dirname, '../..', envFileName) });
 
 // Import routers after env variables are loaded
 const { default: pelecardRouter } = await import('./pelecard.js');
@@ -35,7 +35,7 @@ app.use('/api', menuApiRouter);
 app.use('/api', analyticsRouter);
 
 // Serve static files from dist
-app.use(express.static(join(__dirname, '../dist')));
+app.use(express.static(join(__dirname, '../../dist')));
 
 // CSP headers for iframe embedding
 app.use((req, res, next) => {
@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../dist/index.html'));
+  res.sendFile(join(__dirname, '../../dist/index.html'));
 });
 
 app.listen(PORT, () => {

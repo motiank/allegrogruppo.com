@@ -21,7 +21,7 @@ const DEFAULT_IFRAME_HEIGHT = 600;
  * - orderData: full order data to store on server (cartItems, locationData, menuRevision, etc.)
  *
  * The component expects the backend endpoint `/pelecard/get-iframe-url`
- * implemented by `server/pelecard.js` to return `{ iframeUrl: string }`.
+ * implemented by `order_sys/server/pelecard.js` to return `{ iframeUrl: string }`.
  */
 export default function PelecardIframe({
   orderId,
