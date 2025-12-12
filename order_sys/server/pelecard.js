@@ -1,4 +1,5 @@
 import express from 'express';
+import { executeSql } from './sources/dbpool.js';
 
 const router = express.Router();
 
@@ -280,6 +281,52 @@ console.log('initPayload', initPayload);
         console.log('[pelecard] Stored order with ConfirmationKey from init:', confirmationKey);
       } else {
         console.log('[pelecard] Stored order with orderId (ConfirmationKey will come in feedback):', orderId);
+      }
+
+      // Insert order into database
+      try {
+        const customerName = orderData.locationData?.name || null;
+        const phone = orderData.locationData?.phone || null;
+        const orderTotal = typeof total === 'number' ? total : parseFloat(total) || 0;
+        
+        // Prepare orderData JSON - preserve original structure and ensure required fields
+        const orderDataJson = {
+          ...orderData,
+          cartItems: orderData.cartItems || [],
+          locationData: orderData.locationData || {},
+          menuRevision: orderData.menuRevision || '',
+          total: orderData.total !== undefined ? orderData.total : orderTotal,
+          orderId: `${orderId}`
+        };
+
+        const insertQuery = `
+          INSERT INTO allegro.orders (orderId, total, currency, language, customer_name, phone, orderData)
+          VALUES (:orderId, :total, :currency, :language, :customer_name, :phone, :orderData)
+          ON DUPLICATE KEY UPDATE
+            total = VALUES(total),
+            currency = VALUES(currency),
+            language = VALUES(language),
+            customer_name = VALUES(customer_name),
+            phone = VALUES(phone),
+            orderData = VALUES(orderData),
+            updated_at = CURRENT_TIMESTAMP
+        `;
+
+        const insertParams = {
+          orderId: `${orderId}`,
+          total: orderTotal,
+          currency: `${currency}`,
+          language: language,
+          customer_name: customerName,
+          phone: phone,
+          orderData: JSON.stringify(orderDataJson)
+        };
+
+        await executeSql(insertQuery, insertParams);
+        console.log('[pelecard] Order inserted into database:', orderId);
+      } catch (dbError) {
+        // Log error but don't fail the request - order is still stored in memory
+        console.error('[pelecard] Failed to insert order into database:', dbError);
       }
     }
 

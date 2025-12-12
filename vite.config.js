@@ -6,14 +6,14 @@ import { resolve } from 'path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@admin': resolve(__dirname, 'admin/client/src'),
+      '@admin': resolve(__dirname, 'admin/client'),
     },
   },
   plugins: [
     {
       name: 'treat-js-files-as-jsx',
       async transform(code, id) {
-        if (!id.match(/(order_sys\/src|admin\/client\/src)\/.*\.js$/)) return null;
+        if (!id.match(/(order_sys\/src|admin\/client)\/.*\.js$/)) return null;
 
         return transformWithEsbuild(code, id, {
           loader: 'jsx',
