@@ -19,6 +19,12 @@ export const useGlobalStyles = createUseStyles({
     '#root': {
       minHeight: '100vh',
     },
+    'a[href="#rearrange-with-drag-and-drop"]': {
+      color: 'red !important',
+    },
+    'nav#contents a[href="#rearrange-with-drag-and-drop"]': {
+      color: 'red !important',
+    },
   },
 });
 

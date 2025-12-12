@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const Login = () => {
+const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -45,8 +45,12 @@ const Login = () => {
 
       if (response.data && response.data.content && response.data.content.status === 'logged-in') {
         console.log('Login successful:', response.data.content.user);
-        // Redirect or update app state here
-        window.location.href = '/admin';
+        // Call the success callback if provided, otherwise redirect
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        } else {
+          window.location.href = '/admin';
+        }
       } else {
         setError(response.data?.flash_error?.[0] || 'Login failed. Please check your credentials.');
       }
