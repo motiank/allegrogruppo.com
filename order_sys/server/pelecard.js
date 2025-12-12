@@ -300,7 +300,7 @@ console.log('initPayload', initPayload);
         };
 
         const insertQuery = `
-          INSERT INTO allegro.orders (orderId, total, currency, language, customer_name, phone, orderData)
+          INSERT INTO orders (orderId, total, currency, language, customer_name, phone, orderData)
           VALUES (:orderId, :total, :currency, :language, :customer_name, :phone, :orderData)
           ON DUPLICATE KEY UPDATE
             total = VALUES(total),
