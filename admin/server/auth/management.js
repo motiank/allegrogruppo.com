@@ -27,5 +27,7 @@ const manage = function (req, res) {
 
 main.get('*', manage);
 main.post('*', manage);
+main.put('*', manage);
+main.delete('*', manage);
 
 export default main;

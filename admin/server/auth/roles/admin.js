@@ -1,6 +1,7 @@
 import express from "express";
 
 import { Router as dashboard } from "../../modules/dashboard.js";
+import { Router as orders } from "../../modules/orders.js";
 
 const api = function () {
   var admin = express.Router();
@@ -14,6 +15,7 @@ const api = function () {
   });
 
   admin.use("/dashboard", dashboard());
+  admin.use("/orders", orders());
   
   return admin;
 };

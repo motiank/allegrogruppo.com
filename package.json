@@ -14,6 +14,7 @@
     "users": "node scripts/users.js"
   },
   "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
     "axios": "^1.13.2",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.5",

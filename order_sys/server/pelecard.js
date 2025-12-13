@@ -300,8 +300,8 @@ console.log('initPayload', initPayload);
         };
 
         const insertQuery = `
-          INSERT INTO orders (orderId, total, currency, language, customer_name, phone, orderData)
-          VALUES (:orderId, :total, :currency, :language, :customer_name, :phone, :orderData)
+          INSERT INTO orders (orderId, total, currency, language, customer_name, phone, orderData, status)
+          VALUES (:orderId, :total, :currency, :language, :customer_name, :phone, :orderData, :status)
           ON DUPLICATE KEY UPDATE
             total = VALUES(total),
             currency = VALUES(currency),
@@ -319,7 +319,8 @@ console.log('initPayload', initPayload);
           language: language,
           customer_name: customerName,
           phone: phone,
-          orderData: JSON.stringify(orderDataJson)
+          orderData: JSON.stringify(orderDataJson),
+          status: 'open'
         };
 
         await executeSql(insertQuery, insertParams);

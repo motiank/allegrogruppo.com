@@ -14,6 +14,8 @@ export const Router = function(){
 
 	router_404.get('/*',unknown);
 	router_404.post('/*',unknown);
+	router_404.put('/*',unknown);
+	router_404.delete('/*',unknown);
 
 	return router_404;
 };
