@@ -111,7 +111,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: './index.html',
+        main: './site-index.html',
         'eatalia-bsr': './eatalia-bsr.html',
         admin: './admin.html',
       },

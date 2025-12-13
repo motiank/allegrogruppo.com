@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, '../../dist/index.html'));
+  res.sendFile(join(__dirname, '../../dist/site-index.html'));
 });
 
 app.listen(PORT, () => {
