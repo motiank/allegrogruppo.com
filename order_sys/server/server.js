@@ -48,6 +48,9 @@ app.use((req, res, next) => {
 
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
+  if(req.path === '/bsr') {
+    return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
+  }
   res.sendFile(join(__dirname, '../../dist/site-index.html'));
 });
 
