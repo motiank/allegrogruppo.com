@@ -89,6 +89,11 @@
   "common": {
     "select": "Select",
     "play": "Play"
+  },
+  "comingSoon": {
+    "title": "Coming Soon!",
+    "message": "We're working hard to bring you the perfect ordering experience. Our chef is preparing something special!",
+    "subtitle": "Please check back soon to order our fresh dishes."
   }
 }
 

@@ -22,11 +22,30 @@ const PORT = process.env.PORT || 3020;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Pelecard routes
-app.use('/pelecard', pelecardRouter);
+// Check if orders are enabled
+const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';
 
-// Beecomm routes
-app.use('/beecomm', beecommRouter);
+// Middleware to block order endpoints when orders are disabled
+const checkOrdersEnabled = (req, res, next) => {
+  if (!BSR_ORDERS_ENABLED) {
+    return res.status(503).json({
+      error: 'Orders are currently disabled',
+      message: 'The ordering system is temporarily unavailable. Please check back soon.',
+    });
+  }
+  next();
+};
+
+// API endpoint to check if orders are enabled (must be before middleware)
+app.get('/api/orders-enabled', (req, res) => {
+  res.json({ enabled: BSR_ORDERS_ENABLED });
+});
+
+// Pelecard routes - block if orders disabled
+app.use('/pelecard', checkOrdersEnabled, pelecardRouter);
+
+// Beecomm routes - block if orders disabled
+app.use('/beecomm', checkOrdersEnabled, beecommRouter);
 
 // Menu API routes (from beecomm module)
 app.use('/api', menuApiRouter);
@@ -56,5 +75,6 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`BSR Orders Enabled: ${BSR_ORDERS_ENABLED ? 'YES' : 'NO (Coming Soon mode)'}`);
 });
 

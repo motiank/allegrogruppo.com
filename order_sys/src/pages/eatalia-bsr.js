@@ -11,6 +11,7 @@ import { LangSwitcher } from '../components/LangSwitcher.js';
 import { PolicyDialog } from '../components/PolicyDialog.js';
 import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
 import PelecardIframe from '../components/pelecardIframe.js';
+import { ComingSoon } from '../components/ComingSoon.js';
 import { trackEvent } from '../utils/analytics.js';
 import { resolveDishImage } from '../utils/imageResolver.js';
 import '../i18n/index.js';
@@ -450,6 +451,29 @@ const EataliaBSRPage = () => {
   const [beecommMetadata, setBeecommMetadata] = useState(null);
   const [dynamicMeals, setDynamicMeals] = useState([]);
   const [dishImagesMap, setDishImagesMap] = useState({});
+  const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
+  
+  // Check if orders are enabled
+  useEffect(() => {
+    const checkOrdersEnabled = async () => {
+      try {
+        const response = await fetch('/api/orders-enabled');
+        if (response.ok) {
+          const data = await response.json();
+          setOrdersEnabled(data.enabled);
+        } else {
+          // If endpoint fails, assume disabled for safety
+          setOrdersEnabled(false);
+        }
+      } catch (error) {
+        console.error('Error checking orders status:', error);
+        // If check fails, assume disabled for safety
+        setOrdersEnabled(false);
+      }
+    };
+    
+    checkOrdersEnabled();
+  }, []);
   
   // Load dish images map from public folder
   useEffect(() => {
@@ -934,6 +958,22 @@ const EataliaBSRPage = () => {
       window.removeEventListener('message', handleMessage);
     };
   }, [orderId]);
+
+  // Show coming soon page if orders are disabled
+  if (ordersEnabled === false) {
+    return <ComingSoon />;
+  }
+  
+  // Show loading state while checking
+  if (ordersEnabled === null) {
+    return (
+      <div className={classes.container}>
+        <div style={{ textAlign: 'center', padding: theme.spacing.xxl, color: theme.colors.text }}>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={classes.container}>
