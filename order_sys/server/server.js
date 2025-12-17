@@ -25,9 +25,24 @@ app.use(express.urlencoded({ extended: true }));
 // Check if orders are enabled
 const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';
 
+// Helper function to check if orders should be enabled based on URL path
+const isOrdersEnabled = (req) => {
+  // If path starts with /test/, always enable orders (ignore env variable)
+  if (req.path.startsWith('/test/')) {
+    return true;
+  }
+  // Check referer header to see if request came from /test/bsr
+  const referer = req.get('referer') || req.get('referrer') || '';
+  if (referer.includes('/test/bsr')) {
+    return true;
+  }
+  // Otherwise, respect the BSR_ORDERS_ENABLED environment variable
+  return BSR_ORDERS_ENABLED;
+};
+
 // Middleware to block order endpoints when orders are disabled
 const checkOrdersEnabled = (req, res, next) => {
-  if (!BSR_ORDERS_ENABLED) {
+  if (!isOrdersEnabled(req)) {
     return res.status(503).json({
       error: 'Orders are currently disabled',
       message: 'The ordering system is temporarily unavailable. Please check back soon.',
@@ -38,7 +53,7 @@ const checkOrdersEnabled = (req, res, next) => {
 
 // API endpoint to check if orders are enabled (must be before middleware)
 app.get('/api/orders-enabled', (req, res) => {
-  res.json({ enabled: BSR_ORDERS_ENABLED });
+  res.json({ enabled: isOrdersEnabled(req) });
 });
 
 // Pelecard routes - block if orders disabled
@@ -67,7 +82,7 @@ app.use((req, res, next) => {
 
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
-  if(req.path === '/bsr') {
+  if(req.path === '/bsr' || req.path === '/test/bsr') {
     return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
   }
   res.sendFile(join(__dirname, '../../dist/site-index.html'));

@@ -838,11 +838,13 @@ const EataliaBSRPage = () => {
                   ...meal,
                   name: dishData.dishName || meal.id,
                   image: menuImage, // Menu image (Layer 1), will be resolved with imagesMap (Layer 2) and default (Layer 3) in component
+                  description: dishData.description || null, // Add description from metadata
                 };
               }
               return {
                 ...meal,
                 image: null, // Will be resolved using imagesMap (Layer 2) and default (Layer 3)
+                description: null,
               };
             });
             setDynamicMeals(updatedMeals);
@@ -1323,7 +1325,12 @@ const EataliaBSRPage = () => {
         open={optionsDialog.open}
         meal={
           optionsDialog.open
-            ? { id: optionsDialog.mealId, displayName: getMealDisplayName(optionsDialog.mealId) }
+            ? {
+                id: optionsDialog.mealId,
+                displayName: getMealDisplayName(optionsDialog.mealId),
+                description: beecommMetadata?.dishMappings?.[optionsDialog.mealId]?.description || null,
+                descriptionTranslate: beecommMetadata?.dishMappings?.[optionsDialog.mealId]?.descriptionTranslate || null,
+              }
             : null
         }
         config={optionsDialog.open ? getMealConfig(optionsDialog.mealId) : null}
@@ -1331,6 +1338,7 @@ const EataliaBSRPage = () => {
         texts={mealOptionsTexts}
         onConfirm={handleMealOptionsConfirm}
         onCancel={handleMealOptionsCancel}
+        metadata={beecommMetadata}
       />
 
       <PolicyDialog

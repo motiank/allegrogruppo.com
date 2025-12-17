@@ -47,6 +47,13 @@ const useStyles = createUseStyles({
     color: theme.colors.textSecondary,
     fontSize: '0.95rem',
   },
+  description: {
+    margin: `${theme.spacing.xs} 0 0`,
+    color: theme.colors.textSecondary,
+    fontSize: '0.9rem',
+    lineHeight: 1.5,
+    fontStyle: 'italic',
+  },
   content: {
     flex: 1,
     overflowY: 'auto',
@@ -118,6 +125,13 @@ const useStyles = createUseStyles({
   optionPrice: {
     fontSize: '0.85rem',
     color: theme.colors.textSecondary,
+  },
+  optionDescription: {
+    fontSize: '0.8rem',
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+    marginBlockStart: theme.spacing.xs,
+    lineHeight: 1.4,
   },
   checkmark: {
     width: '20px',
@@ -206,7 +220,7 @@ const serializeSelections = (selections) =>
     .map(([groupId, optionIds]) => `${groupId}:${optionIds.slice().sort().join('|')}`)
     .join(';');
 
-const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onConfirm, onCancel }) => {
+const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onConfirm, onCancel, metadata }) => {
   const classes = useStyles();
   const [selections, setSelections] = useState({});
 
@@ -310,6 +324,15 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
         <div className={classes.header}>
           <h2 className={classes.title}>{texts.title}</h2>
           <p className={classes.subtitle}>{meal?.displayName}</p>
+          {(() => {
+            // Get translated description based on current language
+            // Normalize language code (e.g., 'en-US' -> 'en')
+            const langCode = language?.split('-')[0] || 'he';
+            const description = meal?.descriptionTranslate?.[langCode] || meal?.descriptionTranslate?.[language] || meal?.description || null;
+            return description && (
+              <p className={classes.description}>{description}</p>
+            );
+          })()}
         </div>
         <div className={classes.content}>
           {config.groups.map((group) => {
@@ -332,6 +355,11 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
                 <div className={classes.optionsList}>
                   {group.options.map((option) => {
                     const isSelected = selected.includes(option.id);
+                    // Get option description from metadata if available, with translation
+                    // Normalize language code (e.g., 'en-US' -> 'en')
+                    const langCode = language?.split('-')[0] || 'he';
+                    const optionData = metadata?.dishMappings?.[option.id];
+                    const optionDescription = optionData?.descriptionTranslate?.[langCode] || optionData?.descriptionTranslate?.[language] || optionData?.description || null;
                     return (
                       <button
                         key={option.id}
@@ -350,6 +378,11 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
                             {typeof texts.price === 'function'
                               ? texts.price(option.price)
                               : texts.price.replace('{{amount}}', option.price.toString())}
+                          </span>
+                        )}
+                        {optionDescription && (
+                          <span className={classes.optionDescription}>
+                            {optionDescription}
                           </span>
                         )}
                         </div>
