@@ -325,6 +325,7 @@ const beecommMenuPath = join(__dirname, '..', 'order_sys', 'menu', 'bcom_menu.js
 const menuOutputPath = join(__dirname, '..', 'order_sys', 'menu', 'tower_menu.json');
 const metadataOutputPath = join(__dirname, '..', 'order_sys', 'menu', 'tower_metadata.json');
 const descriptionsPath = join(__dirname, '..', 'order_sys', 'menu', 'bcom_descriptions.json');
+const drinksMenuPath = join(__dirname, '..', 'order_sys', 'menu', 'drinks_menu.json');
 
 console.log('Reading beecomm menu from:', beecommMenuPath);
 const beecommMenu = JSON.parse(readFileSync(beecommMenuPath, 'utf8'));
@@ -701,7 +702,197 @@ if (sideDishes.length > 0 && (menu[hamburgerDishId] || menu[schnitzelDishId])) {
   console.log(`  → Added ${sideDishes.length} side dishes as options to Hamburger and Schnitzel`);
 }
 
+// Load drinks menu if it exists and add as option group to all meals
+let drinksMenu = {};
+try {
+  if (readFileSync(drinksMenuPath, 'utf8')) {
+    drinksMenu = JSON.parse(readFileSync(drinksMenuPath, 'utf8'));
+    console.log(`Loaded ${Object.keys(drinksMenu).length} drinks from ${drinksMenuPath}`);
+    
+    // Define metadata for each drink type (will generate bottle and can variants)
+    // Mapping drink base IDs to their Beecomm dish IDs and translations
+    const drinksBaseMetadata = {
+      'drink_water': {
+        dishId: '64be9cad4d58c3aa744f53d8', // מינרלים זכוכית* (Mineral water)
+        baseName: {
+          he: 'מים',
+          en: 'Water',
+          ar: 'ماء'
+        },
+        description: {
+          he: 'מים מינרליים',
+          en: 'Mineral water',
+          ar: 'ماء معدني'
+        }
+      },
+      'drink_sparkling_water': {
+        dishId: '64be9cc34d58c3aa744f53d9', // ספרייט* (Sprite - used as sparkling water)
+        baseName: {
+          he: 'מים מוגזים',
+          en: 'Sparkling Water',
+          ar: 'ماء فوار'
+        },
+        description: {
+          he: 'מים מוגזים (סודה)',
+          en: 'Sparkling water (soda)',
+          ar: 'ماء فوار (صودا)'
+        }
+      },
+      'drink_cola_zero': {
+        dishId: '64be9c944d58c3aa744f53d7', // קולה זירו* (Cola Zero)
+        baseName: {
+          he: 'קולה זירו',
+          en: 'Cola Zero',
+          ar: 'كولا زيرو'
+        },
+        description: {
+          he: 'קוקה קולה זירו',
+          en: 'Coca Cola Zero',
+          ar: 'كوكا كولا زيرو'
+        }
+      },
+      'drink_coca_cola': {
+        dishId: '64be9c704d58c3aa744f53d6', // קולה* (Cola)
+        baseName: {
+          he: 'קוקה קולה',
+          en: 'Coca Cola',
+          ar: 'كوكا كولا'
+        },
+        description: {
+          he: 'קוקה קולה קלאסית',
+          en: 'Classic Coca Cola',
+          ar: 'كوكا كولا كلاسيكية'
+        }
+      }
+    };
+    
+    // Generate single variant for each drink
+    const drinkVariants = [];
+    for (const [drinkId, drinkData] of Object.entries(drinksMenu)) {
+      const baseMetadata = drinksBaseMetadata[drinkId];
+      if (!baseMetadata) {
+        console.warn(`  → Warning: No metadata found for drink ${drinkId}, skipping`);
+        continue;
+      }
+      
+      // Generate single variant with price
+      if (drinkData.price !== undefined) {
+        drinkVariants.push({
+          id: drinkId,
+          baseId: drinkId,
+          price: drinkData.price,
+          dishId: baseMetadata.dishId,
+          nameTranslate: {
+            he: baseMetadata.baseName.he,
+            en: baseMetadata.baseName.en,
+            ar: baseMetadata.baseName.ar
+          },
+          descriptionTranslate: {
+            he: baseMetadata.description.he,
+            en: baseMetadata.description.en,
+            ar: baseMetadata.description.ar
+          }
+        });
+      }
+    }
+    
+    // Add drinks metadata to beecommMetadata for each variant
+    for (const variant of drinkVariants) {
+      beecommMetadata.dishMappings[variant.id] = {
+        dishId: variant.dishId, // Use actual Beecomm dishId
+        dishName: variant.nameTranslate.he,
+        kitchenName: variant.nameTranslate.he,
+        imagePath: null,
+        description: variant.descriptionTranslate.he,
+        descriptionTranslate: variant.descriptionTranslate,
+        oneLiner: null,
+        tags: [],
+        prepareTime: 0,
+        isCombo: false,
+        nameTranslate: variant.nameTranslate,
+        groupMappings: [],
+      };
+    }
+    
+    console.log(`  → Added ${drinkVariants.length} drink variants to metadata`);
+    
+    // Add drinks as an option group to all meals
+    // Generate a unique group ID for drinks
+    const drinksGroupId = 'tower_drinks_' + Date.now();
+    
+    const drinksGroup = {
+      id: drinksGroupId,
+      type: 'multiple',
+      title: {
+        he: 'משקאות',
+        en: 'Drinks',
+        ar: 'مشروبات'
+      },
+      required: false,
+      min: 0,
+      max: null,
+      options: [],
+    };
+    
+    // Convert drink variants to options
+    for (const variant of drinkVariants) {
+      const option = {
+        id: variant.id,
+        price: variant.price,
+        label: variant.nameTranslate,
+      };
+      drinksGroup.options.push(option);
+      
+      // Also add to metadata groupMappings for each meal
+      for (const mealId of Object.keys(menu)) {
+        if (beecommMetadata.dishMappings[mealId]) {
+          // Add to groupMappings
+          if (!beecommMetadata.dishMappings[mealId].groupMappings) {
+            beecommMetadata.dishMappings[mealId].groupMappings = [];
+          }
+          
+          // Check if drinks group already exists
+          let groupMapping = beecommMetadata.dishMappings[mealId].groupMappings.find(
+            gm => gm.groupId === drinksGroupId
+          );
+          
+          if (!groupMapping) {
+            groupMapping = {
+              groupId: drinksGroupId,
+              groupName: 'משקאות',
+              minQuantity: 0,
+              maxQuantity: null,
+              allowAboveLimit: false,
+              costAboveLimit: 0,
+              optionMappings: [],
+            };
+            beecommMetadata.dishMappings[mealId].groupMappings.push(groupMapping);
+          }
+          
+          groupMapping.optionMappings.push({
+            optionId: variant.id,
+            dishId: variant.dishId, // Use actual Beecomm dishId
+            kitchenName: variant.nameTranslate.he,
+            isDish: true,
+            isVariable: false,
+          });
+        }
+      }
+    }
+    
+    // Add the drinks group to all meals
+    for (const mealId of Object.keys(menu)) {
+      menu[mealId].groups.push({ ...drinksGroup }); // Create a copy for each meal
+    }
+    
+    console.log(`  → Added ${drinksGroup.options.length} drink options to all ${Object.keys(menu).length} meals`);
+  }
+} catch (error) {
+  console.log('No drinks menu file found, skipping drinks merge');
+}
+
 // Create the final output - matching mealOptions.json structure exactly (no _metadata at root)
+// Do NOT merge drinks into root - they are now part of meal groups
 const output = {
   ...menu,
 };

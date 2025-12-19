@@ -1,7 +1,7 @@
 {
   "menuRevision": "69270a8205b2dc0002585d90",
   "source": "beecomm",
-  "generatedAt": "2025-12-17T00:53:43.033Z",
+  "generatedAt": "2025-12-19T14:35:51.834Z",
   "totalDishes": 4,
   "dishMappings": {
     "668e21afff9c99b7862ec370": {
@@ -57,7 +57,7 @@
           ]
         },
         {
-          "groupId": "tower_side_dishes_1765932823035",
+          "groupId": "tower_side_dishes_1766154951836",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -75,6 +75,44 @@
               "optionId": "668e22d0ff9c99b7862ec379",
               "dishId": "668e22d0ff9c99b7862ec379",
               "kitchenName": "תפוח אדמה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        },
+        {
+          "groupId": "tower_drinks_1766154951837",
+          "groupName": "משקאות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "drink_water",
+              "dishId": "64be9cad4d58c3aa744f53d8",
+              "kitchenName": "מים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_sparkling_water",
+              "dishId": "64be9cc34d58c3aa744f53d9",
+              "kitchenName": "מים מוגזים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_cola_zero",
+              "dishId": "64be9c944d58c3aa744f53d7",
+              "kitchenName": "קולה זירו",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_coca_cola",
+              "dishId": "64be9c704d58c3aa744f53d6",
+              "kitchenName": "קוקה קולה",
               "isDish": true,
               "isVariable": false
             }
@@ -104,7 +142,7 @@
       },
       "groupMappings": [
         {
-          "groupId": "tower_side_dishes_1765932823035",
+          "groupId": "tower_side_dishes_1766154951836",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -122,6 +160,44 @@
               "optionId": "668e22d0ff9c99b7862ec379",
               "dishId": "668e22d0ff9c99b7862ec379",
               "kitchenName": "תפוח אדמה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        },
+        {
+          "groupId": "tower_drinks_1766154951837",
+          "groupName": "משקאות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "drink_water",
+              "dishId": "64be9cad4d58c3aa744f53d8",
+              "kitchenName": "מים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_sparkling_water",
+              "dishId": "64be9cc34d58c3aa744f53d9",
+              "kitchenName": "מים מוגזים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_cola_zero",
+              "dishId": "64be9c944d58c3aa744f53d7",
+              "kitchenName": "קולה זירו",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_coca_cola",
+              "dishId": "64be9c704d58c3aa744f53d6",
+              "kitchenName": "קוקה קולה",
               "isDish": true,
               "isVariable": false
             }
@@ -149,7 +225,46 @@
         "en": "Bolognese Pasta",
         "ar": "باستا بولونيز"
       },
-      "groupMappings": []
+      "groupMappings": [
+        {
+          "groupId": "tower_drinks_1766154951837",
+          "groupName": "משקאות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "drink_water",
+              "dishId": "64be9cad4d58c3aa744f53d8",
+              "kitchenName": "מים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_sparkling_water",
+              "dishId": "64be9cc34d58c3aa744f53d9",
+              "kitchenName": "מים מוגזים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_cola_zero",
+              "dishId": "64be9c944d58c3aa744f53d7",
+              "kitchenName": "קולה זירו",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_coca_cola",
+              "dishId": "64be9c704d58c3aa744f53d6",
+              "kitchenName": "קוקה קולה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        }
+      ]
     },
     "66e2bc8d96e41facc5121f4c": {
       "dishId": "66e2bc8d96e41facc5121f4c",
@@ -171,7 +286,46 @@
         "en": "Iron Salad",
         "ar": "سلطة الحديد"
       },
-      "groupMappings": []
+      "groupMappings": [
+        {
+          "groupId": "tower_drinks_1766154951837",
+          "groupName": "משקאות",
+          "minQuantity": 0,
+          "maxQuantity": null,
+          "allowAboveLimit": false,
+          "costAboveLimit": 0,
+          "optionMappings": [
+            {
+              "optionId": "drink_water",
+              "dishId": "64be9cad4d58c3aa744f53d8",
+              "kitchenName": "מים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_sparkling_water",
+              "dishId": "64be9cc34d58c3aa744f53d9",
+              "kitchenName": "מים מוגזים",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_cola_zero",
+              "dishId": "64be9c944d58c3aa744f53d7",
+              "kitchenName": "קולה זירו",
+              "isDish": true,
+              "isVariable": false
+            },
+            {
+              "optionId": "drink_coca_cola",
+              "dishId": "64be9c704d58c3aa744f53d6",
+              "kitchenName": "קוקה קולה",
+              "isDish": true,
+              "isVariable": false
+            }
+          ]
+        }
+      ]
     },
     "64ff4e082a73c76c505f67c1": {
       "dishId": "64ff4e082a73c76c505f67c1",
@@ -214,6 +368,94 @@
         "he": "תפוח אדמה",
         "en": "Potato",
         "ar": "بطاطا"
+      },
+      "groupMappings": []
+    },
+    "drink_water": {
+      "dishId": "64be9cad4d58c3aa744f53d8",
+      "dishName": "מים",
+      "kitchenName": "מים",
+      "imagePath": null,
+      "description": "מים מינרליים",
+      "descriptionTranslate": {
+        "he": "מים מינרליים",
+        "en": "Mineral water",
+        "ar": "ماء معدني"
+      },
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מים",
+        "en": "Water",
+        "ar": "ماء"
+      },
+      "groupMappings": []
+    },
+    "drink_sparkling_water": {
+      "dishId": "64be9cc34d58c3aa744f53d9",
+      "dishName": "מים מוגזים",
+      "kitchenName": "מים מוגזים",
+      "imagePath": null,
+      "description": "מים מוגזים (סודה)",
+      "descriptionTranslate": {
+        "he": "מים מוגזים (סודה)",
+        "en": "Sparkling water (soda)",
+        "ar": "ماء فوار (صودا)"
+      },
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "מים מוגזים",
+        "en": "Sparkling Water",
+        "ar": "ماء فوار"
+      },
+      "groupMappings": []
+    },
+    "drink_cola_zero": {
+      "dishId": "64be9c944d58c3aa744f53d7",
+      "dishName": "קולה זירו",
+      "kitchenName": "קולה זירו",
+      "imagePath": null,
+      "description": "קוקה קולה זירו",
+      "descriptionTranslate": {
+        "he": "קוקה קולה זירו",
+        "en": "Coca Cola Zero",
+        "ar": "كوكا كولا زيرو"
+      },
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קולה זירו",
+        "en": "Cola Zero",
+        "ar": "كولا زيرو"
+      },
+      "groupMappings": []
+    },
+    "drink_coca_cola": {
+      "dishId": "64be9c704d58c3aa744f53d6",
+      "dishName": "קוקה קולה",
+      "kitchenName": "קוקה קולה",
+      "imagePath": null,
+      "description": "קוקה קולה קלאסית",
+      "descriptionTranslate": {
+        "he": "קוקה קולה קלאסית",
+        "en": "Classic Coca Cola",
+        "ar": "كوكا كولا كلاسيكية"
+      },
+      "oneLiner": null,
+      "tags": [],
+      "prepareTime": 0,
+      "isCombo": false,
+      "nameTranslate": {
+        "he": "קוקה קולה",
+        "en": "Coca Cola",
+        "ar": "كوكا كولا"
       },
       "groupMappings": []
     }

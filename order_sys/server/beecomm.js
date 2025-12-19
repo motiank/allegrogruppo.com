@@ -363,22 +363,78 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     const locationData = storedOrderData.locationData || {};
     const cartItems = storedOrderData.cartItems || [];
 
+    // Load beecomm metadata to get actual dishIds for drinks and other items
+    let beecommMetadata = null;
+    try {
+      let metadataPath;
+      if (process.env.MENU_PATH) {
+        // Extract the menu name from MENU_PATH (e.g., "menu/tower_menu.json" -> "tower")
+        const menuPath = process.env.MENU_PATH;
+        const menuName = menuPath.replace(/^.*\/(\w+)_menu\.json$/, '$1');
+        metadataPath = join(__dirname, '..', 'menu', `${menuName}_metadata.json`);
+      } else {
+        // Default to labraca if MENU_PATH is not set
+        metadataPath = join(__dirname, '..', 'menu', 'labraca_metadata.json');
+      }
+      beecommMetadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+    } catch (error) {
+      console.warn('[beecomm] Could not load metadata, using cartItem.id as dishId:', error.message);
+    }
+
     // Convert cartItems to Beecomm items format
     const items = cartItems.map((cartItem) => {
       // Calculate total price for this item
       const unitPrice = cartItem.unitPrice || 0;
       const totalPrice = unitPrice * (cartItem.quantity || 1);
 
+      // Get actual Beecomm dishId from metadata if available
+      // This is important for drinks and other items that use custom IDs
+      let beecommDishId = cartItem.id;
+      if (beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[cartItem.id]) {
+        const dishMapping = beecommMetadata.dishMappings[cartItem.id];
+        if (dishMapping.dishId) {
+          beecommDishId = dishMapping.dishId;
+          console.log(`[beecomm] Mapped ${cartItem.id} to Beecomm dishId: ${beecommDishId}`);
+        }
+      }
+
       // Convert selections to toppings format
-      // Note: This is a simplified conversion - you may need to adjust based on your menu structure
+      // Map optionIds to their actual Beecomm dishIds using metadata
       const toppings = [];
       if (cartItem.selections) {
+        // Get the dish mapping for this cart item to access groupMappings
+        const dishMapping = beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[cartItem.id]
+          ? beecommMetadata.dishMappings[cartItem.id]
+          : null;
+
         Object.entries(cartItem.selections).forEach(([groupId, optionIds]) => {
           if (Array.isArray(optionIds)) {
             optionIds.forEach((optionId) => {
+              // Try to find the actual Beecomm dishId for this option
+              let beecommOptionDishId = optionId; // Default to optionId if mapping not found
+              
+              if (dishMapping && dishMapping.groupMappings) {
+                // Find the group mapping for this groupId
+                const groupMapping = dishMapping.groupMappings.find(
+                  gm => gm.groupId === groupId
+                );
+                
+                if (groupMapping && groupMapping.optionMappings) {
+                  // Find the option mapping for this optionId
+                  const optionMapping = groupMapping.optionMappings.find(
+                    om => om.optionId === optionId
+                  );
+                  
+                  if (optionMapping && optionMapping.dishId) {
+                    beecommOptionDishId = optionMapping.dishId;
+                    console.log(`[beecomm] Mapped option ${optionId} (group ${groupId}) to Beecomm dishId: ${beecommOptionDishId}`);
+                  }
+                }
+              }
+              
               toppings.push({
                 toppingGroupId: groupId,
-                toppingId: optionId,
+                toppingId: beecommOptionDishId, // Use mapped Beecomm dishId
               });
             });
           }
@@ -386,7 +442,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       }
 
       return {
-        dishId: cartItem.id, // Use the meal/dish ID
+        dishId: beecommDishId, // Use actual Beecomm dishId from metadata
         itemName: cartItem.name || cartItem.id, // Use name if available, fallback to ID
         isCombo: false, // Set based on your menu structure
         quantity: cartItem.quantity || 1,

@@ -1,0 +1,15 @@
+{
+  "drink_water": {
+    "price": 8
+  },
+  "drink_sparkling_water": {
+    "price": 10
+  },
+  "drink_cola_zero": {
+    "price": 12
+  },
+  "drink_coca_cola": {
+    "price": 12
+  }
+}
+

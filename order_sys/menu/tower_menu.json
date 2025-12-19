@@ -42,7 +42,7 @@
         ]
       },
       {
-        "id": "tower_side_dishes_1765932823035",
+        "id": "tower_side_dishes_1766154951836",
         "type": "multiple",
         "title": {
           "he": "תוספות",
@@ -69,6 +69,56 @@
               "he": "תפוח אדמה",
               "en": "Potato",
               "ar": "بطاطا"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tower_drinks_1766154951837",
+        "type": "multiple",
+        "title": {
+          "he": "משקאות",
+          "en": "Drinks",
+          "ar": "مشروبات"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "drink_water",
+            "price": 8,
+            "label": {
+              "he": "מים",
+              "en": "Water",
+              "ar": "ماء"
+            }
+          },
+          {
+            "id": "drink_sparkling_water",
+            "price": 10,
+            "label": {
+              "he": "מים מוגזים",
+              "en": "Sparkling Water",
+              "ar": "ماء فوار"
+            }
+          },
+          {
+            "id": "drink_cola_zero",
+            "price": 12,
+            "label": {
+              "he": "קולה זירו",
+              "en": "Cola Zero",
+              "ar": "كولا زيرو"
+            }
+          },
+          {
+            "id": "drink_coca_cola",
+            "price": 12,
+            "label": {
+              "he": "קוקה קולה",
+              "en": "Coca Cola",
+              "ar": "كوكا كولا"
             }
           }
         ]
@@ -79,7 +129,7 @@
     "basePrice": 59,
     "groups": [
       {
-        "id": "tower_side_dishes_1765932823035",
+        "id": "tower_side_dishes_1766154951836",
         "type": "multiple",
         "title": {
           "he": "תוספות",
@@ -109,15 +159,167 @@
             }
           }
         ]
+      },
+      {
+        "id": "tower_drinks_1766154951837",
+        "type": "multiple",
+        "title": {
+          "he": "משקאות",
+          "en": "Drinks",
+          "ar": "مشروبات"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "drink_water",
+            "price": 8,
+            "label": {
+              "he": "מים",
+              "en": "Water",
+              "ar": "ماء"
+            }
+          },
+          {
+            "id": "drink_sparkling_water",
+            "price": 10,
+            "label": {
+              "he": "מים מוגזים",
+              "en": "Sparkling Water",
+              "ar": "ماء فوار"
+            }
+          },
+          {
+            "id": "drink_cola_zero",
+            "price": 12,
+            "label": {
+              "he": "קולה זירו",
+              "en": "Cola Zero",
+              "ar": "كولا زيرو"
+            }
+          },
+          {
+            "id": "drink_coca_cola",
+            "price": 12,
+            "label": {
+              "he": "קוקה קולה",
+              "en": "Coca Cola",
+              "ar": "كوكا كولا"
+            }
+          }
+        ]
       }
     ]
   },
   "691decf7c8aa7786f3fd0770": {
     "basePrice": 59,
-    "groups": []
+    "groups": [
+      {
+        "id": "tower_drinks_1766154951837",
+        "type": "multiple",
+        "title": {
+          "he": "משקאות",
+          "en": "Drinks",
+          "ar": "مشروبات"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "drink_water",
+            "price": 8,
+            "label": {
+              "he": "מים",
+              "en": "Water",
+              "ar": "ماء"
+            }
+          },
+          {
+            "id": "drink_sparkling_water",
+            "price": 10,
+            "label": {
+              "he": "מים מוגזים",
+              "en": "Sparkling Water",
+              "ar": "ماء فوار"
+            }
+          },
+          {
+            "id": "drink_cola_zero",
+            "price": 12,
+            "label": {
+              "he": "קולה זירו",
+              "en": "Cola Zero",
+              "ar": "كولا زيرو"
+            }
+          },
+          {
+            "id": "drink_coca_cola",
+            "price": 12,
+            "label": {
+              "he": "קוקה קולה",
+              "en": "Coca Cola",
+              "ar": "كوكا كولا"
+            }
+          }
+        ]
+      }
+    ]
   },
   "66e2bc8d96e41facc5121f4c": {
     "basePrice": 59,
-    "groups": []
+    "groups": [
+      {
+        "id": "tower_drinks_1766154951837",
+        "type": "multiple",
+        "title": {
+          "he": "משקאות",
+          "en": "Drinks",
+          "ar": "مشروبات"
+        },
+        "required": false,
+        "min": 0,
+        "max": null,
+        "options": [
+          {
+            "id": "drink_water",
+            "price": 8,
+            "label": {
+              "he": "מים",
+              "en": "Water",
+              "ar": "ماء"
+            }
+          },
+          {
+            "id": "drink_sparkling_water",
+            "price": 10,
+            "label": {
+              "he": "מים מוגזים",
+              "en": "Sparkling Water",
+              "ar": "ماء فوار"
+            }
+          },
+          {
+            "id": "drink_cola_zero",
+            "price": 12,
+            "label": {
+              "he": "קולה זירו",
+              "en": "Cola Zero",
+              "ar": "كولا زيرو"
+            }
+          },
+          {
+            "id": "drink_coca_cola",
+            "price": 12,
+            "label": {
+              "he": "קוקה קולה",
+              "en": "Coca Cola",
+              "ar": "كوكا كولا"
+            }
+          }
+        ]
+      }
+    ]
   }
 }
