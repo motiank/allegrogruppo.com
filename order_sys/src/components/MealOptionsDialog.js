@@ -36,6 +36,30 @@ const useStyles = createUseStyles({
     padding: `0 ${theme.spacing.xl} ${theme.spacing.md}`,
     textAlign: 'start',
     borderBottom: `1px solid ${theme.colors.border}`,
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: theme.spacing.sm,
+    insetInlineEnd: theme.spacing.xl,
+    background: 'transparent',
+    border: 'none',
+    fontSize: '1.5rem',
+    lineHeight: 1,
+    color: theme.colors.textSecondary,
+    cursor: 'pointer',
+    padding: theme.spacing.xs,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    transition: 'background-color 0.2s, color 0.2s',
+    '&:hover': {
+      backgroundColor: theme.colors.surface,
+      color: theme.colors.text,
+    },
   },
   title: {
     margin: 0,
@@ -223,6 +247,7 @@ const serializeSelections = (selections) =>
 const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onConfirm, onCancel, metadata }) => {
   const classes = useStyles();
   const [selections, setSelections] = useState({});
+  const isRTL = language === 'he' || language === 'ar';
 
   const basePrice = config?.basePrice ?? 0;
 
@@ -322,6 +347,14 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
       <div className={classes.dialog}>
         <div className={classes.dragHandle} />
         <div className={classes.header}>
+          <button
+            type="button"
+            className={classes.closeButton}
+            onClick={handleCancel}
+            aria-label={texts.cancel || 'Close'}
+          >
+            ×
+          </button>
           <h2 className={classes.title}>{texts.title}</h2>
           <p className={classes.subtitle}>{meal?.displayName}</p>
           {(() => {
@@ -414,9 +447,6 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
               disabled={!isValid}
             >
               {texts.confirm}
-            </button>
-            <button type="button" className={classes.secondaryButton} onClick={handleCancel}>
-              {texts.cancel}
             </button>
           </div>
         </div>

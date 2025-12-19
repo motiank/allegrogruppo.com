@@ -6,7 +6,8 @@
     "chickenSalad": "سلطة دجاج",
     "pasta": "باستا",
     "addToCart": "أضف إلى السلة",
-    "selectMeal": "اختر وجبة لإضافتها"
+    "selectMeal": "اختر وجبة لإضافتها",
+    "backToCart": "العودة إلى السلة"
   },
   "location": {
     "title": "تفاصيل الموقع",

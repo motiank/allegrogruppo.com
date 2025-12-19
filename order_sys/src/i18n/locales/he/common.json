@@ -6,7 +6,8 @@
     "chickenSalad": "סלט עוף",
     "pasta": "פסטה",
     "addToCart": "הוספה לסל",
-    "selectMeal": "בחרו ארוחה כדי להוסיף אותה"
+    "selectMeal": "בחרו ארוחה כדי להוסיף אותה",
+    "backToCart": "חזרה לסל"
   },
   "location": {
     "title": "פרטי מיקום",

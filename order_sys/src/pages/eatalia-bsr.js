@@ -436,7 +436,7 @@ const EataliaBSRPage = () => {
   const [locationData, setLocationData] = useState(null);
   const [groupName, setGroupName] = useState('');
   const [cartItems, setCartItems] = useState([]);
-  const [optionsDialog, setOptionsDialog] = useState({ open: false, mealId: null });
+  const [optionsDialog, setOptionsDialog] = useState({ open: false, mealId: null, fromStep: null });
   const [policyDialog, setPolicyDialog] = useState({
     open: false,
     type: null,
@@ -640,7 +640,7 @@ const EataliaBSRPage = () => {
       });
       return;
     }
-    setOptionsDialog({ open: true, mealId });
+    setOptionsDialog({ open: true, mealId, fromStep: step });
   };
 
   const handleInstagramOpen = (mealId) => {
@@ -678,17 +678,20 @@ const EataliaBSRPage = () => {
         },
       ];
     });
-    setOptionsDialog({ open: false, mealId: null });
+    setOptionsDialog({ open: false, mealId: null, fromStep: null });
     setSelectedMeal(null);
     setStep('cart');
     trackEvent('meal_added_to_cart', { meal: mealId, selections, price: priceInfo.total });
   };
 
   const handleMealOptionsCancel = () => {
-    const { mealId } = optionsDialog;
-    setOptionsDialog({ open: false, mealId: null });
+    const { mealId, fromStep } = optionsDialog;
+    setOptionsDialog({ open: false, mealId: null, fromStep: null });
     setSelectedMeal(null);
-    setStep('cart');
+    // Navigate back to the step where the dialog was opened from
+    if (fromStep) {
+      setStep(fromStep);
+    }
     if (mealId) {
       trackEvent('meal_customization_cancelled', { meal: mealId });
     }
@@ -756,7 +759,7 @@ const EataliaBSRPage = () => {
     setLocationData(null);
     setGroupName('');
     setCartItems([]);
-    setOptionsDialog({ open: false, mealId: null });
+    setOptionsDialog({ open: false, mealId: null, fromStep: null });
     setOrderId(null);
     setApprovalNo(null);
   };
@@ -1016,7 +1019,7 @@ const EataliaBSRPage = () => {
                 type="button"
                 className={classes.startButton}
                 onClick={() => {
-                  setStep('cart');
+                  setStep('meal');
                   trackEvent('welcome_started', { groupName: groupName || 'anonymous' });
                 }}
               >
@@ -1218,7 +1221,20 @@ const EataliaBSRPage = () => {
               })}
             </div>
             <div className={classes.mealFooter}>
-              <span className={classes.mealHint}>{t('meal.selectMeal')}</span>
+              {cartItems.length > 0 ? (
+                <button
+                  type="button"
+                  className={classes.secondaryButton}
+                  onClick={() => {
+                    setStep('cart');
+                    trackEvent('back_to_cart_clicked', { fromStep: 'meal' });
+                  }}
+                >
+                  {t('meal.backToCart')}
+                </button>
+              ) : (
+                <span className={classes.mealHint}>{t('meal.selectMeal')}</span>
+              )}
             </div>
           </div>
         )}

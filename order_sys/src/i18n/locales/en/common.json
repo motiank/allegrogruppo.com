@@ -6,7 +6,8 @@
     "chickenSalad": "Chicken Salad",
     "pasta": "Pasta",
     "addToCart": "Add to cart",
-    "selectMeal": "Select a meal to add it"
+    "selectMeal": "Select a meal to add it",
+    "backToCart": "Back to cart"
   },
   "location": {
     "title": "Location Details",
