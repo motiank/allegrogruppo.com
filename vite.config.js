@@ -1,6 +1,6 @@
 import { defineConfig, transformWithEsbuild } from 'vite';
 import react from '@vitejs/plugin-react';
-import { readFileSync, statSync } from 'fs';
+import { readFileSync, statSync, copyFileSync, mkdirSync, readdirSync, lstatSync } from 'fs';
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -35,6 +35,29 @@ export default defineConfig({
           
           // Debug: Log ALL requests (not just admin) to see what's happening
           console.log(`[DEBUG MIDDLEWARE] Incoming request: ${url}`);
+          
+          // Serve resources folder in development
+          if (url.startsWith('/resources/')) {
+            const filePath = resolve(process.cwd(), url.slice(1));
+            try {
+              const stats = statSync(filePath);
+              if (stats.isFile()) {
+                const content = readFileSync(filePath);
+                // Set appropriate content type based on file extension
+                if (url.endsWith('.svg')) {
+                  res.setHeader('Content-Type', 'image/svg+xml');
+                } else if (url.match(/\.(png|jpg|jpeg|gif|webp)$/)) {
+                  res.setHeader('Content-Type', `image/${url.split('.').pop()}`);
+                } else if (url.match(/\.(mp3|wav|ogg)$/)) {
+                  res.setHeader('Content-Type', `audio/${url.split('.').pop()}`);
+                }
+                res.end(content);
+                return;
+              }
+            } catch (e) {
+              // File doesn't exist, continue to next middleware
+            }
+          }
           
           // Serve admin.html
           if (url === '/admin.html') {
@@ -97,6 +120,45 @@ export default defineConfig({
           
           next();
         });
+      },
+    },
+    {
+      name: 'copy-resources',
+      writeBundle() {
+        const resourcesDir = resolve(__dirname, 'resources');
+        const distDir = resolve(__dirname, 'dist');
+        const distResourcesDir = resolve(distDir, 'resources');
+        
+        // Helper function to copy directory recursively
+        const copyDir = (src, dest) => {
+          mkdirSync(dest, { recursive: true });
+          const entries = readdirSync(src, { withFileTypes: true });
+          
+          for (const entry of entries) {
+            const srcPath = resolve(src, entry.name);
+            const destPath = resolve(dest, entry.name);
+            
+            if (entry.isDirectory()) {
+              copyDir(srcPath, destPath);
+            } else {
+              copyFileSync(srcPath, destPath);
+            }
+          }
+        };
+        
+        try {
+          // Check if resources directory exists
+          const stats = lstatSync(resourcesDir);
+          if (stats.isDirectory()) {
+            copyDir(resourcesDir, distResourcesDir);
+            console.log('✅ Copied resources folder to dist');
+          }
+        } catch (error) {
+          // Resources folder doesn't exist, skip
+          if (error.code !== 'ENOENT') {
+            console.warn('⚠️ Could not copy resources folder:', error.message);
+          }
+        }
       },
     },
   ],

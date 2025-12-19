@@ -1,6 +1,6 @@
 {
-  "668e21afff9c99b7862ec370": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=600&fit=crop&q=80",
-  "65d1bc9314ed0ca1e102f839": "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&h=600&fit=crop&q=80",
-  "691decf7c8aa7786f3fd0770": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop&q=80",
-  "66e2bc8d96e41facc5121f4c": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80"
+  "668e21afff9c99b7862ec370": "/resources/images/hamburger.png",
+  "65d1bc9314ed0ca1e102f839": "/resources/images/schnitzel.png",
+  "691decf7c8aa7786f3fd0770": "/resources/images/bolognese.png",
+  "66e2bc8d96e41facc5121f4c": "/resources/images/ironsalad.png"
 }

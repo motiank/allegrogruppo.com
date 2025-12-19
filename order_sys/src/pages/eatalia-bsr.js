@@ -388,29 +388,30 @@ const useStyles = createUseStyles({
   },
 });
 
+
 const meals = [
   {
     id: 'hamburger',
     name: 'hamburger',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop',
+    image: '/resources/images/hamburger.png',
     instagramUrl: 'https://www.instagram.com/reel/DNxrviKXmm5/?igsh=MW9kM3Y1MTJqbHViNw==',
   },
   {
     id: 'schnitzel',
     name: 'schnitzel',
-    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop',
+    image: '/resources/images/schnitzel.png',
     instagramUrl: 'https://www.instagram.com/reel/DNxrviKXmm5/?igsh=MW9kM3Y1MTJqbHViNw==',
   },
   {
     id: 'chickenSalad',
     name: 'chickenSalad',
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
+    image: '/resources/images/ironsalad.png',
     instagramUrl: 'https://www.instagram.com/reel/DNxrviKXmm5/?igsh=MW9kM3Y1MTJqbHViNw==',
   },
   {
     id: 'pasta',
     name: 'pasta',
-    image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=400&h=300&fit=crop',
+    image: '/resources/images/bolognese.png',
     instagramUrl: 'https://www.instagram.com/reel/DNxrviKXmm5/?igsh=MW9kM3Y1MTJqbHViNw==',
   },
 ];
@@ -1162,13 +1163,13 @@ const EataliaBSRPage = () => {
                     const meal = allMeals.find(m => m.id === id);
                     const displayName = meal ? getMealDisplayName(id) : id;
                     // Use appropriate default image based on dish type
-                    let defaultImage = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=600&fit=crop&q=80';
+                    let defaultImage = '/resources/images/hamburger.png';
                     if (displayName.toLowerCase().includes('schnitzel')) {
-                      defaultImage = 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=800&h=600&fit=crop&q=80';
+                      defaultImage = '/resources/images/schnitzel.png';
                     } else if (displayName.toLowerCase().includes('salad')) {
-                      defaultImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop&q=80';
+                      defaultImage = '/resources/images/ironsalad.png';
                     } else if (displayName.toLowerCase().includes('pasta')) {
-                      defaultImage = 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop&q=80';
+                      defaultImage = '/resources/images/bolognese.png';
                     }
                     acc[id] = defaultImage;
                     return acc;

@@ -1,5 +1,5 @@
 // Default image for dishes when no image is provided
-const DEFAULT_DISH_IMAGE = '/default-dish-image.svg';
+const DEFAULT_DISH_IMAGE = '/resources/images/default-dish-image.svg';
 
 /**
  * Resolves dish image using 3-layer priority:
