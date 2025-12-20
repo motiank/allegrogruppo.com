@@ -30,6 +30,16 @@ const useStyles = createUseStyles({
     objectFit: 'cover',
     alignSelf: 'center',
   },
+  logoSmall: {
+    position: 'fixed',
+    top: '14px',
+    right: theme.spacing.md,
+    width: '80px',
+    height: 'auto',
+    objectFit: 'contain',
+    zIndex: 100,
+    backgroundColor: 'transparent',
+  },
   mainContent: {
     flex: 1,
     display: 'flex',
@@ -370,6 +380,11 @@ const useStyles = createUseStyles({
     container: {
       padding: `${theme.spacing.lg} ${theme.spacing.md}`,
       paddingBottom: '100px', // Add padding to prevent content from being hidden behind fixed button
+    },
+    logoSmall: {
+      width: '60px',
+      top: '14px',
+      right: theme.spacing.sm,
     },
     welcomeSection: {
       paddingBottom: '80px', // Extra padding for welcome section to accommodate fixed button
@@ -1079,15 +1094,24 @@ const EataliaBSRPage = () => {
 
   return (
     <div className={classes.container}>
-      <img
-        fetchPriority="high"
-        src="/resources/images/logo.avif"
-        alt="מתחם EATALIA - לוגו"
-        style={{ objectFit: 'cover' }}
-        className={classes.logo}
-        width="242"
-        height="149"
-      />
+      {step === 'welcome' ? (
+        <img
+          fetchPriority="high"
+          src="/resources/images/logo.avif"
+          alt="מתחם EATALIA - לוגו"
+          style={{ objectFit: 'cover' }}
+          className={classes.logo}
+          width="242"
+          height="149"
+        />
+      ) : (
+        <img
+          fetchPriority="high"
+          src="/resources/images/logo_small.png"
+          alt="מתחם EATALIA - לוגו"
+          className={classes.logoSmall}
+        />
+      )}
       <LangSwitcher />
 
       <div className={classes.mainContent}>

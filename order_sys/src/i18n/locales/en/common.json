@@ -19,7 +19,14 @@
     "notes": "Notes",
     "notesPlaceholder": "Any delivery notes for the team? (optional)",
     "next": "Next",
-    "selectBuilding": "Select Building"
+    "selectBuilding": "Select Building",
+    "errors": {
+      "name": "Name must be at least 2 characters",
+      "building": "Please select a building",
+      "floor": "Please enter a valid floor (1-100)",
+      "office": "Please enter an office number",
+      "phone": "Please enter a valid phone number (9-10 digits)"
+    }
   },
   "payment": {
     "title": "Payment",
@@ -46,7 +53,7 @@
     "exclusive": "This system is exclusive for Beerser City residents & guests.",
     "question": "Ordering solo or for the whole squad?",
     "instruction": "Choose a group name (anything you all agree on) — or just hit Let’s Start and we’ll take it from there.",
-    "signature": "All dishes are crafted by Chef Kobi Buchar. Fresh, bold, and made to impress.",
+    "signature": "All dishes are crafted by Chef Kobi Bachar. Fresh, bold, and made to impress.",
     "groupLabel": "Group name",
     "groupPlaceholder": "Enter your group name (optional)",
     "start": "Let’s Start"

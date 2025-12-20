@@ -50,14 +50,33 @@ const useStyles = createUseStyles({
   body: {
     padding: theme.spacing.lg,
     overflowY: 'auto',
+    backgroundColor: 'transparent',
+    color: theme.colors.text,
   },
   content: {
+    backgroundColor: 'transparent',
+    color: theme.colors.text,
+    // Override all background colors to transparent
+    '& *, & html, & body, & header, & main, & section, & .card, & footer': {
+      backgroundColor: 'transparent !important',
+    },
+    // Override all text colors to use theme text color
+    '& *, & html, & body, & header, & main, & section, & .card, & footer, & p, & li, & span, & div': {
+      color: `${theme.colors.text} !important`,
+    },
     '& h1, & h2, & h3': {
-      color: theme.colors.primary,
+      color: `${theme.colors.primary} !important`,
     },
     '& p': {
       marginBlockEnd: theme.spacing.md,
       lineHeight: 1.6,
+      color: `${theme.colors.text} !important`,
+    },
+    '& a': {
+      color: `${theme.colors.primary} !important`,
+    },
+    '& .subtitle, & .meta': {
+      color: `${theme.colors.textSecondary} !important`,
     },
   },
   message: {
