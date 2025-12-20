@@ -70,6 +70,7 @@
     "checkout": "إتمام الطلب",
     "quantity": "الكمية",
     "remove": "حذف",
+    "edit": "تعديل",
     "options": "الاختيارات",
     "itemPrice": "{{price}}₪",
     "total": "الإجمالي",

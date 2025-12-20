@@ -251,7 +251,7 @@ const serializeSelections = (selections) =>
     .map(([groupId, optionIds]) => `${groupId}:${optionIds.slice().sort().join('|')}`)
     .join(';');
 
-const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onConfirm, onCancel, metadata }) => {
+const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onConfirm, onCancel, metadata, initialSelections: propInitialSelections }) => {
   const classes = useStyles();
   const [selections, setSelections] = useState({});
   const isRTL = language === 'he' || language === 'ar';
@@ -263,16 +263,23 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
       return;
     }
 
-    const initialSelections = {};
-    config?.groups?.forEach((group) => {
-      if (group.type === 'single' && group.required) {
-        initialSelections[group.id] = [group.options[0]?.id].filter(Boolean);
-      } else {
-        initialSelections[group.id] = [];
-      }
-    });
+    // Use provided initial selections if available, otherwise initialize with defaults
+    let initialSelections = {};
+    if (propInitialSelections && Object.keys(propInitialSelections).length > 0) {
+      // Use the provided initial selections
+      initialSelections = { ...propInitialSelections };
+    } else {
+      // Initialize with defaults
+      config?.groups?.forEach((group) => {
+        if (group.type === 'single' && group.required) {
+          initialSelections[group.id] = [group.options[0]?.id].filter(Boolean);
+        } else {
+          initialSelections[group.id] = [];
+        }
+      });
+    }
     setSelections(initialSelections);
-  }, [open, config]);
+  }, [open, config, propInitialSelections]);
 
   const handleOptionToggle = (group, optionId) => {
     setSelections((prev) => {

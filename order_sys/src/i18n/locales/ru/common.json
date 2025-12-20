@@ -70,6 +70,7 @@
     "checkout": "Оформить заказ",
     "quantity": "Количество",
     "remove": "Удалить",
+    "edit": "Редактировать",
     "options": "Опции",
     "itemPrice": "{{price}}₪",
     "total": "Итого",

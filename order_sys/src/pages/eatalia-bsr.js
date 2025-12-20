@@ -30,6 +30,14 @@ const useStyles = createUseStyles({
     objectFit: 'cover',
     alignSelf: 'center',
   },
+  logoLink: {
+    display: 'inline-block',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    border: 'none',
+    background: 'transparent',
+    padding: 0,
+  },
   logoSmall: {
     position: 'fixed',
     top: '14px',
@@ -39,6 +47,16 @@ const useStyles = createUseStyles({
     objectFit: 'contain',
     zIndex: 100,
     backgroundColor: 'transparent',
+  },
+  logoSmallButton: {
+    position: 'fixed',
+    top: '14px',
+    right: theme.spacing.md,
+    zIndex: 100,
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
   },
   mainContent: {
     flex: 1,
@@ -259,6 +277,18 @@ const useStyles = createUseStyles({
       opacity: 0.8,
     },
   },
+  editButton: {
+    border: 'none',
+    background: 'transparent',
+    color: theme.colors.primary,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'opacity 0.2s',
+    fontSize: '0.9rem',
+    '&:hover': {
+      opacity: 0.8,
+    },
+  },
   cartSummary: {
     color: theme.colors.textSecondary,
     marginBlockEnd: theme.spacing.md,
@@ -383,6 +413,10 @@ const useStyles = createUseStyles({
     },
     logoSmall: {
       width: '60px',
+      top: '14px',
+      right: theme.spacing.sm,
+    },
+    logoSmallButton: {
       top: '14px',
       right: theme.spacing.sm,
     },
@@ -547,7 +581,13 @@ const EataliaBSRPage = () => {
   const [locationData, setLocationData] = useState(null);
   const [groupName, setGroupName] = useState('');
   const [cartItems, setCartItems] = useState([]);
-  const [optionsDialog, setOptionsDialog] = useState({ open: false, mealId: null, fromStep: null });
+  const [optionsDialog, setOptionsDialog] = useState({ 
+    open: false, 
+    mealId: null, 
+    fromStep: null, 
+    initialSelections: null,
+    editingItemKey: null 
+  });
   const [policyDialog, setPolicyDialog] = useState({
     open: false,
     type: null,
@@ -751,7 +791,7 @@ const EataliaBSRPage = () => {
       });
       return;
     }
-    setOptionsDialog({ open: true, mealId, fromStep: step });
+    setOptionsDialog({ open: true, mealId, fromStep: step, initialSelections: null, editingItemKey: null });
   };
 
   const handleInstagramOpen = (mealId) => {
@@ -762,11 +802,48 @@ const EataliaBSRPage = () => {
     }
   };
 
-  const handleMealOptionsConfirm = ({ mealId, selections, price, key }) => {
+  const handleMealOptionsConfirm = ({ mealId, selections, price, key, editingItemKey }) => {
     const itemKey = `${mealId}::${key}`;
     const selectionCopy = cloneSelections(selections);
     const priceInfo = price || calculateItemPrice(mealId, selections);
+    
     setCartItems((prev) => {
+      // If editing an existing item, update it
+      if (editingItemKey) {
+        const updatedItems = prev.map((item) => {
+          if (item.key === editingItemKey) {
+            return {
+              ...item,
+              selections: selectionCopy,
+              unitPrice: priceInfo.total,
+              basePrice: priceInfo.base,
+              optionsPrice: priceInfo.options,
+              // Update the key if selections changed (which would change the key)
+              key: itemKey,
+            };
+          }
+          return item;
+        });
+        
+        // If the key changed, check if the new key already exists and merge if needed
+        if (editingItemKey !== itemKey) {
+          const existingIndex = updatedItems.findIndex((item) => item.key === itemKey && item.key !== editingItemKey);
+          if (existingIndex !== -1) {
+            // Merge with existing item of the same key
+            const merged = [...updatedItems];
+            merged[existingIndex] = {
+              ...merged[existingIndex],
+              quantity: merged[existingIndex].quantity + 1,
+            };
+            // Remove the old item
+            return merged.filter((item) => item.key !== editingItemKey);
+          }
+        }
+        
+        return updatedItems;
+      }
+      
+      // Otherwise, add new item or increment quantity if same key exists
       const existingIndex = prev.findIndex((item) => item.key === itemKey);
       if (existingIndex !== -1) {
         const next = [...prev];
@@ -789,15 +866,19 @@ const EataliaBSRPage = () => {
         },
       ];
     });
-    setOptionsDialog({ open: false, mealId: null, fromStep: null });
+    setOptionsDialog({ open: false, mealId: null, fromStep: null, initialSelections: null, editingItemKey: null });
     setSelectedMeal(null);
     navigateToStep('cart');
-    trackEvent('meal_added_to_cart', { meal: mealId, selections, price: priceInfo.total });
+    if (editingItemKey) {
+      trackEvent('meal_edited_in_cart', { meal: mealId, selections, price: priceInfo.total });
+    } else {
+      trackEvent('meal_added_to_cart', { meal: mealId, selections, price: priceInfo.total });
+    }
   };
 
   const handleMealOptionsCancel = () => {
     const { mealId, fromStep } = optionsDialog;
-    setOptionsDialog({ open: false, mealId: null, fromStep: null });
+    setOptionsDialog({ open: false, mealId: null, fromStep: null, initialSelections: null, editingItemKey: null });
     setSelectedMeal(null);
     // Navigate back to the step where the dialog was opened from
     if (fromStep) {
@@ -806,6 +887,26 @@ const EataliaBSRPage = () => {
     if (mealId) {
       trackEvent('meal_customization_cancelled', { meal: mealId });
     }
+  };
+
+  const handleEditMeal = (itemKey) => {
+    const item = cartItems.find((i) => i.key === itemKey);
+    if (!item) return;
+    
+    const config = getMealConfig(item.id);
+    if (!config) {
+      // If no config, can't edit (no options to change)
+      return;
+    }
+    
+    setOptionsDialog({
+      open: true,
+      mealId: item.id,
+      fromStep: step,
+      initialSelections: item.selections || {},
+      editingItemKey: itemKey,
+    });
+    trackEvent('meal_edit_started', { meal: item.id, itemKey });
   };
 
   const handleQuantityChange = (itemKey, delta) => {
@@ -870,7 +971,7 @@ const EataliaBSRPage = () => {
     setLocationData(null);
     setGroupName('');
     setCartItems([]);
-    setOptionsDialog({ open: false, mealId: null, fromStep: null });
+    setOptionsDialog({ open: false, mealId: null, fromStep: null, initialSelections: null, editingItemKey: null });
     setOrderId(null);
     setApprovalNo(null);
   };
@@ -1097,22 +1198,42 @@ const EataliaBSRPage = () => {
   return (
     <div className={classes.container}>
       {step === 'welcome' ? (
-        <img
-          fetchPriority="high"
-          src="/resources/images/logo.avif"
-          alt={t('common.logoAlt')}
-          style={{ objectFit: 'cover' }}
-          className={classes.logo}
-          width="242"
-          height="149"
-        />
+        <button
+          type="button"
+          className={classes.logoLink}
+          onClick={() => {
+            navigate(basePath);
+            trackEvent('logo_clicked', { fromStep: step, basePath });
+          }}
+          aria-label={t('common.logoAlt')}
+        >
+          <img
+            fetchPriority="high"
+            src="/resources/images/logo.avif"
+            alt={t('common.logoAlt')}
+            style={{ objectFit: 'cover' }}
+            className={classes.logo}
+            width="242"
+            height="149"
+          />
+        </button>
       ) : (
-        <img
-          fetchPriority="high"
-          src="/resources/images/logo_small.png"
-          alt={t('common.logoAlt')}
-          className={classes.logoSmall}
-        />
+        <button
+          type="button"
+          className={classes.logoSmallButton}
+          onClick={() => {
+            navigate(basePath);
+            trackEvent('logo_clicked', { fromStep: step, basePath });
+          }}
+          aria-label={t('common.logoAlt')}
+        >
+          <img
+            fetchPriority="high"
+            src="/resources/images/logo_small.png"
+            alt={t('common.logoAlt')}
+            className={classes.logoSmall}
+          />
+        </button>
       )}
       <LangSwitcher />
 
@@ -1198,13 +1319,24 @@ const EataliaBSRPage = () => {
                             {t('cart.itemPrice', { price: formatCurrency(itemTotal) })}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          className={classes.removeButton}
-                          onClick={() => handleRemoveFromCart(item.key)}
-                        >
-                          {t('cart.remove')}
-                        </button>
+                        <div style={{ display: 'flex', gap: theme.spacing.md, alignItems: 'center' }}>
+                          {getMealConfig(item.id) && (
+                            <button
+                              type="button"
+                              className={classes.editButton}
+                              onClick={() => handleEditMeal(item.key)}
+                            >
+                              {t('cart.edit')}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={classes.removeButton}
+                            onClick={() => handleRemoveFromCart(item.key)}
+                          >
+                            {t('cart.remove')}
+                          </button>
+                        </div>
                       </div>
                       {selectionDetails.length > 0 && (
                         <div className={classes.cartItemOptions}>
@@ -1486,9 +1618,10 @@ const EataliaBSRPage = () => {
         config={optionsDialog.open ? getMealConfig(optionsDialog.mealId) : null}
         language={i18n.language}
         texts={mealOptionsTexts}
-        onConfirm={handleMealOptionsConfirm}
+        onConfirm={(data) => handleMealOptionsConfirm({ ...data, editingItemKey: optionsDialog.editingItemKey })}
         onCancel={handleMealOptionsCancel}
         metadata={beecommMetadata}
+        initialSelections={optionsDialog.initialSelections}
       />
 
       <PolicyDialog

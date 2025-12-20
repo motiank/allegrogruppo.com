@@ -61,6 +61,7 @@
     "checkout": "Checkout",
     "quantity": "Quantity",
     "remove": "Remove",
+    "edit": "Edit",
     "options": "Options",
     "itemPrice": "{{price}}₪",
     "total": "Total",
