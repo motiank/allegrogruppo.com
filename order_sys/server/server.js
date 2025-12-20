@@ -82,7 +82,20 @@ app.use((req, res, next) => {
 
 // Fallback to index.html for SPA routes (if needed)
 app.get('*', (req, res) => {
-  if(req.path === '/bsr' || req.path === '/test/bsr') {
+  // BSR client-side routes (handled by React Router)
+  const bsrClientRoutes = ['/welcome', '/cart', '/meal', '/location', '/payment', '/thankYou'];
+  const isBSRClientRoute = bsrClientRoutes.some(route => req.path === route || req.path.startsWith(route + '/'));
+  
+  // BSR entry points
+  const isBSREntry = req.path === '/bsr' || req.path === '/test/bsr' || 
+                     req.path === '/eatalia-bsr.html' || req.path.startsWith('/test/bsr/');
+  
+  // Test routes for BSR client-side navigation
+  const isTestBSRRoute = req.path.startsWith('/test/welcome') || req.path.startsWith('/test/cart') ||
+                         req.path.startsWith('/test/meal') || req.path.startsWith('/test/location') ||
+                         req.path.startsWith('/test/payment') || req.path.startsWith('/test/thankYou');
+  
+  if (isBSRClientRoute || isBSREntry || isTestBSRRoute) {
     return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
   }
   res.sendFile(join(__dirname, '../../dist/site-index.html'));

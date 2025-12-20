@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
+import { BrowserRouter, useNavigate, useLocation } from 'react-router-dom';
 import { theme, useGlobalStyles } from '../styles/index.js';
 import { MealCard } from '../components/MealCard.js';
 import { OfficeForm } from '../components/OfficeForm.js';
@@ -110,6 +111,9 @@ const useStyles = createUseStyles({
       transform: 'translateY(-2px)',
       boxShadow: '0 14px 28px rgba(0, 112, 243, 0.3)',
     },
+  },
+  startButtonWrapper: {
+    // Wrapper for the start button to handle fixed positioning on mobile
   },
   title: {
     fontSize: '2rem',
@@ -365,6 +369,27 @@ const useStyles = createUseStyles({
   '@media (max-width: 768px)': {
     container: {
       padding: `${theme.spacing.lg} ${theme.spacing.md}`,
+      paddingBottom: '100px', // Add padding to prevent content from being hidden behind fixed button
+    },
+    welcomeSection: {
+      paddingBottom: '80px', // Extra padding for welcome section to accommodate fixed button
+    },
+    startButtonWrapper: {
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: theme.spacing.md,
+      backgroundColor: theme.colors.background,
+      boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.1)',
+      zIndex: 10,
+      display: 'flex',
+      justifyContent: 'center',
+    },
+    startButton: {
+      width: '100%',
+      maxWidth: '600px',
+      alignSelf: 'stretch',
     },
     mealGrid: {
       gridTemplateColumns: '1fr',
@@ -434,8 +459,75 @@ const EataliaBSRPage = () => {
   useGlobalStyles();
   const classes = useStyles();
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [step, setStep] = useState('welcome'); // welcome, cart, meal, location, payment, thankYou
+  // Detect base path: /bsr or /test/bsr
+  const getBasePath = () => {
+    const pathname = location.pathname;
+    if (pathname.startsWith('/test/bsr')) {
+      return '/test/bsr';
+    }
+    if (pathname.startsWith('/bsr')) {
+      return '/bsr';
+    }
+    // Fallback: try to detect from pathname segments
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length >= 2 && segments[0] === 'test' && segments[1] === 'bsr') {
+      return '/test/bsr';
+    }
+    if (segments.length >= 1 && segments[0] === 'bsr') {
+      return '/bsr';
+    }
+    // Default to /bsr if we can't determine
+    return '/bsr';
+  };
+
+  const basePath = getBasePath();
+
+  // Get step from URL pathname after base path
+  // Extract step from pathname like '/bsr/cart' -> 'cart' or '/bsr' -> 'welcome'
+  const getStepFromLocation = () => {
+    const pathname = location.pathname;
+    // Remove base path and get the step
+    let relativePath = pathname;
+    if (pathname.startsWith(basePath)) {
+      relativePath = pathname.slice(basePath.length);
+    }
+    const pathStep = relativePath.replace(/^\//, '').split('/')[0] || 'welcome';
+    const validSteps = ['welcome', 'cart', 'meal', 'location', 'payment', 'thankYou'];
+    return validSteps.includes(pathStep) ? pathStep : 'welcome';
+  };
+  const step = getStepFromLocation();
+
+  // Helper function to navigate while preserving base path
+  const navigateToStep = (stepName) => {
+    navigate(`${basePath}/${stepName}`);
+  };
+  
+  // Initialize URL if empty or at base path (redirect to welcome step)
+  useEffect(() => {
+    const pathname = location.pathname;
+    const currentBasePath = getBasePath();
+    
+    // If we're exactly at the base path or base path with trailing slash, redirect to welcome
+    if (pathname === currentBasePath || pathname === `${currentBasePath}/`) {
+      navigate(`${currentBasePath}/welcome`, { replace: true });
+      return;
+    }
+    
+    // Check if step is valid
+    let relativePath = pathname;
+    if (pathname.startsWith(currentBasePath)) {
+      relativePath = pathname.slice(currentBasePath.length);
+    }
+    const pathStep = relativePath.replace(/^\//, '').split('/')[0] || 'welcome';
+    const validSteps = ['welcome', 'cart', 'meal', 'location', 'payment', 'thankYou'];
+    if (!validSteps.includes(pathStep)) {
+      navigate(`${currentBasePath}/welcome`, { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
   const [groupName, setGroupName] = useState('');
@@ -684,7 +776,7 @@ const EataliaBSRPage = () => {
     });
     setOptionsDialog({ open: false, mealId: null, fromStep: null });
     setSelectedMeal(null);
-    setStep('cart');
+    navigateToStep('cart');
     trackEvent('meal_added_to_cart', { meal: mealId, selections, price: priceInfo.total });
   };
 
@@ -694,7 +786,7 @@ const EataliaBSRPage = () => {
     setSelectedMeal(null);
     // Navigate back to the step where the dialog was opened from
     if (fromStep) {
-      setStep(fromStep);
+      navigateToStep(fromStep);
     }
     if (mealId) {
       trackEvent('meal_customization_cancelled', { meal: mealId });
@@ -749,7 +841,7 @@ const EataliaBSRPage = () => {
     setOrderId(newOrderId);
     setLocationData(payload);
     trackEvent('location_completed', { ...payload, orderId: newOrderId });
-    setStep('payment');
+    navigateToStep('payment');
     trackEvent('payment_step_opened', {
       orderId: newOrderId,
       cart: cartItems,
@@ -758,7 +850,7 @@ const EataliaBSRPage = () => {
   };
 
   const handleRestart = () => {
-    setStep('welcome');
+    navigateToStep('welcome');
     setSelectedMeal(null);
     setLocationData(null);
     setGroupName('');
@@ -944,7 +1036,7 @@ const EataliaBSRPage = () => {
           setApprovalNo(receivedApprovalNo || '');
           
           // Move to thank you step
-          setStep('thankYou');
+          navigateToStep('thankYou');
           
           // Track the completion
           trackEvent('payment_completed', {
@@ -1028,16 +1120,18 @@ const EataliaBSRPage = () => {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className={classes.startButton}
-                onClick={() => {
-                  setStep('meal');
-                  trackEvent('welcome_started', { groupName: groupName || 'anonymous' });
-                }}
-              >
-                {t('welcome.start')}
-              </button>
+              <div className={classes.startButtonWrapper}>
+                <button
+                  type="button"
+                  className={classes.startButton}
+                  onClick={() => {
+                    navigateToStep('meal');
+                    trackEvent('welcome_started', { groupName: groupName || 'anonymous' });
+                  }}
+                >
+                  {t('welcome.start')}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1135,7 +1229,7 @@ const EataliaBSRPage = () => {
                 className={classes.secondaryButton}
                 onClick={() => {
                   setSelectedMeal(null);
-                  setStep('meal');
+                  navigateToStep('meal');
                   trackEvent('cart_add_meal_clicked', {});
                 }}
               >
@@ -1147,7 +1241,7 @@ const EataliaBSRPage = () => {
                 disabled={cartItems.length === 0}
                 onClick={() => {
                   trackEvent('cart_checkout_clicked', { cart: cartItems, total: cartTotal });
-                  setStep('location');
+                  navigateToStep('location');
                 }}
               >
                 {t('cart.checkout')}
@@ -1239,7 +1333,7 @@ const EataliaBSRPage = () => {
                   type="button"
                   className={classes.secondaryButton}
                   onClick={() => {
-                    setStep('cart');
+                    navigateToStep('cart');
                     trackEvent('back_to_cart_clicked', { fromStep: 'meal' });
                   }}
                 >
@@ -1388,9 +1482,18 @@ const EataliaBSRPage = () => {
   );
 };
 
+// Wrapper component to provide BrowserRouter context
+const EataliaBSRApp = () => {
+  return (
+    <BrowserRouter>
+      <EataliaBSRPage />
+    </BrowserRouter>
+  );
+};
+
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
-  root.render(<EataliaBSRPage />);
+  root.render(<EataliaBSRApp />);
 }
 
