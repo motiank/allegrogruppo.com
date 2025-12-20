@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createUseStyles } from 'react-jss';
-import { theme } from '../styles/theme.js';
+import { theme } from '../styles/index.js';
 
 const useStyles = createUseStyles({
   overlay: {
@@ -35,11 +35,13 @@ const useStyles = createUseStyles({
     border: 'none',
     cursor: 'pointer',
     fontSize: '1.5rem',
+    color: theme.colors.text || '#000000',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     '&:hover': {
       backgroundColor: '#ffffff',
+      opacity: 1,
     },
   },
 });

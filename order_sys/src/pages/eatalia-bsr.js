@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
-import { theme } from '../styles/theme.js';
-import { useGlobalStyles } from '../styles/global.js';
+import { theme, useGlobalStyles } from '../styles/index.js';
 import { MealCard } from '../components/MealCard.js';
 import { OfficeForm } from '../components/OfficeForm.js';
 import { ThankYou } from '../components/ThankYou.js';
@@ -24,6 +23,11 @@ const useStyles = createUseStyles({
     margin: '0 auto',
     display: 'flex',
     flexDirection: 'column',
+  },
+  logo: {
+    marginBlockEnd: theme.spacing.lg,
+    objectFit: 'cover',
+    alignSelf: 'center',
   },
   mainContent: {
     flex: 1,
@@ -81,11 +85,11 @@ const useStyles = createUseStyles({
     border: `1px solid ${theme.colors.border}`,
     fontSize: '1rem',
     color: theme.colors.text,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     transition: 'border-color 0.2s, box-shadow 0.2s',
     '&:focus': {
       borderColor: theme.colors.primary,
-      boxShadow: `0 0 0 3px rgba(0, 112, 243, 0.15)`,
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 0 3px ${theme.colors.primary}26`,
       outline: 'none',
     },
   },
@@ -207,7 +211,7 @@ const useStyles = createUseStyles({
     display: 'flex',
     alignItems: 'center',
     gap: theme.spacing.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     borderRadius: theme.borderRadius.sm,
     border: `1px solid ${theme.colors.border}`,
     padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
@@ -299,7 +303,7 @@ const useStyles = createUseStyles({
     transition: 'background-color 0.2s, border-color 0.2s, color 0.2s',
     minWidth: '200px',
     '&:hover': {
-      backgroundColor: '#ffffff',
+      backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
       borderColor: theme.colors.primary,
       color: theme.colors.primary,
     },
@@ -983,6 +987,15 @@ const EataliaBSRPage = () => {
 
   return (
     <div className={classes.container}>
+      <img
+        fetchPriority="high"
+        src="/resources/images/logo.avif"
+        alt="מתחם EATALIA - לוגו"
+        style={{ objectFit: 'cover' }}
+        className={classes.logo}
+        width="242"
+        height="149"
+      />
       <LangSwitcher />
 
       <div className={classes.mainContent}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
-import { theme } from '../styles/theme.js';
+import { theme } from '../styles/index.js';
 import { DEFAULT_DISH_IMAGE } from '../utils/imageResolver.js';
 
 const useStyles = createUseStyles({

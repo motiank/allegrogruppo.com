@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { createUseStyles } from 'react-jss';
-import { theme } from '../styles/theme.js';
+import { theme } from '../styles/index.js';
 
 const useStyles = createUseStyles({
   backdrop: {
@@ -14,13 +14,14 @@ const useStyles = createUseStyles({
     zIndex: 200,
   },
   dialog: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.surface || theme.colors.card || theme.colors.background,
     borderRadius: theme.borderRadius.md,
     width: 'min(90vw, 720px)',
     maxHeight: '80vh',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: theme.boxStyles?.shadow?.xl || '0 12px 32px rgba(0, 0, 0, 0.6)',
+    color: theme.colors.text,
   },
   header: {
     padding: `${theme.spacing.md} ${theme.spacing.lg}`,

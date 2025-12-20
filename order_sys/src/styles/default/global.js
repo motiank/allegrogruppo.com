@@ -1,4 +1,5 @@
 import { createUseStyles } from 'react-jss';
+import { theme } from './theme.js';
 
 export const useGlobalStyles = createUseStyles({
   '@global': {
@@ -11,10 +12,10 @@ export const useGlobalStyles = createUseStyles({
       fontSize: '16px',
     },
     body: {
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      fontFamily: theme.fonts.primary,
       lineHeight: 1.6,
-      color: '#2c3e50',
-      backgroundColor: '#ffffff',
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
     },
     '#root': {
       minHeight: '100vh',

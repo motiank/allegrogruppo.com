@@ -1,8 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
-import { theme } from '../styles/theme.js';
-import { useGlobalStyles } from '../styles/global.js';
+import { theme, useGlobalStyles } from '../styles/index.js';
 import '../i18n/index.js';
 
 const useStyles = createUseStyles({
@@ -13,6 +12,10 @@ const useStyles = createUseStyles({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logo: {
+    marginBlockEnd: theme.spacing.xl,
+    objectFit: 'cover',
   },
   title: {
     fontSize: '2rem',
@@ -50,6 +53,15 @@ const IndexPage = () => {
 
   return (
     <div className={classes.container}>
+      <img
+        fetchPriority="high"
+        src="/resources/images/logo.avif"
+        alt="מתחם EATALIA - לוגו"
+        style={{ objectFit: 'cover' }}
+        className={classes.logo}
+        width="242"
+        height="149"
+      />
       <h1 className={classes.title}>Allegro Gruppo - Landing Pages</h1>
       <ul className={classes.list}>
         {landingPages.map((page) => (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
-import { theme } from '../styles/theme.js';
+import { theme } from '../styles/index.js';
 import { validateLocationForm } from '../utils/validations.js';
 
 const useStyles = createUseStyles({
@@ -26,9 +26,12 @@ const useStyles = createUseStyles({
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.borderRadius.sm,
     fontSize: '1rem',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     '&:focus': {
       outline: 'none',
       borderColor: theme.colors.primary,
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 0 3px ${theme.colors.primary}26`,
     },
   },
   select: {
@@ -36,11 +39,13 @@ const useStyles = createUseStyles({
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.borderRadius.sm,
     fontSize: '1rem',
-    backgroundColor: '#ffffff',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     cursor: 'pointer',
     '&:focus': {
       outline: 'none',
       borderColor: theme.colors.primary,
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 0 3px ${theme.colors.primary}26`,
     },
   },
   textarea: {
@@ -49,28 +54,33 @@ const useStyles = createUseStyles({
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.borderRadius.sm,
     fontSize: '1rem',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     resize: 'vertical',
     '&:focus': {
       outline: 'none',
       borderColor: theme.colors.primary,
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 0 3px ${theme.colors.primary}26`,
     },
   },
   button: {
     padding: theme.spacing.md,
     backgroundColor: theme.colors.primary,
-    color: '#ffffff',
+    color: theme.colors.text || '#ffffff',
     border: 'none',
     borderRadius: theme.borderRadius.sm,
     fontSize: '1rem',
     fontWeight: 'bold',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.2s, box-shadow 0.2s',
     '&:hover:not(:disabled)': {
       backgroundColor: theme.colors.secondary,
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 20px ${theme.colors.primary}40`,
     },
     '&:disabled': {
       backgroundColor: theme.colors.disabled,
       cursor: 'not-allowed',
+      opacity: 0.5,
     },
   },
 });

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createUseStyles } from 'react-jss';
-import { theme } from '../styles/theme.js';
+import { theme } from '../styles/index.js';
 
 const useStyles = createUseStyles({
   backdrop: {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    // Dark backdrop works well for both light and dark themes
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-end',
@@ -15,21 +16,21 @@ const useStyles = createUseStyles({
     padding: theme.spacing.lg,
   },
   dialog: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.surface || theme.colors.card || theme.colors.background,
     borderRadius: `${theme.borderRadius.lg} ${theme.borderRadius.lg} 0 0`,
     width: 'min(560px, 100%)',
     maxHeight: '90vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 -20px 40px rgba(15, 23, 42, 0.25)',
+    boxShadow: theme.boxStyles?.shadow?.xl || '0 -20px 40px rgba(0, 0, 0, 0.5)',
   },
   dragHandle: {
     alignSelf: 'center',
     width: '48px',
     height: '5px',
     borderRadius: '5px',
-    backgroundColor: '#d1d5db',
+    backgroundColor: theme.colors.border,
     marginBlock: theme.spacing.sm,
   },
   header: {
@@ -119,7 +120,7 @@ const useStyles = createUseStyles({
     padding: theme.spacing.md,
     textAlign: 'start',
     cursor: 'pointer',
-    background: '#ffffff',
+    background: theme.colors.card || theme.colors.surface || theme.colors.background,
     transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
     display: 'flex',
     alignItems: 'center',
@@ -127,14 +128,15 @@ const useStyles = createUseStyles({
     gap: theme.spacing.lg,
     '&:hover': {
       borderColor: theme.colors.primary,
-      boxShadow: '0 10px 16px rgba(15, 23, 42, 0.08)',
+      boxShadow: theme.boxStyles?.shadow?.md || '0 4px 12px rgba(0, 0, 0, 0.4)',
       transform: 'translateY(-1px)',
     },
   },
   optionButtonSelected: {
     borderColor: theme.colors.primary,
-    boxShadow: '0 12px 20px rgba(0, 112, 243, 0.12)',
-    background: 'linear-gradient(135deg, rgba(12, 74, 110, 0.04), rgba(37, 99, 235, 0.08))',
+    boxShadow: theme.boxStyles?.shadow?.glow || `0 0 20px ${theme.colors.primary}40`,
+    background: theme.colors.card || theme.colors.surface || theme.colors.background,
+    borderWidth: '2px',
   },
   optionTitle: {
     display: 'flex',
@@ -166,11 +168,13 @@ const useStyles = createUseStyles({
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '0.75rem',
-    color: '#ffffff',
+    color: theme.colors.text,
+    backgroundColor: 'transparent',
   },
   checkmarkSelected: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.primary,
+    color: '#ffffff',
   },
   footer: {
     padding: theme.spacing.lg,
@@ -194,34 +198,37 @@ const useStyles = createUseStyles({
   primaryButton: {
     padding: `${theme.spacing.md} ${theme.spacing.lg}`,
     backgroundColor: theme.colors.primary,
-    color: '#ffffff',
+    color: theme.colors.text || '#ffffff',
     border: 'none',
     borderRadius: theme.borderRadius.md,
     fontSize: '1rem',
     fontWeight: 'bold',
     cursor: 'pointer',
-    transition: 'background-color 0.2s, transform 0.2s',
+    transition: 'background-color 0.2s, transform 0.2s, box-shadow 0.2s',
     '&:hover:not(:disabled)': {
       backgroundColor: theme.colors.secondary,
       transform: 'translateY(-1px)',
+      boxShadow: theme.boxStyles?.shadow?.glow || `0 0 20px ${theme.colors.primary}40`,
     },
     '&:disabled': {
       backgroundColor: theme.colors.disabled,
       cursor: 'not-allowed',
+      opacity: 0.5,
     },
   },
   secondaryButton: {
     padding: `${theme.spacing.md} ${theme.spacing.lg}`,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.card || theme.colors.surface || theme.colors.background,
     color: theme.colors.text,
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.borderRadius.md,
     fontSize: '1rem',
     fontWeight: 'bold',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.2s, border-color 0.2s',
     '&:hover': {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surface || theme.colors.card,
+      borderColor: theme.colors.primary,
     },
   },
 });
