@@ -87,6 +87,7 @@ export const LangSwitcher = () => {
     { code: 'he', label: 'עברית', flag: '🇮🇱' },
     { code: 'en', label: 'English', flag: '🇺🇸' },
     { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+    { code: 'ru', label: 'Русский', flag: '🇷🇺' },
   ];
 
   const handleLanguageChange = (lang) => {

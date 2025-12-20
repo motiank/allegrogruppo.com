@@ -30,7 +30,12 @@
   },
   "payment": {
     "title": "תשלום",
-    "comingSoon": "תשלום בקרוב"
+    "comingSoon": "תשלום בקרוב",
+    "secureCheckout": "השלימו את התשלום בצורה מאובטחת למטה.",
+    "missingOrder": "אנא השלימו את השלבים הקודמים כדי ליצור סשן תשלום.",
+    "preparingCheckout": "מכין תשלום מאובטח…",
+    "loadError": "לא ניתן לטעון את טופס התשלום.",
+    "iframeTitle": "תשלום מאובטח Pelecard"
   },
   "thankYou": {
     "title": "תודה רבה!",
@@ -96,12 +101,17 @@
   },
   "common": {
     "select": "בחרו",
-    "play": "נגן"
+    "play": "נגן",
+    "loading": "טוען...",
+    "logoAlt": "מתחם EATALIA - לוגו"
   },
   "comingSoon": {
     "title": "בקרוב!",
     "message": "אנחנו עובדים קשה כדי להביא לכם חוויית הזמנה מושלמת. השף שלנו מכין משהו מיוחד!",
     "subtitle": "אנא חזרו בקרוב כדי להזמין את המנות הטריות שלנו."
+  },
+  "index": {
+    "title": "Allegro Gruppo - דפי נחיתה"
   }
 }
 

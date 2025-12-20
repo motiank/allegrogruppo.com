@@ -28,10 +28,6 @@
       "phone": "Please enter a valid phone number (9-10 digits)"
     }
   },
-  "payment": {
-    "title": "Payment",
-    "comingSoon": "Payment coming soon"
-  },
   "thankYou": {
     "title": "Thank You!",
     "orderSummary": "Order Summary",
@@ -96,12 +92,26 @@
   },
   "common": {
     "select": "Select",
-    "play": "Play"
+    "play": "Play",
+    "loading": "Loading...",
+    "logoAlt": "EATALIA Complex - Logo"
+  },
+  "payment": {
+    "title": "Payment",
+    "comingSoon": "Payment coming soon",
+    "secureCheckout": "Complete your payment securely below.",
+    "missingOrder": "Please complete the previous steps to generate a payment session.",
+    "preparingCheckout": "Preparing secure checkout…",
+    "loadError": "Unable to load payment form.",
+    "iframeTitle": "Pelecard secure payment"
   },
   "comingSoon": {
     "title": "Coming Soon!",
     "message": "We're working hard to bring you the perfect ordering experience. Our chef is preparing something special!",
     "subtitle": "Please check back soon to order our fresh dishes."
+  },
+  "index": {
+    "title": "Allegro Gruppo - Landing Pages"
   }
 }
 

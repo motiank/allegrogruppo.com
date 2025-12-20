@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_IFRAME_HEIGHT = 600;
 
@@ -35,6 +36,7 @@ export default function PelecardIframe({
   onError,
   orderData,
 }) {
+  const { t } = useTranslation();
   const [iframeUrl, setIframeUrl] = useState('');
   const [status, setStatus] = useState('idle'); // idle | loading | ready | error
   const [error, setError] = useState('');
@@ -109,7 +111,7 @@ export default function PelecardIframe({
   if (status === 'loading' || status === 'idle') {
     return (
       <div className={className}>
-        <p>Preparing secure checkout…</p>
+        <p>{t('payment.preparingCheckout')}</p>
       </div>
     );
   }
@@ -117,7 +119,7 @@ export default function PelecardIframe({
   if (status === 'error') {
     return (
       <div className={className}>
-        <p role="alert">Unable to load payment form. {error}</p>
+        <p role="alert">{t('payment.loadError')} {error}</p>
       </div>
     );
   }
@@ -132,7 +134,7 @@ export default function PelecardIframe({
         frameBorder="0"
         allow="payment *"
         allowPaymentRequest
-        title="Pelecard secure payment"
+        title={t('payment.iframeTitle')}
       />
     </div>
   );

@@ -30,7 +30,12 @@
   },
   "payment": {
     "title": "الدفع",
-    "comingSoon": "الدفع قريباً"
+    "comingSoon": "الدفع قريباً",
+    "secureCheckout": "أكمل الدفع بشكل آمن أدناه.",
+    "missingOrder": "يرجى إكمال الخطوات السابقة لإنشاء جلسة دفع.",
+    "preparingCheckout": "جارٍ إعداد الدفع الآمن…",
+    "loadError": "تعذر تحميل نموذج الدفع.",
+    "iframeTitle": "دفع آمن Pelecard"
   },
   "thankYou": {
     "title": "شكراً لك!",
@@ -96,12 +101,17 @@
   },
   "common": {
     "select": "اختر",
-    "play": "تشغيل"
+    "play": "تشغيل",
+    "loading": "جاري التحميل...",
+    "logoAlt": "مجمع EATALIA - الشعار"
   },
   "comingSoon": {
     "title": "قريباً!",
     "message": "نعمل بجد لنقدم لكم تجربة طلب مثالية. شيفنا يعد شيئاً مميزاً!",
     "subtitle": "يرجى العودة قريباً لطلب أطباقنا الطازجة."
+  },
+  "index": {
+    "title": "Allegro Gruppo - صفحات الهبوط"
   }
 }
 

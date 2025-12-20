@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import he from './locales/he/common.json';
 import en from './locales/en/common.json';
 import ar from './locales/ar/common.json';
+import ru from './locales/ru/common.json';
 import { getLanguageFromUrl, setDocumentDirection } from '../utils/dir.js';
 
 const lang = getLanguageFromUrl();
@@ -15,6 +16,7 @@ i18n
       he: { translation: he },
       en: { translation: en },
       ar: { translation: ar },
+      ru: { translation: ru },
     },
     lng: lang,
     fallbackLng: 'he',

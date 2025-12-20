@@ -368,7 +368,16 @@ const MealOptionsDialogComponent = ({ open, meal, config, language, texts, onCon
             // Get translated description based on current language
             // Normalize language code (e.g., 'en-US' -> 'en')
             const langCode = language?.split('-')[0] || 'he';
-            const description = meal?.descriptionTranslate?.[langCode] || meal?.descriptionTranslate?.[language] || meal?.description || null;
+            // Only use description if we have a translation for the current language
+            // or if the current language is Hebrew (fallback to Hebrew description)
+            let description = null;
+            if (meal?.descriptionTranslate) {
+              description = meal.descriptionTranslate[langCode] || meal.descriptionTranslate[language];
+            }
+            // Only fallback to Hebrew description if current language is Hebrew
+            if (!description && langCode === 'he' && meal?.description) {
+              description = meal.description;
+            }
             return description && (
               <p className={classes.description}>{description}</p>
             );

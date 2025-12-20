@@ -984,7 +984,7 @@ const EataliaBSRPage = () => {
       return undefined;
     }
 
-    const supportedLangs = ['he', 'en', 'ar'];
+    const supportedLangs = ['he', 'en', 'ar', 'ru'];
     const lang = supportedLangs.includes(i18n.language) ? i18n.language : 'he';
 
     const files = {
@@ -992,11 +992,13 @@ const EataliaBSRPage = () => {
         he: '/policies/terms.he.html',
         en: '/policies/terms.en.html',
         ar: '/policies/terms.ar.html',
+        ru: '/policies/terms.ru.html',
       },
       privacy: {
         he: '/policies/privacy.he.html',
         en: '/policies/privacy.en.html',
         ar: '/policies/privacy.ar.html',
+        ru: '/policies/privacy.ru.html',
       },
     };
 
@@ -1086,7 +1088,7 @@ const EataliaBSRPage = () => {
     return (
       <div className={classes.container}>
         <div style={{ textAlign: 'center', padding: theme.spacing.xxl, color: theme.colors.text }}>
-          <p>Loading...</p>
+          <p>{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -1098,7 +1100,7 @@ const EataliaBSRPage = () => {
         <img
           fetchPriority="high"
           src="/resources/images/logo.avif"
-          alt="מתחם EATALIA - לוגו"
+          alt={t('common.logoAlt')}
           style={{ objectFit: 'cover' }}
           className={classes.logo}
           width="242"
@@ -1108,7 +1110,7 @@ const EataliaBSRPage = () => {
         <img
           fetchPriority="high"
           src="/resources/images/logo_small.png"
-          alt="מתחם EATALIA - לוגו"
+          alt={t('common.logoAlt')}
           className={classes.logoSmall}
         />
       )}

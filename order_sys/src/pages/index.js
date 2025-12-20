@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createUseStyles } from 'react-jss';
+import { useTranslation } from 'react-i18next';
 import { theme, useGlobalStyles } from '../styles/index.js';
 import '../i18n/index.js';
 
@@ -46,6 +47,7 @@ const useStyles = createUseStyles({
 const IndexPage = () => {
   useGlobalStyles();
   const classes = useStyles();
+  const { t } = useTranslation();
 
   const landingPages = [
     { name: 'Eatalia BSR', path: '/eatalia-bsr.html' },
@@ -56,13 +58,13 @@ const IndexPage = () => {
       <img
         fetchPriority="high"
         src="/resources/images/logo.avif"
-        alt="מתחם EATALIA - לוגו"
+        alt={t('common.logoAlt')}
         style={{ objectFit: 'cover' }}
         className={classes.logo}
         width="242"
         height="149"
       />
-      <h1 className={classes.title}>Allegro Gruppo - Landing Pages</h1>
+      <h1 className={classes.title}>{t('index.title')}</h1>
       <ul className={classes.list}>
         {landingPages.map((page) => (
           <li key={page.path} className={classes.listItem}>
