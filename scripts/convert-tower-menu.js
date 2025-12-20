@@ -262,6 +262,130 @@ const translationDict = {
     'ועגבנייה': 'وطماطم',
     '250': '250',
   },
+  ru: {
+    // Common phrases
+    'תוספות לתירס צלוי': 'Добавки к жареной кукурузе',
+    'תוספות': 'Добавки',
+    'תוספת': 'Добавка',
+    'סוג פסטה': 'Тип пасты',
+    'סוג': 'Тип',
+    'פסטה בהרכבה': 'Паста на заказ',
+    'פסטה': 'Паста',
+    'פטוצ׳יני': 'Феттучине',
+    'פנה': 'Пенне',
+    'ספגטי ללא גלוטן': 'Спагетти без глютена',
+    'ספגטי': 'Спагетти',
+    'ללא גלוטן': 'Без глютена',
+    'פרמז׳ן': 'Пармезан',
+    'קוקוס': 'Кокос',
+    'צ׳ילי טרי': 'Свежий перец чили',
+    'חלפיניו': 'Халапеньо',
+    'רוטב': 'Соус',
+    'רטבים': 'Соусы',
+    'פסטה בולונז': 'Паста болоньезе',
+    'בולונז': 'Болоньезе',
+    'רוזה': 'Роза',
+    'אלפרדו': 'Альфредо',
+    'תירס צלוי': 'Жареная кукуруза',
+    'תירס': 'Кукуруза',
+    'צלוי': 'Жареный',
+    'חסה': 'Салат',
+    'עגבנייה': 'Помидор',
+    'בצל': 'Лук',
+    'מלפפון': 'Огурец',
+    'פלפל': 'Перец',
+    'גבינה': 'Сыр',
+    'בשר': 'Мясо',
+    'עוף': 'Курица',
+    'דג': 'Рыба',
+    'סלמון': 'Лосось',
+    'כריך': 'Сэндвич',
+    'סלט': 'Салат',
+    'צ׳יפס': 'Картофель фри',
+    'אורז': 'Рис',
+    'לחם': 'Хлеб',
+    'שמנת': 'Сливки',
+    'קרם': 'Сливки',
+    'חדש': 'Новый',
+    'שינויים אפשריים בכריך': 'Возможные изменения в сэндвиче',
+    'שינויים': 'Изменения',
+    'אפשריים': 'Возможные',
+    'בכריך': 'в сэндвиче',
+    'מידת עשייה': 'Уровень прожарки',
+    'המבורגר קלאסי': 'Классический гамбургер',
+    'המבורגר': 'Гамбургер',
+    'קלאסי': 'Классический',
+    'שניצל': 'Шницель',
+    'סלט ברזל': 'Железный салат',
+    'ברזל': 'Железо',
+    'סלט ירוק': 'Зеленый салат',
+    'ירוק': 'Зеленый',
+    'תוספת': 'Добавка',
+    'תפוח אדמה': 'Картофель',
+    'תפוחי אדמה': 'Картофель',
+    'סלט ירוק  תוספת': 'Зеленый салат дополнительно',
+    // Description terms
+    'גרם': 'грамм',
+    'לחמניית בריוש': 'булочка бриошь',
+    'מטוגן': 'жареный',
+    'לחם פריך': 'хрустящий хлеб',
+    'לימון': 'лимон',
+    'רוטב בולונז קלאסי': 'классический соус болоньезе',
+    'בשר בקר טחון': 'говяжий фарш',
+    'יין אדום': 'красное вино',
+    'עלים ירוקים': 'зеленые листья',
+    'תרד': 'шпинат',
+    'עגבניות שרי': 'черри помидоры',
+    'גבינת פטה': 'сыр фета',
+    'אגוזי מלך': 'грецкие орехи',
+    'טרי': 'свежий',
+    'מלפפון': 'огурец',
+    'אפויים': 'запеченный',
+    'או': 'или',
+    'מטוגנים': 'жареный',
+    'איכותי': 'качественный',
+    'ירקות צלויים': 'жареные овощи',
+    'תבלינים': 'специи',
+    'צלוי על הגריל': 'жареный на гриле',
+    'דק': 'тонкий',
+    'גבינת פרמזן': 'сыр пармезан',
+    'רוקט': 'руккола',
+    'שמן זית': 'оливковое масло',
+    'איטלקי': 'итальянский',
+    'מתובל': 'приправленный',
+    'חריף קלות': 'слегка острый',
+    'מיובש': 'сушеный',
+    'בזיליקום': 'базилик',
+    'סיציליאנית': 'сицилийский',
+    'חצילים': 'баклажан',
+    'זיתים': 'оливки',
+    'צלפים': 'каперсы',
+    'חתוך דק': 'тонко нарезанный',
+    'רוטב חרדל': 'горчичный соус',
+    'צלוי לאט': 'медленно жареный',
+    'ירקות שורש': 'корнеплоды',
+    'מוצרלה': 'моцарелла',
+    'פפרוני': 'пепперони',
+    'פטריות': 'грибы',
+    'גבינת גורגונזולה': 'сыр горгонзола',
+    'רוטב טרטר': 'соус тартар',
+    'נתחי עוף': 'кусочки курицы',
+    'רוטב דבש חריף': 'острый медовый соус',
+    'רוטב עגבניות': 'томатный соус',
+    'ירקות': 'овощи',
+    'ירקות טריים': 'свежие овощи',
+    'רוטב': 'соус',
+    'שיפודי כבש': 'шашлык из баранины',
+    'תבלינים מזרחיים': 'восточные специи',
+    'משתנה לפי היום': 'меняется в зависимости от дня',
+    'של השף': 'шеф-повара',
+    'מנת ספיישל': 'особое блюдо',
+    'עגלה': 'телятина',
+    'סציליאני': 'сицилийский',
+    'ועגבניה': 'и помидор',
+    'ועגבנייה': 'и помидор',
+    '250': '250',
+  },
 };
 
 // Helper function to translate Hebrew text
@@ -403,6 +527,7 @@ function convertDish(dish) {
           he: toppingGroup.name || '',
           en: getTranslation(toppingGroup.name, toppingGroup.nameTranslate, 'en'),
           ar: getTranslation(toppingGroup.name, toppingGroup.nameTranslate, 'ar'),
+          ru: getTranslation(toppingGroup.name, toppingGroup.nameTranslate, 'ru'),
         },
         required: minQuantity > 0,
       };
@@ -424,6 +549,7 @@ function convertDish(dish) {
               he: topping.name || '',
               en: getTranslation(topping.name, topping.nameTranslate, 'en'),
               ar: getTranslation(topping.name, topping.nameTranslate, 'ar'),
+              ru: getTranslation(topping.name, topping.nameTranslate, 'ru'),
             },
           };
           options.push(option);
@@ -450,16 +576,19 @@ function convertDish(dish) {
   const descriptionTranslate = {};
   if (finalDescription) {
     descriptionTranslate.he = finalDescription;
-    // Try to translate description to English and Arabic
+    // Try to translate description to English, Arabic, and Russian
     const enTranslation = translateHebrew(finalDescription, 'en');
     const arTranslation = translateHebrew(finalDescription, 'ar');
+    const ruTranslation = translateHebrew(finalDescription, 'ru');
     // Only use translation if it's actually different from Hebrew (contains non-Hebrew characters)
-    descriptionTranslate.en = isHebrew(enTranslation) ? finalDescription : enTranslation;
-    descriptionTranslate.ar = isHebrew(arTranslation) ? finalDescription : arTranslation;
+    descriptionTranslate.en = isHebrew(enTranslation) ? null : enTranslation;
+    descriptionTranslate.ar = isHebrew(arTranslation) ? null : arTranslation;
+    descriptionTranslate.ru = isHebrew(ruTranslation) ? null : ruTranslation;
   } else {
     descriptionTranslate.he = null;
     descriptionTranslate.en = null;
     descriptionTranslate.ar = null;
+    descriptionTranslate.ru = null;
   }
   
   const beecommData = {
@@ -477,6 +606,7 @@ function convertDish(dish) {
       he: dish.name || '',
       en: getTranslation(dish.name, dish.nameTranslate, 'en'),
       ar: getTranslation(dish.name, dish.nameTranslate, 'ar'),
+      ru: getTranslation(dish.name, dish.nameTranslate, 'ru'),
     },
     // Store group and option mappings for order submission
     groupMappings: dish.toppingsGroups?.map(tg => ({
@@ -593,6 +723,7 @@ if (sideDishes.length > 0 && (menu[hamburgerDishId] || menu[schnitzelDishId])) {
       he: 'תוספות',
       en: 'Sides',
       ar: 'إضافات',
+      ru: 'Добавки',
     },
     required: false,
     min: 0,
@@ -612,13 +743,16 @@ if (sideDishes.length > 0 && (menu[hamburgerDishId] || menu[schnitzelDishId])) {
       sideDishDescriptionTranslate.he = sideDishDescription;
       const enTranslation = translateHebrew(sideDishDescription, 'en');
       const arTranslation = translateHebrew(sideDishDescription, 'ar');
+      const ruTranslation = translateHebrew(sideDishDescription, 'ru');
       // Only use translation if it's actually different from Hebrew
-      sideDishDescriptionTranslate.en = isHebrew(enTranslation) ? sideDishDescription : enTranslation;
-      sideDishDescriptionTranslate.ar = isHebrew(arTranslation) ? sideDishDescription : arTranslation;
+      sideDishDescriptionTranslate.en = isHebrew(enTranslation) ? null : enTranslation;
+      sideDishDescriptionTranslate.ar = isHebrew(arTranslation) ? null : arTranslation;
+      sideDishDescriptionTranslate.ru = isHebrew(ruTranslation) ? null : ruTranslation;
     } else {
       sideDishDescriptionTranslate.he = null;
       sideDishDescriptionTranslate.en = null;
       sideDishDescriptionTranslate.ar = null;
+      sideDishDescriptionTranslate.ru = null;
     }
     
     const option = {
@@ -628,6 +762,7 @@ if (sideDishes.length > 0 && (menu[hamburgerDishId] || menu[schnitzelDishId])) {
         he: sideDish.name || '',
         en: getTranslation(sideDish.name, sideDish.nameTranslate, 'en'),
         ar: getTranslation(sideDish.name, sideDish.nameTranslate, 'ar'),
+        ru: getTranslation(sideDish.name, sideDish.nameTranslate, 'ru'),
       },
     };
     sideDishGroup.options.push(option);
@@ -675,6 +810,7 @@ if (sideDishes.length > 0 && (menu[hamburgerDishId] || menu[schnitzelDishId])) {
               he: sideDish.name || '',
               en: getTranslation(sideDish.name, sideDish.nameTranslate, 'en'),
               ar: getTranslation(sideDish.name, sideDish.nameTranslate, 'ar'),
+              ru: getTranslation(sideDish.name, sideDish.nameTranslate, 'ru'),
             },
             groupMappings: [],
           };
@@ -717,12 +853,14 @@ try {
         baseName: {
           he: 'מים',
           en: 'Water',
-          ar: 'ماء'
+          ar: 'ماء',
+          ru: 'Вода'
         },
         description: {
           he: 'מים מינרליים',
           en: 'Mineral water',
-          ar: 'ماء معدني'
+          ar: 'ماء معدني',
+          ru: 'Минеральная вода'
         }
       },
       'drink_sparkling_water': {
@@ -730,12 +868,14 @@ try {
         baseName: {
           he: 'מים מוגזים',
           en: 'Sparkling Water',
-          ar: 'ماء فوار'
+          ar: 'ماء فوار',
+          ru: 'Газированная вода'
         },
         description: {
           he: 'מים מוגזים (סודה)',
           en: 'Sparkling water (soda)',
-          ar: 'ماء فوار (صودا)'
+          ar: 'ماء فوار (صودا)',
+          ru: 'Газированная вода (содовая)'
         }
       },
       'drink_cola_zero': {
@@ -743,12 +883,14 @@ try {
         baseName: {
           he: 'קולה זירו',
           en: 'Cola Zero',
-          ar: 'كولا زيرو'
+          ar: 'كولا زيرو',
+          ru: 'Кола Зеро'
         },
         description: {
           he: 'קוקה קולה זירו',
           en: 'Coca Cola Zero',
-          ar: 'كوكا كولا زيرو'
+          ar: 'كوكا كولا زيرو',
+          ru: 'Кока-Кола Зеро'
         }
       },
       'drink_coca_cola': {
@@ -756,12 +898,14 @@ try {
         baseName: {
           he: 'קוקה קולה',
           en: 'Coca Cola',
-          ar: 'كوكا كولا'
+          ar: 'كوكا كولا',
+          ru: 'Кока-Кола'
         },
         description: {
           he: 'קוקה קולה קלאסית',
           en: 'Classic Coca Cola',
-          ar: 'كوكا كولا كلاسيكية'
+          ar: 'كوكا كولا كلاسيكية',
+          ru: 'Классическая Кока-Кола'
         }
       }
     };
@@ -785,12 +929,14 @@ try {
           nameTranslate: {
             he: baseMetadata.baseName.he,
             en: baseMetadata.baseName.en,
-            ar: baseMetadata.baseName.ar
+            ar: baseMetadata.baseName.ar,
+            ru: baseMetadata.baseName.ru
           },
           descriptionTranslate: {
             he: baseMetadata.description.he,
             en: baseMetadata.description.en,
-            ar: baseMetadata.description.ar
+            ar: baseMetadata.description.ar,
+            ru: baseMetadata.description.ru
           }
         });
       }
@@ -826,7 +972,8 @@ try {
       title: {
         he: 'משקאות',
         en: 'Drinks',
-        ar: 'مشروبات'
+        ar: 'مشروبات',
+        ru: 'Напитки'
       },
       required: false,
       min: 0,

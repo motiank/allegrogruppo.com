@@ -1,7 +1,7 @@
 {
   "menuRevision": "69270a8205b2dc0002585d90",
   "source": "beecomm",
-  "generatedAt": "2025-12-19T14:35:51.834Z",
+  "generatedAt": "2025-12-20T21:54:04.544Z",
   "totalDishes": 4,
   "dishMappings": {
     "668e21afff9c99b7862ec370": {
@@ -13,7 +13,8 @@
       "descriptionTranslate": {
         "he": "250  גרם , לחמניית בריוש, חסה , בצל  ועגבניה",
         "en": "250 grams , brioche bun, Lettuce , Onion and tomato",
-        "ar": "250  גרם , לחמניית בריוש, חסה , בצל  ועגבניה"
+        "ar": null,
+        "ru": "250 грамм , булочка бриошь, Салат , Лук и помидор"
       },
       "oneLiner": null,
       "tags": [],
@@ -22,7 +23,8 @@
       "nameTranslate": {
         "he": "המבורגר קלאסי ",
         "en": "Classic Hamburger",
-        "ar": "هامبرجر كلاسيكي"
+        "ar": "هامبرجر كلاسيكي",
+        "ru": "Классический гамбургер"
       },
       "groupMappings": [
         {
@@ -57,7 +59,7 @@
           ]
         },
         {
-          "groupId": "tower_side_dishes_1766154951836",
+          "groupId": "tower_side_dishes_1766267644546",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -81,7 +83,7 @@
           ]
         },
         {
-          "groupId": "tower_drinks_1766154951837",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -129,7 +131,8 @@
       "descriptionTranslate": {
         "he": "שניצל עוף מטוגן, לחם פריך, לימון",
         "en": "Schnitzel Chicken fried, crispy bread, lemon",
-        "ar": "شنتسل دجاج مقلي, خبز مقرمش, ليمون"
+        "ar": "شنتسل دجاج مقلي, خبز مقرمش, ليمون",
+        "ru": "Шницель Курица жареный, хрустящий хлеб, лимон"
       },
       "oneLiner": null,
       "tags": [],
@@ -138,11 +141,12 @@
       "nameTranslate": {
         "he": "שניצל",
         "en": "Schnitzel",
-        "ar": "شنتسل"
+        "ar": "شنتسل",
+        "ru": "Шницель"
       },
       "groupMappings": [
         {
-          "groupId": "tower_side_dishes_1766154951836",
+          "groupId": "tower_side_dishes_1766267644546",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -166,7 +170,7 @@
           ]
         },
         {
-          "groupId": "tower_drinks_1766154951837",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -213,8 +217,9 @@
       "description": "פסטה עם רוטב בולונז קלאסי, בשר בקר טחון, עגבניות, יין אדום",
       "descriptionTranslate": {
         "he": "פסטה עם רוטב בולונז קלאסי, בשר בקר טחון, עגבניות, יין אדום",
-        "en": "פסטה עם רוטב בולונז קלאסי, בשר בקר טחון, עגבניות, יין אדום",
-        "ar": "פסטה עם רוטב בולונז קלאסי, בשר בקר טחון, עגבניות, יין אדום"
+        "en": null,
+        "ar": null,
+        "ru": null
       },
       "oneLiner": null,
       "tags": [],
@@ -223,11 +228,12 @@
       "nameTranslate": {
         "he": "פסטה בולונז ",
         "en": "Bolognese Pasta",
-        "ar": "باستا بولونيز"
+        "ar": "باستا بولونيز",
+        "ru": "Паста болоньезе"
       },
       "groupMappings": [
         {
-          "groupId": "tower_drinks_1766154951837",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -275,7 +281,8 @@
       "descriptionTranslate": {
         "he": "סלט עלים ירוקים, תרד, עגבניות שרי, גבינת פטה, אגוזי מלך",
         "en": "Salad green leaves, spinach, cherry tomatoes, feta cheese, walnuts",
-        "ar": "سلطة أوراق خضراء, سبانخ, طماطم كرزية, جبنة فيتا, جوز"
+        "ar": "سلطة أوراق خضراء, سبانخ, طماطم كرزية, جبنة فيتا, جوز",
+        "ru": "Салат зеленые листья, шпинат, черри помидоры, сыр фета, грецкие орехи"
       },
       "oneLiner": null,
       "tags": [],
@@ -284,11 +291,12 @@
       "nameTranslate": {
         "he": "סלט ברזל",
         "en": "Iron Salad",
-        "ar": "سلطة الحديد"
+        "ar": "سلطة الحديد",
+        "ru": "Железный салат"
       },
       "groupMappings": [
         {
-          "groupId": "tower_drinks_1766154951837",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -336,7 +344,8 @@
       "descriptionTranslate": {
         "he": "סלט ירוק טרי, חסה, מלפפון, עגבנייה",
         "en": "Green Salad fresh, Lettuce, cucumber, Tomato",
-        "ar": "سلطة خضراء طازج, خس, خيار, طماطم"
+        "ar": "سلطة خضراء طازج, خس, خيار, طماطم",
+        "ru": "Зеленый салат свежий, Салат, огурец, Помидор"
       },
       "oneLiner": null,
       "tags": [],
@@ -345,7 +354,8 @@
       "nameTranslate": {
         "he": "סלט ירוק  תוספת",
         "en": "Green Salad Extra",
-        "ar": "سلطة خضراء إضافية"
+        "ar": "سلطة خضراء إضافية",
+        "ru": "Зеленый салат дополнительно"
       },
       "groupMappings": []
     },
@@ -358,7 +368,8 @@
       "descriptionTranslate": {
         "he": "תפוחי אדמה אפויים או מטוגנים",
         "en": "Potatoes baked or fried",
-        "ar": "بطاطا مخبوز أو مقلية"
+        "ar": "بطاطا مخبوز أو مقلية",
+        "ru": "Картофель запеченный или жареный"
       },
       "oneLiner": null,
       "tags": [],
@@ -367,7 +378,8 @@
       "nameTranslate": {
         "he": "תפוח אדמה",
         "en": "Potato",
-        "ar": "بطاطا"
+        "ar": "بطاطا",
+        "ru": "Картофель"
       },
       "groupMappings": []
     },
@@ -380,7 +392,8 @@
       "descriptionTranslate": {
         "he": "מים מינרליים",
         "en": "Mineral water",
-        "ar": "ماء معدني"
+        "ar": "ماء معدني",
+        "ru": "Минеральная вода"
       },
       "oneLiner": null,
       "tags": [],
@@ -389,7 +402,8 @@
       "nameTranslate": {
         "he": "מים",
         "en": "Water",
-        "ar": "ماء"
+        "ar": "ماء",
+        "ru": "Вода"
       },
       "groupMappings": []
     },
@@ -402,7 +416,8 @@
       "descriptionTranslate": {
         "he": "מים מוגזים (סודה)",
         "en": "Sparkling water (soda)",
-        "ar": "ماء فوار (صودا)"
+        "ar": "ماء فوار (صودا)",
+        "ru": "Газированная вода (содовая)"
       },
       "oneLiner": null,
       "tags": [],
@@ -411,7 +426,8 @@
       "nameTranslate": {
         "he": "מים מוגזים",
         "en": "Sparkling Water",
-        "ar": "ماء فوار"
+        "ar": "ماء فوار",
+        "ru": "Газированная вода"
       },
       "groupMappings": []
     },
@@ -424,7 +440,8 @@
       "descriptionTranslate": {
         "he": "קוקה קולה זירו",
         "en": "Coca Cola Zero",
-        "ar": "كوكا كولا زيرو"
+        "ar": "كوكا كولا زيرو",
+        "ru": "Кока-Кола Зеро"
       },
       "oneLiner": null,
       "tags": [],
@@ -433,7 +450,8 @@
       "nameTranslate": {
         "he": "קולה זירו",
         "en": "Cola Zero",
-        "ar": "كولا زيرو"
+        "ar": "كولا زيرو",
+        "ru": "Кола Зеро"
       },
       "groupMappings": []
     },
@@ -446,7 +464,8 @@
       "descriptionTranslate": {
         "he": "קוקה קולה קלאסית",
         "en": "Classic Coca Cola",
-        "ar": "كوكا كولا كلاسيكية"
+        "ar": "كوكا كولا كلاسيكية",
+        "ru": "Классическая Кока-Кола"
       },
       "oneLiner": null,
       "tags": [],
@@ -455,7 +474,8 @@
       "nameTranslate": {
         "he": "קוקה קולה",
         "en": "Coca Cola",
-        "ar": "كوكا كولا"
+        "ar": "كوكا كولا",
+        "ru": "Кока-Кола"
       },
       "groupMappings": []
     }
