@@ -381,6 +381,50 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       console.warn('[beecomm] Could not load metadata, using cartItem.id as dishId:', error.message);
     }
 
+    // Load beecomm menu to get topping names and costs
+    let beecommMenu = null;
+    try {
+      let menuPath;
+      if (process.env.MENU_PATH) {
+        // If MENU_PATH is absolute, use it as is; otherwise resolve relative to project root
+        menuPath = process.env.MENU_PATH.startsWith('/')
+          ? process.env.MENU_PATH
+          : join(__dirname, '..', process.env.MENU_PATH);
+      } else {
+        menuPath = join(__dirname, '..', 'menu', 'bcom_menu.json');
+      }
+      beecommMenu = JSON.parse(readFileSync(menuPath, 'utf8'));
+    } catch (error) {
+      console.warn('[beecomm] Could not load menu, topping names and costs may be missing:', error.message);
+    }
+
+    // Helper function to find topping info from menu
+    const findToppingInfo = (dishId, dishMenu) => {
+      if (!dishMenu || !dishMenu.deliveryMenu) return null;
+      
+      // Search through all categories, subCategories, and dishes
+      for (const category of dishMenu.deliveryMenu.categories || []) {
+        for (const subCategory of category.subCategories || []) {
+          for (const dish of subCategory.dishes || []) {
+            // Check if this dish has the topping we're looking for
+            for (const toppingGroup of dish.toppingGroups || []) {
+              for (const topping of toppingGroup.toppings || []) {
+                // Check by dishId (for variable toppings) or _id (for regular toppings)
+                if (topping.dishId === dishId || topping._id === dishId) {
+                  return {
+                    toppingId: topping._id,
+                    toppingName: topping.name || topping.kitchenName || '',
+                    additionalCost: topping.costAddition || 0,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+      return null;
+    };
+
     // Convert cartItems to Beecomm items format
     const items = cartItems.map((cartItem) => {
       // Calculate total price for this item
@@ -412,6 +456,8 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
             optionIds.forEach((optionId) => {
               // Try to find the actual Beecomm dishId for this option
               let beecommOptionDishId = optionId; // Default to optionId if mapping not found
+              let toppingName = '';
+              let additionalCost = 0;
               
               if (dishMapping && dishMapping.groupMappings) {
                 // Find the group mapping for this groupId
@@ -427,15 +473,33 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
                   
                   if (optionMapping && optionMapping.dishId) {
                     beecommOptionDishId = optionMapping.dishId;
+                    toppingName = optionMapping.kitchenName || optionMapping.optionId || '';
                     console.log(`[beecomm] Mapped option ${optionId} (group ${groupId}) to Beecomm dishId: ${beecommOptionDishId}`);
                   }
                 }
               }
               
-              toppings.push({
-                toppingGroupId: groupId,
-                toppingId: beecommOptionDishId, // Use mapped Beecomm dishId
-              });
+              // Try to get topping info from menu (name and cost)
+              const toppingInfo = findToppingInfo(beecommOptionDishId, beecommMenu);
+              if (toppingInfo) {
+                // Use info from menu if available (more accurate)
+                toppings.push({
+                  toppingId: toppingInfo.toppingId,
+                  toppingName: toppingInfo.toppingName,
+                  additionalCost: toppingInfo.additionalCost,
+                  quantity: 1, // Default quantity is 1
+                  // operator is optional, can be omitted
+                });
+              } else {
+                // Fallback: use metadata or defaults
+                toppings.push({
+                  toppingId: beecommOptionDishId,
+                  toppingName: toppingName || optionId, // Use mapped name or fallback to optionId
+                  additionalCost: 0, // Default to 0 if not found
+                  quantity: 1, // Default quantity is 1
+                  // operator is optional, can be omitted
+                });
+              }
             });
           }
         });

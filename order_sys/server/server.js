@@ -36,6 +36,7 @@ const isOrdersEnabled = (req) => {
   if (referer.includes('/test/bsr')) {
     return true;
   }
+  console.log(`isOrdersEnabled ${BSR_ORDERS_ENABLED} ${req.path}` );
   // Otherwise, respect the BSR_ORDERS_ENABLED environment variable
   return BSR_ORDERS_ENABLED;
 };
