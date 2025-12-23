@@ -26,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';
 
 // Helper function to check if orders should be enabled based on URL path
+// This is used for UI visibility control only, NOT for blocking order placement
 const isOrdersEnabled = (req) => {
   // If path starts with /test/, always enable orders (ignore env variable)
   if (req.path.startsWith('/test/')) {
@@ -41,27 +42,19 @@ const isOrdersEnabled = (req) => {
   return BSR_ORDERS_ENABLED;
 };
 
-// Middleware to block order endpoints when orders are disabled
-const checkOrdersEnabled = (req, res, next) => {
-  if (!isOrdersEnabled(req)) {
-    return res.status(503).json({
-      error: 'Orders are currently disabled',
-      message: 'The ordering system is temporarily unavailable. Please check back soon.',
-    });
-  }
-  next();
-};
-
-// API endpoint to check if orders are enabled (must be before middleware)
+// API endpoint to check if orders are enabled (for page-level UI control)
+// This is used by the frontend to show/hide ordering UI, but does NOT block actual order placement
 app.get('/api/orders-enabled', (req, res) => {
   res.json({ enabled: isOrdersEnabled(req) });
 });
 
-// Pelecard routes - block if orders disabled
-app.use('/pelecard', checkOrdersEnabled, pelecardRouter);
+// Pelecard routes - orders can always be placed regardless of BSR_ORDERS_ENABLED
+// BSR_ORDERS_ENABLED only controls UI visibility, not order processing
+app.use('/pelecard', pelecardRouter);
 
-// Beecomm routes - block if orders disabled
-app.use('/beecomm', checkOrdersEnabled, beecommRouter);
+// Beecomm routes - orders can always be placed regardless of BSR_ORDERS_ENABLED
+// BSR_ORDERS_ENABLED only controls UI visibility, not order processing
+app.use('/beecomm', beecommRouter);
 
 // Menu API routes (from beecomm module)
 app.use('/api', menuApiRouter);
