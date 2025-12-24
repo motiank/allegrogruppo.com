@@ -357,20 +357,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
 
     console.log('[beecomm] Retrieved order data from storage:', storedOrderData);
 
-    // Check if order push to Beecomm is enabled
-    const pushOrdersEnabled = BEECOMM_PUSH_ORDERS.toLowerCase() === 'true';
-    
-    if (!pushOrdersEnabled) {
-      console.log('[beecomm] Order push to Beecomm is disabled via BEECOMM_PUSH_ORDERS environment variable. Skipping order push.');
-      // Return success response to Pelecard even if we skip pushing to Beecomm
-      // since the payment transaction was successful
-      return res.status(200).json({
-        success: true,
-        skipped: true,
-        message: 'Order push to Beecomm is disabled',
-      });
-    }
-
+   
     // Get access token
     const accessToken = await getAccessToken();
 
@@ -643,6 +630,20 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
 
     console.log('[beecomm] beecommOrder pushed:', JSON.stringify(beecommOrder, '\t', 2));
     // Push order to Beecomm
+     // Check if order push to Beecomm is enabled
+    const pushOrdersEnabled = BEECOMM_PUSH_ORDERS.toLowerCase() === 'true';
+    
+    if (!pushOrdersEnabled) {
+      console.log('[beecomm] Order push to Beecomm is disabled via BEECOMM_PUSH_ORDERS environment variable. Skipping order push.');
+      // Return success response to Pelecard even if we skip pushing to Beecomm
+      // since the payment transaction was successful
+      return res.status(200).json({
+        success: true,
+        skipped: true,
+        message: 'Order push to Beecomm is disabled',
+      });
+    }
+
     const result = pushOrder(accessToken, beecommOrder);
 
     if (!result.result) {
