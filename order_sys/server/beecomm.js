@@ -400,6 +400,58 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       console.warn('[beecomm] Could not load menu, topping names and costs may be missing:', error.message);
     }
 
+    // Load meal options config to get prices for side dishes and drinks
+    let mealOptionsConfig = null;
+    try {
+      let mealOptionsPath;
+      if (process.env.MENU_PATH) {
+        // Extract the menu name from MENU_PATH (e.g., "menu/tower_menu.json" -> "tower")
+        const menuPath = process.env.MENU_PATH;
+        const menuName = menuPath.replace(/^.*\/(\w+)_menu\.json$/, '$1');
+        mealOptionsPath = join(__dirname, '..', 'menu', `${menuName}_menu.json`);
+      } else {
+        // Default to tower if MENU_PATH is not set
+        mealOptionsPath = join(__dirname, '..', 'menu', 'tower_menu.json');
+      }
+      mealOptionsConfig = JSON.parse(readFileSync(mealOptionsPath, 'utf8'));
+    } catch (error) {
+      console.warn('[beecomm] Could not load meal options config, side dish/drink prices may be missing:', error.message);
+    }
+
+    // Helper function to find option price from meal options config
+    const findOptionPriceFromConfig = (optionId, groupId, mealOptionsConfig, mealId = null) => {
+      if (!mealOptionsConfig) return null;
+      
+      // If mealId is provided, try that meal first (more efficient)
+      if (mealId && mealOptionsConfig[mealId]) {
+        const mealConfig = mealOptionsConfig[mealId];
+        if (mealConfig && mealConfig.groups) {
+          const group = mealConfig.groups.find(g => g.id === groupId);
+          if (group && group.options) {
+            const option = group.options.find(o => o.id === optionId);
+            if (option && option.price !== undefined) {
+              return typeof option.price === 'number' ? option.price : parseFloat(option.price) || 0;
+            }
+          }
+        }
+      }
+      
+      // Fallback: search through all meal configs (in case groupId is shared across meals)
+      for (const id in mealOptionsConfig) {
+        const mealConfig = mealOptionsConfig[id];
+        if (mealConfig && mealConfig.groups) {
+          const group = mealConfig.groups.find(g => g.id === groupId);
+          if (group && group.options) {
+            const option = group.options.find(o => o.id === optionId);
+            if (option && option.price !== undefined) {
+              return typeof option.price === 'number' ? option.price : parseFloat(option.price) || 0;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
     // Helper function to find dish info from menu by dishId
     const findDishInfo = (dishId, dishMenu) => {
       if (!dishMenu || !dishMenu.deliveryMenu) return null;
@@ -516,23 +568,30 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
 
               if (shouldBeSeparateItem) {
                 // This should be a separate item (side dish or drink)
-                // Find the dish price from menu
+                // Find the dish price - first try from meal options config, then from menu
                 let dishPrice = 0;
                 let dishName = kitchenName || optionId;
                 
-                const dishInfo = findDishInfo(beecommOptionDishId, beecommMenu);
-                if (dishInfo) {
-                  dishPrice = dishInfo.price;
-                  dishName = dishInfo.kitchenName || dishInfo.name;
+                // First, try to get price from meal options config (where side dishes/drinks prices are stored)
+                const optionPrice = findOptionPriceFromConfig(optionId, groupId, mealOptionsConfig, cartItem.id);
+                if (optionPrice !== null) {
+                  dishPrice = optionPrice;
+                  console.log(`[beecomm] Found price ${dishPrice} for option ${optionId} (group ${groupId}, meal ${cartItem.id}) from meal options config`);
                 } else {
-                  // If not found in menu, try to get name from metadata
-                  if (beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[beecommOptionDishId]) {
-                    const metadataDish = beecommMetadata.dishMappings[beecommOptionDishId];
-                    dishName = metadataDish.kitchenName || metadataDish.dishName || dishName;
+                  // Fallback: try to find in Beecomm menu
+                  const dishInfo = findDishInfo(beecommOptionDishId, beecommMenu);
+                  if (dishInfo) {
+                    dishPrice = dishInfo.price;
+                    dishName = dishInfo.kitchenName || dishInfo.name;
+                  } else {
+                    // If not found in menu, try to get name from metadata
+                    if (beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[beecommOptionDishId]) {
+                      const metadataDish = beecommMetadata.dishMappings[beecommOptionDishId];
+                      dishName = metadataDish.kitchenName || metadataDish.dishName || dishName;
+                    }
+                    // If still not found, price will be 0 (free item)
+                    console.warn(`[beecomm] Could not find price for option ${optionId} (dishId: ${beecommOptionDishId}), using price 0`);
                   }
-                  // For side dishes/drinks, price should be stored in the menu structure
-                  // If not found, price will be 0 (free item)
-                  console.warn(`[beecomm] Could not find dish info in menu for ${beecommOptionDishId}, using price 0`);
                 }
 
                 separateItems.push({
