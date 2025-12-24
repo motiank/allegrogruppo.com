@@ -552,7 +552,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     const beecommOrder = structureOrderForBeecomm(pelecardData, orderData);
     // console.log('[beecomm] beecommOrder data:', beecommOrder.orderInfo.payments);
 
-    console.log('[beecomm] beecommOrder:', beecommOrder);
+    console.log('[beecomm] beecommOrder pushed:', JSON.stringify(beecommOrder, '\t', 2));
     // Push order to Beecomm
     const result = {}; //await pushOrder(accessToken, beecommOrder);
 
