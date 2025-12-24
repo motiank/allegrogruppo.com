@@ -554,7 +554,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
 
     console.log('[beecomm] beecommOrder:', beecommOrder);
     // Push order to Beecomm
-    const result = await pushOrder(accessToken, beecommOrder);
+    const result = {}; //await pushOrder(accessToken, beecommOrder);
 
     if (!result.result) {
       console.error('[beecomm] pushOrder failed:', result);
