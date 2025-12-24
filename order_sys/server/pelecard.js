@@ -270,7 +270,7 @@ console.log('initPayload', initPayload);
         timestamp: new Date().toISOString(),
       };
       
-      console.log('orderInfo', orderInfo);
+      console.log('orderInfo', JSON.stringify(orderInfo, '\t', 2));
 
       // Store with orderId for retrieval via UserKey/ParamX
       orderStorage.set(`orderId:${orderId}`, orderInfo);

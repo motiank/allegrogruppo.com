@@ -1536,7 +1536,7 @@ const EataliaBSRPage = () => {
                   orderData={{
                     cartItems: cartItems.map((item) => ({
                       id: item.id,
-                      key: item.key,
+                      key: `${item.id}::${serializeSelections(item.selections || {})}`,
                       quantity: item.quantity,
                       selections: item.selections || {},
                       unitPrice: item.unitPrice || 0,
