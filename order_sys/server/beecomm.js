@@ -413,6 +413,29 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       console.warn('[beecomm] Could not load menu, topping names and costs may be missing:', error.message);
     }
 
+    // Helper function to find dish info from menu by dishId
+    const findDishInfo = (dishId, dishMenu) => {
+      if (!dishMenu || !dishMenu.deliveryMenu) return null;
+      
+      // Search through all categories, subCategories, and dishes
+      for (const category of dishMenu.deliveryMenu.categories || []) {
+        for (const subCategory of category.subCategories || []) {
+          for (const dish of subCategory.dishes || []) {
+            // Check if this is the dish we're looking for
+            if (dish.dishId === dishId || dish._id === dishId) {
+              return {
+                dishId: dish.dishId || dish._id,
+                name: dish.name || dish.kitchenName || '',
+                kitchenName: dish.kitchenName || dish.name || '',
+                price: typeof dish.price === 'number' ? dish.price : parseFloat(dish.price) || 0,
+              };
+            }
+          }
+        }
+      }
+      return null;
+    };
+
     // Helper function to find topping info from menu
     const findToppingInfo = (dishId, dishMenu) => {
       if (!dishMenu || !dishMenu.deliveryMenu) return null;
@@ -441,13 +464,11 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     };
 
     // Convert cartItems to Beecomm items format
-    const items = cartItems.map((cartItem) => {
-      // Calculate total price for this item
-      const unitPrice = cartItem.unitPrice || 0;
-      const totalPrice = unitPrice * (cartItem.quantity || 1);
-
+    // Separate side dishes and drinks into separate items instead of toppings
+    const allItems = [];
+    
+    cartItems.forEach((cartItem) => {
       // Get actual Beecomm dishId from metadata if available
-      // This is important for drinks and other items that use custom IDs
       let beecommDishId = cartItem.id;
       if (beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[cartItem.id]) {
         const dishMapping = beecommMetadata.dishMappings[cartItem.id];
@@ -457,22 +478,28 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
         }
       }
 
-      // Convert selections to toppings format
-      // Map optionIds to their actual Beecomm dishIds using metadata
-      const toppings = [];
-      if (cartItem.selections) {
-        // Get the dish mapping for this cart item to access groupMappings
-        const dishMapping = beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[cartItem.id]
-          ? beecommMetadata.dishMappings[cartItem.id]
-          : null;
+      // Get the dish mapping for this cart item to access groupMappings
+      const dishMapping = beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[cartItem.id]
+        ? beecommMetadata.dishMappings[cartItem.id]
+        : null;
 
+      // Separate selections into toppings vs separate items (side dishes/drinks)
+      const toppings = [];
+      const separateItems = []; // Side dishes and drinks that should be separate items
+
+      if (cartItem.selections) {
         Object.entries(cartItem.selections).forEach(([groupId, optionIds]) => {
           if (Array.isArray(optionIds)) {
+            // Check if this group is side dishes or drinks (groups with IDs starting with tower_side_dishes_ or tower_drinks_)
+            const isSideDishOrDrinkGroup = groupId.startsWith('tower_side_dishes_') || groupId.startsWith('tower_drinks_');
+            
             optionIds.forEach((optionId) => {
               // Try to find the actual Beecomm dishId for this option
-              let beecommOptionDishId = optionId; // Default to optionId if mapping not found
-              let toppingName = '';
-              let additionalCost = 0;
+              let beecommOptionDishId = optionId;
+              let optionMapping = null;
+              let isDish = false;
+              let isVariable = false;
+              let kitchenName = '';
               
               if (dishMapping && dishMapping.groupMappings) {
                 // Find the group mapping for this groupId
@@ -482,57 +509,104 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
                 
                 if (groupMapping && groupMapping.optionMappings) {
                   // Find the option mapping for this optionId
-                  const optionMapping = groupMapping.optionMappings.find(
+                  optionMapping = groupMapping.optionMappings.find(
                     om => om.optionId === optionId
                   );
                   
-                  if (optionMapping && optionMapping.dishId) {
-                    beecommOptionDishId = optionMapping.dishId;
-                    toppingName = optionMapping.kitchenName || optionMapping.optionId || '';
-                    console.log(`[beecomm] Mapped option ${optionId} (group ${groupId}) to Beecomm dishId: ${beecommOptionDishId}`);
+                  if (optionMapping) {
+                    beecommOptionDishId = optionMapping.dishId || optionId;
+                    kitchenName = optionMapping.kitchenName || optionId;
+                    isDish = optionMapping.isDish || false;
+                    isVariable = optionMapping.isVariable || false;
+                    console.log(`[beecomm] Mapped option ${optionId} (group ${groupId}) to Beecomm dishId: ${beecommOptionDishId}, isDish: ${isDish}, isVariable: ${isVariable}`);
                   }
                 }
               }
-              
-              // Try to get topping info from menu (name and cost)
-              const toppingInfo = findToppingInfo(beecommOptionDishId, beecommMenu);
-              if (toppingInfo) {
-                // Use info from menu if available (more accurate)
-                toppings.push({
-                  toppingId: toppingInfo.toppingId,
-                  toppingName: toppingInfo.toppingName,
-                  additionalCost: toppingInfo.additionalCost,
-                  quantity: 1, // Default quantity is 1
-                  // operator is optional, can be omitted
+
+              // Determine if this should be a separate item or a topping
+              // Separate item if: group is side dishes/drinks OR (isDish is true AND isVariable is false)
+              const shouldBeSeparateItem = isSideDishOrDrinkGroup || (isDish && !isVariable);
+
+              if (shouldBeSeparateItem) {
+                // This should be a separate item (side dish or drink)
+                // Find the dish price from menu
+                let dishPrice = 0;
+                let dishName = kitchenName || optionId;
+                
+                const dishInfo = findDishInfo(beecommOptionDishId, beecommMenu);
+                if (dishInfo) {
+                  dishPrice = dishInfo.price;
+                  dishName = dishInfo.kitchenName || dishInfo.name;
+                } else {
+                  // If not found in menu, try to get name from metadata
+                  if (beecommMetadata && beecommMetadata.dishMappings && beecommMetadata.dishMappings[beecommOptionDishId]) {
+                    const metadataDish = beecommMetadata.dishMappings[beecommOptionDishId];
+                    dishName = metadataDish.kitchenName || metadataDish.dishName || dishName;
+                  }
+                  // For side dishes/drinks, price should be stored in the menu structure
+                  // If not found, price will be 0 (free item)
+                  console.warn(`[beecomm] Could not find dish info in menu for ${beecommOptionDishId}, using price 0`);
+                }
+
+                separateItems.push({
+                  dishId: beecommOptionDishId,
+                  itemName: dishName,
+                  quantity: cartItem.quantity || 1,
+                  dishPrice: dishPrice,
+                  totalPrice: dishPrice * (cartItem.quantity || 1),
+                  isCombo: false,
+                  preparationComments: '',
+                  remarks: [],
+                  toppings: [],
+                  subItems: [],
                 });
               } else {
-                // Fallback: use metadata or defaults
-                toppings.push({
-                  toppingId: beecommOptionDishId,
-                  toppingName: toppingName || optionId, // Use mapped name or fallback to optionId
-                  additionalCost: 0, // Default to 0 if not found
-                  quantity: 1, // Default quantity is 1
-                  // operator is optional, can be omitted
-                });
+                // This is a topping
+                const toppingInfo = findToppingInfo(beecommOptionDishId, beecommMenu);
+                if (toppingInfo) {
+                  toppings.push({
+                    toppingId: toppingInfo.toppingId,
+                    toppingName: toppingInfo.toppingName,
+                    additionalCost: toppingInfo.additionalCost,
+                    quantity: 1,
+                  });
+                } else {
+                  // Fallback: use metadata or defaults
+                  toppings.push({
+                    toppingId: beecommOptionDishId,
+                    toppingName: kitchenName || optionId,
+                    additionalCost: 0,
+                    quantity: 1,
+                  });
+                }
               }
             });
           }
         });
       }
 
-      return {
-        dishId: beecommDishId, // Use actual Beecomm dishId from metadata
-        itemName: cartItem.name || cartItem.id, // Use name if available, fallback to ID
-        isCombo: false, // Set based on your menu structure
+      // Create main dish item with basePrice (not unitPrice which includes options)
+      const basePrice = cartItem.basePrice || 0;
+      const mainDishItem = {
+        dishId: beecommDishId,
+        itemName: cartItem.name || cartItem.id,
+        isCombo: false,
         quantity: cartItem.quantity || 1,
-        dishPrice: unitPrice,
-        totalPrice: totalPrice,
-        preparationComments: '', // Can be added from cartItem if available
+        dishPrice: basePrice, // Use basePrice instead of unitPrice
+        totalPrice: basePrice * (cartItem.quantity || 1),
+        preparationComments: '',
         remarks: [],
-        toppings: toppings,
-        subItems: [], // For combo items
+        toppings: toppings, // Only actual toppings, not side dishes/drinks
+        subItems: [],
       };
+
+      allItems.push(mainDishItem);
+      
+      // Add separate items for side dishes and drinks
+      allItems.push(...separateItems);
     });
+
+    const items = allItems;
 
     // Use stored order data, merging with any additional data from Pelecard
     const orderData = {
