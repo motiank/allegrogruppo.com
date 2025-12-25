@@ -4,7 +4,7 @@ import Login from './Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import LiveOrders from './pages/LiveOrders';
-import Analytics from './pages/Analytics';
+import Analytics from './pages/analytics/index.js';
 import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {

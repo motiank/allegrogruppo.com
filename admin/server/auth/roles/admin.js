@@ -2,6 +2,7 @@ import express from "express";
 
 import { Router as dashboard } from "../../modules/dashboard.js";
 import { Router as orders } from "../../modules/orders.js";
+import  allegro from "../../modules/allegro.js";
 
 const api = function () {
   var admin = express.Router();
@@ -16,7 +17,7 @@ const api = function () {
 
   admin.use("/dashboard", dashboard());
   admin.use("/orders", orders());
-  
+  admin.use("/allegro", allegro());
   return admin;
 };
 
