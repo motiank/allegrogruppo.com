@@ -6,8 +6,13 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables from .env or .envtest depending on NODE_ENV
-const envFileName = process.env.NODE_ENV === 'test' ? '.envtest' : '.env';
+// Load environment variables from .env, .env_qa, or .envtest depending on command line args and NODE_ENV
+let envFileName = '.env';
+if (process.argv.includes('qa')) {
+  envFileName = '.env_qa';
+} else if (process.env.NODE_ENV === 'test') {
+  envFileName = '.envtest';
+}
 dotenv.config({ path: join(__dirname, '../..', envFileName) });
 
 // Import routers after env variables are loaded
