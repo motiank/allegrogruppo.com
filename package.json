@@ -7,6 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node order_sys/server/server.js",
+    "qa": "node order_sys/server/server.js qa",
     "start:test": "NODE_ENV=test node order_sys/server/server.js",
     "admin": "node admin/server/server.js",
     "adminDev": "ADMIN_PORT=3021 NODE_ENV=development node admin/server/server.js",
