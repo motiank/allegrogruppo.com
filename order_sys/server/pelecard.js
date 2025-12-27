@@ -1,5 +1,6 @@
 import express from 'express';
 import { executeSql } from './sources/dbpool.js';
+import { areOrdersEnabled, getStatusMessage, notifyAdmin } from './orderState.js';
 
 const router = express.Router();
 
@@ -130,6 +131,18 @@ function extractIframeUrl(resultData = {}) {
 
 router.post('/get-iframe-url', async (req, res) => {
     console.log('[pelecard] Getting iframe URL:', req.body);
+  
+  // Check if orders are enabled (block if shutdown or postponed)
+  if (!areOrdersEnabled()) {
+    const lang = (req.body.language || 'HE').toLowerCase().slice(0, 2);
+    const statusMessage = getStatusMessage(lang);
+    return res.status(503).json({
+      error: 'Orders are currently unavailable',
+      statusMessage: statusMessage,
+      state: 'unavailable'
+    });
+  }
+  
   const {
     orderId,
     total,
@@ -325,6 +338,18 @@ console.log('initPayload', initPayload);
 
         await executeSql(insertQuery, insertParams);
         console.log('[pelecard] Order inserted into database:', orderId);
+        
+        // Notify admin service about new order (async, don't wait)
+        notifyAdmin({
+          orderId: `${orderId}`,
+          total: orderTotal,
+          currency: `${currency}`,
+          customer_name: customerName,
+          phone: phone,
+          timestamp: new Date().toISOString()
+        }).catch(err => {
+          console.error('[pelecard] Failed to notify admin (non-blocking):', err);
+        });
       } catch (dbError) {
         // Log error but don't fail the request - order is still stored in memory
         console.error('[pelecard] Failed to insert order into database:', dbError);

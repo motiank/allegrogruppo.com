@@ -24,6 +24,7 @@ const gateKeeper = authModule.gateKeeper;
 const cookieSessionStorage = authModule.cookieSessionStorage;
 const managementModule = await import('./auth/management.js');
 const managementRouter = managementModule.default;
+const { Router: orderSystemRouter } = await import('./modules/orderSystem.js');
 
 const app = express();
 const PORT = process.env.ADMIN_PORT || 3021;
@@ -57,6 +58,9 @@ app.use('/auth', authRouter(passport));
 
 // Protected admin routes - require authentication
 app.use('/admin', gateKeeper, managementRouter);
+
+// Order system control routes (also protected)
+app.use('/admin/order-system', gateKeeper, orderSystemRouter());
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -168,17 +168,22 @@ const ChefIcon = ({ className }) => (
   </svg>
 );
 
-export const ComingSoon = () => {
+export const ComingSoon = ({ statusMessage, state }) => {
   const classes = useStyles();
   const { t } = useTranslation();
+
+  // Use custom status message if provided, otherwise use default translations
+  const title = statusMessage?.title || t('comingSoon.title');
+  const message = statusMessage?.message || t('comingSoon.message');
+  const subtitle = state === 'postponed' ? '' : (statusMessage?.subtitle || t('comingSoon.subtitle'));
 
   return (
     <div className={classes.container}>
       <div className={classes.content}>
         <ChefIcon className={classes.chefIcon} />
-        <h1 className={classes.title}>{t('comingSoon.title')}</h1>
-        <p className={classes.message}>{t('comingSoon.message')}</p>
-        <p className={classes.subtitle}>{t('comingSoon.subtitle')}</p>
+        <h1 className={classes.title}>{title}</h1>
+        <p className={classes.message}>{message}</p>
+        {subtitle && <p className={classes.subtitle}>{subtitle}</p>}
       </div>
     </div>
   );

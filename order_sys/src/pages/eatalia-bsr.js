@@ -604,28 +604,39 @@ const EataliaBSRPage = () => {
   const [dynamicMeals, setDynamicMeals] = useState([]);
   const [dishImagesMap, setDishImagesMap] = useState({});
   const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
+  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'postponed'
+  const [statusMessage, setStatusMessage] = useState(null); // Status message object with title and message
   
   // Check if orders are enabled
   useEffect(() => {
     const checkOrdersEnabled = async () => {
       try {
-        const response = await fetch('/api/orders-enabled');
+        const lang = i18n.language || 'he';
+        const response = await fetch(`/api/orders-enabled?lang=${lang}`);
         if (response.ok) {
           const data = await response.json();
           setOrdersEnabled(data.enabled);
+          setOrderSystemState(data.state || null);
+          setStatusMessage(data.statusMessage || null);
         } else {
           // If endpoint fails, assume disabled for safety
           setOrdersEnabled(false);
+          setOrderSystemState('shutdown');
         }
       } catch (error) {
         console.error('Error checking orders status:', error);
         // If check fails, assume disabled for safety
         setOrdersEnabled(false);
+        setOrderSystemState('shutdown');
       }
     };
     
     checkOrdersEnabled();
-  }, []);
+    
+    // Poll for state changes every 30 seconds
+    const interval = setInterval(checkOrdersEnabled, 30000);
+    return () => clearInterval(interval);
+  }, [i18n.language]);
   
   // Load dish images map from public folder
   useEffect(() => {
@@ -1181,7 +1192,7 @@ const EataliaBSRPage = () => {
 
   // Show coming soon page if orders are disabled
   if (ordersEnabled === false) {
-    return <ComingSoon />;
+    return <ComingSoon statusMessage={statusMessage} state={orderSystemState} />;
   }
   
   // Show loading state while checking

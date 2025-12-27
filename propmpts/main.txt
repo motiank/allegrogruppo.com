@@ -185,3 +185,16 @@ I want to create a new menu file from the bc_sandbox_menu.json under the prompts
  and only then Iframe url should be set. once pelecard call our server  (the ServerSideGoodFeedbackURL )
  the order info should be extracted from the map and construct the beecom push order payload. 
  Then use the push order beecom api
+
+
+
+
+ I would like to build the dashboard in the admin. 
+ the dashboard show the live status of today (in qa - lastweek) .
+  the data that should be display is : count of orders , income , average order price,
+   kanban of :  orders ,  in prepration, in delivry , losed order .  
+   each box in the kanbhan should display the name and order number  ( that customer recieved from the beecom) ,  
+   the dshborad is interactive - so order can be drag from one column to the left or right coloumn.
+    when dragged the order status should be updated in the data base.  
+    through the dahboard the admin can postpond the system for 15 min - or shut it down .  
+    when it is postpond the order system should display a page that says  something like we are under load and in order to maintain  a good service .. we will back in [timer clock].

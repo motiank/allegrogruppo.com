@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import LiveOrders from './pages/LiveOrders';
 import Analytics from './pages/analytics/index.js';
+import OrderSystemControl from './pages/OrderSystemControl';
 import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {
@@ -115,6 +116,16 @@ const App = () => {
             <ProtectedRoute>
               <Layout>
                 <Analytics />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order-system"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <OrderSystemControl />
               </Layout>
             </ProtectedRoute>
           }

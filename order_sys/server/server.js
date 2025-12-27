@@ -19,6 +19,7 @@ dotenv.config({ path: join(__dirname, '../..', envFileName) });
 const { default: pelecardRouter } = await import('./pelecard.js');
 const { default: beecommRouter, menuApiRouter } = await import('./beecomm.js');
 const { default: analyticsRouter } = await import('./analytics.js');
+const { getState, areOrdersEnabled, getStatusMessage, verifyAuthToken, updateState } = await import('./orderState.js');
 
 const app = express();
 const PORT = process.env.PORT || 3020;
@@ -27,7 +28,7 @@ const PORT = process.env.PORT || 3020;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Check if orders are enabled
+// Check if orders are enabled (legacy env variable support)
 const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';
 
 // Helper function to check if orders should be enabled based on URL path
@@ -48,9 +49,53 @@ const isOrdersEnabled = (req) => {
 };
 
 // API endpoint to check if orders are enabled (for page-level UI control)
-// This is used by the frontend to show/hide ordering UI, but does NOT block actual order placement
+// This now checks both legacy env variable and order system state
 app.get('/api/orders-enabled', (req, res) => {
-  res.json({ enabled: isOrdersEnabled(req) });
+  const legacyEnabled = isOrdersEnabled(req);
+  const stateEnabled = areOrdersEnabled();
+  const enabled = legacyEnabled && stateEnabled;
+  
+  // Get status message if disabled
+  let statusMessage = null;
+  if (!stateEnabled) {
+    const language = req.query.lang || req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'he';
+    statusMessage = getStatusMessage(language);
+  }
+  
+  res.json({ 
+    enabled: enabled,
+    state: getState().state,
+    statusMessage: statusMessage
+  });
+});
+
+// API endpoint to get order system state (for admin)
+app.get('/api/order-state', (req, res) => {
+  const authToken = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+  
+  if (!verifyAuthToken(authToken)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  res.json(getState());
+});
+
+// API endpoint to update order system state (for admin)
+app.post('/api/order-state', (req, res) => {
+  const authToken = req.headers.authorization?.replace('Bearer ', '') || req.body.token;
+  const { state, updatedBy } = req.body;
+  
+  if (!state) {
+    return res.status(400).json({ error: 'State parameter is required' });
+  }
+  
+  const result = updateState(state, authToken, updatedBy || 'admin');
+  
+  if (!result.success) {
+    return res.status(result.error === 'Unauthorized: Invalid authentication token' ? 401 : 400).json(result);
+  }
+  
+  res.json(result);
 });
 
 // Pelecard routes - orders can always be placed regardless of BSR_ORDERS_ENABLED
