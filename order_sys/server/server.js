@@ -35,17 +35,8 @@ const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';
 // Helper function to check if orders should be enabled based on URL path
 // This is used for UI visibility control only, NOT for blocking order placement
 const isOrdersEnabled = (req) => {
-  // If path starts with /test/, always enable orders (ignore env variable)
-  if (req.path.startsWith('/test/')) {
-    return true;
-  }
-  // Check referer header to see if request came from /test/bsr
-  const referer = req.get('referer') || req.get('referrer') || '';
-  if (referer.includes('/test/bsr')) {
-    return true;
-  }
   console.log(`isOrdersEnabled ${BSR_ORDERS_ENABLED} ${req.path}` );
-  // Otherwise, respect the BSR_ORDERS_ENABLED environment variable
+  // Respect the BSR_ORDERS_ENABLED environment variable
   return BSR_ORDERS_ENABLED;
 };
 
@@ -132,15 +123,9 @@ app.get('*', (req, res) => {
   const isBSRClientRoute = bsrClientRoutes.some(route => req.path === route || req.path.startsWith(route + '/'));
   
   // BSR entry points
-  const isBSREntry = req.path === '/bsr' || req.path === '/test/bsr' || 
-                     req.path === '/eatalia-bsr.html' || req.path.startsWith('/test/bsr/');
+  const isBSREntry = req.path === '/bsr' || req.path === '/eatalia-bsr.html';
   
-  // Test routes for BSR client-side navigation
-  const isTestBSRRoute = req.path.startsWith('/test/welcome') || req.path.startsWith('/test/cart') ||
-                         req.path.startsWith('/test/meal') || req.path.startsWith('/test/location') ||
-                         req.path.startsWith('/test/payment') || req.path.startsWith('/test/thankYou');
-  
-  if (isBSRClientRoute || isBSREntry || isTestBSRRoute) {
+  if (isBSRClientRoute || isBSREntry) {
     return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
   }
   res.sendFile(join(__dirname, '../../dist/site-index.html'));

@@ -511,20 +511,14 @@ const EataliaBSRPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Detect base path: /bsr or /test/bsr
+  // Detect base path: /bsr
   const getBasePath = () => {
     const pathname = location.pathname;
-    if (pathname.startsWith('/test/bsr')) {
-      return '/test/bsr';
-    }
     if (pathname.startsWith('/bsr')) {
       return '/bsr';
     }
     // Fallback: try to detect from pathname segments
     const segments = pathname.split('/').filter(Boolean);
-    if (segments.length >= 2 && segments[0] === 'test' && segments[1] === 'bsr') {
-      return '/test/bsr';
-    }
     if (segments.length >= 1 && segments[0] === 'bsr') {
       return '/bsr';
     }
