@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const OrderSystemWidget = () => {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   // Fetch current state on mount
   useEffect(() => {
@@ -111,21 +109,6 @@ const OrderSystemWidget = () => {
     <div style={styles.widget}>
       <div style={styles.header}>
         <h2 style={styles.title}>Order System Control</h2>
-        <button
-          onClick={() => navigate('/order-system')}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = '#007bff';
-            e.target.style.color = '#fff';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = 'transparent';
-            e.target.style.color = '#007bff';
-          }}
-          style={styles.viewAllButton}
-          title="View full control panel"
-        >
-          View All →
-        </button>
       </div>
 
       {error && (
@@ -255,16 +238,6 @@ const styles = {
     fontWeight: '600',
     color: '#333',
     margin: 0,
-  },
-  viewAllButton: {
-    padding: '6px 12px',
-    backgroundColor: 'transparent',
-    border: '1px solid #007bff',
-    borderRadius: '4px',
-    color: '#007bff',
-    cursor: 'pointer',
-    fontSize: '0.875rem',
-    transition: 'all 0.2s',
   },
   loading: {
     textAlign: 'center',

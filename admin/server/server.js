@@ -15,6 +15,7 @@ if (process.argv.includes('qa')) {
 } else if (process.env.NODE_ENV === 'test') {
   envFileName = '.envtest';
 }
+console.log('[order_sys] envFileName:', envFileName);
 dotenv.config({ path: join(__dirname, '../..', envFileName) });
 
 // Import routers after env variables are loaded

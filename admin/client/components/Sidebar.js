@@ -9,7 +9,6 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/orders', label: 'Live Orders' },
     { path: '/analytics', label: 'Analytics' },
-    { path: '/order-system', label: 'Order System Control' },
   ];
 
   const handleNavigation = (path) => {

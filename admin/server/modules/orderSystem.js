@@ -6,7 +6,7 @@ import { Router as r404 } from './r404.js';
  * Allows admin to control the order system state (active, shutdown, postponed)
  */
 
-const ORDER_SYSTEM_URL = process.env.ORDER_SYSTEM_URL || 'http://localhost:3020';
+const ORDER_SYSTEM_URL = process.env.ORDER_SYSTEM_URL;
 const ORDER_SYSTEM_SECRET = process.env.ORDER_SYSTEM_SECRET || process.env.ADMIN_SECRET || 'change-me-in-production';
 
 /**
@@ -24,12 +24,15 @@ function verifyAuthToken(token) {
  */
 async function getOrderSystemState(req, res) {
   try {
-    const response = await globalThis.fetch(`${ORDER_SYSTEM_URL}/api/order-state?token=${ORDER_SYSTEM_SECRET}`, {
+    const url = `${ORDER_SYSTEM_URL}/api/order-state?token=${ORDER_SYSTEM_SECRET}`;
+    // console.log('[orderSystem] URL:', url);
+    const response = await globalThis.fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
       }
     });
+    // console.log('[orderSystem] Response:', response);
 
     if (!response.ok) {
       return res.status(response.status).json({

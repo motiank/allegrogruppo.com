@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { validateTransaction, getOrderData } from './pelecard.js';
+import { executeSql } from './sources/dbpool.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -703,7 +704,7 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
       });
     }
 
-    const result =await pushOrder(accessToken, beecommOrder);
+    const result = await pushOrder(accessToken, beecommOrder);
 
     if (!result.result) {
       console.error('[beecomm] pushOrder failed:', result);
@@ -715,6 +716,40 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
     }
 
     console.log('[beecomm] Order pushed successfully:', result.orderNumber);
+
+    // Update order in database with beecom orderNumber
+    try {
+      const orderId = pelecardData.ParamX || pelecardData.UserKey;
+      if (orderId && result.orderNumber) {
+        // Get current orderData, add beecomOrderNumber, then update
+        const getOrderQuery = `SELECT orderData FROM orders WHERE orderId = :orderId`;
+        const getOrderResult = await executeSql(getOrderQuery, { orderId });
+        
+        if (getOrderResult && getOrderResult[0] && getOrderResult[0].length > 0) {
+          const currentOrderData = getOrderResult[0][0].orderData;
+          let orderDataObj = typeof currentOrderData === 'string' 
+            ? JSON.parse(currentOrderData) 
+            : currentOrderData;
+          
+          // Add beecomOrderNumber to orderData
+          orderDataObj.beecomOrderNumber = result.orderNumber;
+          
+          const updateQuery = `
+            UPDATE orders 
+            SET orderData = :orderData, updated_at = CURRENT_TIMESTAMP
+            WHERE orderId = :orderId
+          `;
+          await executeSql(updateQuery, { 
+            orderId, 
+            orderData: JSON.stringify(orderDataObj) 
+          });
+          console.log('[beecomm] Updated order with beecom orderNumber:', result.orderNumber);
+        }
+      }
+    } catch (updateError) {
+      console.error('[beecomm] Error updating order with beecom orderNumber:', updateError);
+      // Don't fail the request if update fails
+    }
 
     // Return success response to Pelecard
     res.status(200).json({
