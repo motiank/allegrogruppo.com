@@ -5,8 +5,10 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const LiveOrders = () => {
+  const { theme } = useTheme();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -103,6 +105,236 @@ const LiveOrders = () => {
     });
   };
 
+  const getStyles = () => ({
+    container: {
+      maxWidth: '1400px',
+      margin: '0 auto',
+      padding: '20px',
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '20px',
+      flexWrap: 'wrap',
+      gap: '20px',
+    },
+    title: {
+      fontSize: '2rem',
+      fontWeight: '600',
+      color: theme.text,
+      margin: 0,
+    },
+    filters: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '20px',
+      flexWrap: 'wrap',
+    },
+    filterGroup: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+    },
+    filterLabel: {
+      fontWeight: '500',
+      color: theme.textSecondary,
+    },
+    filterInput: {
+      padding: '8px 12px',
+      border: `1px solid ${theme.border}`,
+      borderRadius: '4px',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      backgroundColor: theme.surface,
+      color: theme.text,
+    },
+    error: {
+      backgroundColor: theme.errorBg,
+      color: theme.error,
+      padding: '12px',
+      borderRadius: '4px',
+      marginBottom: '20px',
+      border: `1px solid ${theme.errorBorder}`,
+    },
+    tableContainer: {
+      backgroundColor: theme.surface,
+      borderRadius: '8px',
+      boxShadow: `0 2px 4px ${theme.shadow}`,
+      overflow: 'hidden',
+      border: `1px solid ${theme.border}`,
+    },
+    loading: {
+      padding: '40px',
+      textAlign: 'center',
+      color: theme.textSecondary,
+    },
+    empty: {
+      padding: '40px',
+      textAlign: 'center',
+      color: theme.textTertiary,
+    },
+    table: {
+      width: '100%',
+      borderCollapse: 'collapse',
+    },
+    tableHeaderRow: {
+      backgroundColor: theme.surfaceSecondary,
+      borderBottom: `2px solid ${theme.border}`,
+    },
+    tableHeader: {
+      padding: '12px 16px',
+      textAlign: 'left',
+      fontWeight: '600',
+      color: theme.text,
+      fontSize: '14px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+    },
+    tableRow: {
+      borderBottom: `1px solid ${theme.borderLight}`,
+      transition: 'background-color 0.2s',
+    },
+    tableRowHover: {
+      backgroundColor: theme.hover,
+    },
+    tableCell: {
+      padding: '12px 16px',
+      fontSize: '14px',
+      color: theme.textSecondary,
+    },
+    orderIdCell: {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: theme.info,
+    },
+    statusSelect: {
+      padding: '6px 10px',
+      border: `1px solid ${theme.border}`,
+      borderRadius: '4px',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      backgroundColor: theme.surface,
+      color: theme.text,
+      minWidth: '120px',
+    },
+    infoButton: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      color: theme.info,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '4px',
+      transition: 'background-color 0.2s',
+    },
+    infoButtonHover: {
+      backgroundColor: theme.activeBg,
+    },
+    modalOverlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.mode === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+    },
+    modalContent: {
+      backgroundColor: theme.surface,
+      borderRadius: '8px',
+      boxShadow: `0 4px 20px ${theme.shadow}`,
+      maxWidth: '800px',
+      width: '100%',
+      maxHeight: '90vh',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      border: `1px solid ${theme.border}`,
+    },
+    modalHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '20px',
+      borderBottom: `1px solid ${theme.border}`,
+    },
+    modalTitle: {
+      margin: 0,
+      fontSize: '1.5rem',
+      fontWeight: '600',
+      color: theme.text,
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      fontSize: '32px',
+      cursor: 'pointer',
+      color: theme.textSecondary,
+      lineHeight: '1',
+      padding: '0',
+      width: '32px',
+      height: '32px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: '4px',
+      transition: 'background-color 0.2s',
+    },
+    closeButtonHover: {
+      backgroundColor: theme.hover,
+      color: theme.text,
+    },
+    modalBody: {
+      padding: '20px',
+      overflowY: 'auto',
+      flex: 1,
+    },
+    detailsSection: {
+      marginBottom: '30px',
+    },
+    sectionTitle: {
+      fontSize: '1.1rem',
+      fontWeight: '600',
+      color: theme.text,
+      marginBottom: '15px',
+      paddingBottom: '10px',
+      borderBottom: `2px solid ${theme.border}`,
+    },
+    detailsGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+      gap: '15px',
+    },
+    detailItem: {
+      fontSize: '14px',
+      color: theme.textSecondary,
+      lineHeight: '1.6',
+    },
+    orderData: {
+      backgroundColor: theme.surfaceSecondary,
+      padding: '15px',
+      borderRadius: '4px',
+      overflow: 'auto',
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      lineHeight: '1.5',
+      maxHeight: '400px',
+      margin: 0,
+      color: theme.text,
+      border: `1px solid ${theme.border}`,
+    },
+  });
+
+  const styles = getStyles();
+
   // Define columns
   const columns = useMemo(
     () => {
@@ -171,6 +403,12 @@ const LiveOrders = () => {
         cell: (info) => (
           <button
             onClick={() => handleInfoClick(info.row.original)}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = theme.activeBg;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
             style={styles.infoButton}
             title="View details"
           >
@@ -283,7 +521,16 @@ const LiveOrders = () => {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} style={styles.tableRow}>
+                <tr 
+                  key={row.id} 
+                  style={styles.tableRow}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = theme.hover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} style={styles.tableCell}>
                       {flexRender(
@@ -308,7 +555,18 @@ const LiveOrders = () => {
           >
             <div style={styles.modalHeader}>
               <h2 style={styles.modalTitle}>Order Details</h2>
-              <button onClick={closeModal} style={styles.closeButton}>
+              <button 
+                onClick={closeModal} 
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = theme.hover;
+                  e.target.style.color = theme.text;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = theme.textSecondary;
+                }}
+                style={styles.closeButton}
+              >
                 ×
               </button>
             </div>
@@ -354,228 +612,6 @@ const LiveOrders = () => {
       )}
     </div>
   );
-};
-
-const styles = {
-  container: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '20px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    gap: '20px',
-  },
-  title: {
-    fontSize: '2rem',
-    fontWeight: '600',
-    color: '#333',
-    margin: 0,
-  },
-  filters: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-    flexWrap: 'wrap',
-  },
-  filterGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-  },
-  filterLabel: {
-    fontWeight: '500',
-    color: '#555',
-  },
-  filterInput: {
-    padding: '8px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'inherit',
-  },
-  error: {
-    backgroundColor: '#fee',
-    color: '#c33',
-    padding: '12px',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    border: '1px solid #fcc',
-  },
-  tableContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    overflow: 'hidden',
-  },
-  loading: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#666',
-  },
-  empty: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#999',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  tableHeaderRow: {
-    backgroundColor: '#f5f5f5',
-    borderBottom: '2px solid #ddd',
-  },
-  tableHeader: {
-    padding: '12px 16px',
-    textAlign: 'left',
-    fontWeight: '600',
-    color: '#333',
-    fontSize: '14px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  tableRow: {
-    borderBottom: '1px solid #eee',
-    transition: 'background-color 0.2s',
-  },
-  tableRowHover: {
-    backgroundColor: '#f9f9f9',
-  },
-  tableCell: {
-    padding: '12px 16px',
-    fontSize: '14px',
-    color: '#555',
-  },
-  orderIdCell: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
-    color: '#0066cc',
-  },
-  statusSelect: {
-    padding: '6px 10px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'inherit',
-    cursor: 'pointer',
-    backgroundColor: '#fff',
-    minWidth: '120px',
-  },
-  infoButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    color: '#0066cc',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '4px',
-    transition: 'background-color 0.2s',
-  },
-  infoButtonHover: {
-    backgroundColor: '#e6f2ff',
-  },
-  // Modal styles
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-    maxWidth: '800px',
-    width: '100%',
-    maxHeight: '90vh',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    borderBottom: '1px solid #eee',
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: '1.5rem',
-    fontWeight: '600',
-    color: '#333',
-  },
-  closeButton: {
-    background: 'none',
-    border: 'none',
-    fontSize: '32px',
-    cursor: 'pointer',
-    color: '#999',
-    lineHeight: '1',
-    padding: '0',
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '4px',
-    transition: 'background-color 0.2s',
-  },
-  closeButtonHover: {
-    backgroundColor: '#f5f5f5',
-    color: '#333',
-  },
-  modalBody: {
-    padding: '20px',
-    overflowY: 'auto',
-    flex: 1,
-  },
-  detailsSection: {
-    marginBottom: '30px',
-  },
-  sectionTitle: {
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '15px',
-    paddingBottom: '10px',
-    borderBottom: '2px solid #eee',
-  },
-  detailsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '15px',
-  },
-  detailItem: {
-    fontSize: '14px',
-    color: '#555',
-    lineHeight: '1.6',
-  },
-  orderData: {
-    backgroundColor: '#f5f5f5',
-    padding: '15px',
-    borderRadius: '4px',
-    overflow: 'auto',
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    lineHeight: '1.5',
-    maxHeight: '400px',
-    margin: 0,
-  },
 };
 
 export default LiveOrders;

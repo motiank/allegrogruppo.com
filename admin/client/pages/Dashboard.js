@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import OrderSystemWidget from '../components/OrderSystemWidget';
+import { useTheme } from '../context/ThemeContext';
 
 const Dashboard = () => {
+  const { theme } = useTheme();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -119,6 +121,160 @@ const Dashboard = () => {
     { id: 'closed', title: 'Closed Orders', color: '#9b9b9b' },
   ];
 
+  const getStyles = () => ({
+    container: {
+      maxWidth: '1600px',
+      margin: '0 auto',
+      padding: '20px',
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: '30px',
+      flexWrap: 'wrap',
+      gap: '20px',
+    },
+    title: {
+      fontSize: '2rem',
+      fontWeight: '600',
+      color: theme.text,
+      margin: 0,
+      marginBottom: '8px',
+    },
+    dateInfo: {
+      fontSize: '0.9rem',
+      color: theme.textSecondary,
+      fontStyle: 'italic',
+    },
+    error: {
+      backgroundColor: theme.errorBg,
+      color: theme.error,
+      padding: '12px',
+      borderRadius: '4px',
+      marginBottom: '20px',
+      border: `1px solid ${theme.errorBorder}`,
+    },
+    loading: {
+      padding: '40px',
+      textAlign: 'center',
+      color: theme.textSecondary,
+      fontSize: '1.1rem',
+    },
+    empty: {
+      padding: '40px',
+      textAlign: 'center',
+      color: theme.textTertiary,
+    },
+    statsContainer: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '20px',
+      marginBottom: '30px',
+    },
+    statCard: {
+      backgroundColor: theme.surface,
+      padding: '24px',
+      borderRadius: '8px',
+      boxShadow: `0 2px 4px ${theme.shadow}`,
+      textAlign: 'center',
+      border: `1px solid ${theme.border}`,
+    },
+    statValue: {
+      fontSize: '2rem',
+      fontWeight: '600',
+      color: theme.text,
+      marginBottom: '8px',
+    },
+    statLabel: {
+      fontSize: '0.9rem',
+      color: theme.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+    },
+    kanbanContainer: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '20px',
+      marginTop: '20px',
+    },
+    kanbanColumn: {
+      backgroundColor: theme.surfaceSecondary,
+      borderRadius: '8px',
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '400px',
+      border: `2px solid ${theme.border}`,
+      transition: 'border-color 0.2s, background-color 0.2s',
+    },
+    kanbanColumnDraggedOver: {
+      borderColor: theme.primary,
+      backgroundColor: theme.mode === 'dark' ? '#1a237e' : '#e8f4fd',
+    },
+    kanbanColumnHeader: {
+      padding: '16px',
+      borderTop: '4px solid #4a90e2',
+      borderRadius: '8px 8px 0 0',
+      backgroundColor: theme.surface,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottom: `1px solid ${theme.border}`,
+    },
+    kanbanColumnTitle: {
+      margin: 0,
+      fontSize: '1.1rem',
+      fontWeight: '600',
+      color: theme.text,
+    },
+    kanbanColumnCount: {
+      fontSize: '0.9rem',
+      color: theme.textSecondary,
+      backgroundColor: theme.hover,
+      padding: '4px 8px',
+      borderRadius: '12px',
+    },
+    kanbanColumnContent: {
+      flex: 1,
+      padding: '12px',
+      overflowY: 'auto',
+    },
+    kanbanCard: {
+      backgroundColor: theme.surface,
+      padding: '12px',
+      borderRadius: '6px',
+      marginBottom: '10px',
+      cursor: 'move',
+      boxShadow: `0 1px 3px ${theme.shadow}`,
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      userSelect: 'none',
+      border: `1px solid ${theme.border}`,
+    },
+    kanbanCardDragging: {
+      opacity: 0.5,
+      transform: 'rotate(5deg)',
+    },
+    kanbanCardName: {
+      fontSize: '0.95rem',
+      fontWeight: '500',
+      color: theme.text,
+      marginBottom: '4px',
+    },
+    kanbanCardOrderNumber: {
+      fontSize: '0.85rem',
+      color: theme.textSecondary,
+      fontFamily: 'monospace',
+    },
+    kanbanEmpty: {
+      textAlign: 'center',
+      color: theme.textTertiary,
+      padding: '20px',
+      fontSize: '0.9rem',
+    },
+  });
+
+  const styles = getStyles();
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -222,155 +378,6 @@ const Dashboard = () => {
       )}
     </div>
   );
-};
-
-const styles = {
-  container: {
-    maxWidth: '1600px',
-    margin: '0 auto',
-    padding: '20px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '30px',
-    flexWrap: 'wrap',
-    gap: '20px',
-  },
-  title: {
-    fontSize: '2rem',
-    fontWeight: '600',
-    color: '#333',
-    margin: 0,
-    marginBottom: '8px',
-  },
-  dateInfo: {
-    fontSize: '0.9rem',
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  error: {
-    backgroundColor: '#fee',
-    color: '#c33',
-    padding: '12px',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    border: '1px solid #fcc',
-  },
-  loading: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#666',
-    fontSize: '1.1rem',
-  },
-  empty: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#999',
-  },
-  statsContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '20px',
-    marginBottom: '30px',
-  },
-  statCard: {
-    backgroundColor: '#ffffff',
-    padding: '24px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    textAlign: 'center',
-  },
-  statValue: {
-    fontSize: '2rem',
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '8px',
-  },
-  statLabel: {
-    fontSize: '0.9rem',
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  kanbanContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px',
-    marginTop: '20px',
-  },
-  kanbanColumn: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '400px',
-    border: '2px solid transparent',
-    transition: 'border-color 0.2s, background-color 0.2s',
-  },
-  kanbanColumnDraggedOver: {
-    borderColor: '#4a90e2',
-    backgroundColor: '#e8f4fd',
-  },
-  kanbanColumnHeader: {
-    padding: '16px',
-    borderTop: '4px solid #4a90e2',
-    borderRadius: '8px 8px 0 0',
-    backgroundColor: '#ffffff',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  kanbanColumnTitle: {
-    margin: 0,
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    color: '#333',
-  },
-  kanbanColumnCount: {
-    fontSize: '0.9rem',
-    color: '#666',
-    backgroundColor: '#f0f0f0',
-    padding: '4px 8px',
-    borderRadius: '12px',
-  },
-  kanbanColumnContent: {
-    flex: 1,
-    padding: '12px',
-    overflowY: 'auto',
-  },
-  kanbanCard: {
-    backgroundColor: '#ffffff',
-    padding: '12px',
-    borderRadius: '6px',
-    marginBottom: '10px',
-    cursor: 'move',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    userSelect: 'none',
-  },
-  kanbanCardDragging: {
-    opacity: 0.5,
-    transform: 'rotate(5deg)',
-  },
-  kanbanCardName: {
-    fontSize: '0.95rem',
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: '4px',
-  },
-  kanbanCardOrderNumber: {
-    fontSize: '0.85rem',
-    color: '#666',
-    fontFamily: 'monospace',
-  },
-  kanbanEmpty: {
-    textAlign: 'center',
-    color: '#999',
-    padding: '20px',
-    fontSize: '0.9rem',
-  },
 };
 
 export default Dashboard;

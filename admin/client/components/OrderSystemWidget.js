@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 const OrderSystemWidget = () => {
+  const { theme } = useTheme();
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -80,6 +82,113 @@ const OrderSystemWidget = () => {
     return `${minutes}m ${seconds}s`;
   };
 
+  const getStyles = () => ({
+    widget: {
+      backgroundColor: theme.surface,
+      borderRadius: '8px',
+      padding: '20px',
+      boxShadow: `0 2px 4px ${theme.shadow}`,
+      marginBottom: '20px',
+      border: `1px solid ${theme.border}`,
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '16px',
+      paddingBottom: '12px',
+      borderBottom: `1px solid ${theme.border}`,
+    },
+    title: {
+      fontSize: '1.25rem',
+      fontWeight: '600',
+      color: theme.text,
+      margin: 0,
+    },
+    loading: {
+      textAlign: 'center',
+      padding: '20px',
+      color: theme.textSecondary,
+    },
+    error: {
+      textAlign: 'center',
+      padding: '20px',
+      color: theme.error,
+    },
+    alertError: {
+      backgroundColor: theme.errorBg,
+      color: theme.error,
+      padding: '8px 12px',
+      borderRadius: '4px',
+      marginBottom: '12px',
+      fontSize: '0.875rem',
+      border: `1px solid ${theme.errorBorder}`,
+    },
+    stateSection: {
+      marginBottom: '16px',
+    },
+    stateBadge: {
+      display: 'inline-block',
+      padding: '8px 16px',
+      borderRadius: '6px',
+      border: '2px solid',
+      fontWeight: '600',
+      fontSize: '1rem',
+      marginBottom: '8px',
+    },
+    stateLabel: {
+      fontSize: '1rem',
+    },
+    timeRemaining: {
+      fontSize: '0.875rem',
+      color: theme.textSecondary,
+      marginTop: '8px',
+    },
+    actionsSection: {
+      display: 'flex',
+      gap: '8px',
+      flexWrap: 'wrap',
+    },
+    actionButton: {
+      flex: '1',
+      minWidth: '100px',
+      padding: '10px 16px',
+      border: '2px solid',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontSize: '0.9rem',
+      fontWeight: '500',
+      transition: 'all 0.2s',
+      whiteSpace: 'nowrap',
+    },
+    buttonActive: {
+      borderColor: theme.success,
+      backgroundColor: theme.surface,
+      color: theme.success,
+    },
+    buttonPostpone: {
+      borderColor: theme.warning,
+      backgroundColor: theme.surface,
+      color: theme.warningText,
+    },
+    buttonShutdown: {
+      borderColor: theme.error,
+      backgroundColor: theme.surface,
+      color: theme.error,
+    },
+    buttonCurrent: {
+      backgroundColor: theme.surfaceSecondary,
+      cursor: 'default',
+      opacity: 0.7,
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+    },
+  });
+
+  const styles = getStyles();
+
   if (loading) {
     return (
       <div style={styles.widget}>
@@ -143,14 +252,14 @@ const OrderSystemWidget = () => {
               disabled={updating || state.state === 'active'}
               onMouseEnter={(e) => {
                 if (!updating && state.state !== 'active') {
-                  e.target.style.backgroundColor = '#28a745';
+                  e.target.style.backgroundColor = theme.success;
                   e.target.style.color = '#fff';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!updating && state.state !== 'active') {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.color = '#28a745';
+                  e.target.style.backgroundColor = theme.surface;
+                  e.target.style.color = theme.success;
                 }
               }}
               style={{
@@ -167,14 +276,14 @@ const OrderSystemWidget = () => {
               disabled={updating || state.state === 'postponed'}
               onMouseEnter={(e) => {
                 if (!updating && state.state !== 'postponed') {
-                  e.target.style.backgroundColor = '#ffc107';
-                  e.target.style.color = '#000';
+                  e.target.style.backgroundColor = theme.warning;
+                  e.target.style.color = theme.mode === 'dark' ? '#fff' : '#000';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!updating && state.state !== 'postponed') {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.color = '#856404';
+                  e.target.style.backgroundColor = theme.surface;
+                  e.target.style.color = theme.warningText;
                 }
               }}
               style={{
@@ -191,14 +300,14 @@ const OrderSystemWidget = () => {
               disabled={updating || state.state === 'shutdown'}
               onMouseEnter={(e) => {
                 if (!updating && state.state !== 'shutdown') {
-                  e.target.style.backgroundColor = '#dc3545';
+                  e.target.style.backgroundColor = theme.error;
                   e.target.style.color = '#fff';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!updating && state.state !== 'shutdown') {
-                  e.target.style.backgroundColor = '#fff';
-                  e.target.style.color = '#dc3545';
+                  e.target.style.backgroundColor = theme.surface;
+                  e.target.style.color = theme.error;
                 }
               }}
               style={{
@@ -215,110 +324,6 @@ const OrderSystemWidget = () => {
       )}
     </div>
   );
-};
-
-const styles = {
-  widget: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    padding: '20px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    marginBottom: '20px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '16px',
-    paddingBottom: '12px',
-    borderBottom: '1px solid #e0e0e0',
-  },
-  title: {
-    fontSize: '1.25rem',
-    fontWeight: '600',
-    color: '#333',
-    margin: 0,
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#666',
-  },
-  error: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#dc3545',
-  },
-  alertError: {
-    backgroundColor: '#fee',
-    color: '#c33',
-    padding: '8px 12px',
-    borderRadius: '4px',
-    marginBottom: '12px',
-    fontSize: '0.875rem',
-    border: '1px solid #fcc',
-  },
-  stateSection: {
-    marginBottom: '16px',
-  },
-  stateBadge: {
-    display: 'inline-block',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    border: '2px solid',
-    fontWeight: '600',
-    fontSize: '1rem',
-    marginBottom: '8px',
-  },
-  stateLabel: {
-    fontSize: '1rem',
-  },
-  timeRemaining: {
-    fontSize: '0.875rem',
-    color: '#666',
-    marginTop: '8px',
-  },
-  actionsSection: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    flex: '1',
-    minWidth: '100px',
-    padding: '10px 16px',
-    border: '2px solid',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  },
-  buttonActive: {
-    borderColor: '#28a745',
-    backgroundColor: '#fff',
-    color: '#28a745',
-  },
-  buttonPostpone: {
-    borderColor: '#ffc107',
-    backgroundColor: '#fff',
-    color: '#856404',
-  },
-  buttonShutdown: {
-    borderColor: '#dc3545',
-    backgroundColor: '#fff',
-    color: '#dc3545',
-  },
-  buttonCurrent: {
-    backgroundColor: '#f8f9fa',
-    cursor: 'default',
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-  },
 };
 
 export default OrderSystemWidget;

@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme } = useTheme();
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
@@ -14,6 +16,82 @@ const Sidebar = ({ isOpen, onClose }) => {
   const handleNavigation = (path) => {
     navigate(path);
     onClose();
+  };
+
+  const styles = {
+    overlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.mode === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+      zIndex: 999,
+      transition: 'opacity 0.3s ease',
+    },
+    sidebar: {
+      position: 'fixed',
+      top: '60px',
+      left: 0,
+      width: '250px',
+      height: 'calc(100vh - 60px)',
+      backgroundColor: theme.surface,
+      boxShadow: `2px 0 8px ${theme.shadow}`,
+      zIndex: 1000,
+      transition: 'transform 0.3s ease, background-color 0.3s ease',
+      overflowY: 'auto',
+    },
+    sidebarHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '20px',
+      borderBottom: `1px solid ${theme.border}`,
+    },
+    sidebarTitle: {
+      margin: 0,
+      fontSize: '1.25rem',
+      fontWeight: '600',
+      color: theme.text,
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: theme.textSecondary,
+      borderRadius: '4px',
+      transition: 'background-color 0.2s',
+    },
+    nav: {
+      padding: '10px 0',
+    },
+    menuList: {
+      listStyle: 'none',
+      margin: 0,
+      padding: 0,
+    },
+    menuItem: {
+      margin: 0,
+    },
+    menuButton: {
+      width: '100%',
+      padding: '12px 20px',
+      background: 'none',
+      border: 'none',
+      textAlign: 'left',
+      fontSize: '1rem',
+      color: theme.text,
+      cursor: 'pointer',
+      transition: 'background-color 0.2s, color 0.2s',
+    },
+    menuButtonActive: {
+      backgroundColor: theme.active,
+      color: '#ffffff',
+    },
   };
 
   return (
@@ -38,6 +116,12 @@ const Sidebar = ({ isOpen, onClose }) => {
           <h2 style={styles.sidebarTitle}>Menu</h2>
           <button
             onClick={onClose}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = theme.hover;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
             style={styles.closeButton}
             aria-label="Close menu"
           >
@@ -67,7 +151,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     onClick={() => handleNavigation(item.path)}
                     onMouseEnter={(e) => {
                       if (!isActive) {
-                        e.target.style.backgroundColor = '#f0f0f0';
+                        e.target.style.backgroundColor = theme.hover;
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -90,85 +174,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       </div>
     </>
   );
-};
-
-const styles = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 999,
-    transition: 'opacity 0.3s ease',
-  },
-  sidebar: {
-    position: 'fixed',
-    top: '60px',
-    left: 0,
-    width: '250px',
-    height: 'calc(100vh - 60px)',
-    backgroundColor: '#ffffff',
-    boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)',
-    zIndex: 1000,
-    transition: 'transform 0.3s ease',
-    overflowY: 'auto',
-  },
-  sidebarHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    borderBottom: '1px solid #e0e0e0',
-  },
-  sidebarTitle: {
-    margin: 0,
-    fontSize: '1.25rem',
-    fontWeight: '600',
-    color: '#333',
-  },
-  closeButton: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#666',
-    borderRadius: '4px',
-    transition: 'background-color 0.2s',
-  },
-  nav: {
-    padding: '10px 0',
-  },
-  menuList: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 0,
-  },
-  menuItem: {
-    margin: 0,
-  },
-  menuButton: {
-    width: '100%',
-    padding: '12px 20px',
-    background: 'none',
-    border: 'none',
-    textAlign: 'left',
-    fontSize: '1rem',
-    color: '#333',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s, color 0.2s',
-  },
-  menuButtonActive: {
-    backgroundColor: '#007bff',
-    color: '#ffffff',
-  },
-  menuButtonHover: {
-    backgroundColor: '#f0f0f0',
-  },
 };
 
 export default Sidebar;
