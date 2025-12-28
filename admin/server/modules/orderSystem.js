@@ -86,16 +86,20 @@ async function updateOrderSystemState(req, res) {
       })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return res.status(response.status).json({
-        error: 'Failed to update order system state',
-        status: response.status,
-        details: errorData
+    const result = await response.json();
+    
+    // Check if the order system returned an error (even if HTTP status is 200)
+    if (!response.ok || (result.success === false)) {
+      const errorMessage = result.error || 'Failed to update order system state';
+      const statusCode = response.status === 200 ? 400 : response.status;
+      return res.status(statusCode).json({
+        error: errorMessage,
+        success: false,
+        status: statusCode,
+        details: result
       });
     }
-
-    const result = await response.json();
+    
     res.json(result);
   } catch (error) {
     console.error('[orderSystem] Error updating state:', error);

@@ -16,11 +16,124 @@ let currentState = {
   state: ORDER_STATE.ACTIVE,
   suspendedUntil: null, // ISO timestamp when suspend state should end
   lastUpdated: new Date().toISOString(),
-  lastUpdatedBy: null // Admin user who made the change
+  lastUpdatedBy: null, // Admin user who made the change
+  manuallySet: false // Track if state was manually set (should not be overridden by auto-activation)
 };
 
 // Get shared secret from environment
 const SHARED_SECRET = process.env.ORDER_SYSTEM_SECRET || process.env.ADMIN_SECRET || 'change-me-in-production';
+
+// Time-based activation configuration
+const DEFAULT_START_TIME = '11:00'; // Default start time in HH:MM format
+const DEFAULT_END_TIME = '15:00';   // Default end time in HH:MM format
+const START_TIME = process.env.OS_IL_START_TIME || DEFAULT_START_TIME;
+const END_TIME = process.env.OS_IL_END_TIME || DEFAULT_END_TIME;
+const ISRAEL_TIMEZONE = 'Asia/Jerusalem';
+
+/**
+ * Parse time string in HH:MM format to hours and minutes
+ * @param {string} timeStr - Time string in HH:MM format
+ * @returns {Object|null} Object with hours and minutes, or null if invalid
+ */
+function parseTime(timeStr) {
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    console.warn(`[orderState] Invalid time format: ${timeStr}. Expected HH:MM format.`);
+    return null;
+  }
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    console.warn(`[orderState] Invalid time values: ${timeStr}. Hours must be 0-23, minutes 0-59.`);
+    return null;
+  }
+  
+  return { hours, minutes };
+}
+
+/**
+ * Get current time in Israel timezone
+ * @returns {Object} Object with hours, minutes, and a Date object for Israel time
+ */
+function getIsraelTime() {
+  const now = new Date();
+  // Get time components in Israel timezone using Intl API
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: ISRAEL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year').value);
+  const month = parseInt(parts.find(p => p.type === 'month').value) - 1; // Month is 0-indexed
+  const day = parseInt(parts.find(p => p.type === 'day').value);
+  const hour = parseInt(parts.find(p => p.type === 'hour').value);
+  const minute = parseInt(parts.find(p => p.type === 'minute').value);
+  const second = parseInt(parts.find(p => p.type === 'second').value);
+  
+  // Return both the components and a Date object
+  // The Date object is created in local time but represents the Israel time values
+  return {
+    hours: hour,
+    minutes: minute,
+    seconds: second,
+    date: new Date(year, month, day, hour, minute, second)
+  };
+}
+
+/**
+ * Check if current time is within the active time window (Israel time)
+ * @returns {boolean} True if current time is within active hours
+ */
+function isWithinActiveHours() {
+  const startTime = parseTime(START_TIME);
+  const endTime = parseTime(END_TIME);
+  
+  if (!startTime || !endTime) {
+    console.warn(`[orderState] Invalid time configuration. Using defaults: ${DEFAULT_START_TIME}-${DEFAULT_END_TIME}`);
+    // Fallback to default times
+    const defaultStart = parseTime(DEFAULT_START_TIME);
+    const defaultEnd = parseTime(DEFAULT_END_TIME);
+    if (!defaultStart || !defaultEnd) {
+      // If even defaults fail, default to always active
+      return true;
+    }
+    return checkTimeWindow(defaultStart, defaultEnd);
+  }
+  
+  return checkTimeWindow(startTime, endTime);
+}
+
+/**
+ * Check if current Israel time is within the specified time window
+ * @param {Object} startTime - Start time {hours, minutes}
+ * @param {Object} endTime - End time {hours, minutes}
+ * @returns {boolean} True if within window
+ */
+function checkTimeWindow(startTime, endTime) {
+  const israelNow = getIsraelTime();
+  const currentHours = israelNow.hours;
+  const currentMinutes = israelNow.minutes;
+  const currentTimeMinutes = currentHours * 60 + currentMinutes;
+  const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+  const endTimeMinutes = endTime.hours * 60 + endTime.minutes;
+  
+  // Handle case where end time is after midnight (e.g., 23:00 to 02:00)
+  if (endTimeMinutes < startTimeMinutes) {
+    // Window spans midnight
+    return currentTimeMinutes >= startTimeMinutes || currentTimeMinutes <= endTimeMinutes;
+  } else {
+    // Normal window within same day
+    return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes;
+  }
+}
 
 /**
  * Verify authentication token from admin service
@@ -38,7 +151,7 @@ export function verifyAuthToken(token) {
 
 /**
  * Get current order system state
- * @returns {Object} Current state object
+ * @returns {Object} Current state object with controlsEnabled field
  */
 export function getState() {
   // Check if suspend state has expired
@@ -47,18 +160,90 @@ export function getState() {
     const suspendedUntil = new Date(currentState.suspendedUntil);
     
     if (now >= suspendedUntil) {
-      // Auto-resume to active state
-      currentState = {
-        state: ORDER_STATE.ACTIVE,
-        suspendedUntil: null,
-        lastUpdated: new Date().toISOString(),
-        lastUpdatedBy: 'system-auto-resume'
-      };
-      console.log('[orderState] Suspend state expired, auto-resuming to active');
+      // Auto-resume to active state (if within active hours and not manually shutdown)
+      if (!currentState.manuallySet || currentState.state === ORDER_STATE.ACTIVE) {
+        currentState = {
+          ...currentState,
+          state: ORDER_STATE.ACTIVE,
+          suspendedUntil: null,
+          lastUpdated: new Date().toISOString(),
+          lastUpdatedBy: 'system-auto-resume'
+        };
+        console.log('[orderState] Suspend state expired, auto-resuming to active');
+      }
     }
   }
   
-  return { ...currentState };
+  // Check if we're within active hours (used for controls enabled status)
+  const withinActiveHours = isWithinActiveHours();
+  
+  // Apply time-based activation (only if not manually set to SHUTDOWN)
+  // If manually set to SHUTDOWN, respect that override
+  if (!currentState.manuallySet || currentState.state !== ORDER_STATE.SHUTDOWN) {
+    if (withinActiveHours) {
+      // Within active hours - ensure state is ACTIVE (unless manually shutdown)
+      if (currentState.state !== ORDER_STATE.ACTIVE && currentState.state !== ORDER_STATE.SHUTDOWN) {
+        currentState = {
+          ...currentState,
+          state: ORDER_STATE.ACTIVE,
+          suspendedUntil: null,
+          lastUpdated: new Date().toISOString(),
+          lastUpdatedBy: 'system-time-based-activation'
+        };
+        console.log(`[orderState] Time-based activation: within active hours (${START_TIME}-${END_TIME} Israel time), setting to ACTIVE`);
+      }
+    } else {
+      // Outside active hours - set to SUSPEND (unless manually shutdown)
+      if (currentState.state !== ORDER_STATE.SHUTDOWN) {
+        const israelNow = getIsraelTime();
+        // Calculate time until start time next
+        const startTime = parseTime(START_TIME);
+        if (startTime) {
+          // Calculate minutes until next start time
+          const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
+          const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+          
+          let minutesUntilStart;
+          if (currentTimeMinutes < startTimeMinutes) {
+            // Start time is later today
+            minutesUntilStart = startTimeMinutes - currentTimeMinutes;
+          } else {
+            // Start time is tomorrow
+            minutesUntilStart = (24 * 60 - currentTimeMinutes) + startTimeMinutes;
+          }
+          
+          // Calculate the next active time in UTC
+          const nextActiveTime = new Date(Date.now() + minutesUntilStart * 60 * 1000);
+          
+          // Update state to SUSPEND if not already, or update suspendedUntil if already suspended
+          const wasSuspended = currentState.state === ORDER_STATE.SUSPEND;
+          
+          currentState = {
+            ...currentState,
+            state: ORDER_STATE.SUSPEND,
+            suspendedUntil: nextActiveTime.toISOString(),
+            lastUpdated: new Date().toISOString(),
+            lastUpdatedBy: wasSuspended ? 'system-time-based-update' : 'system-time-based-deactivation'
+          };
+          
+          if (!wasSuspended) {
+            console.log(`[orderState] Time-based deactivation: outside active hours (${START_TIME}-${END_TIME} Israel time), setting to SUSPEND until ${nextActiveTime.toISOString()}`);
+          }
+        }
+      }
+    }
+  }
+  
+  // Return state with controlsEnabled field
+  // Controls are only enabled during active hours
+  return { 
+    ...currentState,
+    controlsEnabled: withinActiveHours,
+    activeHours: {
+      start: START_TIME,
+      end: END_TIME
+    }
+  };
 }
 
 /**
@@ -193,31 +378,78 @@ export function updateState(newState, authToken, updatedBy = 'admin') {
     };
   }
   
+  // Check if we're within active hours - manual updates are only allowed during active hours
+  const withinActiveHours = isWithinActiveHours();
+  if (!withinActiveHours) {
+    return {
+      success: false,
+      error: `Manual state changes are not allowed outside active hours (${START_TIME}-${END_TIME} Israel time). The system will automatically activate during active hours.`
+    };
+  }
+  
   // Update state
   const now = new Date();
   let suspendedUntil = null;
   
+  // Mark as manually set if state is SHUTDOWN (SHUTDOWN always overrides time-based activation)
+  // Setting to ACTIVE manually allows time-based activation to take over again
+  // Setting to SUSPEND manually allows time-based activation to take over again after the suspend expires
+  const manuallySet = newState === ORDER_STATE.SHUTDOWN;
+  
   if (newState === ORDER_STATE.SUSPEND) {
-    // Set suspended until 15 minutes from now
-    suspendedUntil = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+    // Set suspended until 15 minutes from now (unless within time-based window)
+    if (withinActiveHours) {
+      // If within active hours but manually suspending, use 15 minutes
+      suspendedUntil = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+    } else {
+      // Outside active hours, calculate until next start time
+      const startTime = parseTime(START_TIME);
+      if (startTime) {
+        const israelNow = getIsraelTime();
+        const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
+        const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+        
+        // Calculate minutes until next start time
+        let minutesUntilStart;
+        if (currentTimeMinutes < startTimeMinutes) {
+          // Start time is later today
+          minutesUntilStart = startTimeMinutes - currentTimeMinutes;
+        } else {
+          // Start time is tomorrow
+          minutesUntilStart = (24 * 60 - currentTimeMinutes) + startTimeMinutes;
+        }
+        
+        // Calculate the next active time in UTC
+        const nextActiveTime = new Date(Date.now() + minutesUntilStart * 60 * 1000);
+        suspendedUntil = nextActiveTime.toISOString();
+      } else {
+        // Fallback to 15 minutes
+        suspendedUntil = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      }
+    }
   }
   
   currentState = {
     state: newState,
     suspendedUntil: suspendedUntil,
     lastUpdated: now.toISOString(),
-    lastUpdatedBy: updatedBy
+    lastUpdatedBy: updatedBy,
+    manuallySet: manuallySet
   };
   
   console.log(`[orderState] State updated to ${newState} by ${updatedBy}`, {
     state: newState,
     suspendedUntil: suspendedUntil,
-    lastUpdated: currentState.lastUpdated
+    lastUpdated: currentState.lastUpdated,
+    manuallySet: manuallySet
   });
+  
+  // Get updated state with controlsEnabled field
+  const updatedState = getState();
   
   return {
     success: true,
-    state: { ...currentState }
+    state: updatedState
   };
 }
 

@@ -62,11 +62,12 @@ const OrderSystemDropdown = () => {
         { withCredentials: true }
       );
 
-      if (response.data.success !== false) {
+      // Check for error in response (either success: false or HTTP error status)
+      if (response.data.success === false || response.status >= 400) {
+        setError(response.data.error || 'Failed to update state');
+      } else {
         setState(response.data.state || response.data);
         setIsOpen(false);
-      } else {
-        setError(response.data.error || 'Failed to update state');
       }
     } catch (err) {
       console.error('Error updating state:', err);
@@ -230,11 +231,16 @@ const OrderSystemDropdown = () => {
     );
   }
 
+  const controlsDisabled = state?.controlsEnabled === false;
+
   return (
     <div style={styles.container} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        style={styles.button}
+        style={{
+          ...styles.button,
+          ...(controlsDisabled && !isOpen ? { opacity: 0.6 } : {}),
+        }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = theme.hover;
         }}
@@ -259,22 +265,24 @@ const OrderSystemDropdown = () => {
           </div>
           {statuses.map((status) => {
             const isCurrent = currentState === status.value;
+            const controlsDisabled = state?.controlsEnabled === false;
             return (
               <button
                 key={status.value}
-                onClick={() => !isCurrent && !updating && updateState(status.value)}
-                disabled={updating || isCurrent}
+                onClick={() => !isCurrent && !updating && !controlsDisabled && updateState(status.value)}
+                disabled={updating || isCurrent || controlsDisabled}
                 style={{
                   ...styles.dropdownItem,
                   ...(isCurrent ? styles.dropdownItemCurrent : {}),
+                  ...(controlsDisabled && !isCurrent ? { opacity: 0.4, cursor: 'not-allowed' } : {}),
                 }}
                 onMouseEnter={(e) => {
-                  if (!isCurrent && !updating) {
+                  if (!isCurrent && !updating && !controlsDisabled) {
                     e.currentTarget.style.backgroundColor = theme.hover;
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isCurrent && !updating) {
+                  if (!isCurrent && !updating && !controlsDisabled) {
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }
                 }}
@@ -283,6 +291,7 @@ const OrderSystemDropdown = () => {
                   style={{
                     ...styles.statusIndicator,
                     backgroundColor: status.color,
+                    opacity: controlsDisabled && !isCurrent ? 0.4 : 1,
                   }}
                 />
                 <span style={styles.statusLabel}>{status.label}</span>
@@ -290,6 +299,11 @@ const OrderSystemDropdown = () => {
               </button>
             );
           })}
+          {state?.controlsEnabled === false && (
+            <div style={styles.timeRemainingText}>
+              <strong>Controls disabled:</strong> System automatically manages state outside active hours ({state.activeHours?.start || '11:00'} - {state.activeHours?.end || '15:00'} Israel time)
+            </div>
+          )}
           {error && (
             <div style={styles.errorMessage}>
               <strong>Error:</strong> {error}

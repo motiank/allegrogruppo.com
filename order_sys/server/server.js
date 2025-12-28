@@ -78,13 +78,16 @@ app.post('/api/order-state', (req, res) => {
   const { state, updatedBy } = req.body;
   
   if (!state) {
-    return res.status(400).json({ error: 'State parameter is required' });
+    return res.status(400).json({ error: 'State parameter is required', success: false });
   }
   
   const result = updateState(state, authToken, updatedBy || 'admin');
   
   if (!result.success) {
-    return res.status(result.error === 'Unauthorized: Invalid authentication token' ? 401 : 400).json(result);
+    // Return 403 for outside active hours, 401 for unauthorized, 400 for other errors
+    const statusCode = result.error?.includes('Unauthorized') ? 401 : 
+                       result.error?.includes('not allowed outside active hours') ? 403 : 400;
+    return res.status(statusCode).json(result);
   }
   
   res.json(result);
@@ -122,8 +125,8 @@ app.get('*', (req, res) => {
   const bsrClientRoutes = ['/welcome', '/cart', '/meal', '/location', '/payment', '/thankYou'];
   const isBSRClientRoute = bsrClientRoutes.some(route => req.path === route || req.path.startsWith(route + '/'));
   
-  // BSR entry points
-  const isBSREntry = req.path === '/bsr' || req.path === '/eatalia-bsr.html';
+  // BSR entry points - check if path starts with /bsr
+  const isBSREntry = req.path === '/bsr' || req.path === '/eatalia-bsr.html' || req.path.startsWith('/bsr/');
   
   if (isBSRClientRoute || isBSREntry) {
     return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
@@ -134,5 +137,16 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`BSR Orders Enabled: ${BSR_ORDERS_ENABLED ? 'YES' : 'NO (Coming Soon mode)'}`);
+  
+  // Initialize and log order state configuration on startup
+  const initialState = getState();
+  const startTime = process.env.OS_IL_START_TIME || '11:00';
+  const endTime = process.env.OS_IL_END_TIME || '15:00';
+  console.log(`[order_sys] Order system time-based activation configured:`);
+  console.log(`[order_sys]   Active hours: ${startTime} - ${endTime} (Israel time)`);
+  console.log(`[order_sys]   Initial state: ${initialState.state}`);
+  if (process.env.OS_IL_START_TIME || process.env.OS_IL_END_TIME) {
+    console.log(`[order_sys]   Environment variables: OS_IL_START_TIME=${process.env.OS_IL_START_TIME || '(default: 11:00)'}, OS_IL_END_TIME=${process.env.OS_IL_END_TIME || '(default: 15:00)'}`);
+  }
 });
 

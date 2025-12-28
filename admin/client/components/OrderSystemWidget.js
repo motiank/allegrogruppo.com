@@ -43,10 +43,11 @@ const OrderSystemWidget = () => {
         { withCredentials: true }
       );
 
-      if (response.data.success !== false) {
-        setState(response.data.state || response.data);
-      } else {
+      // Check for error in response (either success: false or HTTP error status)
+      if (response.data.success === false || response.status >= 400) {
         setError(response.data.error || 'Failed to update state');
+      } else {
+        setState(response.data.state || response.data);
       }
     } catch (err) {
       console.error('Error updating state:', err);
@@ -244,20 +245,25 @@ const OrderSystemWidget = () => {
                 Resumes in: <strong>{timeRemaining}</strong>
               </div>
             )}
+            {state.controlsEnabled === false && (
+              <div style={styles.timeRemaining}>
+                <strong>Controls disabled:</strong> System automatically manages state outside active hours ({state.activeHours?.start || '11:00'} - {state.activeHours?.end || '15:00'} Israel time)
+              </div>
+            )}
           </div>
 
           <div style={styles.actionsSection}>
             <button
               onClick={() => updateState('active')}
-              disabled={updating || state.state === 'active'}
+              disabled={updating || state.state === 'active' || state.controlsEnabled === false}
               onMouseEnter={(e) => {
-                if (!updating && state.state !== 'active') {
+                if (!updating && state.state !== 'active' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.success;
                   e.target.style.color = '#fff';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!updating && state.state !== 'active') {
+                if (!updating && state.state !== 'active' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.surface;
                   e.target.style.color = theme.success;
                 }
@@ -266,22 +272,23 @@ const OrderSystemWidget = () => {
                 ...styles.actionButton,
                 ...styles.buttonActive,
                 ...(state.state === 'active' ? styles.buttonCurrent : {}),
-                ...(updating ? styles.buttonDisabled : {}),
+                ...(updating || state.controlsEnabled === false ? styles.buttonDisabled : {}),
+                ...(state.controlsEnabled === false ? { opacity: 0.4 } : {}),
               }}
             >
               ✓ Turn On
             </button>
             <button
               onClick={() => updateState('suspend')}
-              disabled={updating || state.state === 'suspend'}
+              disabled={updating || state.state === 'suspend' || state.controlsEnabled === false}
               onMouseEnter={(e) => {
-                if (!updating && state.state !== 'suspend') {
+                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.warning;
                   e.target.style.color = theme.mode === 'dark' ? '#fff' : '#000';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!updating && state.state !== 'suspend') {
+                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.surface;
                   e.target.style.color = theme.warningText;
                 }
@@ -290,22 +297,23 @@ const OrderSystemWidget = () => {
                 ...styles.actionButton,
                 ...styles.buttonPostpone,
                 ...(state.state === 'suspend' ? styles.buttonCurrent : {}),
-                ...(updating ? styles.buttonDisabled : {}),
+                ...(updating || state.controlsEnabled === false ? styles.buttonDisabled : {}),
+                ...(state.controlsEnabled === false ? { opacity: 0.4 } : {}),
               }}
             >
               ⏸ Suspend
             </button>
             <button
               onClick={() => updateState('shutdown')}
-              disabled={updating || state.state === 'shutdown'}
+              disabled={updating || state.state === 'shutdown' || state.controlsEnabled === false}
               onMouseEnter={(e) => {
-                if (!updating && state.state !== 'shutdown') {
+                if (!updating && state.state !== 'shutdown' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.error;
                   e.target.style.color = '#fff';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!updating && state.state !== 'shutdown') {
+                if (!updating && state.state !== 'shutdown' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.surface;
                   e.target.style.color = theme.error;
                 }
@@ -314,7 +322,8 @@ const OrderSystemWidget = () => {
                 ...styles.actionButton,
                 ...styles.buttonShutdown,
                 ...(state.state === 'shutdown' ? styles.buttonCurrent : {}),
-                ...(updating ? styles.buttonDisabled : {}),
+                ...(updating || state.controlsEnabled === false ? styles.buttonDisabled : {}),
+                ...(state.controlsEnabled === false ? { opacity: 0.4 } : {}),
               }}
             >
               ✗ Shut Down
