@@ -12,7 +12,8 @@ import { PolicyDialog } from '../components/PolicyDialog.js';
 import { MealOptionsDialog } from '../components/MealOptionsDialog.js';
 import PelecardIframe from '../components/pelecardIframe.js';
 import { ComingSoon } from '../components/ComingSoon.js';
-import { trackEvent } from '../utils/analytics.js';
+import CookieConsent from '../components/CookieConsent.js';
+import { trackEvent, initUserId } from '../utils/analytics.js';
 import { resolveDishImage } from '../utils/imageResolver.js';
 import '../i18n/index.js';
 
@@ -570,6 +571,15 @@ const EataliaBSRPage = () => {
       navigate(`${currentBasePath}/welcome`, { replace: true });
     }
   }, [location.pathname, navigate]);
+
+  // Initialize user ID on page load (only if consent given)
+  useEffect(() => {
+    // Make initUserId available globally for CookieConsent
+    if (typeof window !== 'undefined') {
+      window.initUserId = initUserId;
+    }
+    initUserId();
+  }, []);
 
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
@@ -1642,6 +1652,7 @@ const EataliaBSRPage = () => {
         onClose={handlePolicyClose}
         closeLabel={t('policy.close')}
       />
+      <CookieConsent />
     </div>
   );
 };

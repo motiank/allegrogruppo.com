@@ -113,6 +113,12 @@
   },
   "index": {
     "title": "Allegro Gruppo - Landing Pages"
+  },
+  "cookieConsent": {
+    "message": "We use cookies and local storage (localStorage) to improve your experience and analyze user behavior. Would you like to allow this?",
+    "learnMore": "Learn more",
+    "accept": "I Accept",
+    "reject": "I Decline"
   }
 }
 

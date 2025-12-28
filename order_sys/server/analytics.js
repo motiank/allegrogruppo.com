@@ -8,7 +8,8 @@ const router = express.Router();
  */
 router.post('/track', (req, res) => {
   const { event, data } = req.body;
-  console.log('Analytics event:', event, data);
+  const userId = data?.userId || 'unknown';
+  console.log(`[Analytics] Event: ${event}, UserId: ${userId}`, data);
   // In production, you would save this to a database or analytics service
   res.json({ success: true });
 });
