@@ -57,6 +57,12 @@ app.use((req, res, next) => {
 // Auth routes (login, logout, register, etc.)
 app.use('/auth', authRouter(passport));
 
+// Config endpoint (expose client config like DARKMODE) - public endpoint
+app.get('/config', (req, res) => {
+  const darkMode = process.env.DARKMODE === 'true';
+  res.json({ darkMode });
+});
+
 // Protected admin routes - require authentication
 app.use('/admin', gateKeeper, managementRouter);
 
@@ -74,7 +80,7 @@ app.use(express.static(join(__dirname, '../../dist')));
 // Fallback to admin.html for SPA routes (only for non-API routes)
 app.get('*', (req, res, next) => {
   // Skip API routes
-  if (req.path.startsWith('/auth') || req.path.startsWith('/admin') || req.path.startsWith('/health')) {
+  if (req.path.startsWith('/auth') || req.path.startsWith('/admin') || req.path.startsWith('/health') || req.path.startsWith('/config')) {
     return next();
   }
   res.sendFile(join(__dirname, '../../dist/admin.html'));

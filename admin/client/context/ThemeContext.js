@@ -82,19 +82,45 @@ export const ThemeProvider = ({ children }) => {
     // Check system preference
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+  const [darkModeForced, setDarkModeForced] = useState(false);
+
+  // Check for DARKMODE environment variable on mount
+  useEffect(() => {
+    const checkDarkModeConfig = async () => {
+      try {
+        const response = await fetch('/config');
+        if (response.ok) {
+          const config = await response.json();
+          if (config.darkMode === true) {
+            setDarkModeForced(true);
+            setIsDark(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch dark mode config:', error);
+      }
+    };
+    checkDarkModeConfig();
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('adminTheme', isDark ? 'dark' : 'light');
-  }, [isDark]);
+    // Only save to localStorage if dark mode is not forced
+    if (!darkModeForced) {
+      localStorage.setItem('adminTheme', isDark ? 'dark' : 'light');
+    }
+  }, [isDark, darkModeForced]);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
+    // Don't allow toggling if dark mode is forced
+    if (!darkModeForced) {
+      setIsDark(!isDark);
+    }
   };
 
   const theme = isDark ? darkTheme : lightTheme;
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, darkModeForced }}>
       {children}
     </ThemeContext.Provider>
   );

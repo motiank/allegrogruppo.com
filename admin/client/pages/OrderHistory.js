@@ -15,7 +15,7 @@ const OrderHistory = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
@@ -51,36 +51,9 @@ const OrderHistory = () => {
     setSelectedDate(e.target.value);
   };
 
-  const handleStatusChange = (e) => {
-    setSelectedStatus(e.target.value);
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
   };
-
-  const handleStatusUpdate = useCallback(async (orderId, newStatus) => {
-    try {
-      const response = await axios.put(`/admin/orders/${orderId}/status`, 
-        { status: newStatus },
-        { withCredentials: true }
-      );
-      
-      if (response.data.meta?.err) {
-        setError(response.data.meta.err);
-        return false;
-      }
-
-      // Update the order in the local state
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.orderId === orderId 
-            ? { ...order, status: newStatus }
-            : order
-        )
-      );
-      return true;
-    } catch (err) {
-      setError(err.response?.data?.meta?.err || err.message || 'Failed to update status');
-      return false;
-    }
-  }, []);
 
   const handleInfoClick = (order) => {
     setSelectedOrder(order);
@@ -92,17 +65,16 @@ const OrderHistory = () => {
     setSelectedOrder(null);
   };
 
-  // Format date for display
+  // Format date for display (short format: MM/DD/YYYY HH:MM)
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${month}/${day}/${year} ${hours}:${minutes}`;
   };
 
   const getStyles = () => ({
@@ -142,6 +114,16 @@ const OrderHistory = () => {
       fontFamily: 'inherit',
       backgroundColor: theme.surface,
       color: theme.text,
+    },
+    searchInput: {
+      padding: '8px 12px',
+      border: `1px solid ${theme.border}`,
+      borderRadius: '4px',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      backgroundColor: theme.surface,
+      color: theme.text,
+      minWidth: '200px',
     },
     error: {
       backgroundColor: theme.errorBg,
@@ -188,6 +170,7 @@ const OrderHistory = () => {
     tableRow: {
       borderBottom: `1px solid ${theme.borderLight}`,
       transition: 'background-color 0.2s',
+      cursor: 'pointer',
     },
     tableRowHover: {
       backgroundColor: theme.hover,
@@ -201,17 +184,6 @@ const OrderHistory = () => {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: theme.info,
-    },
-    statusSelect: {
-      padding: '6px 10px',
-      border: `1px solid ${theme.border}`,
-      borderRadius: '4px',
-      fontSize: '14px',
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-      backgroundColor: theme.surface,
-      color: theme.text,
-      minWidth: '120px',
     },
     infoButton: {
       background: 'none',
@@ -331,17 +303,12 @@ const OrderHistory = () => {
 
   // Define columns
   const columns = useMemo(
-    () => {
-      const handleStatusChangeInCell = (orderId, newStatus) => {
-        handleStatusUpdate(orderId, newStatus);
-      };
-      
-      return [
+    () => [
       {
-        accessorKey: 'orderId',
-        header: 'Order ID',
+        accessorKey: 'id',
+        header: 'ID',
         cell: (info) => (
-          <span style={styles.orderIdCell}>{info.getValue()}</span>
+          <span style={styles.orderIdCell}>#{info.getValue()}</span>
         ),
       },
       {
@@ -369,34 +336,14 @@ const OrderHistory = () => {
         },
       },
       {
-        accessorKey: 'status',
-        header: 'Status',
-        cell: (info) => {
-          const order = info.row.original;
-          const currentStatus = order.status || 'open';
-          
-          return (
-            <select
-              value={currentStatus}
-              onChange={(e) => {
-                const newStatus = e.target.value;
-                handleStatusChangeInCell(order.orderId, newStatus);
-              }}
-              style={styles.statusSelect}
-            >
-              <option value="open">Open</option>
-              <option value="ready">Ready</option>
-              <option value="delivered">Delivered</option>
-            </select>
-          );
-        },
-      },
-      {
         id: 'actions',
         header: '',
         cell: (info) => (
           <button
-            onClick={() => handleInfoClick(info.row.original)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleInfoClick(info.row.original);
+            }}
             onMouseEnter={(e) => {
               e.target.style.backgroundColor = theme.activeBg;
             }}
@@ -423,18 +370,27 @@ const OrderHistory = () => {
           </button>
         ),
       },
-      ];
-    },
-    [handleStatusUpdate]
+    ],
+    []
   );
 
-  // Filter orders by status (client-side)
+  // Filter orders by search term (id, name, or phone)
   const filteredOrders = useMemo(() => {
-    if (selectedStatus === 'all') {
+    if (!searchTerm.trim()) {
       return orders;
     }
-    return orders.filter(order => order.status === selectedStatus);
-  }, [orders, selectedStatus]);
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return orders.filter(order => {
+      const id = String(order.id || '').toLowerCase();
+      const name = (order.customer_name || '').toLowerCase();
+      const phone = (order.phone || '').toLowerCase();
+      
+      return id.includes(searchLower) || 
+             name.includes(searchLower) || 
+             phone.includes(searchLower);
+    });
+  }, [orders, searchTerm]);
 
   const table = useReactTable({
     data: filteredOrders,
@@ -459,20 +415,17 @@ const OrderHistory = () => {
             />
           </div>
           <div style={styles.filterGroup}>
-            <label htmlFor="status-select" style={styles.filterLabel}>
-              Status:
+            <label htmlFor="search-input" style={styles.filterLabel}>
+              Search:
             </label>
-            <select
-              id="status-select"
-              value={selectedStatus}
-              onChange={handleStatusChange}
-              style={styles.filterInput}
-            >
-              <option value="all">All</option>
-              <option value="open">Open</option>
-              <option value="ready">Ready</option>
-              <option value="delivered">Delivered</option>
-            </select>
+            <input
+              id="search-input"
+              type="text"
+              placeholder="ID, Name, or Phone"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              style={styles.searchInput}
+            />
           </div>
         </div>
       </div>
@@ -492,7 +445,7 @@ const OrderHistory = () => {
           </div>
         ) : filteredOrders.length === 0 ? (
           <div style={styles.empty}>
-            No orders found with status "{selectedStatus}"
+            No orders match your search "{searchTerm}"
           </div>
         ) : (
           <table style={styles.table}>
@@ -517,6 +470,7 @@ const OrderHistory = () => {
                 <tr 
                   key={row.id} 
                   style={styles.tableRow}
+                  onClick={() => handleInfoClick(row.original)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = theme.hover;
                   }}
@@ -568,7 +522,7 @@ const OrderHistory = () => {
                 <h3 style={styles.sectionTitle}>Basic Information</h3>
                 <div style={styles.detailsGrid}>
                   <div style={styles.detailItem}>
-                    <strong>Order ID:</strong> {selectedOrder.orderId}
+                    <strong>Order ID:</strong> #{selectedOrder.id}
                   </div>
                   <div style={styles.detailItem}>
                     <strong>Date:</strong> {formatDate(selectedOrder.created_at)}

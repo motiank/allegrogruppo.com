@@ -70,16 +70,16 @@ class Orders {
 
   /**
    * Update order status
-   * @param {Object} params - Parameters: orderId, status
+   * @param {Object} params - Parameters: id, status
    * @param {Function} callback - Callback function to return results
    */
   updateOrderStatus(params, callback) {
-    const { orderId, status } = params;
+    const { id, status } = params;
     
-    if (!orderId || !status) {
+    if (!id || !status) {
       return callback({
         meta: {
-          err: 'orderId and status parameters are required',
+          err: 'id and status parameters are required',
           resType: 'error'
         },
         rows: []
@@ -101,10 +101,10 @@ class Orders {
     const query = `
       UPDATE orders 
       SET status = :status, updated_at = CURRENT_TIMESTAMP
-      WHERE orderId = :orderId
+      WHERE id = :id
     `;
 
-    executeSql(query, { orderId, status }, function(db_res) {
+    executeSql(query, { id, status }, function(db_res) {
       try {
         const result = db_res.getRes();
         if (result.meta.err) {
@@ -115,7 +115,7 @@ class Orders {
               err: null,
               resType: 'content'
             },
-            rows: [{ orderId, status }],
+            rows: [{ id, status }],
             rowCount: result.rowCount || 0
           });
         }
@@ -365,13 +365,13 @@ export const Router = function() {
     }
   });
 
-  // PUT /orders/:orderId/status
-  ordersRouter.put('/:orderId/status', function(req, res) {
-    const { orderId } = req.params;
+  // PUT /orders/:id/status
+  ordersRouter.put('/:id/status', function(req, res) {
+    const { id } = req.params;
     const { status } = req.body;
     
-    console.log("updateOrderStatus " + JSON.stringify({ orderId, status }));
-    orders.updateOrderStatus({ orderId, status }, (result) => {
+    console.log("updateOrderStatus " + JSON.stringify({ id, status }));
+    orders.updateOrderStatus({ id, status }, (result) => {
       if (result.meta.err) {
         return res.status(400).json(result);
       }

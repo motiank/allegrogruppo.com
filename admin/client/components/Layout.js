@@ -6,7 +6,7 @@ import OrderSystemDropdown from './OrderSystemDropdown';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, darkModeForced } = useTheme();
   const location = useLocation();
 
   const menuItems = [
@@ -29,6 +29,9 @@ const Layout = ({ children }) => {
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh',
+      width: '100%',
+      margin: 0,
+      padding: 0,
       backgroundColor: theme.background,
       color: theme.text,
       transition: 'background-color 0.3s ease, color 0.3s ease',
@@ -133,36 +136,38 @@ const Layout = ({ children }) => {
         </div>
         <div style={styles.topBarRight}>
           <OrderSystemDropdown />
-          <button
-            onClick={toggleTheme}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = theme.hover;
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = 'transparent';
-          }}
-          style={styles.themeToggle}
-          aria-label="Toggle dark mode"
-          title={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {theme.mode === 'dark' ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5"></circle>
-              <line x1="12" y1="1" x2="12" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="23"></line>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-              <line x1="1" y1="12" x2="3" y2="12"></line>
-              <line x1="21" y1="12" x2="23" y2="12"></line>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
+          {!darkModeForced && (
+            <button
+              onClick={toggleTheme}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = theme.hover;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+              }}
+              style={styles.themeToggle}
+              aria-label="Toggle dark mode"
+              title={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme.mode === 'dark' ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              )}
+            </button>
           )}
-          </button>
         </div>
       </div>
 
