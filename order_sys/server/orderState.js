@@ -160,16 +160,20 @@ export function getState() {
     const suspendedUntil = new Date(currentState.suspendedUntil);
     
     if (now >= suspendedUntil) {
-      // Auto-resume to active state (if within active hours and not manually shutdown)
-      if (!currentState.manuallySet || currentState.state === ORDER_STATE.ACTIVE) {
+      // Suspend expired - clear the flag and let time-based activation determine next state
+      // Don't immediately set to ACTIVE here, let the time-based logic below handle it
+      if (currentState.manuallySet) {
+        // Manually set suspend expired - clear the flag so time-based activation can take over
         currentState = {
           ...currentState,
-          state: ORDER_STATE.ACTIVE,
-          suspendedUntil: null,
+          manuallySet: false,
           lastUpdated: new Date().toISOString(),
-          lastUpdatedBy: 'system-auto-resume'
+          lastUpdatedBy: 'system-suspend-expired'
         };
-        console.log('[orderState] Suspend state expired, auto-resuming to active');
+        console.log('[orderState] Manually set suspend expired, clearing manuallySet flag - time-based activation will determine next state');
+      } else {
+        // System-suspended (time-based) expired - will be handled by time-based logic below
+        console.log('[orderState] System suspend expired, time-based activation will determine next state');
       }
     }
   }
@@ -177,25 +181,32 @@ export function getState() {
   // Check if we're within active hours (used for controls enabled status)
   const withinActiveHours = isWithinActiveHours();
   
-  // Apply time-based activation (only if not manually set to SHUTDOWN)
+  // Apply time-based activation (only if not manually set to SHUTDOWN or manually set SUSPEND that hasn't expired)
   // If manually set to SHUTDOWN, respect that override
+  // If manually set to SUSPEND, respect it until suspendedUntil expires
+  const isManuallySuspended = currentState.manuallySet && currentState.state === ORDER_STATE.SUSPEND && currentState.suspendedUntil;
+  const suspendExpired = isManuallySuspended && new Date() >= new Date(currentState.suspendedUntil);
+  
   if (!currentState.manuallySet || currentState.state !== ORDER_STATE.SHUTDOWN) {
-    if (withinActiveHours) {
-      // Within active hours - ensure state is ACTIVE (unless manually shutdown)
-      if (currentState.state !== ORDER_STATE.ACTIVE && currentState.state !== ORDER_STATE.SHUTDOWN) {
-        currentState = {
-          ...currentState,
-          state: ORDER_STATE.ACTIVE,
-          suspendedUntil: null,
-          lastUpdated: new Date().toISOString(),
-          lastUpdatedBy: 'system-time-based-activation'
-        };
-        console.log(`[orderState] Time-based activation: within active hours (${START_TIME}-${END_TIME} Israel time), setting to ACTIVE`);
-      }
-    } else {
-      // Outside active hours - set to SUSPEND (unless manually shutdown)
-      if (currentState.state !== ORDER_STATE.SHUTDOWN) {
-        const israelNow = getIsraelTime();
+    // Don't override manually set SUSPEND unless it has expired
+    if (!isManuallySuspended || suspendExpired) {
+      if (withinActiveHours) {
+        // Within active hours - ensure state is ACTIVE (unless manually shutdown or manually suspended)
+        if (currentState.state !== ORDER_STATE.ACTIVE && currentState.state !== ORDER_STATE.SHUTDOWN) {
+          currentState = {
+            ...currentState,
+            state: ORDER_STATE.ACTIVE,
+            suspendedUntil: null,
+            manuallySet: false, // Clear manuallySet when auto-activating
+            lastUpdated: new Date().toISOString(),
+            lastUpdatedBy: 'system-time-based-activation'
+          };
+          console.log(`[orderState] Time-based activation: within active hours (${START_TIME}-${END_TIME} Israel time), setting to ACTIVE`);
+        }
+      } else {
+        // Outside active hours - set to SUSPEND (unless manually shutdown)
+        if (currentState.state !== ORDER_STATE.SHUTDOWN) {
+          const israelNow = getIsraelTime();
         // Calculate time until start time next
         const startTime = parseTime(START_TIME);
         if (startTime) {
@@ -230,6 +241,7 @@ export function getState() {
             console.log(`[orderState] Time-based deactivation: outside active hours (${START_TIME}-${END_TIME} Israel time), setting to SUSPEND until ${nextActiveTime.toISOString()}`);
           }
         }
+      }
       }
     }
   }
@@ -391,10 +403,11 @@ export function updateState(newState, authToken, updatedBy = 'admin') {
   const now = new Date();
   let suspendedUntil = null;
   
-  // Mark as manually set if state is SHUTDOWN (SHUTDOWN always overrides time-based activation)
+  // Mark as manually set if state is SHUTDOWN or SUSPEND
+  // SHUTDOWN always overrides time-based activation
+  // SUSPEND overrides time-based activation until suspendedUntil expires
   // Setting to ACTIVE manually allows time-based activation to take over again
-  // Setting to SUSPEND manually allows time-based activation to take over again after the suspend expires
-  const manuallySet = newState === ORDER_STATE.SHUTDOWN;
+  const manuallySet = newState === ORDER_STATE.SHUTDOWN || newState === ORDER_STATE.SUSPEND;
   
   if (newState === ORDER_STATE.SUSPEND) {
     // Set suspended until 15 minutes from now (unless within time-based window)
