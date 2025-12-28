@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import axios from 'axios';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -16,6 +17,22 @@ const Sidebar = ({ isOpen, onClose }) => {
   const handleNavigation = (path) => {
     navigate(path);
     onClose();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.get('/auth/logout', {
+        withCredentials: true,
+      });
+      // Navigate to login screen after successful logout
+      navigate('/login', { replace: true });
+      onClose();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails, redirect to login
+      navigate('/login', { replace: true });
+      onClose();
+    }
   };
 
   const styles = {
@@ -40,6 +57,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       zIndex: 1000,
       transition: 'transform 0.3s ease, background-color 0.3s ease',
       overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
     },
     sidebarHeader: {
       display: 'flex',
@@ -68,6 +87,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     nav: {
       padding: '10px 0',
+      flex: 1,
     },
     menuList: {
       listStyle: 'none',
@@ -91,6 +111,23 @@ const Sidebar = ({ isOpen, onClose }) => {
     menuButtonActive: {
       backgroundColor: theme.active,
       color: '#ffffff',
+    },
+    logoutButton: {
+      width: '100%',
+      padding: '12px 20px',
+      background: 'none',
+      border: 'none',
+      textAlign: 'left',
+      fontSize: '1rem',
+      color: theme.text,
+      cursor: 'pointer',
+      transition: 'background-color 0.2s, color 0.2s',
+      borderTop: `1px solid ${theme.border}`,
+      marginTop: '10px',
+    },
+    logoutSection: {
+      marginTop: 'auto',
+      paddingTop: '10px',
     },
   };
 
@@ -171,6 +208,22 @@ const Sidebar = ({ isOpen, onClose }) => {
             })}
           </ul>
         </nav>
+
+        {/* Logout Section */}
+        <div style={styles.logoutSection}>
+          <button
+            onClick={handleLogout}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = theme.hover;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+            style={styles.logoutButton}
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </>
   );
