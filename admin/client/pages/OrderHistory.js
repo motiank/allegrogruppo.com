@@ -7,7 +7,7 @@ import {
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 
-const LiveOrders = () => {
+const OrderHistory = () => {
   const { theme } = useTheme();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -113,17 +113,11 @@ const LiveOrders = () => {
     },
     header: {
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-end',
       alignItems: 'center',
       marginBottom: '20px',
       flexWrap: 'wrap',
       gap: '20px',
-    },
-    title: {
-      fontSize: '2rem',
-      fontWeight: '600',
-      color: theme.text,
-      margin: 0,
     },
     filters: {
       display: 'flex',
@@ -451,7 +445,6 @@ const LiveOrders = () => {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>Live Orders</h1>
         <div style={styles.filters}>
           <div style={styles.filterGroup}>
             <label htmlFor="date-select" style={styles.filterLabel}>
@@ -614,4 +607,5 @@ const LiveOrders = () => {
   );
 };
 
-export default LiveOrders;
+export default OrderHistory;
+

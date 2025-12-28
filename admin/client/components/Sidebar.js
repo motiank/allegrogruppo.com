@@ -9,7 +9,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
-    { path: '/orders', label: 'Live Orders' },
+    { path: '/orders', label: 'Orders History' },
     { path: '/analytics', label: 'Analytics' },
   ];
 

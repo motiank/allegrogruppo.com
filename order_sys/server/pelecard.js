@@ -132,7 +132,7 @@ function extractIframeUrl(resultData = {}) {
 router.post('/get-iframe-url', async (req, res) => {
     console.log('[pelecard] Getting iframe URL:', req.body);
   
-  // Check if orders are enabled (block if shutdown or postponed)
+  // Check if orders are enabled (block if shutdown or suspended)
   if (!areOrdersEnabled()) {
     const lang = (req.body.language || 'HE').toLowerCase().slice(0, 2);
     const statusMessage = getStatusMessage(lang);

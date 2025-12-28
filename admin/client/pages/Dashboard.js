@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import OrderSystemWidget from '../components/OrderSystemWidget';
 import { useTheme } from '../context/ThemeContext';
 
 const Dashboard = () => {
@@ -127,25 +126,11 @@ const Dashboard = () => {
       margin: '0 auto',
       padding: '20px',
     },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: '30px',
-      flexWrap: 'wrap',
-      gap: '20px',
-    },
-    title: {
-      fontSize: '2rem',
-      fontWeight: '600',
-      color: theme.text,
-      margin: 0,
-      marginBottom: '8px',
-    },
     dateInfo: {
       fontSize: '0.9rem',
       color: theme.textSecondary,
       fontStyle: 'italic',
+      marginBottom: '20px',
     },
     error: {
       backgroundColor: theme.errorBg,
@@ -277,22 +262,16 @@ const Dashboard = () => {
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Dashboard</h1>
-          {stats && stats.date && (
-            <div style={styles.dateInfo}>
-              Showing orders for: {new Date(stats.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </div>
-          )}
+      {stats && stats.date && (
+        <div style={styles.dateInfo}>
+          Showing orders for: {new Date(stats.date + 'T00:00:00').toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
         </div>
-        <OrderSystemWidget />
-      </div>
+      )}
 
       {error && (
         <div style={styles.error}>

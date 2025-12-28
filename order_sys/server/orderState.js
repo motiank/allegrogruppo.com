@@ -1,6 +1,6 @@
 /**
  * Order System State Management
- * Manages the state of the order system (active, shutdown, postponed)
+ * Manages the state of the order system (active, shutdown, suspend)
  * and provides secure communication with admin service
  */
 
@@ -8,13 +8,13 @@
 export const ORDER_STATE = {
   ACTIVE: 'active',
   SHUTDOWN: 'shutdown',
-  POSTPONED: 'postponed'
+  SUSPEND: 'suspend'
 };
 
 // In-memory state storage
 let currentState = {
   state: ORDER_STATE.ACTIVE,
-  postponedUntil: null, // ISO timestamp when postponed state should end
+  suspendedUntil: null, // ISO timestamp when suspend state should end
   lastUpdated: new Date().toISOString(),
   lastUpdatedBy: null // Admin user who made the change
 };
@@ -41,20 +41,20 @@ export function verifyAuthToken(token) {
  * @returns {Object} Current state object
  */
 export function getState() {
-  // Check if postponed state has expired
-  if (currentState.state === ORDER_STATE.POSTPONED && currentState.postponedUntil) {
+  // Check if suspend state has expired
+  if (currentState.state === ORDER_STATE.SUSPEND && currentState.suspendedUntil) {
     const now = new Date();
-    const postponedUntil = new Date(currentState.postponedUntil);
+    const suspendedUntil = new Date(currentState.suspendedUntil);
     
-    if (now >= postponedUntil) {
+    if (now >= suspendedUntil) {
       // Auto-resume to active state
       currentState = {
         state: ORDER_STATE.ACTIVE,
-        postponedUntil: null,
+        suspendedUntil: null,
         lastUpdated: new Date().toISOString(),
         lastUpdatedBy: 'system-auto-resume'
       };
-      console.log('[orderState] Postponed state expired, auto-resuming to active');
+      console.log('[orderState] Suspend state expired, auto-resuming to active');
     }
   }
   
@@ -84,9 +84,9 @@ export function getStatusMessage(language = 'he') {
         title: 'הזמנות מושבתות זמנית',
         message: 'מערכת ההזמנות מושבתת כרגע. אנא נסו שוב מאוחר יותר.'
       },
-      postponed: {
-        title: 'הזמנות נדחו זמנית',
-        message: 'מערכת ההזמנות נדחתה זמנית. אנא נסו שוב בעוד כמה דקות.'
+      suspend: {
+        title: 'הזמנות מושעות זמנית',
+        message: 'מערכת ההזמנות מושעת זמנית. אנא נסו שוב בעוד כמה דקות.'
       },
       active: {
         title: '',
@@ -98,9 +98,9 @@ export function getStatusMessage(language = 'he') {
         title: 'Orders Temporarily Disabled',
         message: 'The ordering system is currently disabled. Please try again later.'
       },
-      postponed: {
-        title: 'Orders Temporarily Postponed',
-        message: 'The ordering system has been temporarily postponed. Please try again in a few minutes.'
+      suspend: {
+        title: 'Orders Temporarily Suspended',
+        message: 'The ordering system has been temporarily suspended. Please try again in a few minutes.'
       },
       active: {
         title: '',
@@ -112,9 +112,9 @@ export function getStatusMessage(language = 'he') {
         title: 'الطلبات معطلة مؤقتاً',
         message: 'نظام الطلبات معطل حالياً. يرجى المحاولة مرة أخرى لاحقاً.'
       },
-      postponed: {
-        title: 'الطلبات مؤجلة مؤقتاً',
-        message: 'تم تأجيل نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
+      suspend: {
+        title: 'الطلبات معطلة مؤقتاً',
+        message: 'تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
       },
       active: {
         title: '',
@@ -126,9 +126,9 @@ export function getStatusMessage(language = 'he') {
         title: 'Заказы временно отключены',
         message: 'Система заказов в настоящее время отключена. Пожалуйста, попробуйте позже.'
       },
-      postponed: {
-        title: 'Заказы временно отложены',
-        message: 'Система заказов временно отложена. Пожалуйста, попробуйте через несколько минут.'
+      suspend: {
+        title: 'Заказы временно приостановлены',
+        message: 'Система заказов временно приостановлена. Пожалуйста, попробуйте через несколько минут.'
       },
       active: {
         title: '',
@@ -141,27 +141,27 @@ export function getStatusMessage(language = 'he') {
   
   if (state.state === ORDER_STATE.SHUTDOWN) {
     return langMessages.shutdown;
-  } else if (state.state === ORDER_STATE.POSTPONED) {
-    // Calculate remaining time if postponed
-    let message = langMessages.postponed.message;
-    if (state.postponedUntil) {
+  } else if (state.state === ORDER_STATE.SUSPEND) {
+    // Calculate remaining time if suspended
+    let message = langMessages.suspend.message;
+    if (state.suspendedUntil) {
       const now = new Date();
-      const until = new Date(state.postponedUntil);
+      const until = new Date(state.suspendedUntil);
       const minutesLeft = Math.ceil((until - now) / (1000 * 60));
       if (minutesLeft > 0) {
         if (language === 'he') {
-          message = `מערכת ההזמנות נדחתה זמנית. אנא נסו שוב בעוד ${minutesLeft} דקות.`;
+          message = `מערכת ההזמנות מושעת זמנית. אנא נסו שוב בעוד ${minutesLeft} דקות.`;
         } else if (language === 'en') {
-          message = `The ordering system has been temporarily postponed. Please try again in ${minutesLeft} minutes.`;
+          message = `The ordering system has been temporarily suspended. Please try again in ${minutesLeft} minutes.`;
         } else if (language === 'ar') {
-          message = `تم تأجيل نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد ${minutesLeft} دقائق.`;
+          message = `تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد ${minutesLeft} دقائق.`;
         } else if (language === 'ru') {
-          message = `Система заказов временно отложена. Пожалуйста, попробуйте через ${minutesLeft} минут.`;
+          message = `Система заказов временно приостановлена. Пожалуйста, попробуйте через ${minutesLeft} минут.`;
         }
       }
     }
     return {
-      title: langMessages.postponed.title,
+      title: langMessages.suspend.title,
       message: message
     };
   }
@@ -171,7 +171,7 @@ export function getStatusMessage(language = 'he') {
 
 /**
  * Update order system state (called by admin service)
- * @param {string} newState - New state (active, shutdown, postponed)
+ * @param {string} newState - New state (active, shutdown, suspend)
  * @param {string} authToken - Authentication token
  * @param {string} updatedBy - Admin user who made the change
  * @returns {Object} Result object with success status
@@ -195,23 +195,23 @@ export function updateState(newState, authToken, updatedBy = 'admin') {
   
   // Update state
   const now = new Date();
-  let postponedUntil = null;
+  let suspendedUntil = null;
   
-  if (newState === ORDER_STATE.POSTPONED) {
-    // Set postponed until 15 minutes from now
-    postponedUntil = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+  if (newState === ORDER_STATE.SUSPEND) {
+    // Set suspended until 15 minutes from now
+    suspendedUntil = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
   }
   
   currentState = {
     state: newState,
-    postponedUntil: postponedUntil,
+    suspendedUntil: suspendedUntil,
     lastUpdated: now.toISOString(),
     lastUpdatedBy: updatedBy
   };
   
   console.log(`[orderState] State updated to ${newState} by ${updatedBy}`, {
     state: newState,
-    postponedUntil: postponedUntil,
+    suspendedUntil: suspendedUntil,
     lastUpdated: currentState.lastUpdated
   });
   

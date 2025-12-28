@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import Login from './Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import LiveOrders from './pages/LiveOrders';
+import OrderHistory from './pages/OrderHistory';
 import Analytics from './pages/analytics/index.js';
 import axios from 'axios';
 
@@ -104,7 +104,7 @@ const App = () => {
           element={
             <ProtectedRoute>
               <Layout>
-                <LiveOrders />
+                <OrderHistory />
               </Layout>
             </ProtectedRoute>
           }

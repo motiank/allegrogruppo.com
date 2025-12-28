@@ -3,7 +3,7 @@ import { Router as r404 } from './r404.js';
 
 /**
  * Order System Control Module
- * Allows admin to control the order system state (active, shutdown, postponed)
+ * Allows admin to control the order system state (active, shutdown, suspend)
  */
 
 const ORDER_SYSTEM_URL = process.env.ORDER_SYSTEM_URL;
@@ -61,11 +61,11 @@ async function updateOrderSystemState(req, res) {
   if (!state) {
     return res.status(400).json({
       error: 'State parameter is required',
-      validStates: ['active', 'shutdown', 'postponed']
+      validStates: ['active', 'shutdown', 'suspend']
     });
   }
 
-  const validStates = ['active', 'shutdown', 'postponed'];
+  const validStates = ['active', 'shutdown', 'suspend'];
   if (!validStates.includes(state)) {
     return res.status(400).json({
       error: `Invalid state. Must be one of: ${validStates.join(', ')}`

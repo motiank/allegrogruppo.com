@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useTheme } from '../context/ThemeContext';
+import OrderSystemDropdown from './OrderSystemDropdown';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+
+  const menuItems = [
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/orders', label: 'Orders History' },
+    { path: '/analytics', label: 'Analytics' },
+  ];
+
+  const getCurrentPageTitle = () => {
+    const currentItem = menuItems.find(item => item.path === location.pathname);
+    return currentItem ? currentItem.label : 'Admin Panel';
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -34,6 +48,11 @@ const Layout = ({ children }) => {
       zIndex: 1000,
       boxShadow: `0 2px 4px ${theme.shadow}`,
       transition: 'background-color 0.3s ease, border-color 0.3s ease',
+    },
+    topBarRight: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
     },
     topBarLeft: {
       display: 'flex',
@@ -110,10 +129,12 @@ const Layout = ({ children }) => {
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <h1 style={styles.title}>Admin Panel</h1>
+          <h1 style={styles.title}>{getCurrentPageTitle()}</h1>
         </div>
-        <button
-          onClick={toggleTheme}
+        <div style={styles.topBarRight}>
+          <OrderSystemDropdown />
+          <button
+            onClick={toggleTheme}
           onMouseEnter={(e) => {
             e.target.style.backgroundColor = theme.hover;
           }}
@@ -141,7 +162,8 @@ const Layout = ({ children }) => {
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
           )}
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Sidebar */}

@@ -62,17 +62,17 @@ const OrderSystemWidget = () => {
         return { label: 'Active', color: '#28a745', bgColor: '#d4edda', borderColor: '#c3e6cb' };
       case 'shutdown':
         return { label: 'Shutdown', color: '#dc3545', bgColor: '#f8d7da', borderColor: '#f5c6cb' };
-      case 'postponed':
-        return { label: 'Postponed', color: '#856404', bgColor: '#fff3cd', borderColor: '#ffeaa7' };
+      case 'suspend':
+        return { label: 'Suspend', color: '#856404', bgColor: '#fff3cd', borderColor: '#ffeaa7' };
       default:
         return { label: 'Unknown', color: '#6c757d', bgColor: '#e9ecef', borderColor: '#dee2e6' };
     }
   };
 
-  const getTimeRemaining = (postponedUntil) => {
-    if (!postponedUntil) return null;
+  const getTimeRemaining = (suspendedUntil) => {
+    if (!suspendedUntil) return null;
     const now = new Date();
-    const until = new Date(postponedUntil);
+    const until = new Date(suspendedUntil);
     const diff = until - now;
     
     if (diff <= 0) return 'Expired';
@@ -212,7 +212,7 @@ const OrderSystemWidget = () => {
   }
 
   const stateDisplay = state ? getStateDisplay(state.state) : null;
-  const timeRemaining = state?.postponedUntil ? getTimeRemaining(state.postponedUntil) : null;
+  const timeRemaining = state?.suspendedUntil ? getTimeRemaining(state.suspendedUntil) : null;
 
   return (
     <div style={styles.widget}>
@@ -272,16 +272,16 @@ const OrderSystemWidget = () => {
               ✓ Turn On
             </button>
             <button
-              onClick={() => updateState('postponed')}
-              disabled={updating || state.state === 'postponed'}
+              onClick={() => updateState('suspend')}
+              disabled={updating || state.state === 'suspend'}
               onMouseEnter={(e) => {
-                if (!updating && state.state !== 'postponed') {
+                if (!updating && state.state !== 'suspend') {
                   e.target.style.backgroundColor = theme.warning;
                   e.target.style.color = theme.mode === 'dark' ? '#fff' : '#000';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!updating && state.state !== 'postponed') {
+                if (!updating && state.state !== 'suspend') {
                   e.target.style.backgroundColor = theme.surface;
                   e.target.style.color = theme.warningText;
                 }
@@ -289,11 +289,11 @@ const OrderSystemWidget = () => {
               style={{
                 ...styles.actionButton,
                 ...styles.buttonPostpone,
-                ...(state.state === 'postponed' ? styles.buttonCurrent : {}),
+                ...(state.state === 'suspend' ? styles.buttonCurrent : {}),
                 ...(updating ? styles.buttonDisabled : {}),
               }}
             >
-              ⏸ Postpone
+              ⏸ Suspend
             </button>
             <button
               onClick={() => updateState('shutdown')}

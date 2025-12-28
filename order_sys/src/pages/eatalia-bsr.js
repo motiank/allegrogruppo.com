@@ -598,7 +598,7 @@ const EataliaBSRPage = () => {
   const [dynamicMeals, setDynamicMeals] = useState([]);
   const [dishImagesMap, setDishImagesMap] = useState({});
   const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
-  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'postponed'
+  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'suspend'
   const [statusMessage, setStatusMessage] = useState(null); // Status message object with title and message
   
   // Check if orders are enabled
