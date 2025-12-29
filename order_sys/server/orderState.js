@@ -291,8 +291,8 @@ export function getStatusMessage(language = 'he') {
   const messages = {
     he: {
       shutdown: {
-        title: 'הזמנות מושבתות זמנית',
-        message: 'מערכת ההזמנות מושבתת כרגע. אנא נסו שוב מאוחר יותר.'
+        title: 'סיימנו להיום',
+        message: 'מחר ב־{START_TIME} חוזרים\nעם אוכל מצוין ומחירים מפתיעים.'
       },
       suspend: {
         title: 'המטבח עובד במלוא הקצב 🔥',
@@ -313,8 +313,8 @@ export function getStatusMessage(language = 'he') {
     },
     en: {
       shutdown: {
-        title: 'Orders Temporarily Disabled',
-        message: 'The ordering system is currently disabled. Please try again later.'
+        title: 'We finished for today',
+        message: 'Tomorrow at {START_TIME} we\'re back\nwith excellent food and surprising prices.'
       },
       suspend: {
         title: 'Orders Temporarily Suspended',
@@ -325,8 +325,8 @@ export function getStatusMessage(language = 'he') {
         message: 'The system is currently closed, we\'re doing final preparations.'
       },
       afterClosing: {
-        title: 'Orders Temporarily Suspended',
-        message: 'The ordering system has been temporarily suspended. Please try again in a few minutes.'
+        title: 'We finished for today',
+        message: 'Tomorrow at {START_TIME} we\'re back\nwith excellent food and surprising prices.'
       },
       active: {
         title: '',
@@ -335,8 +335,8 @@ export function getStatusMessage(language = 'he') {
     },
     ar: {
       shutdown: {
-        title: 'الطلبات معطلة مؤقتاً',
-        message: 'نظام الطلبات معطل حالياً. يرجى المحاولة مرة أخرى لاحقاً.'
+        title: 'انتهينا لهذا اليوم',
+        message: 'غداً في {START_TIME} نعود\nمع طعام ممتاز وأسعار مفاجئة.'
       },
       suspend: {
         title: 'الطلبات معطلة مؤقتاً',
@@ -347,8 +347,8 @@ export function getStatusMessage(language = 'he') {
         message: 'النظام مغلق حالياً، نحن في التحضيرات النهائية.'
       },
       afterClosing: {
-        title: 'الطلبات معطلة مؤقتاً',
-        message: 'تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
+        title: 'انتهينا لهذا اليوم',
+        message: 'غداً في {START_TIME} نعود\nمع طعام ممتاز وأسعار مفاجئة.'
       },
       active: {
         title: '',
@@ -357,8 +357,8 @@ export function getStatusMessage(language = 'he') {
     },
     ru: {
       shutdown: {
-        title: 'Заказы временно отключены',
-        message: 'Система заказов в настоящее время отключена. Пожалуйста, попробуйте позже.'
+        title: 'Мы закончили на сегодня',
+        message: 'Завтра в {START_TIME} возвращаемся\nс отличной едой и удивительными ценами.'
       },
       suspend: {
         title: 'Заказы временно приостановлены',
@@ -369,8 +369,8 @@ export function getStatusMessage(language = 'he') {
         message: 'Система в настоящее время закрыта, мы делаем последние приготовления.'
       },
       afterClosing: {
-        title: 'Заказы временно приостановлены',
-        message: 'Система заказов временно приостановлена. Пожалуйста, попробуйте через несколько минут.'
+        title: 'Мы закончили на сегодня',
+        message: 'Завтра в {START_TIME} возвращаемся\nс отличной едой и удивительными ценами.'
       },
       active: {
         title: '',
@@ -382,7 +382,38 @@ export function getStatusMessage(language = 'he') {
   const langMessages = messages[language] || messages.he;
   
   if (state.state === ORDER_STATE.SHUTDOWN) {
-    return langMessages.shutdown;
+    // Use the same message as after closing
+    if (language === 'he') {
+      const messageText = langMessages.shutdown.message.replace('{START_TIME}', START_TIME);
+      return {
+        title: langMessages.shutdown.title,
+        message: `<pre>${messageText}</pre>`
+      };
+    } else if (language === 'en') {
+      const messageText = langMessages.shutdown.message.replace('{START_TIME}', START_TIME);
+      return {
+        title: langMessages.shutdown.title,
+        message: `<pre>${messageText}</pre>`
+      };
+    } else if (language === 'ar') {
+      const messageText = langMessages.shutdown.message.replace('{START_TIME}', START_TIME);
+      return {
+        title: langMessages.shutdown.title,
+        message: `<pre>${messageText}</pre>`
+      };
+    } else if (language === 'ru') {
+      const messageText = langMessages.shutdown.message.replace('{START_TIME}', START_TIME);
+      return {
+        title: langMessages.shutdown.title,
+        message: `<pre>${messageText}</pre>`
+      };
+    }
+    // Fallback
+    const messageText = langMessages.shutdown.message.replace('{START_TIME}', START_TIME);
+    return {
+      title: langMessages.shutdown.title,
+      message: `<pre>${messageText}</pre>`
+    };
   } else if (state.state === ORDER_STATE.SUSPEND) {
     // Check if we're in pre-opening (before start time) or after closing (after end time)
     const israelNow = getIsraelTime();
@@ -465,19 +496,22 @@ export function getStatusMessage(language = 'he') {
             message: `<pre>${messageText}</pre>`
           };
         } else if (language === 'en') {
+          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
           return {
             title: langMessages.afterClosing.title,
-            message: `<pre>We finished for today! Tomorrow at ${START_TIME} we're back\nwith excellent food and surprising prices.</pre>`
+            message: `<pre>${messageText}</pre>`
           };
         } else if (language === 'ar') {
+          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
           return {
             title: langMessages.afterClosing.title,
-            message: `<pre>انتهينا لهذا اليوم! غداً في ${START_TIME} نعود\nمع طعام ممتاز وأسعار مفاجئة.</pre>`
+            message: `<pre>${messageText}</pre>`
           };
         } else if (language === 'ru') {
+          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
           return {
             title: langMessages.afterClosing.title,
-            message: `<pre>Мы закончили на сегодня! Завтра в ${START_TIME} возвращаемся\nс отличной едой и удивительными ценами.</pre>`
+            message: `<pre>${messageText}</pre>`
           };
         }
       }
