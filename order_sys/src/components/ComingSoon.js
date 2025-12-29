@@ -48,6 +48,14 @@ const useStyles = createUseStyles({
     lineHeight: 1.6,
     opacity: 0.95,
     margin: 0,
+    '& pre': {
+      margin: 0,
+      fontFamily: 'inherit',
+      fontSize: 'inherit',
+      lineHeight: 'inherit',
+      whiteSpace: 'pre-wrap',
+      wordWrap: 'break-word',
+    },
   },
   subtitle: {
     fontSize: '1rem',
@@ -182,7 +190,10 @@ export const ComingSoon = ({ statusMessage, state }) => {
       <div className={classes.content}>
         <ChefIcon className={classes.chefIcon} />
         <h1 className={classes.title}>{title}</h1>
-        <p className={classes.message}>{message}</p>
+        <div 
+          className={classes.message} 
+          dangerouslySetInnerHTML={{ __html: message }}
+        />
         {subtitle && <p className={classes.subtitle}>{subtitle}</p>}
       </div>
     </div>

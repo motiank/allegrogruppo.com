@@ -69,7 +69,7 @@ function getIsraelTime() {
     second: '2-digit',
     hour12: false
   });
-  
+   console.log(`[orderState] getIsraelTime: ${now}`);
   const parts = formatter.formatToParts(now);
   const year = parseInt(parts.find(p => p.type === 'year').value);
   const month = parseInt(parts.find(p => p.type === 'month').value) - 1; // Month is 0-indexed
@@ -207,12 +207,14 @@ export function getState() {
         // Outside active hours - set to SUSPEND (unless manually shutdown)
         if (currentState.state !== ORDER_STATE.SHUTDOWN) {
           const israelNow = getIsraelTime();
+          console.log(`[orderState] israelNow: ${israelNow}`);
         // Calculate time until start time next
         const startTime = parseTime(START_TIME);
         if (startTime) {
           // Calculate minutes until next start time
           const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
           const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+          console.log(`[orderState] startTimeMinutes: ${startTimeMinutes}, currentTimeMinutes: ${currentTimeMinutes}`);
           
           let minutesUntilStart;
           if (currentTimeMinutes < startTimeMinutes) {
@@ -268,6 +270,17 @@ export function areOrdersEnabled() {
 }
 
 /**
+ * Format minutes as HH:MM
+ * @param {number} minutes - Total minutes
+ * @returns {string} Formatted time as HH:MM
+ */
+function formatTimeRemaining(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
+
+/**
  * Get status message for customers based on current state
  * @param {string} language - Language code (he, en, ar, ru)
  * @returns {Object} Status message object with title and message
@@ -282,8 +295,16 @@ export function getStatusMessage(language = 'he') {
         message: 'מערכת ההזמנות מושבתת כרגע. אנא נסו שוב מאוחר יותר.'
       },
       suspend: {
-        title: 'הזמנות מושעות זמנית',
-        message: 'מערכת ההזמנות מושעת זמנית. אנא נסו שוב בעוד כמה דקות.'
+        title: 'המטבח עובד במלוא הקצב 🔥',
+        message: 'כרגע לא יכולים לקבל הזמנות נוספות.'
+      },
+      preOpening: {
+        title: '☀️ בוקר טוב!',
+        message: 'המערכת סגורה כרגע, אנחנו בהכנות אחרונות.'
+      },
+      afterClosing: {
+        title: 'סיימנו להיום',
+        message: 'מחר ב־{START_TIME} חוזרים\nעם אוכל מצוין ומחירים מפתיעים.'
       },
       active: {
         title: '',
@@ -296,6 +317,14 @@ export function getStatusMessage(language = 'he') {
         message: 'The ordering system is currently disabled. Please try again later.'
       },
       suspend: {
+        title: 'Orders Temporarily Suspended',
+        message: 'The ordering system has been temporarily suspended. Please try again in a few minutes.'
+      },
+      preOpening: {
+        title: '☀️ Good morning!',
+        message: 'The system is currently closed, we\'re doing final preparations.'
+      },
+      afterClosing: {
         title: 'Orders Temporarily Suspended',
         message: 'The ordering system has been temporarily suspended. Please try again in a few minutes.'
       },
@@ -313,6 +342,14 @@ export function getStatusMessage(language = 'he') {
         title: 'الطلبات معطلة مؤقتاً',
         message: 'تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
       },
+      preOpening: {
+        title: '☀️ صباح الخير!',
+        message: 'النظام مغلق حالياً، نحن في التحضيرات النهائية.'
+      },
+      afterClosing: {
+        title: 'الطلبات معطلة مؤقتاً',
+        message: 'تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
+      },
       active: {
         title: '',
         message: ''
@@ -324,6 +361,14 @@ export function getStatusMessage(language = 'he') {
         message: 'Система заказов в настоящее время отключена. Пожалуйста, попробуйте позже.'
       },
       suspend: {
+        title: 'Заказы временно приостановлены',
+        message: 'Система заказов временно приостановлена. Пожалуйста, попробуйте через несколько минут.'
+      },
+      preOpening: {
+        title: '☀️ Доброе утро!',
+        message: 'Система в настоящее время закрыта, мы делаем последние приготовления.'
+      },
+      afterClosing: {
         title: 'Заказы временно приостановлены',
         message: 'Система заказов временно приостановлена. Пожалуйста, попробуйте через несколько минут.'
       },
@@ -339,7 +384,106 @@ export function getStatusMessage(language = 'he') {
   if (state.state === ORDER_STATE.SHUTDOWN) {
     return langMessages.shutdown;
   } else if (state.state === ORDER_STATE.SUSPEND) {
-    // Calculate remaining time if suspended
+    // Check if we're in pre-opening (before start time) or after closing (after end time)
+    const israelNow = getIsraelTime();
+    const startTime = parseTime(START_TIME);
+    const endTime = parseTime(END_TIME);
+    
+    // Calculate minutes until start time from suspendedUntil if available
+    let minutesUntilStart = 0;
+    if (state.suspendedUntil) {
+      const now = new Date();
+      const until = new Date(state.suspendedUntil);
+      minutesUntilStart = Math.ceil((until - now) / (1000 * 60));
+    }
+    
+    if (startTime && endTime && minutesUntilStart > 0) {
+      const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
+      const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+      const endTimeMinutes = endTime.hours * 60 + endTime.minutes;
+      
+      let isPreOpening = false;
+      
+      // Determine if we're before opening or after closing
+      // When in SUSPEND state, we're outside active hours
+      if (endTimeMinutes < startTimeMinutes) {
+        // Window spans midnight (e.g., 22:00 to 02:00)
+        // Active: startTime (today) to endTime (tomorrow)
+        // So if current <= endTime, we're in the early morning part of active window (shouldn't happen in SUSPEND)
+        // If current > endTime and current < startTime, we're waiting for today's start time (pre-opening)
+        if (currentTimeMinutes > endTimeMinutes && currentTimeMinutes < startTimeMinutes) {
+          // Pre-opening: waiting for today's start time
+          isPreOpening = true;
+        } else {
+          // After closing: waiting for tomorrow's start time (technically same as today's start time, but next occurrence)
+          isPreOpening = false;
+        }
+      } else {
+        // Normal window within same day (e.g., 11:00 to 15:00)
+        if (currentTimeMinutes < startTimeMinutes) {
+          // Pre-opening: before today's start time
+          isPreOpening = true;
+        } else {
+          // After closing: after today's end time, waiting for tomorrow's start time
+          isPreOpening = false;
+        }
+      }
+      
+      // Use pre-opening message if we're before start time
+      if (isPreOpening) {
+        const timeStr = formatTimeRemaining(minutesUntilStart);
+        if (language === 'he') {
+          return {
+            title: langMessages.preOpening.title,
+            message: `<pre>${langMessages.preOpening.message}\nנפתח בעוד ${timeStr} כדאי לחזור!</pre>`
+          };
+        } else if (language === 'en') {
+          return {
+            title: langMessages.preOpening.title,
+            message: `<pre>${langMessages.preOpening.message}\nWill open in ${timeStr}, worth coming back!</pre>`
+          };
+        } else if (language === 'ar') {
+          return {
+            title: langMessages.preOpening.title,
+            message: `<pre>${langMessages.preOpening.message}\nسيفتح خلال ${timeStr}، يستحق العودة!</pre>`
+          };
+        } else if (language === 'ru') {
+          return {
+            title: langMessages.preOpening.title,
+            message: `<pre>${langMessages.preOpening.message}\nОткроется через ${timeStr}, стоит вернуться!</pre>`
+          };
+        }
+      }
+      
+      // Use after closing message
+      if (!isPreOpening) {
+        const timeStr = formatTimeRemaining(minutesUntilStart);
+        if (language === 'he') {
+          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
+          return {
+            title: langMessages.afterClosing.title,
+            message: `<pre>${messageText}</pre>`
+          };
+        } else if (language === 'en') {
+          return {
+            title: langMessages.afterClosing.title,
+            message: `<pre>We finished for today! Tomorrow at ${START_TIME} we're back\nwith excellent food and surprising prices.</pre>`
+          };
+        } else if (language === 'ar') {
+          return {
+            title: langMessages.afterClosing.title,
+            message: `<pre>انتهينا لهذا اليوم! غداً في ${START_TIME} نعود\nمع طعام ممتاز وأسعار مفاجئة.</pre>`
+          };
+        } else if (language === 'ru') {
+          return {
+            title: langMessages.afterClosing.title,
+            message: `<pre>Мы закончили на сегодня! Завтра в ${START_TIME} возвращаемся\nс отличной едой и удивительными ценами.</pre>`
+          };
+        }
+      }
+    }
+    
+    // Fallback to generic suspend message
     let message = langMessages.suspend.message;
     if (state.suspendedUntil) {
       const now = new Date();
@@ -347,15 +491,21 @@ export function getStatusMessage(language = 'he') {
       const minutesLeft = Math.ceil((until - now) / (1000 * 60));
       if (minutesLeft > 0) {
         if (language === 'he') {
-          message = `מערכת ההזמנות מושעת זמנית. אנא נסו שוב בעוד ${minutesLeft} דקות.`;
+          message = `<pre>${langMessages.suspend.message}\nתנו לנו עוד ${minutesLeft} דקות — שווה לחזור.</pre>`;
         } else if (language === 'en') {
-          message = `The ordering system has been temporarily suspended. Please try again in ${minutesLeft} minutes.`;
+          message = `<pre>The kitchen is working at full speed 🔥\nCurrently cannot accept additional orders.\nGive us ${minutesLeft} more minutes — worth coming back.</pre>`;
         } else if (language === 'ar') {
-          message = `تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد ${minutesLeft} دقائق.`;
+          message = `<pre>المطبخ يعمل بكامل طاقته 🔥\nحالياً لا يمكننا قبول طلبات إضافية.\nامنحونا ${minutesLeft} دقائق أخرى — يستحق العودة.</pre>`;
         } else if (language === 'ru') {
-          message = `Система заказов временно приостановлена. Пожалуйста, попробуйте через ${minutesLeft} минут.`;
+          message = `<pre>Кухня работает на полную мощность 🔥\nВ настоящее время не можем принимать дополнительные заказы.\nДайте нам еще ${minutesLeft} минут — стоит вернуться.</pre>`;
         }
+      } else {
+        // If no time left, wrap the basic message in <pre>
+        message = `<pre>${langMessages.suspend.message}</pre>`;
       }
+    } else {
+      // If no suspendedUntil, wrap the basic message in <pre>
+      message = `<pre>${langMessages.suspend.message}</pre>`;
     }
     return {
       title: langMessages.suspend.title,
