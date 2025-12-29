@@ -415,7 +415,7 @@ export function getStatusMessage(language = 'he') {
       message: `<pre>${messageText}</pre>`
     };
   } else if (state.state === ORDER_STATE.SUSPEND) {
-    // Check if we're in pre-opening (before start time) or after closing (after end time)
+    // Check if we're in pre-opening (before start time)
     const israelNow = getIsraelTime();
     const startTime = parseTime(START_TIME);
     const endTime = parseTime(END_TIME);
@@ -428,95 +428,53 @@ export function getStatusMessage(language = 'he') {
       minutesUntilStart = Math.ceil((until - now) / (1000 * 60));
     }
     
-    if (startTime && endTime && minutesUntilStart > 0) {
+    // Check if we're in pre-opening time (before start time)
+    let isPreOpening = false;
+    if (startTime && endTime) {
       const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
       const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
       const endTimeMinutes = endTime.hours * 60 + endTime.minutes;
       
-      let isPreOpening = false;
-      
-      // Determine if we're before opening or after closing
-      // When in SUSPEND state, we're outside active hours
       if (endTimeMinutes < startTimeMinutes) {
-        // Window spans midnight (e.g., 22:00 to 02:00)
-        // Active: startTime (today) to endTime (tomorrow)
-        // So if current <= endTime, we're in the early morning part of active window (shouldn't happen in SUSPEND)
-        // If current > endTime and current < startTime, we're waiting for today's start time (pre-opening)
+        // Window spans midnight
         if (currentTimeMinutes > endTimeMinutes && currentTimeMinutes < startTimeMinutes) {
-          // Pre-opening: waiting for today's start time
           isPreOpening = true;
-        } else {
-          // After closing: waiting for tomorrow's start time (technically same as today's start time, but next occurrence)
-          isPreOpening = false;
         }
       } else {
-        // Normal window within same day (e.g., 11:00 to 15:00)
+        // Normal window within same day
         if (currentTimeMinutes < startTimeMinutes) {
-          // Pre-opening: before today's start time
           isPreOpening = true;
-        } else {
-          // After closing: after today's end time, waiting for tomorrow's start time
-          isPreOpening = false;
-        }
-      }
-      
-      // Use pre-opening message if we're before start time
-      if (isPreOpening) {
-        const timeStr = formatTimeRemaining(minutesUntilStart);
-        if (language === 'he') {
-          return {
-            title: langMessages.preOpening.title,
-            message: `<pre>${langMessages.preOpening.message}\nנפתח בעוד ${timeStr} כדאי לחזור!</pre>`
-          };
-        } else if (language === 'en') {
-          return {
-            title: langMessages.preOpening.title,
-            message: `<pre>${langMessages.preOpening.message}\nWill open in ${timeStr}, worth coming back!</pre>`
-          };
-        } else if (language === 'ar') {
-          return {
-            title: langMessages.preOpening.title,
-            message: `<pre>${langMessages.preOpening.message}\nسيفتح خلال ${timeStr}، يستحق العودة!</pre>`
-          };
-        } else if (language === 'ru') {
-          return {
-            title: langMessages.preOpening.title,
-            message: `<pre>${langMessages.preOpening.message}\nОткроется через ${timeStr}, стоит вернуться!</pre>`
-          };
-        }
-      }
-      
-      // Use after closing message
-      if (!isPreOpening) {
-        const timeStr = formatTimeRemaining(minutesUntilStart);
-        if (language === 'he') {
-          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
-          return {
-            title: langMessages.afterClosing.title,
-            message: `<pre>${messageText}</pre>`
-          };
-        } else if (language === 'en') {
-          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
-          return {
-            title: langMessages.afterClosing.title,
-            message: `<pre>${messageText}</pre>`
-          };
-        } else if (language === 'ar') {
-          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
-          return {
-            title: langMessages.afterClosing.title,
-            message: `<pre>${messageText}</pre>`
-          };
-        } else if (language === 'ru') {
-          const messageText = langMessages.afterClosing.message.replace('{START_TIME}', START_TIME);
-          return {
-            title: langMessages.afterClosing.title,
-            message: `<pre>${messageText}</pre>`
-          };
         }
       }
     }
     
+    // Use pre-opening message if we're before start time
+    if (isPreOpening && minutesUntilStart > 0) {
+      const timeStr = formatTimeRemaining(minutesUntilStart);
+      if (language === 'he') {
+        return {
+          title: langMessages.preOpening.title,
+          message: `<pre>${langMessages.preOpening.message}\nנפתח בעוד ${timeStr} כדאי לחזור!</pre>`
+        };
+      } else if (language === 'en') {
+        return {
+          title: langMessages.preOpening.title,
+          message: `<pre>${langMessages.preOpening.message}\nWill open in ${timeStr}, worth coming back!</pre>`
+        };
+      } else if (language === 'ar') {
+        return {
+          title: langMessages.preOpening.title,
+          message: `<pre>${langMessages.preOpening.message}\nسيفتح خلال ${timeStr}، يستحق العودة!</pre>`
+        };
+      } else if (language === 'ru') {
+        return {
+          title: langMessages.preOpening.title,
+          message: `<pre>${langMessages.preOpening.message}\nОткроется через ${timeStr}, стоит вернуться!</pre>`
+        };
+      }
+    }
+    
+    // For all other suspend cases (including after closing), use the suspend message
     // Fallback to generic suspend message
     let message = langMessages.suspend.message;
     if (state.suspendedUntil) {
