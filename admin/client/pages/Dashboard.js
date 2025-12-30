@@ -12,6 +12,12 @@ const Dashboard = () => {
   const [openDropdownOrderId, setOpenDropdownOrderId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [eventCounts, setEventCounts] = useState({
+    welcome_started: 0,
+    meal_added_to_cart: 0,
+    payment_step_opened: 0,
+  });
+  const [eventCountsLoading, setEventCountsLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -41,12 +47,58 @@ const Dashboard = () => {
     }
   }, []);
 
+  const fetchEventCounts = useCallback(async (date) => {
+    try {
+      setEventCountsLoading(true);
+      const params = new URLSearchParams();
+      if (date) {
+        params.append('start', date);
+        params.append('end', date);
+      }
+      
+      const response = await axios.get(`/admin/analytics/event-counts?${params.toString()}`, {
+        withCredentials: true,
+      });
+      
+      setEventCounts({
+        welcome_started: response.data.welcome_started || 0,
+        meal_added_to_cart: response.data.meal_added_to_cart || 0,
+        payment_step_opened: response.data.payment_step_opened || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching event counts:', error);
+      setEventCounts({
+        welcome_started: 0,
+        meal_added_to_cart: 0,
+        payment_step_opened: 0,
+      });
+    } finally {
+      setEventCountsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDashboardData();
     // Refresh every 30 seconds
     const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    // Fetch event counts when stats date changes - only for the displayed date
+    if (stats && stats.date) {
+      // Fetch event counts for the same date that's displayed on the dashboard
+      fetchEventCounts(stats.date);
+    } else {
+      // Reset counts if no date
+      setEventCounts({
+        welcome_started: 0,
+        meal_added_to_cart: 0,
+        payment_step_opened: 0,
+      });
+      setEventCountsLoading(false);
+    }
+  }, [stats?.date, fetchEventCounts]);
 
   const handleDragStart = (e, order) => {
     setOpenDropdownOrderId(null); // Close dropdown when dragging starts
@@ -491,6 +543,41 @@ const Dashboard = () => {
       color: theme.text,
       border: `1px solid ${theme.border}`,
     },
+    eventStatsContainer: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '20px',
+      marginBottom: '30px',
+    },
+    eventBox: {
+      backgroundColor: theme.surface,
+      border: `1px solid ${theme.border}`,
+      borderRadius: '8px',
+      padding: '24px',
+      textAlign: 'center',
+      boxShadow: `0 2px 4px ${theme.shadow}`,
+    },
+    eventLabel: {
+      fontSize: '0.75rem',
+      color: theme.textSecondary,
+      textTransform: 'uppercase',
+      marginBottom: '8px',
+      fontWeight: 600,
+      letterSpacing: '0.5px',
+    },
+    eventCount: {
+      fontSize: '2rem',
+      fontWeight: 'bold',
+      color: theme.success,
+    },
+    conversionRate: {
+      fontSize: '1.125rem',
+      fontWeight: 'bold',
+      color: theme.info,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });
 
   const styles = getStyles();
@@ -505,6 +592,37 @@ const Dashboard = () => {
             month: 'long', 
             day: 'numeric' 
           })}
+        </div>
+      )}
+
+      {stats && stats.date && !eventCountsLoading && (
+        <div style={styles.eventStatsContainer}>
+          <div style={styles.eventBox}>
+            <div style={styles.eventLabel}>Welcome</div>
+            <div style={styles.eventCount}>{eventCounts.welcome_started}</div>
+          </div>
+          
+          <div style={styles.conversionRate}>
+            {eventCounts.welcome_started > 0 
+              ? ((eventCounts.meal_added_to_cart / eventCounts.welcome_started) * 100).toFixed(1)
+              : '0.0'}%
+          </div>
+          
+          <div style={styles.eventBox}>
+            <div style={styles.eventLabel}>Cart Add</div>
+            <div style={styles.eventCount}>{eventCounts.meal_added_to_cart}</div>
+          </div>
+          
+          <div style={styles.conversionRate}>
+            {eventCounts.meal_added_to_cart > 0
+              ? ((eventCounts.payment_step_opened / eventCounts.meal_added_to_cart) * 100).toFixed(1)
+              : '0.0'}%
+          </div>
+          
+          <div style={styles.eventBox}>
+            <div style={styles.eventLabel}>Payment Step Opened</div>
+            <div style={styles.eventCount}>{eventCounts.payment_step_opened}</div>
+          </div>
         </div>
       )}
 

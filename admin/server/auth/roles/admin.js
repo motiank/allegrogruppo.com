@@ -4,6 +4,7 @@ import { Router as dashboard } from "../../modules/dashboard.js";
 import { Router as orders } from "../../modules/orders.js";
 import  allegro from "../../modules/allegro.js";
 import { Router as orderSystem } from "../../modules/orderSystem.js";
+import { Router as analytics } from "../../modules/analytics.js";
 
 const api = function () {
   var admin = express.Router();
@@ -20,6 +21,7 @@ const api = function () {
   admin.use("/orders", orders());
   admin.use("/allegro", allegro());
   admin.use("/order-system", orderSystem());
+  admin.use("/analytics", analytics());
   return admin;
 };
 

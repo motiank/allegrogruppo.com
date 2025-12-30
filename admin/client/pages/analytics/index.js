@@ -167,6 +167,7 @@ function ChartWidget() {
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
+
   const handleChange = (barData) => {
     settbarData(barData);
     let new_data = groupIntoDateMap(getDateMap(barData), rawData);
