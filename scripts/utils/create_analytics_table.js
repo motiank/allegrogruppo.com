@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync } from 'fs';
-import { executeSql } from '../order_sys/server/sources/dbpool.js';
+import { executeSql } from '../../order_sys/server/sources/dbpool.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
