@@ -2,6 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import passport from 'passport';
 import cookieParser from 'cookie-parser';
+import cron from 'node-cron';
+import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -89,4 +91,34 @@ app.get('*', (req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Admin server running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+  
+  // Setup analoader cron job - runs every day at 6:00 AM
+  const projectRoot = join(__dirname, '../..');
+  
+  cron.schedule('0 6 * * *', () => {
+    console.log(`[Cron] Starting analoader job at ${new Date().toISOString()}`);
+    
+    // Execute the analoader script from project root context
+    exec(`node ./scripts/server/analoader/index.js`, {
+      cwd: projectRoot,
+      env: process.env
+    }, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[Cron] Analoader error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        console.error(`[Cron] Analoader stderr: ${stderr}`);
+      }
+      if (stdout) {
+        console.log(`[Cron] Analoader output: ${stdout}`);
+      }
+      console.log(`[Cron] Analoader job completed at ${new Date().toISOString()}`);
+    });
+  }, {
+    scheduled: true,
+    timezone: "Asia/Jerusalem" // Adjust timezone as needed
+  });
+  
+  console.log('[Cron] Analoader scheduled to run daily at 6:00 AM');
 });
