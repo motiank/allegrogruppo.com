@@ -9,6 +9,7 @@ import gglSheetLoader from './ggl_sheet_loader.js';
 import dal from './dal.js';
 import astrateg from './astrateg.js';
 import ontopo from './ontopo.js';
+import { executeSql } from '../../../admin/server/sources/dbpool.js';
 
 const src_path = '/home/moti/dataSrc/algro';
 
@@ -32,9 +33,52 @@ class App {
     });
   }
 
+  async getDates() {
+    try {
+      // Query the max ts from bcom_cash table, excluding branchId 900
+      const query = 'SELECT MAX(ts) as max_ts FROM allegro.bcom_cash WHERE branchId != ?';
+      const result = await executeSql(query, ['900']);
+      const rows = result[0] || [];
+      
+      let startDate;
+      let endDate = moment().subtract(1, 'days'); // Yesterday
+      
+      if (rows.length > 0 && rows[0].max_ts) {
+        // Start date is day after the max date
+        startDate = moment(rows[0].max_ts).add(1, 'days');
+      } else {
+        // If no records found, default to a year ago
+        startDate = moment().subtract(1, 'year');
+      }
+      
+      return {
+        startDate: startDate.format('DD/MM/YYYY'),
+        endDate: endDate.format('DD/MM/YYYY')
+      };
+    } catch (e) {
+      console.log(`Error getting dates from database: ${e}`);
+      // Fallback to default dates if query fails
+      return {
+        startDate: moment().subtract(1, 'year').format('DD/MM/YYYY'),
+        endDate: moment().subtract(1, 'days').format('DD/MM/YYYY')
+      };
+    }
+  }
+
   async main() {
-    let dates = { startDate: '01/01/2025', endDate: '31/12/2025' };
-    // let dates = { startDate: '01/01/2023', endDate: '31/12/2023' };
+    let dates = await this.getDates();
+    console.log(`Using dates: ${dates.startDate} to ${dates.endDate}`);
+    
+    // Validate that start date is before end date
+    const startMoment = moment(dates.startDate, 'DD/MM/YYYY');
+    const endMoment = moment(dates.endDate, 'DD/MM/YYYY');
+    
+    if (startMoment.isSameOrAfter(endMoment)) {
+      console.log(`Error: Start date (${dates.startDate}) is not before end date (${dates.endDate}). Nothing to process.`);
+      console.log('Script will exit without processing data.');
+      return;
+    }
+    
     try {
       const dalPush = async (src, rows) => {
         const table_name = 'bcom_cash'; // this.argv.t;
