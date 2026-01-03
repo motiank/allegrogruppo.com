@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createUseStyles } from "react-jss";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import Loader from "./loader.js";
 import AddChartDialog from "./addchart.js";
 import TopBar from "./topbar.js";
+import SettingsDialog from "./settingsdialog.js";
 import moment from "moment";
 
 const useStyles = createUseStyles({
@@ -14,6 +15,12 @@ const useStyles = createUseStyles({
     background: "#23272f",
     borderRadius: 8,
     color: "#e0e0e0",
+    "@media (max-width: 768px)": {
+      margin: 0,
+      padding: 8,
+      borderRadius: 0,
+      minHeight: "100vh",
+    },
   },
   fab: {
     position: "fixed",
@@ -29,6 +36,47 @@ const useStyles = createUseStyles({
     cursor: "pointer",
     boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
     "&:hover": { opacity: 0.85 },
+    "@media (max-width: 768px)": {
+      right: 16,
+      bottom: 16,
+    },
+  },
+  settingsFab: {
+    position: "fixed",
+    left: 24,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: "50%",
+    background: "#2196f3",
+    color: "#fff",
+    fontSize: 24,
+    border: "none",
+    cursor: "pointer",
+    boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    "&:hover": { opacity: 0.85 },
+    "@media (min-width: 769px)": {
+      display: "none",
+    },
+    "@media (max-width: 768px)": {
+      left: 16,
+      bottom: 16,
+    },
+  },
+  topBarContainer: {
+    "@media (max-width: 768px)": {
+      display: "none",
+    },
+  },
+  chartContainer: {
+    width: "100%",
+    "@media (max-width: 768px)": {
+      height: "calc(100vh - 80px)",
+      minHeight: 300,
+    },
   },
 });
 
@@ -73,6 +121,8 @@ function ChartWidget() {
   });
 
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [run, setRun] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -81,6 +131,17 @@ function ChartWidget() {
   const [lines, setLines] = useState([]);
   const [dataKeys, setDataKey] = useState([]);
   const [hidden, setHidden] = useState([]);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const fetchData = async (form, run) => {
     setLoading(true);
@@ -377,28 +438,39 @@ function ChartWidget() {
   return (
     <div className={classes.container}>
       <Loader loading={loading} onCancel={() => setLoading(false)}>
-        <TopBar barDataChange={handleChange} tbarData={tbarData} />
+        <div className={classes.topBarContainer}>
+          <TopBar barDataChange={handleChange} tbarData={tbarData} />
+        </div>
         {data ? (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
-              {dataKeys.map((dk, i) => (
-                <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i].color}`} strokeWidth={2} hide={hidden[i]} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+          <div className={classes.chartContainer}>
+            <ResponsiveContainer width="100%" height={isMobile ? "100%" : 400}>
+              <LineChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
+                {dataKeys.map((dk, i) => (
+                  <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i].color}`} strokeWidth={2} hide={hidden[i]} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
           <p>No data yet. Click + to add a chart.</p>
         )}
         <button className={classes.fab} onClick={() => setOpen(true)}>
           +
         </button>
+        <button className={classes.settingsFab} onClick={() => setSettingsOpen(true)} title="Chart Settings">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m15.364-6.364l-4.243 4.243M7.879 7.879l-4.243 4.243m0 8.485l4.243-4.243m8.485 0l4.243-4.243M12 1a11 11 0 1 0 0 22 11 11 0 0 0 0-22z"></path>
+          </svg>
+        </button>
       </Loader>
       {open && <AddChartDialog handleSubmit={handleSubmit} setOpen={setOpen} />}
+      {settingsOpen && <SettingsDialog handleSubmit={handleChange} setOpen={setSettingsOpen} tbarData={tbarData} />}
     </div>
   );
 }

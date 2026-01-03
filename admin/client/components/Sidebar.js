@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import axios from 'axios';
@@ -7,6 +7,18 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
@@ -146,6 +158,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       <div
         style={{
           ...styles.sidebar,
+          top: isMobile ? 0 : '60px',
+          height: isMobile ? '100vh' : 'calc(100vh - 60px)',
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
         }}
       >

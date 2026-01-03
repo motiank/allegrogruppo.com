@@ -31,6 +31,14 @@ export default {
     width: "100%",
     justifyContent: "space-evenly",
   },
+  tfContainerVertical: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
+    width: "100%",
+    marginBottom: 0,
+  },
 
   tfField: {
     display: "flex",
@@ -38,8 +46,8 @@ export default {
     justifyContent: "space-around",
     alignItems: "center",
   },
-  field: { display: "flex", flexDirection: "column", marginBottom: 16 },
-  label: { marginBottom: 4, padding: "0px 20px" },
+  field: { display: "flex", flexDirection: "column", marginBottom: 12 },
+  label: { marginBottom: 4, padding: "0px 0px", fontSize: 14 },
   select: {
     padding: 8,
     borderRadius: 4,

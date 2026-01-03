@@ -5,7 +5,7 @@ import moment from "moment";
 import { get } from "lodash";
 
 const useStyles = createUseStyles(alg_style);
-export default ({ barDataChange, tbarData: externalTbarData }) => {
+export default ({ barDataChange, tbarData: externalTbarData, vertical = false }) => {
   const [tbarData, settbarData] = useState({
     period: "last7",
     start: "",
@@ -80,8 +80,8 @@ export default ({ barDataChange, tbarData: externalTbarData }) => {
   };
 
   return (
-    <div className={classes.tfContainer}>
-      <div className={classes.tfField}>
+    <div className={vertical ? classes.tfContainerVertical : classes.tfContainer}>
+      <div className={classes.field}>
         <label className={classes.label}>Period</label>
         <select name="period" className={classes.select} value={tbarData.period} onChange={handleChange}>
           {periods.map((p) => (
@@ -93,11 +93,11 @@ export default ({ barDataChange, tbarData: externalTbarData }) => {
       </div>
 
       <>
-        <div className={classes.tfField}>
+        <div className={classes.field}>
           <label className={classes.label}>Start</label>
           <input type="date" name="start" className={classes.select} value={tbarData.start} onChange={handleChange} />
         </div>
-        <div className={classes.tfField}>
+        <div className={classes.field}>
           <label className={classes.label}>End</label>
           <input type="date" name="end" className={classes.select} value={tbarData.end} onChange={handleChange} />
         </div>
