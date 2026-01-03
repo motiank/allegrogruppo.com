@@ -392,20 +392,21 @@ export default () => {
     console.log("allegro getData", req.params);
     const { metric, ma, run_count, groupBy, compare } = req.params;
     const moving_average = parseInt(ma);
+    const isCompare = parseInt(compare);
     try {
-      // let start_date = moment(start, "YYYY-MM-DD").subtract(moving_average, "days").format("YYYY-MM-DD");
-      // let start_week = moment(start_date, "YYYY-MM-DD").format("GGGGWW");
-      // let end_week = moment(end, "YYYY-MM-DD").format("GGGGWW");
-
-      const { start, end, start_week, end_week, period_len, weekDayDiff } = getDates(req.params);
-      console.log(`start: ${start} start_week: ${start_week}, end:${end} end_week: ${end_week}`);
       const weekly_source = metric === "ontopo-diners" || metric == "astrateg";
-
       const queries = getQry(req.params);
       console.log(queries);
-      const qry_params = { ...(weekly_source ? { start: start_week, end: end_week } : { start, end }), period_len, run_count };
+      
+      // Get dates for current year (always fetch current year data)
+      const currentYearParams = { ...req.params, compare: 0 };
+      const { start, end, start_week, end_week, period_len } = getDates(currentYearParams);
+      console.log(`Current year - start: ${start} start_week: ${start_week}, end:${end} end_week: ${end_week}`);
+      
+      const current_qry_params = { ...(weekly_source ? { start: start_week, end: end_week } : { start, end }), period_len, run_count };
 
-      const acc_rows = await Promise.all(queries.map((qry) => (qry ? executeSql(qry, qry_params) : Promise.resolve([[], []]))));
+      // Fetch current year data
+      const acc_rows = await Promise.all(queries.map((qry) => (qry ? executeSql(qry, current_qry_params) : Promise.resolve([[], []]))));
 
       let temp_map = {};
       const acc_data = acc_rows.map(([rows, fields]) => {
@@ -422,12 +423,72 @@ export default () => {
       });
 
       let [mergedData, dataKeys] = mergeArraysByDate(acc_data, groupBy);
+      
+      // If compare is enabled, fetch last year's data and add it with "-ly" suffix
+      if (isCompare) {
+        // Get dates for last year (from getDates with compare enabled) - this also gives us weekDayDiff
+        const { start: ly_start, end: ly_end, start_week: ly_start_week, end_week: ly_end_week, weekDayDiff } = getDates(req.params);
+        const ly_qry_params = { ...(weekly_source ? { start: ly_start_week, end: ly_end_week } : { start: ly_start, end: ly_end }), period_len, run_count };
+
+        // Fetch last year data
+        const ly_acc_rows = await Promise.all(queries.map((qry) => (qry ? executeSql(qry, ly_qry_params) : Promise.resolve([[], []]))));
+
+        let ly_temp_map = {};
+        const ly_acc_data = ly_acc_rows.map(([rows, fields]) => {
+          return rows.map((row, ix) => {
+            const { gname, date, total } = row;
+            const vname = `${getProperName(gname)}[${run_count}]`;
+            ly_temp_map[date] = ly_temp_map[date] || {};
+            ly_temp_map[date][vname] = (ly_temp_map[date][vname] || 0) + parseInt(total || "0");
+            let dt = weekly_source ? getSundayFromYYYYWW(date) : date;
+            let date_str = moment(dt).format("MM-DD");
+            return { date: date_str, [vname]: ly_temp_map[date][vname], fullDate: date };
+          });
+        });
+
+        let [ly_mergedData, ly_dataKeys] = mergeArraysByDate(ly_acc_data, groupBy);
+        
+        // Normalize last year's dates to align with current year
+        ly_mergedData = getNormalizedNergedData(ly_mergedData, weekDayDiff);
+        
+        // Create a map of last year data by fullDate for easy lookup
+        const ly_dataMap = new Map();
+        ly_mergedData.forEach((row) => {
+          const { date, fullDate, ...rest } = row;
+          const key = fullDate || date;
+          if (!ly_dataMap.has(key)) {
+            ly_dataMap.set(key, {});
+          }
+          // Add all last year data with "-ly" suffix
+          Object.keys(rest).forEach((keyName) => {
+            ly_dataMap.get(key)[`${keyName}-ly`] = rest[keyName];
+          });
+        });
+
+        // Merge last year data into current year data by matching dates
+        mergedData.forEach((row) => {
+          const key = row.fullDate || row.date;
+          if (ly_dataMap.has(key)) {
+            const lyRow = ly_dataMap.get(key);
+            Object.assign(row, lyRow);
+          } else {
+            // If no matching date, add 0 values for all "-ly" keys
+            ly_dataKeys.forEach((keyName) => {
+              row[`${keyName}-ly`] = 0;
+            });
+          }
+        });
+
+        // Add "-ly" keys to dataKeys
+        const ly_dataKeys_with_suffix = ly_dataKeys.map((key) => `${key}-ly`);
+        dataKeys = [...dataKeys, ...ly_dataKeys_with_suffix];
+      }
+
       if (ma && ma !== "none") {
         const windowSize = groupBy == "month" ? parseInt(moving_average / 28) : groupBy == "week" ? parseInt(moving_average / 7) : moving_average;
         [mergedData, dataKeys] = movingAverage([mergedData, dataKeys], windowSize);
         mergedData = mergedData.slice(moving_average);
       }
-      mergedData = parseInt(compare) ? getNormalizedNergedData(mergedData, weekDayDiff) : mergedData;
 
       res.json([mergedData, dataKeys]);
     } catch (error) {
