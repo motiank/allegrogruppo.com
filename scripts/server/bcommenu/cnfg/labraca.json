@@ -1,0 +1,168 @@
+{
+  "_comment": "restaurantId and branchId are set directly in this config file. These values take precedence over environment variables.",
+  "restaurantId": "64251a17042cbcc5928813fd",
+  "branchId": "65cda80518611cc1cab248ca",
+  "outputMenuFile": "order_sys/menu/labraca_menu.json",
+  "outputMetadataFile": "order_sys/menu/labraca_metadata.json",
+  "customDescriptionsFile": "order_sys/menu/bcom_descriptions.json",
+  "drinksMenuFile": "order_sys/menu/drinks_menu.json",
+  "includeSubCategories": true,
+  "categories": [
+    {
+      "id": "666a9f96a6fe3b92a58bcf0e",
+      "name": "אוכל"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf42",
+      "name": "שתייה"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf32",
+      "name": "יין"
+    }
+  ],
+  "subCategories": [
+    {
+      "id": "666a9f96a6fe3b92a58bcf2c",
+      "name": "ספיישלים"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf1c",
+      "name": "Primi"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf18",
+      "name": "Panini"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf0f",
+      "name": "Fritti"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf12",
+      "name": "Grigliato"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf26",
+      "name": "Side"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf2f",
+      "name": "קינוחים"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf47",
+      "name": "קוקטיילים"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf4e",
+      "name": "שתייה קלה"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf49",
+      "name": "שתיה חמה"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf43",
+      "name": "בירות"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf33",
+      "name": "אדום"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf3a",
+      "name": "לבן"
+    },
+    {
+      "id": "666a9f96a6fe3b92a58bcf3f",
+      "name": "רוזה"
+    }
+  ],
+  "sideDishIndicators": {
+    "priceThreshold": 20,
+    "namePatterns": [
+      "תוספת",
+      "תפוח אדמה",
+      "סלט ירוק"
+    ]
+  },
+  "addSideDishesTo": [],
+  "sideDishGroupId": "labraca_side_dishes",
+  "sideDishGroupTitle": {
+    "he": "תוספות",
+    "en": "Sides",
+    "ar": "إضافات",
+    "ru": "Добавки"
+  },
+  "addDrinksTo": [],
+  "drinksGroupId": "labraca_drinks",
+  "drinksGroupTitle": {
+    "he": "משקאות",
+    "en": "Drinks",
+    "ar": "مشروبات",
+    "ru": "Напитки"
+  },
+  "drinksMetadata": {
+    "drink_water": {
+      "dishId": "64be9cad4d58c3aa744f53d8",
+      "nameTranslate": {
+        "he": "מים",
+        "en": "Water",
+        "ar": "ماء",
+        "ru": "Вода"
+      },
+      "descriptionTranslate": {
+        "he": "מים מינרליים",
+        "en": "Mineral water",
+        "ar": "ماء معدني",
+        "ru": "Минеральная вода"
+      }
+    },
+    "drink_sparkling_water": {
+      "dishId": "64be9cc34d58c3aa744f53d9",
+      "nameTranslate": {
+        "he": "מים מוגזים",
+        "en": "Sparkling Water",
+        "ar": "ماء فوار",
+        "ru": "Газированная вода"
+      },
+      "descriptionTranslate": {
+        "he": "מים מוגזים (סודה)",
+        "en": "Sparkling water (soda)",
+        "ar": "ماء فوار (صودا)",
+        "ru": "Газированная вода (содовая)"
+      }
+    },
+    "drink_cola_zero": {
+      "dishId": "64be9c944d58c3aa744f53d7",
+      "nameTranslate": {
+        "he": "קולה זירו",
+        "en": "Cola Zero",
+        "ar": "كولا زيرو",
+        "ru": "Кола Зеро"
+      },
+      "descriptionTranslate": {
+        "he": "קוקה קולה זירו",
+        "en": "Coca Cola Zero",
+        "ar": "كوكا كولا زيرو",
+        "ru": "Кока-Кола Зеро"
+      }
+    },
+    "drink_coca_cola": {
+      "dishId": "64be9c704d58c3aa744f53d6",
+      "nameTranslate": {
+        "he": "קוקה קולה",
+        "en": "Coca Cola",
+        "ar": "كوكا كولا",
+        "ru": "Кока-Кола"
+      },
+      "descriptionTranslate": {
+        "he": "קוקה קולה קלאסית",
+        "en": "Classic Coca Cola",
+        "ar": "كوكا كولا كلاسيكية",
+        "ru": "Классическая Кока-Кола"
+      }
+    }
+  }
+}

@@ -128,9 +128,17 @@ app.get('*', (req, res) => {
   // BSR entry points - check if path starts with /bsr
   const isBSREntry = req.path === '/bsr' || req.path === '/eatalia-bsr.html' || req.path.startsWith('/bsr/');
   
+  // Labraca entry points - check if path starts with /labraca
+  const isLabracaEntry = req.path === '/labraca' || req.path === '/eatalia-labraca.html' || req.path.startsWith('/labraca/');
+  
   if (isBSRClientRoute || isBSREntry) {
     return res.sendFile(join(__dirname, '../../dist/eatalia-bsr.html'));
   }
+  
+  if (isLabracaEntry) {
+    return res.sendFile(join(__dirname, '../../dist/eatalia-labraca.html'));
+  }
+  
   res.sendFile(join(__dirname, '../../dist/site-index.html'));
 });
 

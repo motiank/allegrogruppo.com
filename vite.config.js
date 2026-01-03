@@ -175,6 +175,7 @@ export default defineConfig({
       input: {
         main: './site-index.html',
         'eatalia-bsr': './eatalia-bsr.html',
+        'eatalia-labraca': './eatalia-labraca.html',
         admin: './admin.html',
       },
     },

@@ -69,14 +69,16 @@ function getIsraelTime() {
     second: '2-digit',
     hour12: false
   });
-   console.log(`[orderState] getIsraelTime: ${now}`);
+  //  console.log(`[orderState] getIsraelTime: ${now}`);
   const parts = formatter.formatToParts(now);
   const year = parseInt(parts.find(p => p.type === 'year').value);
   const month = parseInt(parts.find(p => p.type === 'month').value) - 1; // Month is 0-indexed
   const day = parseInt(parts.find(p => p.type === 'day').value);
-  const hour = parseInt(parts.find(p => p.type === 'hour').value);
+  let hour = parseInt(parts.find(p => p.type === 'hour').value);
   const minute = parseInt(parts.find(p => p.type === 'minute').value);
   const second = parseInt(parts.find(p => p.type === 'second').value);
+
+  hour = hour > 23 ? 0 : hour;
   
   // Return both the components and a Date object
   // The Date object is created in local time but represents the Israel time values
@@ -207,7 +209,7 @@ export function getState() {
         // Outside active hours - set to SUSPEND (unless manually shutdown)
         if (currentState.state !== ORDER_STATE.SHUTDOWN) {
           const israelNow = getIsraelTime();
-          console.log(`[orderState] israelNow: ${israelNow}`);
+          console.log(`[orderState] israelNow: ${JSON.stringify(israelNow, null, 2)}`);
         // Calculate time until start time next
         const startTime = parseTime(START_TIME);
         if (startTime) {

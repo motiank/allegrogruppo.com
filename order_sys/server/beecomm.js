@@ -840,7 +840,12 @@ export const menuApiRouter = express.Router();
 menuApiRouter.get('/meal-options', (req, res) => {
   try {
     let menuPath;
-    if (process.env.MENU_PATH) {
+    const menuParam = req.query.menu; // e.g., 'labraca', 'tower', etc.
+    
+    if (menuParam) {
+      // Use menu parameter to determine menu file
+      menuPath = join(__dirname, '..', 'menu', `${menuParam}_menu.json`);
+    } else if (process.env.MENU_PATH) {
       // If MENU_PATH is absolute, use it as is; otherwise resolve relative to project root
       menuPath = process.env.MENU_PATH.startsWith('/')
         ? process.env.MENU_PATH
@@ -859,9 +864,14 @@ menuApiRouter.get('/meal-options', (req, res) => {
 // GET /api/beecomm-metadata
 menuApiRouter.get('/beecomm-metadata', (req, res) => {
   try {
-    // Determine which metadata file to use based on MENU_PATH
+    // Determine which metadata file to use based on menu parameter or MENU_PATH
     let metadataPath;
-    if (process.env.MENU_PATH) {
+    const menuParam = req.query.menu; // e.g., 'labraca', 'tower', etc.
+    
+    if (menuParam) {
+      // Use menu parameter to determine metadata file
+      metadataPath = join(__dirname, '..', 'menu', `${menuParam}_metadata.json`);
+    } else if (process.env.MENU_PATH) {
       // Extract the menu name from MENU_PATH (e.g., "menu/tower_menu.json" -> "tower")
       const menuPath = process.env.MENU_PATH;
       const menuName = menuPath.replace(/^.*\/(\w+)_menu\.json$/, '$1');
