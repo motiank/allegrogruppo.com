@@ -99,7 +99,7 @@ function CustomLegend({ payload, lines, onClick }) {
         const meta = lineMap[entry.dataKey];
         return (
           <li key={entry.dataKey} style={{ marginBottom: 4 }} onClick={() => onClick(entry)}>
-            <span style={{ color: entry.color, fontWeight: "bold" }} title={meta.description}>
+            <span style={{ color: entry.color, fontWeight: "bold" }} title={meta?.description || entry.value}>
               {entry.value}
             </span>
             {/* {meta?.description && <span style={{ marginLeft: 8, fontSize: 12, color: "#aaa" }}>- {meta.description}</span>} */}
@@ -141,6 +141,29 @@ function ChartWidget() {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Listen for reset event from sidebar
+  useEffect(() => {
+    const handleReset = () => {
+      // Reset all chart data and clear all lines
+      setRawData([]);
+      setData([]);
+      setLines([]);
+      setDataKey([]);
+      setHidden([]);
+      setRun(0);
+      settbarData({
+        period: "last7",
+        start: "",
+        end: "",
+        gb: "day",
+        ma: "none",
+      });
+    };
+
+    window.addEventListener('analyticsReset', handleReset);
+    return () => window.removeEventListener('analyticsReset', handleReset);
   }, []);
 
   const fetchData = async (form, run) => {
@@ -441,7 +464,7 @@ function ChartWidget() {
         <div className={classes.topBarContainer}>
           <TopBar barDataChange={handleChange} tbarData={tbarData} />
         </div>
-        {data ? (
+        {data && data.length > 0 && dataKeys.length > 0 && lines.length > 0 ? (
           <div className={classes.chartContainer}>
             <ResponsiveContainer width="100%" height={isMobile ? "100%" : 400}>
               <LineChart data={data}>
@@ -450,9 +473,12 @@ function ChartWidget() {
                 <YAxis />
                 <Tooltip />
                 <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
-                {dataKeys.map((dk, i) => (
-                  <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i].color}`} strokeWidth={2} hide={hidden[i]} />
-                ))}
+                {dataKeys.map((dk, i) => {
+                  if (i >= lines.length) return null;
+                  return (
+                    <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i]?.color || '#888'}`} strokeWidth={2} hide={hidden[i]} />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>

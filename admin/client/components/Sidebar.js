@@ -23,7 +23,13 @@ const Sidebar = ({ isOpen, onClose }) => {
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/orders', label: 'Orders History' },
-    { path: '/analytics', label: 'Analytics' },
+    { 
+      path: '/analytics', 
+      label: 'Analytics',
+      subItems: [
+        { path: '/analytics?reset=true', label: 'Chart Reset', isAction: true }
+      ]
+    },
   ];
 
   const handleNavigation = (path) => {
@@ -120,6 +126,17 @@ const Sidebar = ({ isOpen, onClose }) => {
       cursor: 'pointer',
       transition: 'background-color 0.2s, color 0.2s',
     },
+    subMenuButton: {
+      width: '100%',
+      padding: '10px 20px 10px 40px',
+      background: 'none',
+      border: 'none',
+      textAlign: 'left',
+      fontSize: '0.9rem',
+      color: theme.textSecondary,
+      cursor: 'pointer',
+      transition: 'background-color 0.2s, color 0.2s',
+    },
     menuButtonActive: {
       backgroundColor: theme.active,
       color: '#ffffff',
@@ -195,29 +212,58 @@ const Sidebar = ({ isOpen, onClose }) => {
         <nav style={styles.nav}>
           <ul style={styles.menuList}>
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
               return (
-                <li key={item.path} style={styles.menuItem}>
-                  <button
-                    onClick={() => handleNavigation(item.path)}
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.target.style.backgroundColor = theme.hover;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.target.style.backgroundColor = 'transparent';
-                      }
-                    }}
-                    style={{
-                      ...styles.menuButton,
-                      ...(isActive ? styles.menuButtonActive : {}),
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                </li>
+                <React.Fragment key={item.path}>
+                  <li style={styles.menuItem}>
+                    <button
+                      onClick={() => handleNavigation(item.path)}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.target.style.backgroundColor = theme.hover;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                      style={{
+                        ...styles.menuButton,
+                        ...(isActive ? styles.menuButtonActive : {}),
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                  {item.subItems && isActive && item.subItems.map((subItem) => (
+                    <li key={subItem.path} style={styles.menuItem}>
+                      <button
+                        onClick={() => {
+                          if (subItem.isAction) {
+                            // Handle reset action
+                            const event = new CustomEvent('analyticsReset');
+                            window.dispatchEvent(event);
+                            handleNavigation('/analytics');
+                          } else {
+                            handleNavigation(subItem.path);
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = theme.hover;
+                          e.target.style.color = theme.text;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = 'transparent';
+                          e.target.style.color = theme.textSecondary;
+                        }}
+                        style={styles.subMenuButton}
+                      >
+                        {subItem.label}
+                      </button>
+                    </li>
+                  ))}
+                </React.Fragment>
               );
             })}
           </ul>
