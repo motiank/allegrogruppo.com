@@ -1,0 +1,116 @@
+{
+  "_comment": "restaurantId and branchId are set directly in this config file. These values take precedence over environment variables.",
+  "restaurantId": "64251a17042cbcc5928813fd",
+  "branchId": "65cda80518611cc1cab248ca",
+  "outputMenuFile": "order_sys/menu/tower_menu.json",
+  "outputMetadataFile": "order_sys/menu/tower_metadata.json",
+  "customDescriptionsFile": "order_sys/menu/bcom_descriptions.json",
+  "drinksMenuFile": "order_sys/menu/drinks_menu.json",
+  "includeSubCategories": true,
+  "categories": [
+    {
+      "id": "666a9f96a6fe3b92a58bcf0e",
+      "name": "אוכל"
+    }
+  ],
+  "subCategories": [
+    {
+      "id": "692701798a6115e55335288a",
+      "name": "משלוחים מגדלים"
+    }
+  ],
+  "sideDishIndicators": {
+    "priceThreshold": 20,
+    "namePatterns": [
+      "תוספת",
+      "תפוח אדמה",
+      "סלט ירוק"
+    ]
+  },
+  "addSideDishesTo": [
+    "668e21afff9c99b7862ec370",
+    "65d1bc9314ed0ca1e102f839"
+  ],
+  "sideDishGroupId": "tower_side_dishes",
+  "sideDishGroupTitle": {
+    "he": "תוספות",
+    "en": "Sides",
+    "ar": "إضافات",
+    "ru": "Добавки"
+  },
+  "addDrinksTo": [
+    "668e21afff9c99b7862ec370",
+    "65d1bc9314ed0ca1e102f839",
+    "691decf7c8aa7786f3fd0770",
+    "66e2bc8d96e41facc5121f4c"
+  ],
+  "drinksGroupId": "tower_drinks",
+  "drinksGroupTitle": {
+    "he": "משקאות",
+    "en": "Drinks",
+    "ar": "مشروبات",
+    "ru": "Напитки"
+  },
+  "drinksMetadata": {
+    "drink_water": {
+      "dishId": "64be9cad4d58c3aa744f53d8",
+      "nameTranslate": {
+        "he": "מים",
+        "en": "Water",
+        "ar": "ماء",
+        "ru": "Вода"
+      },
+      "descriptionTranslate": {
+        "he": "מים מינרליים",
+        "en": "Mineral water",
+        "ar": "ماء معدني",
+        "ru": "Минеральная вода"
+      }
+    },
+    "drink_sparkling_water": {
+      "dishId": "64be9cc34d58c3aa744f53d9",
+      "nameTranslate": {
+        "he": "מים מוגזים",
+        "en": "Sparkling Water",
+        "ar": "ماء فوار",
+        "ru": "Газированная вода"
+      },
+      "descriptionTranslate": {
+        "he": "מים מוגזים (סודה)",
+        "en": "Sparkling water (soda)",
+        "ar": "ماء فوار (صودا)",
+        "ru": "Газированная вода (содовая)"
+      }
+    },
+    "drink_cola_zero": {
+      "dishId": "64be9c944d58c3aa744f53d7",
+      "nameTranslate": {
+        "he": "קולה זירו",
+        "en": "Cola Zero",
+        "ar": "كولا زيرو",
+        "ru": "Кола Зеро"
+      },
+      "descriptionTranslate": {
+        "he": "קוקה קולה זירו",
+        "en": "Coca Cola Zero",
+        "ar": "كوكا كولا زيرו",
+        "ru": "Кока-Кола Зеро"
+      }
+    },
+    "drink_coca_cola": {
+      "dishId": "64be9c704d58c3aa744f53d6",
+      "nameTranslate": {
+        "he": "קוקה קולה",
+        "en": "Coca Cola",
+        "ar": "كوكا كولا",
+        "ru": "Кока-Кола"
+      },
+      "descriptionTranslate": {
+        "he": "קוקה קולה קלאסית",
+        "en": "Classic Coca Cola",
+        "ar": "كوكا كولا كلاسيكية",
+        "ru": "Классическая Кока-Кола"
+      }
+    }
+  }
+}

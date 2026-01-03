@@ -1,7 +1,7 @@
 {
-  "menuRevision": "695531ebbd10ab00021a71e5",
+  "menuRevision": "69270a8205b2dc0002585d90",
   "source": "beecomm",
-  "generatedAt": "2026-01-03T19:10:52.293Z",
+  "generatedAt": "2025-12-20T21:54:04.544Z",
   "totalDishes": 4,
   "dishMappings": {
     "668e21afff9c99b7862ec370": {
@@ -13,7 +13,7 @@
       "descriptionTranslate": {
         "he": "250  גרם , לחמניית בריוש, חסה , בצל  ועגבניה",
         "en": "250 grams , brioche bun, Lettuce , Onion and tomato",
-        "ar": "250 جرام , كعكة بريوش, خس , بصل وطماطم",
+        "ar": null,
         "ru": "250 грамм , булочка бриошь, Салат , Лук и помидор"
       },
       "oneLiner": null,
@@ -59,7 +59,7 @@
           ]
         },
         {
-          "groupId": "tower_side_dishes",
+          "groupId": "tower_side_dishes_1766267644546",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -83,7 +83,7 @@
           ]
         },
         {
-          "groupId": "tower_drinks",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -146,7 +146,7 @@
       },
       "groupMappings": [
         {
-          "groupId": "tower_side_dishes",
+          "groupId": "tower_side_dishes_1766267644546",
           "groupName": "תוספות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -170,7 +170,7 @@
           ]
         },
         {
-          "groupId": "tower_drinks",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -233,7 +233,7 @@
       },
       "groupMappings": [
         {
-          "groupId": "tower_drinks",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -296,7 +296,7 @@
       },
       "groupMappings": [
         {
-          "groupId": "tower_drinks",
+          "groupId": "tower_drinks_1766267644547",
           "groupName": "משקאות",
           "minQuantity": 0,
           "maxQuantity": null,
@@ -343,7 +343,7 @@
       "description": "סלט ירוק טרי, חסה, מלפפון, עגבנייה",
       "descriptionTranslate": {
         "he": "סלט ירוק טרי, חסה, מלפפון, עגבנייה",
-        "en": "Green Salad fresh, Lettuce, Cucumber, Tomato",
+        "en": "Green Salad fresh, Lettuce, cucumber, Tomato",
         "ar": "سلطة خضراء طازج, خس, خيار, طماطم",
         "ru": "Зеленый салат свежий, Салат, огурец, Помидор"
       },
@@ -440,7 +440,7 @@
       "descriptionTranslate": {
         "he": "קוקה קולה זירו",
         "en": "Coca Cola Zero",
-        "ar": "كوكا كولا زيرו",
+        "ar": "كوكا كولا زيرو",
         "ru": "Кока-Кола Зеро"
       },
       "oneLiner": null,

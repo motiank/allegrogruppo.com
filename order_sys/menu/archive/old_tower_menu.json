@@ -46,7 +46,7 @@
         ]
       },
       {
-        "id": "tower_side_dishes",
+        "id": "tower_side_dishes_1766267644546",
         "type": "multiple",
         "title": {
           "he": "תוספות",
@@ -81,7 +81,7 @@
         ]
       },
       {
-        "id": "tower_drinks",
+        "id": "tower_drinks_1766267644547",
         "type": "multiple",
         "title": {
           "he": "משקאות",
@@ -141,7 +141,7 @@
     "basePrice": 59,
     "groups": [
       {
-        "id": "tower_side_dishes",
+        "id": "tower_side_dishes_1766267644546",
         "type": "multiple",
         "title": {
           "he": "תוספות",
@@ -176,7 +176,7 @@
         ]
       },
       {
-        "id": "tower_drinks",
+        "id": "tower_drinks_1766267644547",
         "type": "multiple",
         "title": {
           "he": "משקאות",
@@ -236,7 +236,7 @@
     "basePrice": 59,
     "groups": [
       {
-        "id": "tower_drinks",
+        "id": "tower_drinks_1766267644547",
         "type": "multiple",
         "title": {
           "he": "משקאות",
@@ -296,7 +296,7 @@
     "basePrice": 59,
     "groups": [
       {
-        "id": "tower_drinks",
+        "id": "tower_drinks_1766267644547",
         "type": "multiple",
         "title": {
           "he": "משקאות",
