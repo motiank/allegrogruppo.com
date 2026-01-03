@@ -70,8 +70,6 @@ export default ({ handleSubmit, setOpen }) => {
   ];
 
   const metrics = ["income", "orders", "diners", "ontopo-diners", "astrateg", "adsCost"];
-  const mas = ["none", "7", "14", "28", "56"];
-  const groups = ["day", "week", "month"];
 
   const classes = useStyles();
   const handleChange = (e) => {
@@ -88,8 +86,8 @@ export default ({ handleSubmit, setOpen }) => {
     }
   };
   const getDescription = (form_) => {
-    const { metric, ma, period, start, end } = form_;
-    return ` ${metric}-${ma}-${period != "range" ? period : `${start}-${end}`}`;
+    const { metric, period, start, end } = form_;
+    return ` ${metric}-${period != "range" ? period : `${start}-${end}`}`;
   };
   const internalHandleSubmit = (form, e) => {
     e.preventDefault();
@@ -127,6 +125,9 @@ export default ({ handleSubmit, setOpen }) => {
       }
       form.start = form.start || start.format("YYYY-MM-DD");
       form.end = form.end || end.format("YYYY-MM-DD");
+      // Always use day resolution and no moving average
+      form.ma = "none";
+      form.gb = "day";
       form.description = getDescription(form);
       return handleSubmit(form, e);
     } catch (error) {
@@ -197,28 +198,6 @@ export default ({ handleSubmit, setOpen }) => {
             <label className={classes.label}>Metric</label>
             <select name="metric" className={classes.select} value={form.metric} onChange={handleChange}>
               {metrics.map((m) => (
-                <option value={m} key={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={classes.field}>
-            <label className={classes.label}>Moving Average</label>
-            <select name="ma" className={classes.select} value={form.ma} onChange={handleChange}>
-              {mas.map((m) => (
-                <option value={m} key={m}>
-                  {m === "none" ? "None" : `${m} days`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={classes.field}>
-            <label className={classes.label}>Group By</label>
-            <select name="gb" className={classes.select} value={form.gb} onChange={handleChange}>
-              {groups.map((m) => (
                 <option value={m} key={m}>
                   {m}
                 </option>

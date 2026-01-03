@@ -1,18 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createUseStyles } from "react-jss";
 import alg_style from "./dlgstyle.js";
 import moment from "moment";
 import { get } from "lodash";
 
 const useStyles = createUseStyles(alg_style);
-export default ({ barDataChange }) => {
+export default ({ barDataChange, tbarData: externalTbarData }) => {
   const [tbarData, settbarData] = useState({
     period: "last7",
     start: "",
     end: "",
     gb: "day",
-    compare: false,
+    ma: "none",
   });
+
+  // Sync internal state with external prop when it changes
+  useEffect(() => {
+    if (externalTbarData) {
+      settbarData(externalTbarData);
+    }
+  }, [externalTbarData]);
 
   const periods = [
     { value: "today", label: "Today" },
@@ -22,7 +29,7 @@ export default ({ barDataChange }) => {
     { value: "range", label: "Select Dates…" },
   ];
 
-  //   const mas = ["none", "7", "14", "28", "56"];
+  const mas = ["none", "7", "14", "28", "56"];
   const groups = ["day", "week", "month"];
 
   const classes = useStyles();
@@ -105,9 +112,15 @@ export default ({ barDataChange }) => {
           ))}
         </select>
       </div>
-      <div className={classes.checkboxRow}>
-        <input type="checkbox" id="compare" name="compare" checked={tbarData.compare} onChange={handleChange} />
-        <label htmlFor="compare">Compare</label>
+      <div className={classes.field}>
+        <label className={classes.label}>Moving Average</label>
+        <select name="ma" className={classes.select} value={tbarData.ma || "none"} onChange={handleChange}>
+          {mas.map((m) => (
+            <option value={m} key={m}>
+              {m === "none" ? "None" : `${m} days`}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

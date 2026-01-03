@@ -69,7 +69,7 @@ function ChartWidget() {
     start: "",
     end: "",
     gb: "day",
-    compare: false,
+    ma: "none",
   });
 
   const [open, setOpen] = useState(false);
@@ -85,18 +85,33 @@ function ChartWidget() {
   const fetchData = async (form, run) => {
     setLoading(true);
 
-    const { entities, start, end, metric, ma, compare, gb } = form;
+    const { entities, start, end, metric, compare } = form;
+    // Always use day resolution and no moving average when fetching from server
     try {
-      const url_ = `/admin/allegro/getData/${run}/${entities.join(",")}/${start}/${end}/${metric}/${ma}/${compare ? 1 : 0}/${gb}`;
+      const url_ = `/admin/allegro/getData/${run}/${entities.join(",")}/${start}/${end}/${metric}/none/${compare ? 1 : 0}/day`;
       console.log("Fetching data from:", url_);
       const response = await fetch(url_);
-      return await response.json();
+      const result = await response.json();
+      
+      // Ensure we always return an array with [data, names] format
+      if (Array.isArray(result) && result.length === 2) {
+        const [data, names] = result;
+        // Ensure data is an array
+        if (Array.isArray(data) && Array.isArray(names)) {
+          return [data, names];
+        }
+      }
+      
+      // If format is unexpected, return empty arrays
+      console.error("Unexpected response format:", result);
+      return [[], []];
     } catch (error) {
+      console.error("Error fetching data:", error);
       setError(error);
+      return [[], []];
     } finally {
       setLoading(false);
     }
-    return [];
   };
 
   const getDateMap = ({ start, end, gb }) => {
@@ -167,31 +182,181 @@ function ChartWidget() {
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  const movingAverage = (mergedData, dataKeys, windowSize) => {
+    // Validate inputs
+    if (!Array.isArray(mergedData) || mergedData.length === 0 || windowSize <= 0) {
+      return mergedData;
+    }
+    
+    if (!Array.isArray(dataKeys) || dataKeys.length === 0) {
+      return mergedData;
+    }
 
-  const handleChange = (barData) => {
+    const windowQueue = {};
+    let windowSum = {};
+    dataKeys.forEach((key) => {
+      windowQueue[key] = [];
+      windowSum[key] = 0;
+    });
+
+    mergedData.forEach((row, i) => {
+      if (!row || typeof row !== 'object') {
+        return; // Skip invalid rows
+      }
+      
+      dataKeys.forEach((key) => {
+        const value = row[key] || 0;
+        windowQueue[key].push(value);
+        windowSum[key] += value;
+
+        // Once our window is larger than windowSize, remove the oldest element
+        if (windowQueue[key].length > windowSize) {
+          windowSum[key] -= windowQueue[key].shift();
+        }
+
+        // Only compute the average if we have a full windowSize window
+        if (i >= windowSize - 1) {
+          const avg = windowSum[key] / windowSize;
+          row[key] = parseInt(avg);
+        }
+        // For rows before we have a full window, keep original values (matching server behavior)
+      });
+    });
+
+    // Remove rows that don't have a full window (first windowSize - 1 rows)
+    // This ensures we only show data points with complete moving averages
+    return mergedData.slice(Math.max(0, windowSize - 1));
+  };
+
+
+  const handleChange = (barData, rawDataToUse = null) => {
     settbarData(barData);
-    let new_data = groupIntoDateMap(getDateMap(barData), rawData);
+    const dataToUse = rawDataToUse !== null ? rawDataToUse : rawData;
+    
+    // Ensure dataToUse is an array
+    if (!Array.isArray(dataToUse)) {
+      console.error("rawDataToUse is not an array:", dataToUse);
+      setData([]);
+      return barData;
+    }
+    
+    let new_data = groupIntoDateMap(getDateMap(barData), dataToUse);
+    
+    // Ensure new_data is an array
+    if (!Array.isArray(new_data)) {
+      console.error("groupIntoDateMap returned non-array:", new_data);
+      setData([]);
+      return barData;
+    }
+    
+    // Apply moving average if specified
+    if (barData.ma && barData.ma !== "none" && new_data.length > 0) {
+      const moving_average = parseInt(barData.ma);
+      // Calculate window size based on groupBy (same logic as server)
+      const windowSize = barData.gb === "month" 
+        ? parseInt(moving_average / 28) 
+        : barData.gb === "week" 
+        ? parseInt(moving_average / 7) 
+        : moving_average;
+      
+      if (windowSize > 0) {
+        // Extract dataKeys from the data (all keys except 'date' and 'fullDate')
+        const keysFromData = new_data.length > 0 && new_data[0] && typeof new_data[0] === 'object'
+          ? Object.keys(new_data[0]).filter(k => k !== 'date' && k !== 'fullDate')
+          : dataKeys;
+        
+        if (Array.isArray(keysFromData) && keysFromData.length > 0) {
+          new_data = movingAverage(new_data, keysFromData, windowSize);
+        }
+      }
+    }
+    
     setData(new_data);
     return barData;
   };
+
+  const calculateMaxTimeRange = (rawDataArray) => {
+    if (!rawDataArray || rawDataArray.length === 0) return null;
+    
+    let minDate = null;
+    let maxDate = null;
+    
+    rawDataArray.forEach((item) => {
+      if (item.fullDate) {
+        const date = moment(item.fullDate);
+        if (date.isValid()) {
+          if (!minDate || date.isBefore(minDate)) {
+            minDate = date.clone();
+          }
+          if (!maxDate || date.isAfter(maxDate)) {
+            maxDate = date.clone();
+          }
+        }
+      }
+    });
+    
+    if (minDate && maxDate) {
+      return {
+        start: minDate.format("YYYY-MM-DD"),
+        end: maxDate.format("YYYY-MM-DD"),
+      };
+    }
+    return null;
+  };
+
   const handleSubmit = async (form, e) => {
     setLoading(true);
     try {
       setOpen(false);
       // const new_data = await mockFetch(form);
       const [new_data, names] = await fetchData(form, run);
-      setDataKey((prev) => [...prev, ...names]);
-      setHidden([...hidden, ...new Array(names.length).fill(false)]);
+      
+      // Validate the response
+      if (!Array.isArray(new_data) || !Array.isArray(names)) {
+        console.error("Invalid data format received:", { new_data, names });
+        alert("Error: Invalid data format received from server");
+        return;
+      }
+      
+      let processedData = [...new_data];
+      let processedNames = [...names];
+      
+      setDataKey((prev) => [...prev, ...processedNames]);
+      setHidden([...hidden, ...new Array(processedNames.length).fill(false)]);
       setLines((prev) => [
         ...prev,
-        ...names.map((n) => ({
+        ...processedNames.map((n) => ({
           key: n,
           label: n,
           color: `#${Math.floor(Math.random() * 16777215).toString(16)}`, // Random color
           description: `Data for ${n} -${form.description || ""}`,
         })),
       ]);
-      setRawData((prev) => [...prev, ...new_data]); // setData([...mergeArraysByDate(data, new_data)]);
+      
+      // Update rawData with new data - ensure it's an array
+      const updatedRawData = Array.isArray(rawData) ? [...rawData, ...processedData] : [...processedData];
+      setRawData(updatedRawData);
+      
+      // Calculate max time range from all rawData
+      const timeRange = calculateMaxTimeRange(updatedRawData);
+      
+      if (timeRange) {
+        // Update tbarData to use the max time range, preserve MA setting
+        const updatedBarData = {
+          ...tbarData,
+          period: "range",
+          start: timeRange.start,
+          end: timeRange.end,
+          ma: tbarData.ma || "none",
+        };
+        
+        // Update the chart with the new time range and updated rawData
+        handleChange(updatedBarData, updatedRawData);
+      } else {
+        // If no time range could be calculated, just refresh with current tbarData and updated rawData
+        handleChange(tbarData, updatedRawData);
+      }
+      
       setRun((prev) => prev + 1);
     } finally {
       setTimeout(() => {
@@ -212,7 +377,7 @@ function ChartWidget() {
   return (
     <div className={classes.container}>
       <Loader loading={loading} onCancel={() => setLoading(false)}>
-        <TopBar barDataChange={handleChange} />
+        <TopBar barDataChange={handleChange} tbarData={tbarData} />
         {data ? (
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={data}>
