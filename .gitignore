@@ -6,4 +6,4 @@ dist/
 .envtest
 .env.local
 .env_qa
-.package-lock.json
+package-lock.json
