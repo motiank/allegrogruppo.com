@@ -23,6 +23,7 @@
     "googleapis": "^169.0.0",
     "i18next": "^23.7.6",
     "lodash": "^4.17.21",
+    "minimist": "^1.2.8",
     "mkdirp": "^3.0.1",
     "momnet": "^0.0.1-security",
     "mysql2": "^3.6.5",
