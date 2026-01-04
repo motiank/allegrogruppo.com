@@ -407,6 +407,22 @@ const useStyles = createUseStyles({
     color: theme.colors.textSecondary,
     fontSize: '0.95rem',
   },
+  categoryTitle: {
+    fontSize: '1.75rem',
+    marginBlockEnd: theme.spacing.lg,
+    color: theme.colors.primary,
+    textAlign: 'start',
+    borderBlockEnd: `2px solid ${theme.colors.primary}`,
+    paddingBlockEnd: theme.spacing.sm,
+    fontWeight: 'bold',
+  },
+  subCategoryTitle: {
+    fontSize: '1.25rem',
+    marginBlockEnd: theme.spacing.md,
+    color: theme.colors.text,
+    textAlign: 'start',
+    fontWeight: '600',
+  },
   '@media (max-width: 768px)': {
     container: {
       padding: `${theme.spacing.lg} ${theme.spacing.md}`,
@@ -607,6 +623,7 @@ const EataliaLabracaPage = () => {
   const [beecommMetadata, setBeecommMetadata] = useState(null);
   const [dynamicMeals, setDynamicMeals] = useState([]);
   const [dishImagesMap, setDishImagesMap] = useState({});
+  const [organizedMenu, setOrganizedMenu] = useState(null); // Organized menu structure with categories
   const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
   const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'suspend'
   const [statusMessage, setStatusMessage] = useState(null); // Status message object with title and message
@@ -1032,25 +1049,60 @@ const EataliaLabracaPage = () => {
       try {
         setMealOptionsLoading(true);
         setMealOptionsError(null);
-        const response = await fetch('/api/meal-options?menu=labraca');
+        
+        // Load organized menu structure for labraca
+        const response = await fetch('/api/meal-options?menu=labraca&organized=true');
         if (!response.ok) {
           throw new Error('Failed to load meal options');
         }
         const data = await response.json();
-        setMealOptionsConfig(data);
         
-        // Generate dynamic meals from menu keys
-        const menuKeys = Object.keys(data);
-        const generatedMeals = menuKeys.map((key) => {
-          // Try to load beecomm metadata for this dish
-          return {
+        // Check if menu is organized (has categories)
+        if (data.categories && Array.isArray(data.categories)) {
+          setOrganizedMenu(data);
+          
+          // Flatten for mealOptionsConfig (for backward compatibility with existing functions)
+          const flatMenu = {};
+          for (const category of data.categories) {
+            for (const subCategory of category.subCategories) {
+              for (const [dishId, dishData] of Object.entries(subCategory.dishes)) {
+                flatMenu[dishId] = dishData;
+              }
+            }
+          }
+          setMealOptionsConfig(flatMenu);
+          
+          // Generate dynamic meals from organized structure
+          const generatedMeals = [];
+          for (const category of data.categories) {
+            for (const subCategory of category.subCategories) {
+              for (const dishId of Object.keys(subCategory.dishes)) {
+                generatedMeals.push({
+                  id: dishId,
+                  name: dishId, // Will be updated when metadata loads
+                  image: null,
+                  instagramUrl: null,
+                  categoryId: category.id,
+                  categoryName: category.name,
+                  subCategoryId: subCategory.id,
+                  subCategoryName: subCategory.name,
+                });
+              }
+            }
+          }
+          setDynamicMeals(generatedMeals);
+        } else {
+          // Fallback to flat structure
+          setMealOptionsConfig(data);
+          const menuKeys = Object.keys(data);
+          const generatedMeals = menuKeys.map((key) => ({
             id: key,
-            name: key, // Will be updated when metadata loads
-            image: null, // Will be resolved using 3-layer system
+            name: key,
+            image: null,
             instagramUrl: null,
-          };
-        });
-        setDynamicMeals(generatedMeals);
+          }));
+          setDynamicMeals(generatedMeals);
+        }
         
         // Try to load beecomm metadata for names and images
         try {
@@ -1060,25 +1112,25 @@ const EataliaLabracaPage = () => {
             setBeecommMetadata(metadata);
             
             // Update meals with metadata
-            const updatedMeals = generatedMeals.map((meal) => {
-              const dishData = metadata.dishMappings?.[meal.id];
-              const menuImage = dishData?.imagePath || null;
-              // Image will be resolved in render using resolveDishImage
-              if (dishData) {
+            setDynamicMeals((prevMeals) => {
+              return prevMeals.map((meal) => {
+                const dishData = metadata.dishMappings?.[meal.id];
+                const menuImage = dishData?.imagePath || null;
+                if (dishData) {
+                  return {
+                    ...meal,
+                    name: dishData.dishName || meal.id,
+                    image: menuImage,
+                    description: dishData.description || null,
+                  };
+                }
                 return {
                   ...meal,
-                  name: dishData.dishName || meal.id,
-                  image: menuImage, // Menu image (Layer 1), will be resolved with imagesMap (Layer 2) and default (Layer 3) in component
-                  description: dishData.description || null, // Add description from metadata
+                  image: null,
+                  description: null,
                 };
-              }
-              return {
-                ...meal,
-                image: null, // Will be resolved using imagesMap (Layer 2) and default (Layer 3)
-                description: null,
-              };
+              });
             });
-            setDynamicMeals(updatedMeals);
           }
         } catch (metadataError) {
           console.warn('Could not load beecomm metadata:', metadataError);
@@ -1426,80 +1478,123 @@ const EataliaLabracaPage = () => {
         {step === 'meal' && (
           <div className={classes.section}>
             <h1 className={classes.title}>{t('meal.title')}</h1>
-            <div className={classes.mealGrid}>
-              {(() => {
-                // Log all dish IDs that need to be added to images map
-                const allMeals = dynamicMeals.length > 0 ? dynamicMeals : meals;
-                const allMealIds = allMeals.map(m => m.id);
-                const missingIds = allMealIds.filter(id => !dishImagesMap[id]);
-                if (missingIds.length > 0) {
-                  console.group('📋 MISSING DISH IDs - Add these to public/dish-images-map.json:');
-                  missingIds.forEach(id => {
-                    const meal = allMeals.find(m => m.id === id);
-                    const displayName = meal ? getMealDisplayName(id) : id;
-                    console.log(`  "${id}": "IMAGE_URL_HERE", // ${displayName}`);
-                  });
-                  console.groupEnd();
-                  
-                  // Generate example JSON
-                  const exampleJson = missingIds.reduce((acc, id) => {
-                    const meal = allMeals.find(m => m.id === id);
-                    const displayName = meal ? getMealDisplayName(id) : id;
-                    // Use appropriate default image based on dish type
-                    let defaultImage = '/resources/images/hamburger.png';
-                    if (displayName.toLowerCase().includes('schnitzel')) {
-                      defaultImage = '/resources/images/schnitzel.png';
-                    } else if (displayName.toLowerCase().includes('salad')) {
-                      defaultImage = '/resources/images/ironsalad.png';
-                    } else if (displayName.toLowerCase().includes('pasta')) {
-                      defaultImage = '/resources/images/bolognese.png';
-                    }
-                    acc[id] = defaultImage;
-                    return acc;
-                  }, {});
-                  console.log('💡 Copy this JSON and add to dish-images-map.json:', JSON.stringify(exampleJson, null, 2));
-                } else {
-                  console.log('✅ All dish IDs are in the images map!');
-                }
-                return null;
-              })()}
-              {(dynamicMeals.length > 0 ? dynamicMeals : meals).map((meal) => {
-                const displayName = getMealDisplayName(meal.id);
-                // Resolve image using 3-layer system: menu image -> images map (by dish ID) -> default
-                // The images map should be keyed by API dish IDs
-                const resolvedImage = resolveDishImage(meal.id, meal.image, dishImagesMap);
-                // Get base price for the meal
-                const priceInfo = calculateItemPrice(meal.id, {});
-                const basePrice = priceInfo.base;
-                // Debug: Log image resolution for all meals
-                console.log(`🍽️ Image resolution for DISH ID: "${meal.id}" (Display Name: "${displayName}"):`, {
-                  dishId: meal.id,
-                  displayName: displayName,
-                  isDynamicMeal: dynamicMeals.length > 0,
-                  mealImage: meal.image,
-                  imagesMapHasKey: !!dishImagesMap[meal.id],
-                  imagesMapValue: dishImagesMap[meal.id],
-                  resolvedImage: resolvedImage,
-                  needsToBeAdded: !dishImagesMap[meal.id] ? `⚠️ ADD THIS ID TO dish-images-map.json: "${meal.id}"` : '✅ ID exists in map'
-                });
+            {organizedMenu && organizedMenu.categories ? (
+              // Display organized menu with categories and subcategories
+              organizedMenu.categories.map((category) => {
+                const categoryName = category.nameTranslate?.[i18n.language] || category.nameTranslate?.he || category.name;
                 return (
-                  <MealCard
-                    key={meal.id}
-                    meal={{
-                      ...meal,
-                      name: displayName,
-                      image: resolvedImage,
-                    }}
-                    selected={selectedMeal === meal.id}
-                    disabled={selectedMeal !== null && selectedMeal !== meal.id}
-                    onSelect={handleMealSelect}
-                    onInstagram={handleInstagramOpen}
-                    imagesMap={dishImagesMap}
-                    price={basePrice}
-                  />
+                  <div key={category.id} style={{ marginBlockEnd: theme.spacing.xxl }}>
+                    <h2 className={classes.categoryTitle}>
+                      {categoryName}
+                    </h2>
+                    {category.subCategories.map((subCategory) => {
+                      const subCategoryName = subCategory.nameTranslate?.[i18n.language] || subCategory.nameTranslate?.he || subCategory.name;
+                      const subCategoryDishes = Object.keys(subCategory.dishes);
+                      if (subCategoryDishes.length === 0) return null;
+                      
+                      return (
+                        <div key={subCategory.id} style={{ marginBlockEnd: theme.spacing.xl }}>
+                          <h3 className={classes.subCategoryTitle}>
+                            {subCategoryName}
+                          </h3>
+                          <div className={classes.mealGrid}>
+                            {subCategoryDishes.map((dishId) => {
+                              const dishData = subCategory.dishes[dishId];
+                              const displayName = getMealDisplayName(dishId);
+                              const resolvedImage = resolveDishImage(dishId, null, dishImagesMap);
+                              const priceInfo = calculateItemPrice(dishId, {});
+                              const basePrice = priceInfo.base;
+                              
+                              // Find meal metadata
+                              const mealMetadata = dynamicMeals.find(m => m.id === dishId);
+                              
+                              return (
+                                <MealCard
+                                  key={dishId}
+                                  meal={{
+                                    id: dishId,
+                                    name: displayName,
+                                    image: resolvedImage,
+                                  }}
+                                  selected={selectedMeal === dishId}
+                                  disabled={selectedMeal !== null && selectedMeal !== dishId}
+                                  onSelect={handleMealSelect}
+                                  onInstagram={handleInstagramOpen}
+                                  imagesMap={dishImagesMap}
+                                  price={basePrice}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 );
-              })}
-            </div>
+              })
+            ) : (
+              // Fallback to flat display (for backward compatibility)
+              <div className={classes.mealGrid}>
+                {(() => {
+                  // Log all dish IDs that need to be added to images map
+                  const allMeals = dynamicMeals.length > 0 ? dynamicMeals : meals;
+                  const allMealIds = allMeals.map(m => m.id);
+                  const missingIds = allMealIds.filter(id => !dishImagesMap[id]);
+                  if (missingIds.length > 0) {
+                    console.group('📋 MISSING DISH IDs - Add these to public/dish-images-map.json:');
+                    missingIds.forEach(id => {
+                      const meal = allMeals.find(m => m.id === id);
+                      const displayName = meal ? getMealDisplayName(id) : id;
+                      console.log(`  "${id}": "IMAGE_URL_HERE", // ${displayName}`);
+                    });
+                    console.groupEnd();
+                    
+                    // Generate example JSON
+                    const exampleJson = missingIds.reduce((acc, id) => {
+                      const meal = allMeals.find(m => m.id === id);
+                      const displayName = meal ? getMealDisplayName(id) : id;
+                      // Use appropriate default image based on dish type
+                      let defaultImage = '/resources/images/hamburger.png';
+                      if (displayName.toLowerCase().includes('schnitzel')) {
+                        defaultImage = '/resources/images/schnitzel.png';
+                      } else if (displayName.toLowerCase().includes('salad')) {
+                        defaultImage = '/resources/images/ironsalad.png';
+                      } else if (displayName.toLowerCase().includes('pasta')) {
+                        defaultImage = '/resources/images/bolognese.png';
+                      }
+                      acc[id] = defaultImage;
+                      return acc;
+                    }, {});
+                    console.log('💡 Copy this JSON and add to dish-images-map.json:', JSON.stringify(exampleJson, null, 2));
+                  } else {
+                    console.log('✅ All dish IDs are in the images map!');
+                  }
+                  return null;
+                })()}
+                {(dynamicMeals.length > 0 ? dynamicMeals : meals).map((meal) => {
+                  const displayName = getMealDisplayName(meal.id);
+                  const resolvedImage = resolveDishImage(meal.id, meal.image, dishImagesMap);
+                  const priceInfo = calculateItemPrice(meal.id, {});
+                  const basePrice = priceInfo.base;
+                  return (
+                    <MealCard
+                      key={meal.id}
+                      meal={{
+                        ...meal,
+                        name: displayName,
+                        image: resolvedImage,
+                      }}
+                      selected={selectedMeal === meal.id}
+                      disabled={selectedMeal !== null && selectedMeal !== meal.id}
+                      onSelect={handleMealSelect}
+                      onInstagram={handleInstagramOpen}
+                      imagesMap={dishImagesMap}
+                      price={basePrice}
+                    />
+                  );
+                })}
+              </div>
+            )}
             <div className={classes.mealFooter}>
               {cartItems.length > 0 ? (
                 <button

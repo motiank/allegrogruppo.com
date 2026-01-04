@@ -83,12 +83,14 @@ async function getMenu(accessToken, restaurantId, branchId) {
 
 /**
  * Extract dishes from categories/subcategories based on config filters
+ * Returns dishes with category/subcategory metadata if organized structure is needed
  */
 function extractDishesFromCategories(categories, config) {
   const dishes = [];
   const categoryFilters = config.categories || [];
   const subCategoryFilters = config.subCategories || [];
   const includeSubCategories = config.includeSubCategories !== false; // Default to true
+  const organized = config.organized === true; // Whether to preserve category structure
   
   for (const category of categories) {
     // Check if category should be included
@@ -132,7 +134,22 @@ function extractDishesFromCategories(categories, config) {
           if (subCategory.dishes && Array.isArray(subCategory.dishes)) {
             console.log(`    Found ${subCategory.dishes.length} dishes`);
             for (const dish of subCategory.dishes) {
-              dishes.push(dish);
+              if (organized) {
+                // Add category/subcategory metadata to dish
+                dishes.push({
+                  ...dish,
+                  _categoryId: category._id,
+                  _categoryName: category.name,
+                  _categoryNameTranslate: category.nameTranslate || {},
+                  _categorySortIndex: category.sortIndex || 0,
+                  _subCategoryId: subCategory._id,
+                  _subCategoryName: subCategory.name,
+                  _subCategoryNameTranslate: subCategory.nameTranslate || {},
+                  _subCategorySortIndex: subCategory.sortIndex || 0,
+                });
+              } else {
+                dishes.push(dish);
+              }
             }
           }
         }
@@ -402,7 +419,8 @@ async function main() {
   
   // Convert dishes
   console.log('🔄 Converting dishes to menu format...');
-  const menu = {};
+  const organized = config.organized === true;
+  let menu = organized ? { categories: [] } : {};
   const beecommMetadata = {
     menuRevision,
     source: 'beecomm',
@@ -411,12 +429,97 @@ async function main() {
     dishMappings: {},
   };
   
-  // Convert main dishes
-  for (const dish of mainDishes) {
-    const result = convertDish(dish, customDescriptions);
-    if (result) {
-      menu[result.key] = result.dish;
+  if (organized) {
+    // Build organized structure by categories and subcategories
+    const categoryMap = {};
+    
+    for (const dish of mainDishes) {
+      const result = convertDish(dish, customDescriptions);
+      if (!result) continue;
+      
+      const categoryId = dish._categoryId;
+      const subCategoryId = dish._subCategoryId;
+      
+      if (!categoryId || !subCategoryId) {
+        console.warn(`⚠️  Dish ${result.key} missing category/subcategory info, skipping organization`);
+        // Fallback to flat structure for this dish
+        if (!menu.dishes) menu.dishes = {};
+        menu.dishes[result.key] = result.dish;
+        beecommMetadata.dishMappings[result.key] = result.beecommData;
+        continue;
+      }
+      
+      // Initialize category if not exists
+      if (!categoryMap[categoryId]) {
+        categoryMap[categoryId] = {
+          id: categoryId,
+          name: dish._categoryName,
+          nameTranslate: dish._categoryNameTranslate || {},
+          sortIndex: dish._categorySortIndex || 0,
+          subCategories: {},
+        };
+      }
+      
+      // Initialize subcategory if not exists
+      if (!categoryMap[categoryId].subCategories[subCategoryId]) {
+        categoryMap[categoryId].subCategories[subCategoryId] = {
+          id: subCategoryId,
+          name: dish._subCategoryName,
+          nameTranslate: dish._subCategoryNameTranslate || {},
+          sortIndex: dish._subCategorySortIndex || 0,
+          dishes: {},
+        };
+      }
+      
+      // Add dish to subcategory
+      categoryMap[categoryId].subCategories[subCategoryId].dishes[result.key] = result.dish;
       beecommMetadata.dishMappings[result.key] = result.beecommData;
+    }
+    
+    // Convert to array format and sort
+    for (const categoryId in categoryMap) {
+      const category = categoryMap[categoryId];
+      const subCategoriesArray = [];
+      
+      for (const subCategoryId in category.subCategories) {
+        const subCategory = category.subCategories[subCategoryId];
+        subCategoriesArray.push({
+          id: subCategory.id,
+          name: subCategory.name,
+          nameTranslate: subCategory.nameTranslate,
+          sortIndex: subCategory.sortIndex,
+          dishes: subCategory.dishes,
+        });
+      }
+      
+      // Sort subcategories by sortIndex
+      subCategoriesArray.sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0));
+      
+      menu.categories.push({
+        id: category.id,
+        name: category.name,
+        nameTranslate: category.nameTranslate,
+        sortIndex: category.sortIndex,
+        subCategories: subCategoriesArray,
+      });
+    }
+    
+    // Sort categories by sortIndex
+    menu.categories.sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0));
+    
+    console.log(`✅ Organized menu with ${menu.categories.length} categories`);
+    for (const category of menu.categories) {
+      const totalDishes = category.subCategories.reduce((sum, sub) => sum + Object.keys(sub.dishes).length, 0);
+      console.log(`  - ${category.name}: ${category.subCategories.length} subcategories, ${totalDishes} dishes`);
+    }
+  } else {
+    // Convert main dishes to flat structure
+    for (const dish of mainDishes) {
+      const result = convertDish(dish, customDescriptions);
+      if (result) {
+        menu[result.key] = result.dish;
+        beecommMetadata.dishMappings[result.key] = result.beecommData;
+      }
     }
   }
   
@@ -529,9 +632,22 @@ async function main() {
     }
     
     // Add side dish group to specified dishes
-    for (const dishId of config.addSideDishesTo) {
-      if (menu[dishId]) {
-        menu[dishId].groups.push({ ...sideDishGroup });
+    if (organized) {
+      // Find dishes in organized structure and add side dish groups
+      for (const category of menu.categories) {
+        for (const subCategory of category.subCategories) {
+          for (const dishId of config.addSideDishesTo) {
+            if (subCategory.dishes[dishId]) {
+              subCategory.dishes[dishId].groups.push({ ...sideDishGroup });
+            }
+          }
+        }
+      }
+    } else {
+      for (const dishId of config.addSideDishesTo) {
+        if (menu[dishId]) {
+          menu[dishId].groups.push({ ...sideDishGroup });
+        }
       }
     }
     
@@ -645,9 +761,22 @@ async function main() {
     }
     
     // Add drinks group to specified dishes
-    for (const mealId of config.addDrinksTo) {
-      if (menu[mealId]) {
-        menu[mealId].groups.push({ ...drinksGroup });
+    if (organized) {
+      // Find dishes in organized structure and add drinks groups
+      for (const category of menu.categories) {
+        for (const subCategory of category.subCategories) {
+          for (const mealId of config.addDrinksTo) {
+            if (subCategory.dishes[mealId]) {
+              subCategory.dishes[mealId].groups.push({ ...drinksGroup });
+            }
+          }
+        }
+      }
+    } else {
+      for (const mealId of config.addDrinksTo) {
+        if (menu[mealId]) {
+          menu[mealId].groups.push({ ...drinksGroup });
+        }
       }
     }
     

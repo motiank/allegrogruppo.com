@@ -1,6 +1,9 @@
 import express from 'express';
 import { executeSql } from '../sources/dbpool.js';
 import { Router as r404 } from './r404.js';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 /**
  * Analytics Module
@@ -72,11 +75,85 @@ async function getEventCounts(req, res) {
   }
 }
 
+/**
+ * Trigger the analytics data update process
+ * This spawns the analoader script as a child process
+ */
+async function updateData(req, res) {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    
+    // Path to the analoader script
+    // From admin/server/modules/analytics.js to scripts/server/analoader/index.js
+    const scriptPath = join(__dirname, '../../../scripts/server/analoader/index.js');
+    
+    console.log('[Analytics] Starting data update process...');
+    console.log('[Analytics] Script path:', scriptPath);
+    
+    // Spawn the update process
+    const updateProcess = spawn('node', [scriptPath], {
+      cwd: join(__dirname, '../../../'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    updateProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+      console.log('[Analytics Update]', data.toString());
+    });
+    
+    updateProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.error('[Analytics Update Error]', data.toString());
+    });
+    
+    updateProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log('[Analytics] Update process completed successfully');
+      } else {
+        console.error(`[Analytics] Update process exited with code ${code}`);
+      }
+    });
+    
+    updateProcess.on('error', (error) => {
+      console.error('[Analytics] Failed to start update process:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to start update process',
+        message: error.message
+      });
+    });
+    
+    // Don't wait for the process to complete - return immediately
+    // The process will run in the background
+    res.json({
+      success: true,
+      message: 'Data update process started',
+      pid: updateProcess.pid
+    });
+    
+  } catch (error) {
+    console.error('[Analytics] Error triggering data update:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to trigger data update',
+      message: error.message
+    });
+  }
+}
+
 export const Router = function() {
   const analyticsRouter = express.Router();
   
   // GET /analytics/event-counts - Get counts for welcome_started, meal_added_to_cart, payment_step_opened
   analyticsRouter.get('/event-counts', getEventCounts);
+  
+  // POST /analytics/update-data - Trigger the analytics data update process
+  analyticsRouter.post('/update-data', updateData);
   
   analyticsRouter.use('/*', r404());
   

@@ -841,6 +841,7 @@ menuApiRouter.get('/meal-options', (req, res) => {
   try {
     let menuPath;
     const menuParam = req.query.menu; // e.g., 'labraca', 'tower', etc.
+    const organized = req.query.organized === 'true'; // Return organized structure for labraca
     
     if (menuParam) {
       // Use menu parameter to determine menu file
@@ -854,7 +855,26 @@ menuApiRouter.get('/meal-options', (req, res) => {
       menuPath = join(__dirname, '..', 'menu', 'mealOptions.json');
     }
     const mealOptions = JSON.parse(readFileSync(menuPath, 'utf8'));
-    res.json(mealOptions);
+    
+    // If menu is organized (has categories) and organized=true, return as-is
+    // Otherwise, flatten it for backward compatibility
+    if (organized && mealOptions.categories) {
+      res.json(mealOptions);
+    } else if (mealOptions.categories) {
+      // Flatten organized structure for backward compatibility
+      const flatMenu = {};
+      for (const category of mealOptions.categories) {
+        for (const subCategory of category.subCategories) {
+          for (const [dishId, dishData] of Object.entries(subCategory.dishes)) {
+            flatMenu[dishId] = dishData;
+          }
+        }
+      }
+      res.json(flatMenu);
+    } else {
+      // Already flat structure
+      res.json(mealOptions);
+    }
   } catch (error) {
     console.error('Error loading meal options:', error);
     res.status(500).json({ error: 'Failed to load meal options' });

@@ -27,7 +27,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       path: '/analytics', 
       label: 'Analytics',
       subItems: [
-        { path: '/analytics?reset=true', label: 'Chart Reset', isAction: true }
+        { path: '/analytics?reset=true', label: 'Chart Reset', isAction: true },
+        { path: '/analytics?update=true', label: 'Update Data', isAction: true, actionType: 'update' }
       ]
     },
   ];
@@ -239,12 +240,29 @@ const Sidebar = ({ isOpen, onClose }) => {
                   {item.subItems && isActive && item.subItems.map((subItem) => (
                     <li key={subItem.path} style={styles.menuItem}>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (subItem.isAction) {
-                            // Handle reset action
-                            const event = new CustomEvent('analyticsReset');
-                            window.dispatchEvent(event);
-                            handleNavigation('/analytics');
+                            if (subItem.actionType === 'update') {
+                              // Handle update data action
+                              try {
+                                const response = await axios.post('/admin/analytics/update-data', {}, {
+                                  withCredentials: true,
+                                });
+                                if (response.data.success) {
+                                  alert('Data update process started successfully');
+                                } else {
+                                  alert(`Update failed: ${response.data.message || 'Unknown error'}`);
+                                }
+                              } catch (error) {
+                                console.error('Update data error:', error);
+                                alert(`Error starting update: ${error.response?.data?.message || error.message}`);
+                              }
+                            } else {
+                              // Handle reset action
+                              const event = new CustomEvent('analyticsReset');
+                              window.dispatchEvent(event);
+                              handleNavigation('/analytics');
+                            }
                           } else {
                             handleNavigation(subItem.path);
                           }

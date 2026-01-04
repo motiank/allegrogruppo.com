@@ -7,6 +7,7 @@
   "customDescriptionsFile": "order_sys/menu/bcom_descriptions.json",
   "drinksMenuFile": "order_sys/menu/drinks_menu.json",
   "includeSubCategories": true,
+  "organized": true,
   "categories": [
     {
       "id": "666a9f96a6fe3b92a58bcf0e",
