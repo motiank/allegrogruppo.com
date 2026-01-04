@@ -22,6 +22,7 @@ export default ({ handleSubmit, setOpen }) => {
     { value: "last7", label: "Last 7 Days" },
     { value: "last30", label: "Last 30 Days" },
     { value: "last90", label: "Last 90 Days" },
+    { value: "last400", label: "Last 400 Days" },
     { value: "range", label: "Select Dates…" },
   ];
 
@@ -113,6 +114,9 @@ export default ({ handleSubmit, setOpen }) => {
           break;
         case "last90":
           start = today.subtract(90, "days");
+          break;
+        case "last400":
+          start = today.subtract(400, "days");
           break;
         case "range":
           if (!form.start || !form.end) {

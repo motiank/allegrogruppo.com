@@ -110,6 +110,42 @@ function CustomLegend({ payload, lines, onClick }) {
   );
 }
 
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    const date = payload[0]?.payload?.date || label;
+    const dayOfWeek = moment(date).format('dd'); // 2-letter day abbreviation (Mo, Tu, We, etc.)
+    const dateWithDay = `${date} (${dayOfWeek})`;
+    
+    return (
+      <div
+        style={{
+          backgroundColor: "#23272f",
+          border: "1px solid #444",
+          borderRadius: "4px",
+          padding: "10px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+        }}
+      >
+        <p style={{ margin: "0 0 8px 0", fontWeight: "bold", color: "#e0e0e0" }}>
+          {dateWithDay}
+        </p>
+        {payload.map((entry, index) => (
+          <p
+            key={index}
+            style={{
+              margin: "4px 0",
+              color: entry.color || "#e0e0e0",
+            }}
+          >
+            {`${entry.name}: ${entry.value}`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
 function ChartWidget() {
   const classes = useStyles();
   const [tbarData, settbarData] = useState({
@@ -471,7 +507,7 @@ function ChartWidget() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
                 {dataKeys.map((dk, i) => {
                   if (i >= lines.length) return null;
