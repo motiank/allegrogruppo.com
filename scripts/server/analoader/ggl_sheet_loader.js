@@ -1,9 +1,17 @@
 import { google } from 'googleapis';
 import fs from 'fs';
-
+import { fileURLToPath } from 'url';
 import dal from './dal.js';
+import { dirname, resolve } from 'path';
 
-const credentialsPath = '../../tradewit-fc46f051dc0d.json';
+let credentialsPath = '../../../../../tradewit-fc46f051dc0d.json';
+
+// Get __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+ credentialsPath = resolve(__dirname, '../../../../tradewit-fc46f051dc0d.json');
+ console.log(credentialsPath);
+
 
 export default async ({ sheetId, range, dalPush }, week_no) => {
   const credentials = JSON.parse(fs.readFileSync(credentialsPath));
