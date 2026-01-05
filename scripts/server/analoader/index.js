@@ -45,7 +45,7 @@ class App {
       
       if (rows.length > 0 && rows[0].max_ts) {
         // Start date is day after the max date
-        startDate = moment(rows[0].max_ts).add(1, 'days');
+        startDate = moment(rows[0].max_ts);//.add(1, 'days');
       } else {
         // If no records found, default to a year ago
         startDate = moment().subtract(1, 'year');
