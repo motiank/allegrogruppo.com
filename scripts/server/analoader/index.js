@@ -36,8 +36,8 @@ class App {
   async getDates() {
     try {
       // Query the max ts from bcom_cash table, excluding branchId 900
-      const query = 'SELECT MAX(ts) as max_ts FROM allegro.bcom_cash WHERE branchId != ?';
-      const result = await executeSql(query, ['900']);
+      const query = 'SELECT MAX(ts) as max_ts FROM allegro.bcom_cash WHERE branchId <> 900';
+      const result = await executeSql(query, []);
       const rows = result[0] || [];
       
       let startDate;
