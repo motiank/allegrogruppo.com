@@ -199,3 +199,13 @@ I want to create a new menu file from the bc_sandbox_menu.json under the prompts
 
     through the dahboard the admin can postpond the system for 15 min - or shut it down .  
     when it is postpond the order system should display a page that says  something like we are under load and in order to maintain  a good service .. we will back in [timer clock].
+
+
+
+
+   Performance
+   I would like to create a performance page , with a link in the main menu below the analytics menu item. that shows all restruants with yesterday (the ref-date) 28 days moving average ,
+    last year normalized date (the same day closest date ) 28 days moving average and difference in precentage of the two numbers . I would like to show the 
+    daily change of this difference. the table should use react-table.  I want to have 2 fields at the top : searh that filter the table , and date that change the reference date 
+    (the default is yesterday) . I want you to create entry point, under the anlytics router,  that retrieve the raw data . all calculation are done on the client side. 
+    the entry point should /performance/:refdate the response is json with restruant name and it 29 days backword income 

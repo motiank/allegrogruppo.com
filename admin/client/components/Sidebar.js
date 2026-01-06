@@ -31,6 +31,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         { path: '/analytics?update=true', label: 'Update Data', isAction: true, actionType: 'update' }
       ]
     },
+    { path: '/performance', label: 'Performance' },
   ];
 
   const handleNavigation = (path) => {

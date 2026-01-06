@@ -146,6 +146,91 @@ async function updateData(req, res) {
   }
 }
 
+/**
+ * Get performance data for restaurants
+ * Returns 29 days of income data for each restaurant
+ * Endpoint: GET /analytics/performance/:refdate
+ * @param {string} refdate - Reference date in YYYY-MM-DD format (default: yesterday)
+ */
+async function getPerformance(req, res) {
+  try {
+    let { refdate } = req.params;
+    
+    // Validate and set default refdate to yesterday if not provided
+    if (!refdate) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      refdate = yesterday.toISOString().split('T')[0];
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(refdate)) {
+      return res.status(400).json({
+        error: 'Invalid date format. Use YYYY-MM-DD',
+        message: `Received: ${refdate}`
+      });
+    }
+    
+    // Calculate start date (29 days before refdate, inclusive)
+    const query = `
+      SELECT 
+        COALESCE(c.branchName, c.branchId) as restaurantName,
+        DATE(b.ts) as date,
+        COALESCE(SUM(b.total), 0) as income
+      FROM allegro.bcom_cash b
+      LEFT JOIN allegro.branches c ON b.branchId = c.branchId
+      WHERE DATE(b.ts) BETWEEN DATE_SUB(:refdate, INTERVAL 28 DAY) AND :refdate
+        AND c.branchId IS NOT NULL
+      GROUP BY c.branchId, COALESCE(c.branchName, c.branchId), DATE(b.ts)
+      ORDER BY restaurantName, DATE(b.ts)
+    `;
+    
+    const [rows] = await executeSql(query, { refdate });
+    
+    // Organize data by restaurant name
+    // Structure: { "restaurantName": [incomeDay1, incomeDay2, ..., incomeDay29] }
+    const result = {};
+    const dateMap = new Map(); // Track which dates we have for each restaurant
+    
+    // Initialize all restaurants with 29 days of zeros
+    rows.forEach(row => {
+      if (!result[row.restaurantName]) {
+        result[row.restaurantName] = new Array(29).fill(0);
+        dateMap.set(row.restaurantName, new Map());
+      }
+    });
+    
+    // Fill in actual income values
+    rows.forEach(row => {
+      const restaurantName = row.restaurantName;
+      if (!result[restaurantName]) {
+        result[restaurantName] = new Array(29).fill(0);
+        dateMap.set(restaurantName, new Map());
+      }
+      
+      // Calculate which day index this date represents (0-28)
+      const rowDate = new Date(row.date);
+      const refDate = new Date(refdate);
+      const daysDiff = Math.floor((refDate - rowDate) / (1000 * 60 * 60 * 24));
+      const dayIndex = 28 - daysDiff; // Reverse index (day 0 is 28 days ago, day 28 is refdate)
+      
+      if (dayIndex >= 0 && dayIndex < 29) {
+        result[restaurantName][dayIndex] = parseFloat(row.income) || 0;
+        dateMap.get(restaurantName).set(row.date, dayIndex);
+      }
+    });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('[Analytics] Error fetching performance data:', error);
+    res.status(500).json({
+      error: 'Failed to fetch performance data',
+      message: error.message
+    });
+  }
+}
+
 export const Router = function() {
   const analyticsRouter = express.Router();
   
@@ -154,6 +239,9 @@ export const Router = function() {
   
   // POST /analytics/update-data - Trigger the analytics data update process
   analyticsRouter.post('/update-data', updateData);
+  
+  // GET /analytics/performance/:refdate - Get restaurant performance data (29 days of income)
+  analyticsRouter.get('/performance/:refdate', getPerformance);
   
   analyticsRouter.use('/*', r404());
   
