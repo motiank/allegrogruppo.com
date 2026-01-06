@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createUseStyles } from "react-jss";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+} from "@tanstack/react-table";
 import Loader from "./loader.js";
 import AddChartDialog from "./addchart.js";
 import TopBar from "./topbar.js";
@@ -78,6 +83,70 @@ const useStyles = createUseStyles({
       minHeight: 300,
     },
   },
+  tableContainer: {
+    marginTop: 24,
+    backgroundColor: "#1a1d24",
+    borderRadius: 8,
+    overflow: "hidden",
+    border: "1px solid #444",
+    "@media (max-width: 768px)": {
+      marginTop: 16,
+      overflowX: "auto",
+    },
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    color: "#e0e0e0",
+  },
+  tableHeader: {
+    backgroundColor: "#2a2d34",
+    padding: "12px 16px",
+    textAlign: "left",
+    fontWeight: "600",
+    fontSize: "14px",
+    color: "#e0e0e0",
+    borderBottom: "2px solid #444",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+  },
+  tableCell: {
+    padding: "12px 16px",
+    fontSize: "14px",
+    color: "#b0b0b0",
+    borderBottom: "1px solid #333",
+  },
+  tableRow: {
+    "&:hover": {
+      backgroundColor: "#2a2d34",
+    },
+  },
+  tableRowOdd: {
+    backgroundColor: "#1f2228",
+    "&:hover": {
+      backgroundColor: "#2a2d34",
+    },
+  },
+  tableRowEven: {
+    backgroundColor: "#1a1d24",
+    "&:hover": {
+      backgroundColor: "#2a2d34",
+    },
+  },
+  tableFooter: {
+    backgroundColor: "#2a2d34",
+    borderTop: "2px solid #444",
+    fontWeight: "600",
+  },
+  tableFooterCell: {
+    padding: "12px 16px",
+    fontSize: "14px",
+    color: "#e0e0e0",
+    borderTop: "2px solid #444",
+  },
 });
 
 function CustomLegend({ payload, lines, onClick }) {
@@ -144,6 +213,179 @@ function CustomTooltip({ active, payload, label }) {
     );
   }
   return null;
+}
+
+function ChartTable({ data, dataKeys, lines, hidden, classes }) {
+  // Calculate visible data keys (excluding hidden lines)
+  const visibleDataKeys = useMemo(() => {
+    const visible = [];
+    dataKeys.forEach((dataKey, index) => {
+      if (!hidden || !hidden[index]) {
+        visible.push(dataKey);
+      }
+    });
+    return visible;
+  }, [dataKeys, hidden]);
+
+  // Create columns: date column + one column for each line (excluding hidden ones)
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        accessorKey: 'date',
+        header: 'Date',
+        cell: (info) => {
+          const date = info.getValue();
+          const dayOfWeek = moment(date).format('dd');
+          return `${date} (${dayOfWeek})`;
+        },
+      },
+    ];
+
+    // Add a column for each line, but only if it's not hidden
+    dataKeys.forEach((dataKey, index) => {
+      // Skip if this line is hidden
+      if (hidden && hidden[index]) return;
+      
+      const line = lines[index];
+      if (line) {
+        cols.push({
+          accessorKey: dataKey,
+          header: line.label || dataKey,
+          cell: (info) => {
+            const value = info.getValue();
+            return value != null ? value.toLocaleString() : '-';
+          },
+        });
+      }
+    });
+
+    // Add sum column at the end
+    cols.push({
+      id: 'rowSum',
+      header: 'Sum',
+      cell: (info) => {
+        const row = info.row.original;
+        const sum = visibleDataKeys.reduce((total, key) => {
+          const value = row[key];
+          const numValue = typeof value === 'number' ? value : parseFloat(value);
+          return total + (isNaN(numValue) ? 0 : numValue);
+        }, 0);
+        return sum.toLocaleString();
+      },
+    });
+
+    return cols;
+  }, [dataKeys, lines, hidden, visibleDataKeys]);
+
+  // Transform data for table (data is already in the right format)
+  const tableData = useMemo(() => {
+    return data || [];
+  }, [data]);
+
+  // Calculate summary (totals) for each numeric column
+  const summary = useMemo(() => {
+    if (!data || data.length === 0) return {};
+    
+    const summaryObj = {};
+    
+    // Get all numeric column keys (excluding 'date' and 'rowSum')
+    const numericKeys = columns
+      .filter(col => col.accessorKey && col.accessorKey !== 'date' && col.id !== 'rowSum')
+      .map(col => col.accessorKey);
+    
+    // Calculate totals for each numeric column
+    numericKeys.forEach(key => {
+      const total = data.reduce((sum, row) => {
+        const value = row[key];
+        const numValue = typeof value === 'number' ? value : parseFloat(value);
+        return sum + (isNaN(numValue) ? 0 : numValue);
+      }, 0);
+      summaryObj[key] = total;
+    });
+    
+    // Calculate total for the sum column (sum of all row sums)
+    const rowSumTotal = data.reduce((total, row) => {
+      const rowSum = visibleDataKeys.reduce((sum, key) => {
+        const value = row[key];
+        const numValue = typeof value === 'number' ? value : parseFloat(value);
+        return sum + (isNaN(numValue) ? 0 : numValue);
+      }, 0);
+      return total + rowSum;
+    }, 0);
+    summaryObj.rowSum = rowSumTotal;
+    
+    return summaryObj;
+  }, [data, columns, visibleDataKeys]);
+
+  const table = useReactTable({
+    data: tableData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={classes.tableContainer}>
+      <table className={classes.table}>
+        <thead>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <th key={header.id} className={classes.tableHeader}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map((row, index) => (
+            <tr 
+              key={row.id} 
+              className={index % 2 === 0 ? classes.tableRowEven : classes.tableRowOdd}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <td key={cell.id} className={classes.tableCell}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className={classes.tableFooter}>
+            {table.getHeaderGroups()[0]?.headers.map((header, index) => {
+              const accessorKey = header.column.columnDef.accessorKey;
+              const columnId = header.column.columnDef.id;
+              
+              // Date column shows "Total" label
+              if (accessorKey === 'date') {
+                return (
+                  <td key={header.id} className={classes.tableFooterCell}>
+                    Total
+                  </td>
+                );
+              }
+              
+              // Sum column or numeric columns show the sum
+              const key = columnId === 'rowSum' ? 'rowSum' : accessorKey;
+              const total = summary[key];
+              return (
+                <td key={header.id} className={classes.tableFooterCell}>
+                  {total != null ? total.toLocaleString() : '-'}
+                </td>
+              );
+            })}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
 }
 
 function ChartWidget() {
@@ -501,23 +743,26 @@ function ChartWidget() {
           <TopBar barDataChange={handleChange} tbarData={tbarData} />
         </div>
         {data && data.length > 0 && dataKeys.length > 0 && lines.length > 0 ? (
-          <div className={classes.chartContainer}>
-            <ResponsiveContainer width="100%" height={isMobile ? "100%" : 400}>
-              <LineChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
-                {dataKeys.map((dk, i) => {
-                  if (i >= lines.length) return null;
-                  return (
-                    <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i]?.color || '#888'}`} strokeWidth={2} hide={hidden[i]} />
-                  );
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className={classes.chartContainer}>
+              <ResponsiveContainer width="100%" height={isMobile ? "100%" : 400}>
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
+                  {dataKeys.map((dk, i) => {
+                    if (i >= lines.length) return null;
+                    return (
+                      <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i]?.color || '#888'}`} strokeWidth={2} hide={hidden[i]} />
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <ChartTable data={data} dataKeys={dataKeys} lines={lines} hidden={hidden} classes={classes} />
+          </>
         ) : (
           <p>No data yet. Click + to add a chart.</p>
         )}
