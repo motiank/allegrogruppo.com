@@ -114,6 +114,43 @@ function isWithinActiveHours() {
 }
 
 /**
+ * Determine if current time is before opening hours or after closing hours
+ * @returns {string|null} 'before_hours', 'after_hours', or null if within hours
+ */
+export function getTimeStatus() {
+  const startTime = parseTime(START_TIME);
+  const endTime = parseTime(END_TIME);
+  
+  if (!startTime || !endTime) {
+    return null;
+  }
+  
+  const israelNow = getIsraelTime();
+  const currentTimeMinutes = israelNow.hours * 60 + israelNow.minutes;
+  const startTimeMinutes = startTime.hours * 60 + startTime.minutes;
+  const endTimeMinutes = endTime.hours * 60 + endTime.minutes;
+  
+  // Handle case where end time is after midnight (e.g., 23:00 to 02:00)
+  if (endTimeMinutes < startTimeMinutes) {
+    // Window spans midnight
+    if (currentTimeMinutes > endTimeMinutes && currentTimeMinutes < startTimeMinutes) {
+      return 'after_hours';
+    }
+    // Otherwise within hours
+    return null;
+  } else {
+    // Normal window within same day
+    if (currentTimeMinutes < startTimeMinutes) {
+      return 'before_hours';
+    } else if (currentTimeMinutes >= endTimeMinutes) {
+      return 'after_hours';
+    }
+    // Otherwise within hours
+    return null;
+  }
+}
+
+/**
  * Check if current Israel time is within the specified time window
  * @param {Object} startTime - Start time {hours, minutes}
  * @param {Object} endTime - End time {hours, minutes}

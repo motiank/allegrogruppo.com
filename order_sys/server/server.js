@@ -42,22 +42,27 @@ const isOrdersEnabled = (req) => {
 
 // API endpoint to check if orders are enabled (for page-level UI control)
 // This now checks both legacy env variable and order system state
-app.get('/api/orders-enabled', (req, res) => {
+app.get('/api/orders-enabled', async (req, res) => {
+  const { getTimeStatus } = await import('./orderState.js');
   const legacyEnabled = isOrdersEnabled(req);
   const stateEnabled = areOrdersEnabled();
   const enabled = legacyEnabled && stateEnabled;
   
   // Get status message if disabled
   let statusMessage = null;
+  let timeStatus = null;
   if (!stateEnabled) {
     const language = req.query.lang || req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'he';
     statusMessage = getStatusMessage(language);
+    // Determine if it's before or after hours
+    timeStatus = getTimeStatus();
   }
   
   res.json({ 
     enabled: enabled,
     state: getState().state,
-    statusMessage: statusMessage
+    statusMessage: statusMessage,
+    timeStatus: timeStatus // 'before_hours', 'after_hours', or null
   });
 });
 

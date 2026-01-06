@@ -630,6 +630,8 @@ const EataliaLabracaPage = () => {
   
   // Check if orders are enabled
   useEffect(() => {
+    let previousTimeStatus = null;
+    
     const checkOrdersEnabled = async () => {
       try {
         const lang = i18n.language || 'he';
@@ -639,6 +641,27 @@ const EataliaLabracaPage = () => {
           setOrdersEnabled(data.enabled);
           setOrderSystemState(data.state || null);
           setStatusMessage(data.statusMessage || null);
+          
+          // Track analytics events for system closed scenarios
+          if (!data.enabled && data.timeStatus) {
+            // Only track if timeStatus changed to avoid duplicate events
+            if (previousTimeStatus !== data.timeStatus) {
+              if (data.timeStatus === 'before_hours') {
+                trackEvent('visit_before_hours', {
+                  state: data.state,
+                  language: lang
+                });
+              } else if (data.timeStatus === 'after_hours') {
+                trackEvent('visit_after_hours', {
+                  state: data.state,
+                  language: lang
+                });
+              }
+              previousTimeStatus = data.timeStatus;
+            }
+          } else {
+            previousTimeStatus = null;
+          }
         } else {
           // If endpoint fails, assume disabled for safety
           setOrdersEnabled(false);
