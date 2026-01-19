@@ -70,7 +70,7 @@ export default ({ handleSubmit, setOpen }) => {
     },
   ];
 
-  const metrics = ["income", "orders", "diners", "ontopo-diners", "astrateg", "adsCost"];
+  const metrics = ["income", "orders", "diners", "ontopo-diners", "astrateg", "adsCost", "last-year-delta"];
 
   const classes = useStyles();
   const handleChange = (e) => {

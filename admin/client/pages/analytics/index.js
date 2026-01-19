@@ -181,8 +181,11 @@ function CustomLegend({ payload, lines, onClick }) {
 
 function CustomTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
+    // Use fullDate (YYYY-MM-DD) if available, otherwise fall back to date or label
+    const fullDate = payload[0]?.payload?.fullDate || payload[0]?.payload?.date || label;
     const date = payload[0]?.payload?.date || label;
-    const dayOfWeek = moment(date).format('dd'); // 2-letter day abbreviation (Mo, Tu, We, etc.)
+    // Parse using fullDate for accurate day of week calculation
+    const dayOfWeek = moment(fullDate).format('dd'); // 2-letter day abbreviation (Mo, Tu, We, etc.)
     const dateWithDay = `${date} (${dayOfWeek})`;
     
     return (
@@ -198,17 +201,24 @@ function CustomTooltip({ active, payload, label }) {
         <p style={{ margin: "0 0 8px 0", fontWeight: "bold", color: "#e0e0e0" }}>
           {dateWithDay}
         </p>
-        {payload.map((entry, index) => (
-          <p
-            key={index}
-            style={{
-              margin: "4px 0",
-              color: entry.color || "#e0e0e0",
-            }}
-          >
-            {`${entry.name}: ${entry.value}`}
-          </p>
-        ))}
+        {payload.map((entry, index) => {
+          // Format percentage values for last-year-delta metrics
+          const isDelta = entry.dataKey && entry.dataKey.includes('-delta');
+          const formattedValue = isDelta && typeof entry.value === 'number' 
+            ? `${entry.value.toFixed(2)}%` 
+            : entry.value;
+          return (
+            <p
+              key={index}
+              style={{
+                margin: "4px 0",
+                color: entry.color || "#e0e0e0",
+              }}
+            >
+              {`${entry.name}: ${formattedValue}`}
+            </p>
+          );
+        })}
       </div>
     );
   }
@@ -233,11 +243,14 @@ function ChartTable({ data, dataKeys, lines, hidden, classes }) {
       {
         accessorKey: 'date',
         header: 'Date',
-        cell: (info) => {
-          const date = info.getValue();
-          const dayOfWeek = moment(date).format('dd');
-          return `${date} (${dayOfWeek})`;
-        },
+          cell: (info) => {
+            const row = info.row.original;
+            const date = info.getValue();
+            // Use fullDate for accurate day of week calculation
+            const fullDate = row.fullDate || date;
+            const dayOfWeek = moment(fullDate).format('dd');
+            return `${date} (${dayOfWeek})`;
+          },
       },
     ];
 
@@ -253,6 +266,11 @@ function ChartTable({ data, dataKeys, lines, hidden, classes }) {
           header: line.label || dataKey,
           cell: (info) => {
             const value = info.getValue();
+            // Format percentage values for last-year-delta metrics
+            const isDelta = dataKey.includes('-delta');
+            if (isDelta && typeof value === 'number') {
+              return `${value.toFixed(2)}%`;
+            }
             return value != null ? value.toLocaleString() : '-';
           },
         });
@@ -388,6 +406,38 @@ function ChartTable({ data, dataKeys, lines, hidden, classes }) {
   );
 }
 
+// Predefined color palette for chart lines - ensures visibility
+const CHART_COLORS = [
+  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+  '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384', '#36A2EB', '#FFCE56',
+  '#4BC0C0', '#9966FF', '#FF9F40', '#FF6384', '#36A2EB', '#FFCE56'
+];
+
+// Generate a valid hex color that's always visible
+const generateChartColor = (index) => {
+  // Use predefined colors first, then generate random ones
+  if (index < CHART_COLORS.length) {
+    return CHART_COLORS[index];
+  }
+  
+  // Generate a random color with guaranteed 6-digit hex format
+  // Ensure it's not too light (avoid colors close to white/background)
+  const minBrightness = 100; // Minimum RGB component value
+  const maxBrightness = 220; // Maximum RGB component value to avoid too light colors
+  
+  const r = Math.floor(Math.random() * (maxBrightness - minBrightness) + minBrightness);
+  const g = Math.floor(Math.random() * (maxBrightness - minBrightness) + minBrightness);
+  const b = Math.floor(Math.random() * (maxBrightness - minBrightness) + minBrightness);
+  
+  // Convert to hex with proper padding
+  const toHex = (num) => {
+    const hex = num.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
 function ChartWidget() {
   const classes = useStyles();
   const [tbarData, settbarData] = useState({
@@ -448,6 +498,30 @@ function ChartWidget() {
     setLoading(true);
 
     const { entities, start, end, metric, compare } = form;
+    
+    // Handle last-year-delta metric separately
+    if (metric === "last-year-delta") {
+      try {
+        const url_ = `/admin/allegro/last-year-delta/${run}/${entities.join(",")}/${start}/${end}`;
+        console.log("Fetching last-year-delta data from:", url_);
+        const response = await fetch(url_);
+        const result = await response.json();
+        
+        if (result.thisYear && result.lastYear && result.keys) {
+          // Return the raw data - we'll process it in handleSubmit based on grouping
+          return [result, result.keys];
+        }
+        
+        console.error("Unexpected last-year-delta response format:", result);
+        return [[], []];
+      } catch (error) {
+        console.error("Error fetching last-year-delta data:", error);
+        return [[], []];
+      } finally {
+        setLoading(false);
+      }
+    }
+    
     // Always use day resolution and no moving average when fetching from server
     try {
       const url_ = `/admin/allegro/getData/${run}/${entities.join(",")}/${start}/${end}/${metric}/none/${compare ? 1 : 0}/day`;
@@ -497,7 +571,8 @@ function ChartWidget() {
 
     while (current.isSameOrBefore(end_)) {
       const date = current.format("YYYY-MM-DD");
-      result.set(date, { date });
+      const dateStr = current.format("MM-DD");
+      result.set(date, { date: dateStr, fullDate: date });
       current.add(step, "days");
     }
 
@@ -541,7 +616,12 @@ function ChartWidget() {
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return Array.from(map.values()).sort((a, b) => {
+      // Sort by fullDate if available, otherwise fall back to date
+      const aDate = a.fullDate || a.date;
+      const bDate = b.fullDate || b.date;
+      return aDate.localeCompare(bDate);
+    });
   }
 
   const movingAverage = (mergedData, dataKeys, windowSize) => {
@@ -673,24 +753,185 @@ function ChartWidget() {
       // const new_data = await mockFetch(form);
       const [new_data, names] = await fetchData(form, run);
       
-      // Validate the response
-      if (!Array.isArray(new_data) || !Array.isArray(names)) {
-        console.error("Invalid data format received:", { new_data, names });
-        alert("Error: Invalid data format received from server");
-        return;
-      }
+      let processedData = [];
+      let processedNames = [];
       
-      let processedData = [...new_data];
-      let processedNames = [...names];
+      // Handle last-year-delta metric
+      if (form.metric === "last-year-delta" && new_data.thisYear && new_data.lastYear && new_data.keys) {
+        // Get the current grouping setting (default to day if not set)
+        const groupBy = tbarData.gb || "day";
+        
+        // Calculate time range from thisYear data
+        const thisYearDates = new_data.thisYear.map(d => d.fullDate).filter(Boolean);
+        const lastYearDates = new_data.lastYear.map(d => d.fullDate).filter(Boolean);
+        const allDates = [...thisYearDates, ...lastYearDates].sort();
+        
+        if (allDates.length === 0) {
+          alert("Error: No data received from server");
+          return;
+        }
+        
+        const startDate = allDates[0];
+        const endDate = allDates[allDates.length - 1];
+        
+        // Group both arrays by the selected grouping (day/week/month)
+        // Create separate date maps for each array since groupIntoDateMap modifies the map
+        const dateMapTemplate = getDateMap({ start: startDate, end: endDate, gb: groupBy });
+        
+        // Clone the date map for thisYear
+        const thisYearDateMap = new Map();
+        dateMapTemplate.forEach((value, key) => {
+          thisYearDateMap.set(key, { ...value });
+        });
+        
+        // Clone the date map for lastYear
+        const lastYearDateMap = new Map();
+        dateMapTemplate.forEach((value, key) => {
+          lastYearDateMap.set(key, { ...value });
+        });
+        
+        const groupedThisYear = groupIntoDateMap(thisYearDateMap, new_data.thisYear);
+        const groupedLastYear = groupIntoDateMap(lastYearDateMap, new_data.lastYear);
+        
+        console.log("Date map size:", dateMapTemplate.size);
+        console.log("Grouped thisYear length:", groupedThisYear.length);
+        console.log("Grouped lastYear length:", groupedLastYear.length);
+        console.log("Grouped thisYear sample:", groupedThisYear[0]);
+        console.log("Grouped lastYear sample:", groupedLastYear[0]);
+        console.log("Server keys:", new_data.keys);
+        
+        // Extract actual keys from the grouped data (all keys except date and fullDate)
+        // Use keys from server response, but verify they exist in the data
+        const actualKeys = new Set();
+        if (groupedThisYear.length > 0 && groupedThisYear[0]) {
+          Object.keys(groupedThisYear[0]).forEach((key) => {
+            if (key !== "date" && key !== "fullDate") {
+              actualKeys.add(key);
+            }
+          });
+        }
+        // Fallback to server keys if no keys found in grouped data
+        const keysToProcess = actualKeys.size > 0 ? Array.from(actualKeys) : (new_data.keys || []);
+        
+        console.log("Keys to process:", keysToProcess);
+        
+        if (keysToProcess.length === 0) {
+          console.error("No keys found to process!");
+          alert("Error: No data keys found. Please check the server response.");
+          return;
+        }
+        
+        // Create a map of last year data by fullDate for easy lookup
+        const lastYearMap = new Map();
+        groupedLastYear.forEach((row) => {
+          const dateKey = row.fullDate || row.date;
+          if (dateKey) {
+            lastYearMap.set(dateKey, row);
+          }
+        });
+        
+        console.log("LastYearMap size:", lastYearMap.size);
+        console.log("LastYearMap sample entries:", Array.from(lastYearMap.entries()).slice(0, 3));
+        
+        // Calculate percentage difference for each key
+        processedData = groupedThisYear.map((thisYearRow) => {
+          const dateKey = thisYearRow.fullDate || thisYearRow.date;
+          const lastYearRow = lastYearMap.get(dateKey) || {};
+          
+          if (!lastYearRow || Object.keys(lastYearRow).length === 0) {
+            console.warn(`No matching lastYear data for date: ${dateKey}`);
+          }
+          
+          const result = { 
+            date: thisYearRow.date || thisYearRow.fullDate, 
+            fullDate: thisYearRow.fullDate || thisYearRow.date 
+          };
+          
+          // Calculate percentage difference for each key that exists in the data
+          keysToProcess.forEach((key) => {
+            const thisYearValue = parseFloat(thisYearRow[key]) || 0;
+            const lastYearValue = parseFloat(lastYearRow[key]) || 0;
+            
+            // Calculate percentage difference: ((current - lastYear) / lastYear) * 100
+            let percentageDiff = 0;
+            if (lastYearValue !== 0) {
+              percentageDiff = ((thisYearValue - lastYearValue) / lastYearValue) * 100;
+            } else if (thisYearValue !== 0) {
+              // If last year was 0 but this year has value, show 100% increase
+              percentageDiff = 100;
+            } else {
+              // Both are 0, percentage diff is 0
+              percentageDiff = 0;
+            }
+            
+            // Create a new key name for the percentage difference
+            const deltaKey = `${key}-delta`;
+            result[deltaKey] = parseFloat(percentageDiff.toFixed(2));
+            
+            // Add to processedNames if not already added
+            if (!processedNames.includes(deltaKey)) {
+              processedNames.push(deltaKey);
+            }
+          });
+          
+          return result;
+        });
+        
+        // Sort processedData by fullDate to ensure correct chronological order
+        processedData.sort((a, b) => {
+          const aDate = a.fullDate || a.date;
+          const bDate = b.fullDate || b.date;
+          return aDate.localeCompare(bDate);
+        });
+        
+        console.log("Processed data sample:", processedData[0]);
+        console.log("Processed data length:", processedData.length);
+        console.log("Processed names:", processedNames);
+        
+        // Log a few sample calculations to verify
+        if (processedData.length > 0) {
+          const sample = processedData[0];
+          console.log("Sample processed row:", sample);
+          Object.keys(sample).forEach(key => {
+            if (key.includes('-delta')) {
+              console.log(`  ${key}: ${sample[key]}`);
+            }
+          });
+        }
+        
+        // Ensure we have at least one data point
+        if (processedData.length === 0) {
+          console.error("No processed data after grouping and calculation");
+          alert("Error: No data points after processing. Please check the date range.");
+          return;
+        }
+        
+        if (processedNames.length === 0) {
+          console.error("No processed names after calculation");
+          alert("Error: No data keys found. Please check the server response.");
+          return;
+        }
+      } else {
+        // Handle regular metrics
+        // Validate the response
+        if (!Array.isArray(new_data) || !Array.isArray(names)) {
+          console.error("Invalid data format received:", { new_data, names });
+          alert("Error: Invalid data format received from server");
+          return;
+        }
+        
+        processedData = [...new_data];
+        processedNames = [...names];
+      }
       
       setDataKey((prev) => [...prev, ...processedNames]);
       setHidden([...hidden, ...new Array(processedNames.length).fill(false)]);
       setLines((prev) => [
         ...prev,
-        ...processedNames.map((n) => ({
+        ...processedNames.map((n, idx) => ({
           key: n,
           label: n,
-          color: `#${Math.floor(Math.random() * 16777215).toString(16)}`, // Random color
+          color: generateChartColor(prev.length + idx), // Use proper color generation
           description: `Data for ${n} -${form.description || ""}`,
         })),
       ]);
@@ -754,8 +995,21 @@ function ChartWidget() {
                   <Legend content={(props) => <CustomLegend {...props} lines={lines} onClick={toggleLine} />} />
                   {dataKeys.map((dk, i) => {
                     if (i >= lines.length) return null;
+                    // Ensure stroke color is always set and valid
+                    const strokeColor = lines[i]?.color || generateChartColor(i);
                     return (
-                      <Line key={i} type="monotone" dataKey={dk} name={`${dk}`} stroke={`${lines[i]?.color || '#888'}`} strokeWidth={2} hide={hidden[i]} />
+                      <Line 
+                        key={i} 
+                        type="monotone" 
+                        dataKey={dk} 
+                        name={`${dk}`} 
+                        stroke={strokeColor} 
+                        strokeWidth={2} 
+                        hide={hidden[i]}
+                        strokeOpacity={1}
+                        dot={{ fill: strokeColor, strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
                     );
                   })}
                 </LineChart>

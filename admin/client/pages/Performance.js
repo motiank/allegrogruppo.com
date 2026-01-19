@@ -94,6 +94,35 @@ const Performance = () => {
     return sum / days;
   };
 
+  // Calculate average daily income from the start of the month to refDate
+  const calculateMonthToDateAverage = (incomeArray, refDateStr) => {
+    if (!incomeArray || incomeArray.length !== 29 || !refDateStr) return 0;
+    
+    const refDate = new Date(refDateStr);
+    const monthStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+    
+    // Calculate days from month start to refDate (inclusive)
+    const daysFromMonthStart = Math.floor((refDate - monthStart) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // The incomeArray index 28 corresponds to refDate
+    // Index 0 corresponds to refDate - 28 days
+    // So index 28 - daysFromMonthStart + 1 corresponds to month start
+    const startIndex = Math.max(0, 29 - daysFromMonthStart);
+    const endIndex = 29; // Include refDate (index 28)
+    
+    // If month start is before our 29-day window, use all available days
+    if (startIndex === 0 && daysFromMonthStart > 29) {
+      // Use all 29 days if month start is before our window
+      const sum = incomeArray.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+      return sum / 29;
+    }
+    
+    const days = endIndex - startIndex;
+    if (days <= 0) return 0;
+    const sum = incomeArray.slice(startIndex, endIndex).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+    return sum / days;
+  };
+
   // Process data for table display
   const tableData = useMemo(() => {
     const processed = [];
@@ -103,15 +132,22 @@ const Performance = () => {
 
       // Calculate current 28-day moving average (days 1-28) - yesterday's average
       const currentMA = calculateMovingAverage(incomeArray, 1, 29);
+      
+      // Calculate average daily income from month start to refDate
+      const monthToDateAvg = calculateMonthToDateAverage(incomeArray, refDate);
 
       // Get last year data
       const lastYearIncomeArray = lastYearData[restaurantName];
       let lastYearMA = 0;
+      let lastYearMonthToDateAvg = 0;
       let hasLastYearData = false;
       
       if (lastYearIncomeArray && lastYearIncomeArray.length === 29) {
         // Calculate last year 28-day moving average (days 1-28) - yesterday's average
         lastYearMA = calculateMovingAverage(lastYearIncomeArray, 1, 29);
+        // Calculate last year month-to-date average
+        const lastYearRefDate = findLastYearDate(refDate);
+        lastYearMonthToDateAvg = calculateMonthToDateAverage(lastYearIncomeArray, lastYearRefDate);
         hasLastYearData = true;
       }
       
@@ -145,7 +181,9 @@ const Performance = () => {
       processed.push({
         restaurantName,
         currentMA,
+        monthToDateAvg,
         lastYearMA: hasLastYearData ? lastYearMA : null,
+        lastYearMonthToDateAvg: hasLastYearData ? lastYearMonthToDateAvg : null,
         percentageDiff: hasLastYearData ? percentageDiff : null,
         dailyChange,
         rawIncome: incomeArray, // Keep for reference
@@ -153,7 +191,7 @@ const Performance = () => {
     });
 
     return processed.sort((a, b) => a.restaurantName.localeCompare(b.restaurantName));
-  }, [performanceData, lastYearData]);
+  }, [performanceData, lastYearData, refDate]);
 
   // Filter data based on search term
   const filteredData = useMemo(() => {
@@ -183,7 +221,18 @@ const Performance = () => {
         cell: (info) => {
           const value = info.getValue();
           if (value === null || value === undefined) return 'N/A';
-          return `₪${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const row = info.row.original;
+          const monthAvg = row.monthToDateAvg || 0;
+          return (
+            <span>
+              ₪{value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {monthAvg > 0 && (
+                <span style={{ color: theme.textSecondary || '#666', fontSize: '0.9em', marginLeft: '4px' }}>
+                  (₪{monthAvg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </span>
+              )}
+            </span>
+          );
         },
       },
       {
@@ -192,7 +241,22 @@ const Performance = () => {
         cell: (info) => {
           const value = info.getValue();
           if (value === null || value === undefined) return 'N/A';
-          return `₪${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const row = info.row.original;
+          const monthAvg = row.lastYearMonthToDateAvg || 0;
+          return (
+            <span>
+              ₪{value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {monthAvg > 0 ? (
+                <span style={{ color: theme.textSecondary || '#666', fontSize: '0.9em', marginLeft: '4px' }}>
+                  (₪{monthAvg.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </span>
+              ) : (
+                <span style={{ color: theme.textSecondary || '#666', fontSize: '0.9em', marginLeft: '4px' }}>
+                  (none till now)
+                </span>
+              )}
+            </span>
+          );
         },
       },
       {

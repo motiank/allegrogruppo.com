@@ -497,5 +497,157 @@ export default () => {
     }
   });
 
+  /**
+   * Get last year delta data
+   * Returns income from the specified period of this year and the same period of last year, normalized by day of week
+   * Endpoint: GET /last-year-delta/:run_count/:entities/:start/:end
+   */
+  apiRouter.get("/last-year-delta/:run_count/:entities/:start/:end", async (req, res) => {
+    console.log("allegro last-year-delta", req.params);
+    const { run_count, entities, start, end } = req.params;
+    
+    try {
+      const start_date = moment(start, "YYYY-MM-DD");
+      const end_date = moment(end, "YYYY-MM-DD");
+      
+      if (!start_date.isValid() || !end_date.isValid()) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      console.log("Server: Received dates - start:", start_date.format("YYYY-MM-DD"), "end:", end_date.format("YYYY-MM-DD"));
+      
+      // Calculate period length
+      const period_len = end_date.diff(start_date, "days");
+      
+      // Calculate last year dates, normalized by day of week
+      const last_year_start = start_date.clone().subtract(1, "year");
+      const last_year_end = last_year_start.clone().add(period_len, "days");
+      
+      console.log("Server: Last year dates (before normalization) - start:", last_year_start.format("YYYY-MM-DD"), "end:", last_year_end.format("YYYY-MM-DD"));
+      
+      // Normalize last year start to match day of week of this year start
+      const targetWeekday = start_date.day(); // 0=Sunday, 1=Monday, etc.
+      let weekDayDiff = 0;
+      for (let i = -3; i <= 3; i++) {
+        const candidate = last_year_start.clone().add(i, "days");
+        if (candidate.day() === targetWeekday) {
+          weekDayDiff = i;
+          break;
+        }
+      }
+      const normalized_last_year_start = last_year_start.clone().add(weekDayDiff, "days");
+      const normalized_last_year_end = normalized_last_year_start.clone().add(period_len, "days");
+      
+      console.log("Server: Normalized last year dates - start:", normalized_last_year_start.format("YYYY-MM-DD"), "end:", normalized_last_year_end.format("YYYY-MM-DD"));
+      console.log("Server: Weekday diff:", weekDayDiff, "target weekday:", targetWeekday);
+      
+      // Parse entities
+      let companies = [],
+        restaurants = [],
+        brands = [];
+      
+      entities.split(",").forEach((e) => {
+        const [type, id] = e.split(":");
+        if (type === "c") {
+          companies.push(id);
+        } else if (type === "r") {
+          restaurants.push(id);
+        } else if (type === "allegro") {
+          brands.push("allegro");
+        }
+      });
+      
+      // Build queries for this year
+      const thisYearQueries = [
+        getRestQry({ restaurants, companies, groupBy: "day", metric: "income", tableName: "bcom_cash" }),
+        getCompanyQry({ restaurants, companies, groupBy: "day", metric: "income", tableName: "bcom_cash" }),
+        getBrandsQry({ restaurants, brands, groupBy: "day", metric: "income", tableName: "bcom_cash" }),
+      ];
+      
+      // Fetch this year data
+      const thisYearParams = { start: start_date.format("YYYY-MM-DD"), end: end_date.format("YYYY-MM-DD") };
+      const thisYearRows = await Promise.all(
+        thisYearQueries.map((qry) => (qry ? executeSql(qry, thisYearParams) : Promise.resolve([[], []])))
+      );
+      
+      let thisYearTempMap = {};
+      const thisYearData = thisYearRows.map(([rows, fields]) => {
+        return rows.map((row) => {
+          const { gname, date, total } = row;
+          const vname = `${getProperName(gname)}[${run_count}]`;
+          thisYearTempMap[date] = thisYearTempMap[date] || {};
+          thisYearTempMap[date][vname] = (thisYearTempMap[date][vname] || 0) + parseInt(total || "0");
+          const dateStr = moment(date).format("MM-DD");
+          return { date: dateStr, [vname]: thisYearTempMap[date][vname], fullDate: date };
+        });
+      });
+      
+      // Fetch last year data
+      const lastYearParams = { 
+        start: normalized_last_year_start.format("YYYY-MM-DD"), 
+        end: normalized_last_year_end.format("YYYY-MM-DD") 
+      };
+      const lastYearRows = await Promise.all(
+        thisYearQueries.map((qry) => (qry ? executeSql(qry, lastYearParams) : Promise.resolve([[], []])))
+      );
+      
+      let lastYearTempMap = {};
+      const lastYearData = lastYearRows.map(([rows, fields]) => {
+        return rows.map((row) => {
+          const { gname, date, total } = row;
+          const vname = `${getProperName(gname)}[${run_count}]`;
+          lastYearTempMap[date] = lastYearTempMap[date] || {};
+          lastYearTempMap[date][vname] = (lastYearTempMap[date][vname] || 0) + parseInt(total || "0");
+          const dateStr = moment(date).format("MM-DD");
+          return { date: dateStr, [vname]: lastYearTempMap[date][vname], fullDate: date };
+        });
+      });
+      
+      // Merge and normalize last year data to align with this year dates
+      let [thisYearMerged, thisYearKeys] = mergeArraysByDate(thisYearData, "day");
+      let [lastYearMerged, lastYearKeys] = mergeArraysByDate(lastYearData, "day");
+      
+      console.log("Server: thisYearMerged sample:", thisYearMerged[0]);
+      console.log("Server: lastYearMerged sample (before normalization):", lastYearMerged[0]);
+      console.log("Server: normalized_last_year_start:", normalized_last_year_start.format("YYYY-MM-DD"));
+      console.log("Server: start_date:", start_date.format("YYYY-MM-DD"));
+      
+      // Normalize last year dates to align with this year (by day of week)
+      // Map each day from the normalized last year period to the corresponding day in this year's period
+      const normalizedLastYear = lastYearMerged.map((row) => {
+        const { fullDate, date, ...rest } = row;
+        const originalDate = moment(fullDate, "YYYY-MM-DD");
+        
+        // Calculate how many days from the start of the normalized last year period
+        const daysFromStart = originalDate.diff(normalized_last_year_start, "days");
+        
+        // Map to the corresponding date in this year's period
+        const correspondingThisYearDate = start_date.clone().add(daysFromStart, "days");
+        
+        console.log(`Server: Mapping ${originalDate.format("YYYY-MM-DD")} (day ${daysFromStart}) -> ${correspondingThisYearDate.format("YYYY-MM-DD")}`);
+        
+        return { 
+          ...rest, 
+          date: correspondingThisYearDate.format("MM-DD"), 
+          fullDate: correspondingThisYearDate.format("YYYY-MM-DD") 
+        };
+      });
+      
+      console.log("Server: normalizedLastYear sample:", normalizedLastYear[0]);
+      console.log("Server: thisYearMerged length:", thisYearMerged.length);
+      console.log("Server: normalizedLastYear length:", normalizedLastYear.length);
+      
+      // Return both arrays separately so client can group them
+      res.json({
+        thisYear: thisYearMerged,
+        lastYear: normalizedLastYear,
+        keys: thisYearKeys,
+      });
+    } catch (error) {
+      console.error("Error fetching last year delta data:", error);
+      res.status(500).json({ error: `Internal Server Error ${error}` });
+    }
+  });
+
   return apiRouter;
 };
