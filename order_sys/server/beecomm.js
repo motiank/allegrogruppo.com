@@ -671,10 +671,10 @@ router.post('/pelecard/placeorder', express.text({ type: ['text/plain', 'text/*'
         building: locationData.building || '',
         floor: locationData.floor || '',
         companyName: locationData.office || '',
-        cityName: "Petch Tikva",
-        streetName: "Tozert Haaretz",
-        homeNumber: "3",
-        formattedAddress: "Formatted :Tozert Haaretz 3, Petch Tikva",
+        cityName: "BSR - Petch Tikva",
+        streetName: "building",
+        homeNumber: locationData.building || '',
+        formattedAddress: `Formatted :Building : ${locationData.building}, ${locationData.floor}, ${locationData.office}, BSR Petch Tikva`,
         deliveryCost:0,
 
         // Add other delivery fields as needed
