@@ -153,13 +153,16 @@ const Performance = () => {
       
       // Calculate percentage difference
       let percentageDiff = 0;
+      let ratio = null;
       if (hasLastYearData && lastYearMA > 0) {
         percentageDiff = ((currentMA - lastYearMA) / lastYearMA) * 100;
+        ratio = currentMA / lastYearMA; // Ratio: current/lastYear
       }
 
       // Calculate daily change in percentage difference
       // Use days 0-27 from the same 29-day datasets to calculate 2 days before metrics
       let dailyChange = null;
+      let changeRatio = null;
       if (hasLastYearData && lastYearIncomeArray && lastYearIncomeArray.length === 29) {
         // Calculate 2 days before current 28-day MA (days 0-27)
         const prevDayCurrentMA = calculateMovingAverage(incomeArray, 0, 28);
@@ -175,6 +178,11 @@ const Performance = () => {
         // Daily change is the difference in percentage difference
         if (hasLastYearData && lastYearMA > 0) {
           dailyChange = percentageDiff - prevPercentageDiff;
+          // Ratio for change: current day's ratio / previous day's ratio
+          if (prevDayLastYearMA > 0) {
+            const prevRatio = prevDayCurrentMA / prevDayLastYearMA;
+            changeRatio = ratio / prevRatio; // Ratio of ratios
+          }
         }
       }
 
@@ -185,7 +193,9 @@ const Performance = () => {
         lastYearMA: hasLastYearData ? lastYearMA : null,
         lastYearMonthToDateAvg: hasLastYearData ? lastYearMonthToDateAvg : null,
         percentageDiff: hasLastYearData ? percentageDiff : null,
+        ratio: hasLastYearData ? ratio : null,
         dailyChange,
+        changeRatio,
         rawIncome: incomeArray, // Keep for reference
       });
     });
@@ -265,10 +275,25 @@ const Performance = () => {
         cell: (info) => {
           const value = info.getValue();
           if (value === null || value === undefined) return 'N/A';
+          const row = info.row.original;
+          const monthToDateAvg = row.monthToDateAvg || 0;
+          const lastYearMonthToDateAvg = row.lastYearMonthToDateAvg || 0;
           const color = value >= 0 ? theme.success || '#10b981' : theme.error || '#ef4444';
+          // Calculate percentage difference between month-to-date averages
+          let monthToDatePercentageDiff = null;
+          if (lastYearMonthToDateAvg > 0) {
+            monthToDatePercentageDiff = ((monthToDateAvg - lastYearMonthToDateAvg) / lastYearMonthToDateAvg) * 100;
+          } else if (monthToDateAvg > 0) {
+            monthToDatePercentageDiff = 100; // If last year was 0 but this year has value
+          }
           return (
             <span style={{ color }}>
               {value >= 0 ? '+' : ''}{value.toFixed(2)}%
+              {monthToDatePercentageDiff !== null && (
+                <span style={{ color: theme.textSecondary || '#666', fontSize: '0.9em', marginLeft: '4px' }}>
+                  ({monthToDatePercentageDiff >= 0 ? '+' : ''}{monthToDatePercentageDiff.toFixed(2)}%)
+                </span>
+              )}
             </span>
           );
         },
@@ -279,10 +304,19 @@ const Performance = () => {
         cell: (info) => {
           const value = info.getValue();
           if (value === null || value === undefined) return 'N/A';
+          const row = info.row.original;
+          const changeRatio = row.changeRatio;
           const color = value >= 0 ? theme.success || '#10b981' : theme.error || '#ef4444';
+          // Convert change ratio to percentage: (changeRatio - 1) * 100
+          const changeRatioAsPercentage = changeRatio !== null && changeRatio !== undefined ? (changeRatio - 1) * 100 : null;
           return (
             <span style={{ color }}>
               {value >= 0 ? '+' : ''}{value.toFixed(2)}%
+              {changeRatioAsPercentage !== null && (
+                <span style={{ color: theme.textSecondary || '#666', fontSize: '0.9em', marginLeft: '4px' }}>
+                  ({changeRatioAsPercentage >= 0 ? '+' : ''}{changeRatioAsPercentage.toFixed(2)}%)
+                </span>
+              )}
             </span>
           );
         },
