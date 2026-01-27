@@ -48,7 +48,7 @@ const useStyles = createUseStyles({
     fontSize: '2.2rem',
     lineHeight: 1.2,
     marginBottom: theme.spacing.md,
-    color: '#ffffff',
+    color: theme.colors.primary,
   },
   subtitle: {
     fontSize: '1.2rem',
