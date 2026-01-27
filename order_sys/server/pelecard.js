@@ -338,7 +338,36 @@ console.log('initPayload', initPayload);
 
         await executeSql(insertQuery, insertParams);
         console.log('[pelecard] Order inserted into database:', orderId);
-        
+
+        // Affiliate attribution: link order to affiliate when affc cookie is present
+        const affc = req.cookies?.affc;
+        if (affc) {
+          try {
+            const code = String(affc).trim().slice(0, 8);
+            const [orderRows] = await executeSql(
+              'SELECT id FROM orders WHERE orderId = :orderId LIMIT 1',
+              { orderId: `${orderId}` }
+            );
+            const orderIdPK = orderRows?.[0]?.id;
+            if (orderIdPK) {
+              const [affRows] = await executeSql(
+                'SELECT affiliate_id FROM affiliate WHERE affiliate_code = :code LIMIT 1',
+                { code }
+              );
+              const affiliateId = affRows?.[0]?.affiliate_id;
+              if (affiliateId) {
+                await executeSql(
+                  'INSERT IGNORE INTO affiliate_orders (affiliate_id, order_id) VALUES (:affiliate_id, :order_id)',
+                  { affiliate_id: affiliateId, order_id: orderIdPK }
+                );
+                console.log('[pelecard] Linked order to affiliate:', { orderId, affiliateId, affc: code });
+              }
+            }
+          } catch (affErr) {
+            console.error('[pelecard] Affiliate attribution failed (non-blocking):', affErr);
+          }
+        }
+
         // Notify admin service about new order (async, don't wait)
         notifyAdmin({
           orderId: `${orderId}`,

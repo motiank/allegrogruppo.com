@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import OrderHistory from './pages/OrderHistory';
 import Analytics from './pages/analytics/index.js';
 import Performance from './pages/Performance';
+import Affiliates from './pages/Affiliates';
 import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {
@@ -126,6 +127,16 @@ const App = () => {
             <ProtectedRoute>
               <Layout>
                 <Performance />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/affiliates"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Affiliates />
               </Layout>
             </ProtectedRoute>
           }

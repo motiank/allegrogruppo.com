@@ -5,6 +5,7 @@ import { Router as orders } from "../../modules/orders.js";
 import  allegro from "../../modules/allegro.js";
 import { Router as orderSystem } from "../../modules/orderSystem.js";
 import { Router as analytics } from "../../modules/analytics.js";
+import { Router as affiliates } from "../../modules/affiliates.js";
 
 const api = function () {
   var admin = express.Router();
@@ -22,6 +23,7 @@ const api = function () {
   admin.use("/allegro", allegro());
   admin.use("/order-system", orderSystem());
   admin.use("/analytics", analytics());
+  admin.use("/affiliates", affiliates());
   return admin;
 };
 

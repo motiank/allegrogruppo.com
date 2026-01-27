@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -25,9 +26,10 @@ const { getState, areOrdersEnabled, getStatusMessage, verifyAuthToken, updateSta
 const app = express();
 const PORT = process.env.PORT || 3020;
 
-// Parse JSON bodies
+// Parse JSON bodies and cookies (affc for affiliate attribution)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Check if orders are enabled (legacy env variable support)
 const BSR_ORDERS_ENABLED = process.env.BSR_ORDERS_ENABLED === 'true';

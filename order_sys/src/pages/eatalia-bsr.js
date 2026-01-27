@@ -553,13 +553,14 @@ const EataliaBSRPage = () => {
   useEffect(() => {
     const pathname = location.pathname;
     const currentBasePath = getBasePath();
-    
+    const search = location.search || '';
+
     // If we're exactly at the base path or base path with trailing slash, redirect to welcome
     if (pathname === currentBasePath || pathname === `${currentBasePath}/`) {
-      navigate(`${currentBasePath}/welcome`, { replace: true });
+      navigate(`${currentBasePath}/welcome${search}`, { replace: true });
       return;
     }
-    
+
     // Check if step is valid
     let relativePath = pathname;
     if (pathname.startsWith(currentBasePath)) {
@@ -568,9 +569,9 @@ const EataliaBSRPage = () => {
     const pathStep = relativePath.replace(/^\//, '').split('/')[0] || 'welcome';
     const validSteps = ['welcome', 'cart', 'meal', 'location', 'payment', 'thankYou'];
     if (!validSteps.includes(pathStep)) {
-      navigate(`${currentBasePath}/welcome`, { replace: true });
+      navigate(`${currentBasePath}/welcome${search}`, { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.search, navigate]);
 
   // Initialize user ID on page load (only if consent given)
   useEffect(() => {
@@ -580,6 +581,17 @@ const EataliaBSRPage = () => {
     }
     initUserId();
   }, []);
+
+  // Affiliate code: read ?affc= from URL, store in cookie (3-day expiry) for order attribution
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(location.search);
+    const affc = params.get('affc');
+    if (!affc || !affc.trim()) return;
+    const value = affc.trim().slice(0, 8);
+    const maxAge = 3 * 24 * 60 * 60; // 3 days
+    document.cookie = `affc=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Lax`;
+  }, [location.search]);
 
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [locationData, setLocationData] = useState(null);
