@@ -83,8 +83,10 @@ const OrderSystemDropdown = () => {
         return { label: 'Active', color: theme.success, bgColor: theme.successBg, borderColor: theme.successBorder };
       case 'shutdown':
         return { label: 'Shutdown', color: theme.error, bgColor: theme.errorBg, borderColor: theme.errorBorder };
+      case 'pause':
+        return { label: 'Pause', color: theme.warningText, bgColor: theme.warningBg, borderColor: theme.warningBorder };
       case 'suspend':
-        return { label: 'Suspend', color: theme.warningText, bgColor: theme.warningBg, borderColor: theme.warningBorder };
+        return { label: 'Suspend', color: theme.error, bgColor: theme.errorBg, borderColor: theme.errorBorder };
       default:
         return { label: 'Unknown', color: theme.textSecondary, bgColor: theme.surfaceSecondary, borderColor: theme.border };
     }
@@ -105,7 +107,8 @@ const OrderSystemDropdown = () => {
 
   const statuses = [
     { value: 'active', label: 'Active', color: theme.success },
-    { value: 'suspend', label: 'Suspend', color: theme.warning },
+    { value: 'pause', label: 'Pause', color: theme.warning },
+    { value: 'suspend', label: 'Suspend', color: theme.error },
     { value: 'shutdown', label: 'Shutdown', color: theme.error },
   ];
 

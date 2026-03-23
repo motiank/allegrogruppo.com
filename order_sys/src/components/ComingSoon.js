@@ -183,7 +183,7 @@ export const ComingSoon = ({ statusMessage, state }) => {
   // Use custom status message if provided, otherwise use default translations
   const title = statusMessage?.title || t('comingSoon.title');
   const message = statusMessage?.message || t('comingSoon.message');
-  const subtitle = state === 'suspend' ? '' : (statusMessage?.subtitle || t('comingSoon.subtitle'));
+  const subtitle = (state === 'suspend' || state === 'pause') ? '' : (statusMessage?.subtitle || t('comingSoon.subtitle'));
 
   return (
     <div className={classes.container}>

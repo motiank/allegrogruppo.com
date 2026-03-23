@@ -625,7 +625,7 @@ const EataliaLabracaPage = () => {
   const [dishImagesMap, setDishImagesMap] = useState({});
   const [organizedMenu, setOrganizedMenu] = useState(null); // Organized menu structure with categories
   const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
-  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'suspend'
+  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'pause', 'suspend'
   const [statusMessage, setStatusMessage] = useState(null); // Status message object with title and message
   
   // Check if orders are enabled

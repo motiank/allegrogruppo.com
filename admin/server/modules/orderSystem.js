@@ -61,11 +61,11 @@ async function updateOrderSystemState(req, res) {
   if (!state) {
     return res.status(400).json({
       error: 'State parameter is required',
-      validStates: ['active', 'shutdown', 'suspend']
+      validStates: ['active', 'shutdown', 'pause', 'suspend']
     });
   }
 
-  const validStates = ['active', 'shutdown', 'suspend'];
+  const validStates = ['active', 'shutdown', 'pause', 'suspend'];
   if (!validStates.includes(state)) {
     return res.status(400).json({
       error: `Invalid state. Must be one of: ${validStates.join(', ')}`

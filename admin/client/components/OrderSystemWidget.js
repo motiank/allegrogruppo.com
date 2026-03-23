@@ -63,8 +63,10 @@ const OrderSystemWidget = () => {
         return { label: 'Active', color: '#28a745', bgColor: '#d4edda', borderColor: '#c3e6cb' };
       case 'shutdown':
         return { label: 'Shutdown', color: '#dc3545', bgColor: '#f8d7da', borderColor: '#f5c6cb' };
+      case 'pause':
+        return { label: 'Pause', color: '#856404', bgColor: '#fff3cd', borderColor: '#ffeaa7' };
       case 'suspend':
-        return { label: 'Suspend', color: '#856404', bgColor: '#fff3cd', borderColor: '#ffeaa7' };
+        return { label: 'Suspend', color: '#721c24', bgColor: '#f8d7da', borderColor: '#f5c6cb' };
       default:
         return { label: 'Unknown', color: '#6c757d', bgColor: '#e9ecef', borderColor: '#dee2e6' };
     }
@@ -279,16 +281,16 @@ const OrderSystemWidget = () => {
               ✓ Turn On
             </button>
             <button
-              onClick={() => updateState('suspend')}
-              disabled={updating || state.state === 'suspend' || state.controlsEnabled === false}
+              onClick={() => updateState('pause')}
+              disabled={updating || state.state === 'pause' || state.controlsEnabled === false}
               onMouseEnter={(e) => {
-                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
+                if (!updating && state.state !== 'pause' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.warning;
                   e.target.style.color = theme.mode === 'dark' ? '#fff' : '#000';
                 }
               }}
               onMouseLeave={(e) => {
-                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
+                if (!updating && state.state !== 'pause' && state.controlsEnabled !== false) {
                   e.target.style.backgroundColor = theme.surface;
                   e.target.style.color = theme.warningText;
                 }
@@ -296,12 +298,37 @@ const OrderSystemWidget = () => {
               style={{
                 ...styles.actionButton,
                 ...styles.buttonPostpone,
+                ...(state.state === 'pause' ? styles.buttonCurrent : {}),
+                ...(updating || state.controlsEnabled === false ? styles.buttonDisabled : {}),
+                ...(state.controlsEnabled === false ? { opacity: 0.4 } : {}),
+              }}
+            >
+              ⏸ Pause
+            </button>
+            <button
+              onClick={() => updateState('suspend')}
+              disabled={updating || state.state === 'suspend' || state.controlsEnabled === false}
+              onMouseEnter={(e) => {
+                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
+                  e.target.style.backgroundColor = theme.error;
+                  e.target.style.color = '#fff';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!updating && state.state !== 'suspend' && state.controlsEnabled !== false) {
+                  e.target.style.backgroundColor = theme.surface;
+                  e.target.style.color = theme.error;
+                }
+              }}
+              style={{
+                ...styles.actionButton,
+                ...styles.buttonShutdown,
                 ...(state.state === 'suspend' ? styles.buttonCurrent : {}),
                 ...(updating || state.controlsEnabled === false ? styles.buttonDisabled : {}),
                 ...(state.controlsEnabled === false ? { opacity: 0.4 } : {}),
               }}
             >
-              ⏸ Suspend
+              ⛔ Suspend
             </button>
             <button
               onClick={() => updateState('shutdown')}

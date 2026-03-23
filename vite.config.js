@@ -58,6 +58,31 @@ export default defineConfig({
               // File doesn't exist, continue to next middleware
             }
           }
+
+          // Support client-side route entries for order system tests
+          // so /bsr/welcome works directly without manual /eatalia-bsr.html prefix.
+          if (url.startsWith('/bsr') || url.startsWith('/eatalia-bsr')) {
+            try {
+              const htmlFile = resolve(process.cwd(), 'eatalia-bsr.html');
+              const content = readFileSync(htmlFile, 'utf-8');
+              res.setHeader('Content-Type', 'text/html');
+              res.end(content);
+              return;
+            } catch (e) {
+              console.log('[DEBUG] Error serving eatalia-bsr.html for /bsr path:', e.message);
+            }
+          }
+          if (url.startsWith('/labraca') || url.startsWith('/eatalia-labraca')) {
+            try {
+              const htmlFile = resolve(process.cwd(), 'eatalia-labraca.html');
+              const content = readFileSync(htmlFile, 'utf-8');
+              res.setHeader('Content-Type', 'text/html');
+              res.end(content);
+              return;
+            } catch (e) {
+              console.log('[DEBUG] Error serving eatalia-labraca.html for /labraca path:', e.message);
+            }
+          }
           
           // Serve admin.html
           if (url === '/admin.html') {

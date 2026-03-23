@@ -620,7 +620,7 @@ const EataliaBSRPage = () => {
   const [dynamicMeals, setDynamicMeals] = useState([]);
   const [dishImagesMap, setDishImagesMap] = useState({});
   const [ordersEnabled, setOrdersEnabled] = useState(null); // null = checking, true = enabled, false = disabled
-  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'suspend'
+  const [orderSystemState, setOrderSystemState] = useState(null); // null, 'active', 'shutdown', 'pause', 'suspend'
   const [statusMessage, setStatusMessage] = useState(null); // Status message object with title and message
   
   // Check if orders are enabled
@@ -1001,18 +1001,92 @@ const EataliaBSRPage = () => {
     });
   };
 
-  const handleLocationSubmit = (data) => {
+  const handleLocationSubmit = async (data) => {
     const payload = { ...data, groupName };
     const newOrderId = createOrderId();
     setOrderId(newOrderId);
     setLocationData(payload);
     trackEvent('location_completed', { ...payload, orderId: newOrderId });
-    navigateToStep('payment');
-    trackEvent('payment_step_opened', {
-      orderId: newOrderId,
-      cart: cartItems,
+
+    // Prepare order data to send to server
+    const orderData = {
+      cartItems: cartItems.map((item) => ({
+        id: item.id,
+        key: `${item.id}::${serializeSelections(item.selections || {})}`,
+        quantity: item.quantity,
+        selections: item.selections || {},
+        unitPrice: item.unitPrice || 0,
+        basePrice: item.basePrice || 0,
+        optionsPrice: item.optionsPrice || 0,
+      })),
+      locationData: payload,
+      menuRevision: beecommMetadata?.menuRevision || '',
       total: cartTotal,
-    });
+      orderId: newOrderId,
+    };
+
+    // Check coupon code with server - server will validate and process order if valid
+    const couponCode = data.couponCode?.trim();
+    try {
+      const checkResponse = await fetch('/coupons/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: newOrderId,
+          couponCode: couponCode || null,
+          orderData,
+        }),
+      });
+
+      const checkResult = await checkResponse.json();
+
+      if (checkResult.action === 'thankYou') {
+        // Coupon is valid and order was processed server-side
+        trackEvent('coupon_order_completed', {
+          orderId: newOrderId,
+          couponCode,
+          orderNumber: checkResult.orderNumber,
+        });
+        // Go directly to thank you page
+        navigateToStep('thankYou');
+        return;
+      } else {
+        // Coupon is invalid or no coupon - proceed to payment
+        if (couponCode && checkResult.error) {
+          // Show error message if coupon was provided but invalid
+          alert(checkResult.error || 'Invalid coupon code. Please check and try again.');
+          trackEvent('coupon_validation_failed', {
+            orderId: newOrderId,
+            couponCode,
+            error: checkResult.error,
+          });
+        }
+        // Proceed to payment step
+        navigateToStep('payment');
+        trackEvent('payment_step_opened', {
+          orderId: newOrderId,
+          cart: cartItems,
+          total: cartTotal,
+        });
+      }
+    } catch (error) {
+      console.error('[eatalia-bsr] Error checking coupon:', error);
+      // On error, proceed to payment
+      alert('Failed to validate coupon. Please try again or proceed to payment.');
+      trackEvent('coupon_check_error', {
+        orderId: newOrderId,
+        couponCode,
+        error: error.message,
+      });
+      navigateToStep('payment');
+      trackEvent('payment_step_opened', {
+        orderId: newOrderId,
+        cart: cartItems,
+        total: cartTotal,
+      });
+    }
   };
 
   const handleRestart = () => {
@@ -1557,7 +1631,7 @@ const EataliaBSRPage = () => {
         {step === 'location' && (
           <div className={classes.section}>
             <h1 className={classes.title}>{t('location.title')}</h1>
-            <OfficeForm onSubmit={handleLocationSubmit} />
+            <OfficeForm onSubmit={handleLocationSubmit} optional />
           </div>
         )}
 
