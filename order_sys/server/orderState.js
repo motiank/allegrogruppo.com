@@ -327,8 +327,8 @@ export function getStatusMessage(language = 'he') {
         message: 'מחר ב־{START_TIME} חוזרים\nעם אוכל מצוין ומחירים מפתיעים.'
       },
       suspend: {
-        title: 'המטבח עובד במלוא הקצב 🔥',
-        message: 'כרגע לא יכולים לקבל הזמנות נוספות.'
+        title: 'המערכת מושבתת זמנית',
+        message: 'עקב המצב הנוכחי בארץ, המערכת מושבתת זמנית עד להודעה חדשה.\nעם ישראל חי 🇮🇱'
       },
       preOpening: {
         title: '☀️ בוקר טוב!',
