@@ -276,10 +276,15 @@ export function getState() {
   }
 
   // Return state with controlsEnabled field
-  // Controls are only enabled during active hours
+  // Controls are enabled when system is paused or manually overridden; otherwise depend on active hours
+  const controlsEnabled =
+    currentState.state === ORDER_STATE.PAUSE ||
+    currentState.manuallySet ||
+    withinActiveHours;
+
   return {
     ...currentState,
-    controlsEnabled: withinActiveHours,
+    controlsEnabled,
     activeHours: {
       start: START_TIME,
       end: END_TIME
@@ -557,12 +562,19 @@ export function updateState(newState, authToken, updatedBy = 'admin') {
     };
   }
 
-  // Check if we're within active hours - manual updates are only allowed during active hours
+  // Check if we're within active hours - manual updates are typically only allowed during active hours
+  // but allow updates when system is in pause/suspend/shutdown to enable admin override.
   const withinActiveHours = isWithinActiveHours();
-  if (!withinActiveHours) {
+  const allowManualUpdate =
+    withinActiveHours ||
+    currentState.state === ORDER_STATE.PAUSE ||
+    currentState.state === ORDER_STATE.SUSPEND ||
+    currentState.state === ORDER_STATE.SHUTDOWN;
+
+  if (!allowManualUpdate) {
     return {
       success: false,
-      error: `Manual state changes are not allowed outside active hours (${START_TIME}-${END_TIME} Israel time). The system will automatically activate during active hours.`
+      error: `Manual state changes are not allowed outside active hours (${START_TIME}-${END_TIME} Israel time), except when system is in manual pause/suspend/shutdown state.`
     };
   }
 
