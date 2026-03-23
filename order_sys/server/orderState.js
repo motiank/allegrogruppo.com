@@ -312,6 +312,30 @@ function formatTimeRemaining(minutes) {
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 }
 
+function formatDuration(daysHoursMs) {
+  if (daysHoursMs <= 0) {
+    return '00:00:00';
+  }
+
+  let totalSeconds = Math.ceil(daysHoursMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  totalSeconds %= 86400;
+  const hours = Math.floor(totalSeconds / 3600);
+  totalSeconds %= 3600;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  const hh = hours.toString().padStart(2, '0');
+  const mm = minutes.toString().padStart(2, '0');
+  const ss = seconds.toString().padStart(2, '0');
+
+  if (days > 0) {
+    return `${days} days ${hh}:${mm}:${ss}`;
+  }
+
+  return `${hh}:${mm}:${ss}`;
+}
+
 /**
  * Get status message for customers based on current state
  * @param {string} language - Language code (he, en, ar, ru)
@@ -325,6 +349,10 @@ export function getStatusMessage(language = 'he') {
       shutdown: {
         title: 'סיימנו להיום',
         message: 'מחר ב־{START_TIME} חוזרים\nעם אוכל מצוין ומחירים מפתיעים.'
+      },
+      pause: {
+        title: 'המערכת מושבתת לזמן קצר',
+        message: 'המערכת מושבתת זמנית; יש לראות עד כמה זמן נשאר.'
       },
       suspend: {
         title: 'המערכת מושבתת זמנית',
@@ -348,9 +376,13 @@ export function getStatusMessage(language = 'he') {
         title: 'We finished for today',
         message: 'Tomorrow at {START_TIME} we\'re back\nwith excellent food and surprising prices.'
       },
+      pause: {
+        title: 'Temporarily paused',
+        message: 'The system is temporarily paused. Please wait a few moments.'
+      },
       suspend: {
         title: 'Orders Temporarily Suspended',
-        message: 'The ordering system has been temporarily suspended. Please try again in a few minutes.'
+        message: 'Due to the current situation in the country, the system is temporarily suspended until further notice. Am Yisrael Chai 🇮🇱'
       },
       preOpening: {
         title: '☀️ Good morning!',
@@ -370,9 +402,13 @@ export function getStatusMessage(language = 'he') {
         title: 'انتهينا لهذا اليوم',
         message: 'غداً في {START_TIME} نعود\nمع طعام ممتاز وأسعار مفاجئة.'
       },
+      pause: {
+        title: 'النظام في حالة توقف مؤقت',
+        message: 'النظام متوقف مؤقتاً. يرجى الانتظار.'
+      },
       suspend: {
         title: 'الطلبات معطلة مؤقتاً',
-        message: 'تم تعليق نظام الطلبات مؤقتاً. يرجى المحاولة مرة أخرى بعد بضع دقائق.'
+        message: 'بسبب الوضع الحالي في البلاد، النظام معطّل مؤقتاً حتى إشعار آخر. أم يسرائيل حي 🇮🇱'
       },
       preOpening: {
         title: '☀️ صباح الخير!',
@@ -392,9 +428,13 @@ export function getStatusMessage(language = 'he') {
         title: 'Мы закончили на сегодня',
         message: 'Завтра в {START_TIME} возвращаемся\nс отличной едой и удивительными ценами.'
       },
+      pause: {
+        title: 'Система приостановлена',
+        message: 'Система приостановлена на короткое время. Пожалуйста, подождите.'
+      },
       suspend: {
         title: 'Заказы временно приостановлены',
-        message: 'Система заказов временно приостановлена. Пожалуйста, попробуйте через несколько минут.'
+        message: 'В связи с текущей ситуацией в стране система временно приостановлена до дальнейшего уведомления. Am Yisrael Chai 🇮🇱'
       },
       preOpening: {
         title: '☀️ Доброе утро!',
@@ -504,32 +544,28 @@ export function getStatusMessage(language = 'he') {
     let title = '';
 
     if (state.state === ORDER_STATE.PAUSE) {
-      title = langMessages.suspend.title;
-      message = langMessages.suspend.message;
+      title = langMessages.pause?.title || langMessages.suspend.title;
+      const baseMessage = langMessages.pause?.message || langMessages.suspend.message;
 
-      if (state.suspendedUntil && minutesUntilStart > 0) {
-        if (language === 'he') {
-          message = `<pre>${langMessages.suspend.message}\nתנו לנו עוד ${minutesUntilStart} דקות — שווה לחזור.</pre>`;
-        } else if (language === 'en') {
-          message = `<pre>The kitchen is working at full speed 🔥\nCurrently cannot accept additional orders.\nGive us ${minutesUntilStart} more minutes — worth coming back.</pre>`;
-        } else if (language === 'ar') {
-          message = `<pre>المطبخ يعمل بكامل طاقته 🔥\nحالياً لا يمكننا قبول طلبات إضافية.\nامنحونا ${minutesUntilStart} دقائق أخرى — يستحق العودة.</pre>`;
-        } else if (language === 'ru') {
-          message = `<pre>Кухня работает на полную мощность 🔥\nВ настоящее время не можем принимать дополнительные заказы.\nДайте нам еще ${minutesUntilStart} минут — стоит вернуться.</pre>`;
+      if (state.suspendedUntil) {
+        const now = new Date();
+        const until = new Date(state.suspendedUntil);
+        const diffMs = until - now;
+        const remaining = formatDuration(diffMs);
+
+        if (diffMs > 0) {
+          message = `<pre>${baseMessage}\nTime remaining: ${remaining}</pre>`;
+        } else {
+          message = `<pre>${baseMessage}</pre>`;
         }
       } else {
-        message = `<pre>${message}</pre>`;
+        message = `<pre>${baseMessage}</pre>`;
       }
     } else {
       // Manual suspend (indefinite)
-      title = language === 'he' ? 'המערכת בהשהיה' : language === 'ar' ? 'النظام معطل' : language === 'ru' ? 'Система приостановлена' : 'System Suspended';
-      message = language === 'he'
-        ? '<pre>המערכת מושבתת עד שינוי ידני של סטטוס.</pre>'
-        : language === 'ar'
-          ? '<pre>النظام معطل حتى שינוי يدوي للحالة.</pre>'
-          : language === 'ru'
-            ? '<pre>Система приостановлена до ручного изменения состояния.</pre>'
-            : '<pre>The system is suspended until manually changed.</pre>';
+      title = langMessages.suspend.title;
+      const suspendMessage = langMessages.suspend.message;
+      message = suspendMessage.startsWith('<pre>') ? suspendMessage : `<pre>${suspendMessage}</pre>`;
     }
 
     return { title, message };
