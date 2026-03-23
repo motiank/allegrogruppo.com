@@ -30,7 +30,7 @@ const beecommApi = axios.create({
  * Get access token from Beecomm API
  * @returns {Promise<string>} access_token
  */
-async function getAccessToken() {
+export async function getAccessToken() {
   if (!BEECOMM_CLIENT_ID || !BEECOMM_CLIENT_SECRET) {
     throw new Error('BEECOMM_CLIENT_ID and BEECOMM_CLIENT_SECRET must be set in .env');
   }
@@ -61,7 +61,7 @@ async function getAccessToken() {
  * @param {Object} orderPayload
  * @returns {Promise<Object>}
  */
-async function pushOrder(accessToken, orderPayload) {
+export async function pushOrder(accessToken, orderPayload) {
   try {
     const { data } = await beecommApi.post('/order-center/pushOrder', orderPayload, {
       headers: {

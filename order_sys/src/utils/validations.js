@@ -35,3 +35,5 @@ export const validateLocationForm = (formData) => {
   );
 };
 
+/** When optional=true, empty/blank fields are valid (location step is not mandatory). */
+export const validateLocationFormOptional = (formData) => true;

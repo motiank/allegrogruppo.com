@@ -21,6 +21,7 @@ dotenv.config({ path: join(__dirname, '../..', envFileName) });
 const { default: pelecardRouter } = await import('./pelecard.js');
 const { default: beecommRouter, menuApiRouter } = await import('./beecomm.js');
 const { default: analyticsRouter } = await import('./analytics.js');
+const { default: couponsRouter } = await import('./coupons.js');
 const { getState, areOrdersEnabled, getStatusMessage, verifyAuthToken, updateState } = await import('./orderState.js');
 
 const app = express();
@@ -107,6 +108,9 @@ app.use('/pelecard', pelecardRouter);
 // Beecomm routes - orders can always be placed regardless of BSR_ORDERS_ENABLED
 // BSR_ORDERS_ENABLED only controls UI visibility, not order processing
 app.use('/beecomm', beecommRouter);
+
+// Coupons routes - for coupon validation and coupon order processing
+app.use('/coupons', couponsRouter);
 
 // Menu API routes (from beecomm module)
 app.use('/api', menuApiRouter);

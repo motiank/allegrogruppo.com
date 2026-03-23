@@ -18,6 +18,8 @@
     "phone": "Телефон",
     "notes": "Примечания",
     "notesPlaceholder": "Особые примечания для команды? (необязательно)",
+    "couponCode": "Код купона",
+    "couponCodePlaceholder": "Введите код купона (необязательно)",
     "next": "Далее",
     "selectBuilding": "Выберите здание",
     "errors": {

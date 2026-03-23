@@ -33,6 +33,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
     { path: '/performance', label: 'Performance' },
     { path: '/affiliates', label: 'Affiliates' },
+    { path: '/coupons', label: 'Coupons' },
   ];
 
   const handleNavigation = (path) => {

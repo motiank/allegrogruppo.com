@@ -18,6 +18,8 @@
     "phone": "Phone",
     "notes": "Notes",
     "notesPlaceholder": "Any delivery notes for the team? (optional)",
+    "couponCode": "Coupon code",
+    "couponCodePlaceholder": "Enter coupon code (optional)",
     "next": "Next",
     "selectBuilding": "Select Building",
     "errors": {

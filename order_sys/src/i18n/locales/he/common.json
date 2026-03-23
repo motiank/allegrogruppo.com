@@ -18,6 +18,8 @@
     "phone": "טלפון",
     "notes": "הערות",
     "notesPlaceholder": "הערות מיוחדות לצוות? (לא חובה)",
+    "couponCode": "קוד קופון",
+    "couponCodePlaceholder": "הזינו קוד קופון (לא חובה)",
     "next": "הבא",
     "selectBuilding": "בחרו בניין",
     "errors": {

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { theme } from '../styles/index.js';
 import { 
   validateLocationForm, 
+  validateLocationFormOptional,
   validateName, 
   validateBuilding, 
   validateFloor, 
@@ -135,7 +136,7 @@ const useStyles = createUseStyles({
   },
 });
 
-export const OfficeForm = ({ onSubmit }) => {
+export const OfficeForm = ({ onSubmit, optional = false }) => {
   const classes = useStyles();
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
@@ -145,6 +146,7 @@ export const OfficeForm = ({ onSubmit }) => {
     office: '',
     phone: '',
     notes: '',
+    couponCode: '',
   });
   const [touched, setTouched] = useState({
     name: false,
@@ -161,9 +163,10 @@ export const OfficeForm = ({ onSubmit }) => {
     phone: '',
   });
 
-  const isValid = validateLocationForm(formData);
+  const isValid = optional ? validateLocationFormOptional(formData) : validateLocationForm(formData);
 
   const validateField = (field, value) => {
+    if (optional && (value == null || String(value).trim() === '')) return '';
     let error = '';
     switch (field) {
       case 'name':
@@ -235,7 +238,7 @@ export const OfficeForm = ({ onSubmit }) => {
     };
     setErrors(allErrors);
 
-    if (isValid && onSubmit) {
+    if ((optional || isValid) && onSubmit) {
       onSubmit(formData);
     }
   };
@@ -245,7 +248,7 @@ export const OfficeForm = ({ onSubmit }) => {
       <div className={classes.field}>
         <label className={classes.label} htmlFor="name">
           {t('location.name')}
-          <span className={classes.required}>*</span>
+          {!optional && <span className={classes.required}>*</span>}
         </label>
         <input
           id="name"
@@ -263,7 +266,7 @@ export const OfficeForm = ({ onSubmit }) => {
       <div className={classes.field}>
         <label className={classes.label} htmlFor="building">
           {t('location.building')}
-          <span className={classes.required}>*</span>
+          {!optional && <span className={classes.required}>*</span>}
         </label>
         <select
           id="building"
@@ -286,7 +289,7 @@ export const OfficeForm = ({ onSubmit }) => {
       <div className={classes.field}>
         <label className={classes.label} htmlFor="floor">
           {t('location.floor')}
-          <span className={classes.required}>*</span>
+          {!optional && <span className={classes.required}>*</span>}
         </label>
         <input
           id="floor"
@@ -306,7 +309,7 @@ export const OfficeForm = ({ onSubmit }) => {
       <div className={classes.field}>
         <label className={classes.label} htmlFor="office">
           {t('location.office')}
-          <span className={classes.required}>*</span>
+          {!optional && <span className={classes.required}>*</span>}
         </label>
         <input
           id="office"
@@ -324,7 +327,7 @@ export const OfficeForm = ({ onSubmit }) => {
       <div className={classes.field}>
         <label className={classes.label} htmlFor="phone">
           {t('location.phone')}
-          <span className={classes.required}>*</span>
+          {!optional && <span className={classes.required}>*</span>}
         </label>
         <input
           id="phone"
@@ -349,6 +352,20 @@ export const OfficeForm = ({ onSubmit }) => {
           value={formData.notes}
           onChange={(e) => handleChange('notes', e.target.value)}
           placeholder={t('location.notesPlaceholder')}
+        />
+      </div>
+
+      <div className={classes.field}>
+        <label className={classes.label} htmlFor="couponCode">
+          {t('location.couponCode')}
+        </label>
+        <input
+          id="couponCode"
+          type="text"
+          className={classes.input}
+          value={formData.couponCode}
+          onChange={(e) => handleChange('couponCode', e.target.value)}
+          placeholder={t('location.couponCodePlaceholder')}
         />
       </div>
 

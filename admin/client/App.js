@@ -7,6 +7,7 @@ import OrderHistory from './pages/OrderHistory';
 import Analytics from './pages/analytics/index.js';
 import Performance from './pages/Performance';
 import Affiliates from './pages/Affiliates';
+import Coupons from './pages/Coupons';
 import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {
@@ -137,6 +138,16 @@ const App = () => {
             <ProtectedRoute>
               <Layout>
                 <Affiliates />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/coupons"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Coupons />
               </Layout>
             </ProtectedRoute>
           }

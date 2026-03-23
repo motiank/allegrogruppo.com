@@ -18,6 +18,8 @@
     "phone": "الهاتف",
     "notes": "ملاحظات",
     "notesPlaceholder": "أي ملاحظات خاصة للفريق؟ (اختياري)",
+    "couponCode": "رمز القسيمة",
+    "couponCodePlaceholder": "أدخل رمز القسيمة (اختياري)",
     "next": "التالي",
     "selectBuilding": "اختر المبنى",
     "errors": {
