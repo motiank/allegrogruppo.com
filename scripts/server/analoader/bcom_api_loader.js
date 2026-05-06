@@ -39,7 +39,8 @@ async function bcomApiLoad(dates, dal_push) {
   try {
     // 1. Exchange the refresh token for a new access token
     const refreshToken =
-      'AMf-vBw559ceQiZB1iLxqJbzI8ctQYYzqpUj9pnRsb9YIN336LOGOpZNcwLXb4Nt8BWy92p36hO-eIlMU4cfmoMuMUgc-N4be6C-bOewySA1H2qXCV2aK7wPSZ9q-nmLnvT88lpxxKxBoi4gs9DQFE-5-u2zpI1nMdBS82X9U6ms7YsEPiV5AqaO96fBtDWfgMiTPahUsVJx3kwDY0RRZsvkAYaL8TJiyQ'; // e.g. "AE...Zxy"
+    'AMf-vBzfiKAcnkspCSgpCdpd0hoWh7mDko224h920cOf8enIgpYmEOI7_i7bA50AajaVEpPGgNr6Xa--A8COUJstEpawluU48jSCTDfYlm4eqtHwxstpaGafo50ZE8Sjqtj4vxCHhdGNceShKHIuR_izO6zlB9AfoCiExS_XW9S1vppXU1KFXbBXIwC0XAx85AallkHj8BMwUfw3vlSEf5K3OLS1Q9Ed6Q';
+      // 'AMf-vBw559ceQiZB1iLxqJbzI8ctQYYzqpUj9pnRsb9YIN336LOGOpZNcwLXb4Nt8BWy92p36hO-eIlMU4cfmoMuMUgc-N4be6C-bOewySA1H2qXCV2aK7wPSZ9q-nmLnvT88lpxxKxBoi4gs9DQFE-5-u2zpI1nMdBS82X9U6ms7YsEPiV5AqaO96fBtDWfgMiTPahUsVJx3kwDY0RRZsvkAYaL8TJiyQ'; // e.g. "AE...Zxy"
     const apiKey = 'AIzaSyCWThH_TX19GrAxoH7zBLE6OzSx2n1Erps'; // e.g. "AIzaSyCWThH_..."
 
     const tokenUrl = `https://securetoken.googleapis.com/v1/token?key=${apiKey}`;
