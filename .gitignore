@@ -7,3 +7,10 @@ dist/
 .env.local
 .env_qa
 package-lock.json
+.vscode/
+
+# Output artifacts of scripts/update_employees_salary.js
+update_report.json
+missing_employees.json
+duplicate_employees.json
+validation_errors.json

@@ -1,0 +1,19 @@
+{
+  "name": "payroll-summary",
+  "version": "1.0.0",
+  "description": "Consolidate Hebrew time-tracking Excel exports into a single payroll workbook.",
+  "main": "payroll_summary.js",
+  "bin": {
+    "payroll-summary": "./payroll_summary.js"
+  },
+  "scripts": {
+    "start": "node payroll_summary.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "license": "MIT"
+}

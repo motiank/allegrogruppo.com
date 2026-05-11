@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import Login from './Login';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import OrderHistory from './pages/OrderHistory';
-import Analytics from './pages/analytics/index.js';
-import Performance from './pages/Performance';
-import Affiliates from './pages/Affiliates';
-import Coupons from './pages/Coupons';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
+import Login from "./Login";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import OrderHistory from "./pages/OrderHistory";
+import Analytics from "./pages/analytics/index.js";
+import Performance from "./pages/Performance";
+import Affiliates from "./pages/Affiliates";
+import Coupons from "./pages/Coupons";
+import Shifts from "./pages/Shifts";
+import Employees from "./pages/Employees";
+import axios from "axios";
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -18,10 +26,10 @@ const ProtectedRoute = ({ children }) => {
     // Check if user is authenticated
     const checkAuth = async () => {
       try {
-        const response = await axios.get('/auth/login', {
+        const response = await axios.get("/auth/login", {
           withCredentials: true,
         });
-        const isAuth = response.data?.content?.status === 'logged-in';
+        const isAuth = response.data?.content?.status === "logged-in";
         setIsAuthenticated(isAuth);
       } catch (error) {
         setIsAuthenticated(false);
@@ -35,7 +43,14 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <p>Loading...</p>
       </div>
     );
@@ -48,7 +63,7 @@ const LoginWrapper = () => {
   const navigate = useNavigate();
 
   const handleLoginSuccess = () => {
-    navigate('/dashboard');
+    navigate("/dashboard");
   };
 
   return <Login onLoginSuccess={handleLoginSuccess} />;
@@ -61,10 +76,10 @@ const RootRoute = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await axios.get('/auth/login', {
+        const response = await axios.get("/auth/login", {
           withCredentials: true,
         });
-        const isAuth = response.data?.content?.status === 'logged-in';
+        const isAuth = response.data?.content?.status === "logged-in";
         setIsAuthenticated(isAuth);
       } catch (error) {
         setIsAuthenticated(false);
@@ -78,13 +93,24 @@ const RootRoute = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <p>Loading...</p>
       </div>
     );
   }
 
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  return isAuthenticated ? (
+    <Navigate to="/dashboard" replace />
+  ) : (
+    <Navigate to="/login" replace />
+  );
 };
 
 const App = () => {
@@ -152,6 +178,34 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/shift-tabit"
+          element={<Navigate to="/shift-tabit/employees" replace />}
+        />
+        <Route
+          path="/shift-tabit/employees"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Employees />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/shift-tabit/create-payroll"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Shifts />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/shifts"
+          element={<Navigate to="/shift-tabit/create-payroll" replace />}
+        />
         <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
         <Route path="/admin.html" element={<RootRoute />} />
         <Route path="/" element={<RootRoute />} />
@@ -162,4 +216,3 @@ const App = () => {
 };
 
 export default App;
-

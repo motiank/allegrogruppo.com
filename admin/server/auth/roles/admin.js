@@ -2,11 +2,12 @@ import express from "express";
 
 import { Router as dashboard } from "../../modules/dashboard.js";
 import { Router as orders } from "../../modules/orders.js";
-import  allegro from "../../modules/allegro.js";
+import allegro from "../../modules/allegro.js";
 import { Router as orderSystem } from "../../modules/orderSystem.js";
 import { Router as analytics } from "../../modules/analytics.js";
 import { Router as affiliates } from "../../modules/affiliates.js";
 import { Router as coupons } from "../../modules/coupons.js";
+import { Router as payroll } from "../../modules/payroll.js";
 
 const api = function () {
   var admin = express.Router();
@@ -26,6 +27,7 @@ const api = function () {
   admin.use("/analytics", analytics());
   admin.use("/affiliates", affiliates());
   admin.use("/coupons", coupons());
+  admin.use("/payroll", payroll());
   return admin;
 };
 
