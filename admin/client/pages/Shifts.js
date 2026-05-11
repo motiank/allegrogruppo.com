@@ -1419,7 +1419,6 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>נטו/ברוטו</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>טיפ</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה ידני</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נסיעות</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>עובד גלובאלי</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>סה"כ</th>
@@ -1450,7 +1449,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={13}>
+                    <td style={nameCell} colSpan={12}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -1475,7 +1474,6 @@ const Shifts = () => {
                   </td>
                   <td style={cell}>{fmtNum(r.tip)}</td>
                   <td style={cell}>{fmtNum(r.completion)}</td>
-                  <td style={cell}>{fmtNum(r.manualCompletion)}</td>
                   <td style={cell}>
                     {r.first && r.travel != null
                       ? fmtNum(r.travel)

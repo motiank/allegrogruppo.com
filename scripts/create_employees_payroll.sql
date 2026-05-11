@@ -35,3 +35,9 @@ CREATE TABLE IF NOT EXISTS payroll (
 ALTER TABLE employees
   ADD COLUMN hourly_wage DECIMAL(10,2) NULL AFTER `global`,                                                                            
   ADD COLUMN wage_type ENUM('gross','net') NULL AFTER hourly_wage;
+
+ALTER TABLE employees
+  ADD COLUMN travel DECIMAL(10,2) NULL AFTER `hourly_wage`;                                                                           
+
+
+delete from employees where rest = '65bb40ae6729db482e2ed6f2';
