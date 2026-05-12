@@ -12,6 +12,8 @@ const Employees = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
+  const [search, setSearch] = useState("");
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
@@ -21,6 +23,55 @@ const Employees = () => {
     () => findRestaurantLabel(selectedRestaurant),
     [selectedRestaurant],
   );
+
+  const hasWageValue = (v) => {
+    if (v == null) return false;
+    const s = String(v).trim();
+    if (!s) return false;
+    const n = Number(s);
+    return Number.isFinite(n);
+  };
+
+  const isMissingAllWages = (emp) => {
+    if (hasWageValue(emp.global)) return false;
+    if (hasWageValue(emp.hourly_wage)) return false;
+    if ((emp.roles || []).some((r) => hasWageValue(r.wage))) return false;
+    return true;
+  };
+
+  const matchesMissingFilter = (emp) =>
+    !hasWageValue(emp.global) && !hasWageValue(emp.hourly_wage);
+
+  const missingCount = useMemo(
+    () => employees.filter(matchesMissingFilter).length,
+    [employees],
+  );
+
+  const filteredEmployees = useMemo(() => {
+    const indexed = employees.map((emp, origIdx) => ({ emp, origIdx }));
+    const q = search.trim().toLowerCase();
+    let result = indexed;
+    if (showMissingOnly) {
+      result = result.filter(({ emp }) => matchesMissingFilter(emp));
+    }
+    if (q) {
+      result = result.filter(({ emp }) => {
+        const haystack = [
+          emp.name,
+          emp.mic_nmbr,
+          emp.ID_nmbr,
+          emp.employee_id,
+          emp.wage_type,
+          ...(emp.roles || []).map((r) => r.role),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    return result;
+  }, [employees, search, showMissingOnly]);
 
   const loadEmployees = useCallback(async (rest) => {
     if (!rest) {
@@ -32,6 +83,8 @@ const Employees = () => {
     setSaveResult(null);
     setSaveError(null);
     setDirty(false);
+    setSearch("");
+    setShowMissingOnly(false);
     try {
       const res = await axios.post(
         "/admin/payroll/wages",
@@ -200,6 +253,47 @@ const Employees = () => {
       gap: "12px",
     },
     summary: { fontSize: "0.9rem", color: theme.textSecondary },
+    searchRow: {
+      display: "flex",
+      justifyContent: "flex-start",
+      alignItems: "center",
+      gap: "10px",
+      flexWrap: "wrap",
+      width: "100%",
+    },
+    toggleButton: {
+      padding: "8px 14px",
+      fontSize: "0.9rem",
+      fontWeight: 600,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    },
+    toggleButtonActive: {
+      padding: "8px 14px",
+      fontSize: "0.9rem",
+      fontWeight: 600,
+      border: `1px solid ${theme.active || "#2196f3"}`,
+      borderRadius: "6px",
+      backgroundColor: theme.active || "#2196f3",
+      color: "#ffffff",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    },
+    searchInput: {
+      width: "100%",
+      maxWidth: "360px",
+      padding: "8px 12px",
+      fontSize: "0.95rem",
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      outline: "none",
+    },
     errorBox: {
       padding: "10px 12px",
       borderRadius: "6px",
@@ -333,10 +427,52 @@ const Employees = () => {
 
         {selectedRestaurant && !loading && !error && employees.length > 0 && (
           <>
+            <div style={styles.searchRow}>
+              <input
+                type="search"
+                placeholder="Search by name, mic_nmbr, ID, role…"
+                style={styles.searchInput}
+                value={search}
+                onChange={(ev) => setSearch(ev.target.value)}
+              />
+              <button
+                type="button"
+                aria-pressed={showMissingOnly}
+                onClick={() => setShowMissingOnly((v) => !v)}
+                style={
+                  showMissingOnly
+                    ? styles.toggleButtonActive
+                    : styles.toggleButton
+                }
+                title="Show only employees with no global, hourly, or per-role wage set"
+              >
+                {showMissingOnly ? "Showing missing wages" : "Missing wages"}
+                {missingCount > 0 ? ` (${missingCount})` : ""}
+              </button>
+            </div>
             <div style={styles.summary}>
-              <strong style={{ color: theme.text }}>{employees.length}</strong>{" "}
-              employee{employees.length === 1 ? "" : "s"} for{" "}
-              <strong style={{ color: theme.text }}>{selectedLabel}</strong>
+              {search.trim() || showMissingOnly ? (
+                <>
+                  <strong style={{ color: theme.text }}>
+                    {filteredEmployees.length}
+                  </strong>{" "}
+                  of{" "}
+                  <strong style={{ color: theme.text }}>
+                    {employees.length}
+                  </strong>{" "}
+                  employee{employees.length === 1 ? "" : "s"} for{" "}
+                  <strong style={{ color: theme.text }}>{selectedLabel}</strong>
+                  {showMissingOnly ? " — missing wages only" : ""}
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: theme.text }}>
+                    {employees.length}
+                  </strong>{" "}
+                  employee{employees.length === 1 ? "" : "s"} for{" "}
+                  <strong style={{ color: theme.text }}>{selectedLabel}</strong>
+                </>
+              )}
             </div>
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -354,7 +490,7 @@ const Employees = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {employees.flatMap((emp, empIdx) => {
+                  {filteredEmployees.flatMap(({ emp, origIdx: empIdx }) => {
                     const roles =
                       emp.roles && emp.roles.length > 0
                         ? emp.roles
