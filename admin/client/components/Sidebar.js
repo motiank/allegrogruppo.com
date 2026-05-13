@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import axios from "axios";
+import useCurrentUser, { clearCachedUser } from "../hooks/useCurrentUser";
 
 const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
+  const { role } = useCurrentUser();
   const [isMobile, setIsMobile] = useState(false);
 
   // Detect mobile screen size
@@ -20,7 +22,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const menuItems = [
+  const allMenuItems = [
     { path: "/dashboard", label: "Dashboard" },
     { path: "/orders", label: "Orders History" },
     {
@@ -49,6 +51,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     },
   ];
 
+  const menuItems =
+    role === "restMngr"
+      ? allMenuItems.filter((item) => item.path === "/shift-tabit")
+      : allMenuItems;
+
   const handleNavigation = (path) => {
     navigate(path);
     onClose();
@@ -59,12 +66,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       await axios.get("/auth/logout", {
         withCredentials: true,
       });
-      // Navigate to login screen after successful logout
+      clearCachedUser();
       navigate("/login", { replace: true });
       onClose();
     } catch (error) {
       console.error("Logout error:", error);
-      // Even if logout fails, redirect to login
+      clearCachedUser();
       navigate("/login", { replace: true });
       onClose();
     }

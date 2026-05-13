@@ -4,11 +4,37 @@ import { useTheme } from "../context/ThemeContext";
 import {
   RESTAURANT_GROUPS,
   findRestaurantLabel,
+  filterRestaurantGroups,
 } from "../constants/restaurants";
+import useCurrentUser from "../hooks/useCurrentUser";
 
 const Employees = () => {
   const { theme } = useTheme();
+  const { user } = useCurrentUser();
+  const allowedRestaurants = useMemo(
+    () => (Array.isArray(user?.restaurants) ? user.restaurants : null),
+    [user],
+  );
+  const availableGroups = useMemo(
+    () => filterRestaurantGroups(allowedRestaurants),
+    [allowedRestaurants],
+  );
+  const flatAvailable = useMemo(
+    () => availableGroups.flatMap((g) => g.items),
+    [availableGroups],
+  );
   const [selectedRestaurant, setSelectedRestaurant] = useState("");
+
+  useEffect(() => {
+    if (
+      allowedRestaurants &&
+      allowedRestaurants.length > 0 &&
+      flatAvailable.length === 1 &&
+      !selectedRestaurant
+    ) {
+      setSelectedRestaurant(flatAvailable[0].value);
+    }
+  }, [allowedRestaurants, flatAvailable, selectedRestaurant]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
@@ -388,7 +414,7 @@ const Employees = () => {
             onChange={(e) => setSelectedRestaurant(e.target.value)}
           >
             <option value="">-- Choose a restaurant --</option>
-            {RESTAURANT_GROUPS.map((group) => (
+            {availableGroups.map((group) => (
               <optgroup key={group.label} label={group.label}>
                 {group.items.map((r) => (
                   <option key={r.value} value={r.value}>

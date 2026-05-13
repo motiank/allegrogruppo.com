@@ -44,3 +44,12 @@ export const findRestaurantLabel = (value) => {
   }
   return "";
 };
+
+export const filterRestaurantGroups = (allowed) => {
+  if (!Array.isArray(allowed) || allowed.length === 0) return RESTAURANT_GROUPS;
+  const set = new Set(allowed);
+  return RESTAURANT_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((i) => set.has(i.value)),
+  })).filter((group) => group.items.length > 0);
+};

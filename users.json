@@ -7,5 +7,15 @@
     "authKey": "c089988d45acbe1b43a53b693590d76a",
     "role": "admin",
     "status": "active"
+  },
+  {
+    "user_id": 2,
+    "id": 2,
+    "email": "michael",
+    "password": "ran24",
+    "authKey": "7908651cbdab90cdbb74ef7cbdfccad2",
+    "role": "restMngr",
+    "restaurants": ["5ff419934676f0fddabaef3a"],
+    "status": "active"
   }
 ]

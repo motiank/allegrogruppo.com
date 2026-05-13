@@ -17,6 +17,31 @@ import Coupons from "./pages/Coupons";
 import Shifts from "./pages/Shifts";
 import Employees from "./pages/Employees";
 import axios from "axios";
+import useCurrentUser, { clearCachedUser } from "./hooks/useCurrentUser";
+
+const RESTMNGR_HOME = "/shift-tabit/employees";
+
+const RestrictByRole = ({ children, allow }) => {
+  const { role, loading } = useCurrentUser();
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <p>Loading...</p>
+      </div>
+    );
+  }
+  if (role === "restMngr" && !allow.includes("restMngr")) {
+    return <Navigate to={RESTMNGR_HOME} replace />;
+  }
+  return children;
+};
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -62,7 +87,20 @@ const ProtectedRoute = ({ children }) => {
 const LoginWrapper = () => {
   const navigate = useNavigate();
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
+    clearCachedUser();
+    try {
+      const response = await axios.get("/auth/login", {
+        withCredentials: true,
+      });
+      const role = response.data?.content?.user?.role;
+      if (role === "restMngr") {
+        navigate(RESTMNGR_HOME);
+        return;
+      }
+    } catch (err) {
+      // fall through to default landing
+    }
     navigate("/dashboard");
   };
 
@@ -70,26 +108,7 @@ const LoginWrapper = () => {
 };
 
 const RootRoute = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await axios.get("/auth/login", {
-          withCredentials: true,
-        });
-        const isAuth = response.data?.content?.status === "logged-in";
-        setIsAuthenticated(isAuth);
-      } catch (error) {
-        setIsAuthenticated(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  const { user, loading } = useCurrentUser();
 
   if (loading) {
     return (
@@ -106,11 +125,13 @@ const RootRoute = () => {
     );
   }
 
-  return isAuthenticated ? (
-    <Navigate to="/dashboard" replace />
-  ) : (
-    <Navigate to="/login" replace />
-  );
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user.role === "restMngr") {
+    return <Navigate to={RESTMNGR_HOME} replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
 
 const App = () => {
@@ -122,9 +143,11 @@ const App = () => {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
@@ -132,9 +155,11 @@ const App = () => {
           path="/orders"
           element={
             <ProtectedRoute>
-              <Layout>
-                <OrderHistory />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <OrderHistory />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
@@ -142,9 +167,11 @@ const App = () => {
           path="/analytics"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Analytics />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <Analytics />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
@@ -152,9 +179,11 @@ const App = () => {
           path="/performance"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Performance />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <Performance />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
@@ -162,9 +191,11 @@ const App = () => {
           path="/affiliates"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Affiliates />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <Affiliates />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
@@ -172,9 +203,11 @@ const App = () => {
           path="/coupons"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Coupons />
-              </Layout>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <Coupons />
+                </Layout>
+              </RestrictByRole>
             </ProtectedRoute>
           }
         />
