@@ -129,6 +129,7 @@ const Employees = () => {
         hourly_wage: e.hourly_wage == null ? "" : String(e.hourly_wage),
         wage_type: e.wage_type || "",
         travel: e.travel == null ? "" : String(e.travel),
+        contractor: !!e.contractor,
         roles:
           e.roles && e.roles.length > 0
             ? e.roles.map((r) => ({
@@ -205,6 +206,16 @@ const Employees = () => {
     setSaveResult(null);
   };
 
+  const toggleContractor = (empIdx) => {
+    setEmployees((prev) => {
+      const next = prev.slice();
+      next[empIdx] = { ...next[empIdx], contractor: !next[empIdx].contractor };
+      return next;
+    });
+    setDirty(true);
+    setSaveResult(null);
+  };
+
   const handleUpdate = async () => {
     if (saving || employees.length === 0) return;
     setSaving(true);
@@ -219,6 +230,7 @@ const Employees = () => {
           hourly_wage: e.hourly_wage,
           wage_type: e.wage_type,
           travel: e.travel,
+          contractor: !!e.contractor,
         })),
       };
       const res = await axios.post("/admin/payroll/employees/update", payload, {
@@ -244,7 +256,7 @@ const Employees = () => {
     },
     header: {
       width: "100%",
-      maxWidth: "1100px",
+      maxWidth: "1400px",
       display: "flex",
       justifyContent: "center",
       padding: "16px 0 24px",
@@ -273,7 +285,7 @@ const Employees = () => {
     },
     body: {
       width: "100%",
-      maxWidth: "1100px",
+      maxWidth: "1400px",
       display: "flex",
       flexDirection: "column",
       gap: "12px",
@@ -511,6 +523,7 @@ const Employees = () => {
                     <th style={styles.th}>hourly_wage</th>
                     <th style={styles.th}>wage_type</th>
                     <th style={styles.th}>travel</th>
+                    <th style={styles.th}>contractor</th>
                     <th style={styles.th}>role</th>
                     <th style={styles.th}>hourly wage (per role)</th>
                   </tr>
@@ -612,6 +625,24 @@ const Employees = () => {
                                     updateTravel(empIdx, ev.target.value)
                                   }
                                 />
+                              </td>
+                              <td
+                                rowSpan={roles.length}
+                                style={styles.tdEmpBoundary}
+                              >
+                                <button
+                                  type="button"
+                                  aria-pressed={!!emp.contractor}
+                                  onClick={() => toggleContractor(empIdx)}
+                                  style={
+                                    emp.contractor
+                                      ? styles.toggleButtonActive
+                                      : styles.toggleButton
+                                  }
+                                  title="Mark as contractor (קבלן)"
+                                >
+                                  {emp.contractor ? "קבלן" : "שכיר"}
+                                </button>
                               </td>
                             </>
                           ) : null}

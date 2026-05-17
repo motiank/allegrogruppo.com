@@ -117,6 +117,15 @@ const Router = () => {
           workdays: e.workdays,
           global: e.global,
           netGross: e.netGross,
+          work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+          daily_breakdown:
+            e.daily_breakdown && typeof e.daily_breakdown === "object"
+              ? e.daily_breakdown
+              : {},
+          daily_hours:
+            e.daily_hours && typeof e.daily_hours === "object"
+              ? e.daily_hours
+              : {},
         }));
 
         res.json({
@@ -176,8 +185,8 @@ const Router = () => {
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
         try {
           await executeSql(
-            `INSERT INTO employees (rest, mic_nmbr, name, ID_nmbr, roles, t101, \`global\`, hourly_wage, wage_type, travel)
-             VALUES (:rest, :mic_nmbr, :name, :ID_nmbr, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr)`,
+            `INSERT INTO employees (rest, mic_nmbr, name, ID_nmbr, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
+             VALUES (:rest, :mic_nmbr, :name, :ID_nmbr, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
             {
               rest,
               mic_nmbr: emp.mic_nmbr || null,
@@ -189,6 +198,7 @@ const Router = () => {
               hw: hourlyWageVal,
               wt: wageType,
               tr: travelVal,
+              ctr: emp.contractor ? 1 : 0,
             },
           );
           inserted += 1;
@@ -209,7 +219,7 @@ const Router = () => {
       const rest = String(req.body?.rest || "").trim();
       if (!rest) return res.status(400).json({ error: "missing rest" });
       const [rows] = await executeSql(
-        "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel FROM employees WHERE rest = :rest",
+        "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest",
         { rest },
       );
       const out = [];
@@ -232,6 +242,7 @@ const Router = () => {
           hourly_wage: r.hourly_wage == null ? null : Number(r.hourly_wage),
           wage_type: r.wage_type || null,
           travel: r.travel == null ? null : Number(r.travel),
+          contractor: !!r.contractor,
         });
       }
       res.json({ employees: out });
@@ -284,7 +295,8 @@ const Router = () => {
                  \`global\` = :gbl,
                  hourly_wage = :hw,
                  wage_type = :wt,
-                 travel = :tr
+                 travel = :tr,
+                 contractor = :ctr
              WHERE employee_id = :id`,
             {
               id,
@@ -293,6 +305,7 @@ const Router = () => {
               hw: hourlyWageVal,
               wt: wageType,
               tr: travelVal,
+              ctr: emp.contractor ? 1 : 0,
             },
           );
           if (result && result.affectedRows >= 1) updated += 1;
@@ -305,6 +318,88 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/employees/update error:", err);
       res.status(500).json({ error: err.message || "update failed" });
+    }
+  });
+
+  router.post("/payrolls", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      const [rows] = await executeSql(
+        `SELECT month, MAX(updated_at) AS updated_at
+           FROM payroll
+          WHERE rest = :rest
+          GROUP BY month
+          ORDER BY month DESC`,
+        { rest },
+      );
+      const months = (rows || [])
+        .map((r) => String(r.month || "").trim())
+        .filter(Boolean);
+      res.json({ months });
+    } catch (err) {
+      console.error("payroll/payrolls error:", err);
+      res.status(500).json({ error: err.message || "payrolls list failed" });
+    }
+  });
+
+  router.post("/payroll-load", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+
+      const [rows] = await executeSql(
+        `SELECT p.employee_id, p.payroll_data,
+                e.mic_nmbr, e.ID_nmbr, e.name
+           FROM payroll p
+           JOIN employees e ON e.employee_id = p.employee_id
+          WHERE p.rest = :rest AND p.month = :month`,
+        { rest, month },
+      );
+
+      const employees = (rows || []).map((r) => {
+        let raw = r.payroll_data;
+        if (typeof raw === "string") {
+          try {
+            raw = JSON.parse(raw);
+          } catch {
+            raw = {};
+          }
+        }
+        const hasWrapper =
+          raw && typeof raw === "object" && "payroll_data" in raw;
+        const pd = hasWrapper ? raw.payroll_data || {} : raw || {};
+        return {
+          mic_nmbr: r.mic_nmbr,
+          ID_nmbr: r.ID_nmbr,
+          name: r.name,
+          payroll_data: pd,
+          role_extras: hasWrapper ? raw.role_extras || {} : {},
+          workdays: hasWrapper ? (raw.workdays ?? null) : null,
+          global: hasWrapper ? (raw.global ?? null) : null,
+          netGross: hasWrapper ? (raw.netGross ?? null) : null,
+          work_dates:
+            hasWrapper && Array.isArray(raw.work_dates) ? raw.work_dates : [],
+          daily_breakdown:
+            hasWrapper &&
+            raw.daily_breakdown &&
+            typeof raw.daily_breakdown === "object"
+              ? raw.daily_breakdown
+              : {},
+          daily_hours:
+            hasWrapper && raw.daily_hours && typeof raw.daily_hours === "object"
+              ? raw.daily_hours
+              : {},
+        };
+      });
+
+      res.json({ rest, month, employees });
+    } catch (err) {
+      console.error("payroll/payroll-load error:", err);
+      res.status(500).json({ error: err.message || "payroll load failed" });
     }
   });
 
@@ -332,7 +427,23 @@ const Router = () => {
           });
           continue;
         }
-        const payrollJson = JSON.stringify(emp.payroll_data || {});
+        const wrapped = {
+          payroll_data: emp.payroll_data || {},
+          role_extras: emp.role_extras || {},
+          workdays: emp.workdays ?? null,
+          global: emp.global ?? null,
+          netGross: emp.netGross ?? null,
+          work_dates: Array.isArray(emp.work_dates) ? emp.work_dates : [],
+          daily_breakdown:
+            emp.daily_breakdown && typeof emp.daily_breakdown === "object"
+              ? emp.daily_breakdown
+              : {},
+          daily_hours:
+            emp.daily_hours && typeof emp.daily_hours === "object"
+              ? emp.daily_hours
+              : {},
+        };
+        const payrollJson = JSON.stringify(wrapped);
         try {
           await executeSql(
             `INSERT INTO payroll (rest, month, employee_id, payroll_data)
@@ -367,6 +478,112 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/payroll-data error:", err);
       res.status(500).json({ error: err.message || "save failed" });
+    }
+  });
+
+  router.post("/labor-cost-summary", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+
+      const [rows] = await executeSql(
+        `SELECT DATE(ts) AS date,
+                SUM(COALESCE(total, 0))      AS total,
+                MAX(labor_cost)              AS labor_cost
+           FROM allegro.bcom_cash
+          WHERE branchId = :rest
+            AND DATE(ts) >= :start
+            AND DATE(ts) <  :next
+          GROUP BY DATE(ts)
+          ORDER BY DATE(ts)`,
+        {
+          rest,
+          start: `${month}-01`,
+          next: (() => {
+            const [y, m] = month.split("-").map((n) => parseInt(n, 10));
+            const ny = m === 12 ? y + 1 : y;
+            const nm = m === 12 ? 1 : m + 1;
+            return `${ny}-${String(nm).padStart(2, "0")}-01`;
+          })(),
+        },
+      );
+
+      const items = (rows || []).map((r) => {
+        const d =
+          r.date instanceof Date
+            ? r.date.toISOString().slice(0, 10)
+            : String(r.date);
+        const total = Number(r.total) || 0;
+        const labor_cost = r.labor_cost == null ? null : Number(r.labor_cost);
+        const percentage =
+          labor_cost != null && total > 0
+            ? Math.round((labor_cost / total) * 10000) / 100
+            : null;
+        return { date: d, total, labor_cost, percentage };
+      });
+
+      const totals = items.reduce(
+        (acc, it) => {
+          acc.total += it.total || 0;
+          if (it.labor_cost != null) acc.labor_cost += it.labor_cost;
+          return acc;
+        },
+        { total: 0, labor_cost: 0 },
+      );
+      totals.percentage =
+        totals.total > 0
+          ? Math.round((totals.labor_cost / totals.total) * 10000) / 100
+          : null;
+
+      res.json({ rest, month, items, totals });
+    } catch (err) {
+      console.error("payroll/labor-cost-summary error:", err);
+      res
+        .status(500)
+        .json({ error: err.message || "labor cost summary failed" });
+    }
+  });
+
+  router.post("/labor-cost", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      console.log(`payroll/labor-cost: rest=${rest} items=${items.length}`);
+
+      let updated = 0;
+      const errors = [];
+      for (const it of items) {
+        const date = String(it?.date || "").trim();
+        const cost = Number(it?.labor_cost);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          errors.push({ date, issue: "invalid date" });
+          continue;
+        }
+        if (!Number.isFinite(cost)) {
+          errors.push({ date, issue: "invalid labor_cost" });
+          continue;
+        }
+        try {
+          const [result] = await executeSql(
+            `UPDATE allegro.bcom_cash
+                SET labor_cost = :cost
+              WHERE branchId = :rest
+                AND DATE(ts) = :date`,
+            { rest, date, cost },
+          );
+          updated += (result && result.affectedRows) || 0;
+        } catch (e) {
+          errors.push({ date, issue: e.message || "update failed" });
+        }
+      }
+      res.json({ rest, updated, attempted: items.length, errors });
+    } catch (err) {
+      console.error("payroll/labor-cost error:", err);
+      res.status(500).json({ error: err.message || "labor cost save failed" });
     }
   });
 

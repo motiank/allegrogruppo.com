@@ -6,6 +6,15 @@ import React, {
   useEffect,
 } from "react";
 import axios from "axios";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
 import { useTheme } from "../context/ThemeContext";
 import {
   RESTAURANT_GROUPS,
@@ -52,6 +61,7 @@ const buildWageMap = (employeesFromDb) => {
       wage_type: e.wage_type || null,
       global: e.global == null ? null : Number(e.global),
       travel: e.travel == null ? null : Number(e.travel),
+      contractor: !!e.contractor,
     };
     if (e.mic_nmbr) map.set(`mic:${String(e.mic_nmbr).trim()}`, rec);
     if (e.ID_nmbr) map.set(`id:${String(e.ID_nmbr).trim()}`, rec);
@@ -118,6 +128,24 @@ const Shifts = () => {
     }
   }, [allowedRestaurants, flatAvailable, selectedRestaurant]);
 
+  // Step 1 — past-payroll selection
+  const [payrollOptions, setPayrollOptions] = useState([]);
+  const [loadingPayrolls, setLoadingPayrolls] = useState(false);
+  const [selectedPayroll, setSelectedPayroll] = useState("new");
+  const [loadingExistingPayroll, setLoadingExistingPayroll] = useState(false);
+  const [loadPayrollError, setLoadPayrollError] = useState(null);
+
+  // True only when the current allEmployees came from a fresh xlsx
+  // upload (runExtract). Used to gate the daily labor cost calculation
+  // so a payroll-load doesn't trigger it.
+  const [freshExtract, setFreshExtract] = useState(false);
+
+  // Labor-cost summary dialog (shown after a successful save).
+  const [showLaborDialog, setShowLaborDialog] = useState(false);
+  const [laborSummary, setLaborSummary] = useState(null);
+  const [loadingLaborSummary, setLoadingLaborSummary] = useState(false);
+  const [laborSummaryError, setLaborSummaryError] = useState(null);
+
   // Step 2
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -175,8 +203,45 @@ const Shifts = () => {
   }, [shiftIssues]);
   const isEmpFlagged = (emp) => flaggedNames.has(emp.name);
 
+  // ---------- Load list of stored payrolls for this restaurant ----------
+  useEffect(() => {
+    if (!selectedRestaurant) {
+      setPayrollOptions([]);
+      setSelectedPayroll("new");
+      return;
+    }
+    let cancelled = false;
+    setLoadingPayrolls(true);
+    setLoadPayrollError(null);
+    axios
+      .post(
+        "/admin/payroll/payrolls",
+        { rest: selectedRestaurant },
+        { withCredentials: true },
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setPayrollOptions(
+          Array.isArray(res.data?.months) ? res.data.months : [],
+        );
+        setSelectedPayroll("new");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPayrollOptions([]);
+        setSelectedPayroll("new");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPayrolls(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRestaurant]);
+
   // ---------- Reset helpers ----------
   const resetFromStep2 = () => {
+    setFreshExtract(false);
     setNewEmployees([]);
     setAllEmployees([]);
     setMonth("");
@@ -246,10 +311,12 @@ const Shifts = () => {
         hourly_wage: "",
         wage_type: "",
         travel: "",
+        contractor: false,
         roles: (e.roles || []).map((role) => ({ role, wage: "" })),
       }));
       setNewEmployees(fresh);
       setAllEmployees(res.data.allEmployees || []);
+      setFreshExtract(true);
       setMonth(res.data.month || "");
       setExceptions(res.data.exceptions || []);
       setShiftIssues(res.data.shiftIssues || []);
@@ -312,6 +379,17 @@ const Shifts = () => {
     });
   };
 
+  const toggleContractor = (empIdx) => {
+    setNewEmployees((prev) => {
+      const next = prev.slice();
+      next[empIdx] = {
+        ...next[empIdx],
+        contractor: !next[empIdx].contractor,
+      };
+      return next;
+    });
+  };
+
   const handleSaveEmployees = async () => {
     if (saving) return;
     if (noNewEmployees) {
@@ -332,6 +410,7 @@ const Shifts = () => {
           hourly_wage: e.hourly_wage,
           wage_type: e.wage_type,
           travel: e.travel,
+          contractor: !!e.contractor,
           t101: false,
         })),
       };
@@ -345,6 +424,52 @@ const Shifts = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ---------- Step 1: load an existing stored payroll, jump to step 3 ----------
+  const loadExistingPayroll = async (mo) => {
+    if (!selectedRestaurant || !mo || loadingExistingPayroll) return;
+    setLoadingExistingPayroll(true);
+    setLoadPayrollError(null);
+    setExtractError(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/payroll-load",
+        { rest: selectedRestaurant, month: mo },
+        { withCredentials: true },
+      );
+      const list = Array.isArray(res.data?.employees) ? res.data.employees : [];
+      setNewEmployees([]);
+      setAllEmployees(list);
+      setFreshExtract(false);
+      setMonth(res.data?.month || mo);
+      setExceptions([]);
+      setShiftIssues([]);
+      setShiftIssuesAcknowledged(false);
+      setSaveResult({ inserted: 0, attempted: 0, errors: [] });
+      setSaveError(null);
+      setFiles([]);
+      setPayrollResult(null);
+      setPayrollError(null);
+      await loadWages();
+      setStep(3);
+    } catch (err) {
+      console.error("payroll-load error:", err);
+      setLoadPayrollError(
+        err.response?.data?.error || err.message || "Failed to load payroll",
+      );
+    } finally {
+      setLoadingExistingPayroll(false);
+    }
+  };
+
+  const handleSelectPayroll = (val) => {
+    setSelectedPayroll(val);
+    if (val === "new") {
+      // Continue normal flow — user proceeds to step 2 manually.
+      return;
+    }
+    loadExistingPayroll(val);
   };
 
   // ---------- Step 3 → 4: load wages from DB ----------
@@ -365,6 +490,147 @@ const Shifts = () => {
     }
   };
 
+  // Daily labor cost per restaurant.
+  //
+  // Primary path — emp.daily_breakdown (per-row entries pulled from the
+  // xlsx data section):
+  //   for each date entry {role, h100, h125, h150, tip, completion}:
+  //     if tip+completion present → daily contribution = tip + completion
+  //     else                       → (h100 + h125*1.25 + h150*1.5) * rate
+  //   where `rate` is resolveHourlyWage(empData, role) — same rule the
+  //   step-4 table uses, so daily sums reconcile with monthly totals.
+  //
+  // Global employees: distribute the monthly global amount evenly across
+  // the dates they actually worked (no per-hour rate is meaningful).
+  //
+  // Fallback for older stored payrolls (no daily_breakdown saved): split
+  // the employee's monthly total evenly across work_dates.
+  const computeDailyLaborCost = () => {
+    const byDate = new Map();
+    const add = (date, amount) => {
+      if (!date || !Number.isFinite(amount) || amount === 0) return;
+      byDate.set(date, (byDate.get(date) || 0) + amount);
+    };
+
+    for (const emp of allEmployees) {
+      const empData = lookupEmpData(wageMap, emp);
+      const globalAmount =
+        empData && empData.global != null && Number(empData.global) > 0
+          ? Number(empData.global)
+          : null;
+      const breakdown =
+        emp.daily_breakdown && typeof emp.daily_breakdown === "object"
+          ? emp.daily_breakdown
+          : null;
+      const breakdownDates = breakdown ? Object.keys(breakdown) : [];
+
+      if (globalAmount != null) {
+        const dates =
+          breakdownDates.length > 0
+            ? breakdownDates
+            : Array.isArray(emp.work_dates)
+              ? emp.work_dates
+              : [];
+        if (dates.length === 0) continue;
+        const perDay = globalAmount / dates.length;
+        for (const d of dates) add(d, perDay);
+        continue;
+      }
+
+      if (breakdownDates.length > 0) {
+        for (const date of breakdownDates) {
+          const entries = breakdown[date] || [];
+          for (const e of entries) {
+            const tip = Number(e.tip || 0);
+            const completion = Number(e.completion || 0);
+            if (tip !== 0 || completion !== 0) {
+              add(date, tip + completion);
+              continue;
+            }
+            const wage = resolveHourlyWage(empData, e.role);
+            if (wage == null) continue;
+            const cost =
+              ((Number(e.h100) || 0) +
+                (Number(e.h125) || 0) * 1.25 +
+                (Number(e.h150) || 0) * 1.5) *
+              wage;
+            add(date, cost);
+          }
+        }
+        continue;
+      }
+
+      // Fallback A: per-day raw hours (from entry/exit times). Allocate
+      // the monthly total proportionally to each day's hours, so a long
+      // day gets proportionally more cost and the daily sum equals the
+      // monthly total exactly.
+      const dailyHours =
+        emp.daily_hours && typeof emp.daily_hours === "object"
+          ? emp.daily_hours
+          : null;
+      const dailyHoursDates = dailyHours ? Object.keys(dailyHours) : [];
+
+      // Monthly total (matches the step-4 per-employee total).
+      let monthly = 0;
+      for (const [role, payload] of Object.entries(emp.payroll_data || {})) {
+        const hours = (payload && payload.hours) || [];
+        const [h100 = 0, h125 = 0, h150 = 0] = hours;
+        const tip = Number((payload && payload.tip) || 0);
+        const completion = Number((payload && payload.completion) || 0);
+        if (tip !== 0 || completion !== 0) {
+          monthly += tip + completion;
+          continue;
+        }
+        const wage = resolveHourlyWage(empData, role);
+        if (wage == null) continue;
+        monthly +=
+          ((Number(h100) || 0) +
+            (Number(h125) || 0) * 1.25 +
+            (Number(h150) || 0) * 1.5) *
+          wage;
+      }
+
+      if (monthly > 0 && dailyHoursDates.length > 0) {
+        let totalHours = 0;
+        for (const d of dailyHoursDates) {
+          totalHours += Number(dailyHours[d]) || 0;
+        }
+        if (totalHours > 0) {
+          for (const d of dailyHoursDates) {
+            const hrs = Number(dailyHours[d]) || 0;
+            if (hrs <= 0) continue;
+            add(d, monthly * (hrs / totalHours));
+          }
+          continue;
+        }
+      }
+
+      // Fallback B: split monthly total evenly across known work_dates,
+      // or across every calendar day of `month` if neither are present.
+      let dates = Array.isArray(emp.work_dates) ? emp.work_dates : [];
+      if (dates.length === 0 && /^\d{4}-\d{2}$/.test(month)) {
+        const [y, m] = month.split("-").map((n) => parseInt(n, 10));
+        const daysInMonth = new Date(y, m, 0).getDate();
+        dates = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          dates.push(
+            `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+          );
+        }
+      }
+      if (dates.length === 0 || monthly === 0) continue;
+      const perDay = monthly / dates.length;
+      for (const d of dates) add(d, perDay);
+    }
+
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, cost]) => ({
+        date,
+        labor_cost: Math.round(cost * 100) / 100,
+      }));
+  };
+
   // ---------- Step 4: save payroll ----------
   const handleSavePayroll = async () => {
     if (savingPayroll) return;
@@ -379,6 +645,37 @@ const Shifts = () => {
     setSavingPayroll(true);
     setPayrollError(null);
     try {
+      // 1. Compute daily labor cost — only when the payroll was just
+      //    extracted from an xlsx upload. Loading an existing payroll
+      //    from the dropdown skips this entirely.
+      if (freshExtract) {
+        const dailyItems = computeDailyLaborCost();
+        console.log(
+          `[labor-cost] computed ${dailyItems.length} day(s) for rest=${selectedRestaurant}`,
+          dailyItems,
+        );
+        try {
+          await axios.post(
+            "/admin/payroll/labor-cost",
+            { rest: selectedRestaurant, items: dailyItems },
+            { withCredentials: true },
+          );
+        } catch (laborErr) {
+          // Non-fatal — keep saving payroll, but surface a warning.
+          console.error("labor-cost error:", laborErr);
+          setPayrollError(
+            "Warning: daily labor cost save failed (" +
+              (laborErr.response?.data?.error || laborErr.message) +
+              "). Continuing with payroll save…",
+          );
+        }
+      } else {
+        console.log(
+          "[labor-cost] skipped — payroll loaded from DB (not a fresh xlsx extract)",
+        );
+      }
+
+      // 2. Save the payroll itself.
       const payload = {
         rest: selectedRestaurant,
         month,
@@ -387,12 +684,47 @@ const Shifts = () => {
           name: e.name,
           ID_nmbr: e.ID_nmbr,
           payroll_data: e.payroll_data || {},
+          role_extras: e.role_extras || {},
+          workdays: e.workdays ?? null,
+          global: e.global ?? null,
+          netGross: e.netGross ?? null,
+          work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+          daily_breakdown:
+            e.daily_breakdown && typeof e.daily_breakdown === "object"
+              ? e.daily_breakdown
+              : {},
+          daily_hours:
+            e.daily_hours && typeof e.daily_hours === "object"
+              ? e.daily_hours
+              : {},
         })),
       };
       const res = await axios.post("/admin/payroll/payroll-data", payload, {
         withCredentials: true,
       });
       setPayrollResult(res.data);
+      // 3. Fetch labor-cost summary and open the dialog.
+      try {
+        setLoadingLaborSummary(true);
+        setLaborSummaryError(null);
+        const sum = await axios.post(
+          "/admin/payroll/labor-cost-summary",
+          { rest: selectedRestaurant, month },
+          { withCredentials: true },
+        );
+        setLaborSummary(sum.data || null);
+      } catch (sumErr) {
+        console.error("labor-cost-summary error:", sumErr);
+        setLaborSummaryError(
+          sumErr.response?.data?.error ||
+            sumErr.message ||
+            "Failed to load labor cost summary",
+        );
+        setLaborSummary(null);
+      } finally {
+        setLoadingLaborSummary(false);
+        setShowLaborDialog(true);
+      }
     } catch (err) {
       console.error("payroll-data error:", err);
       setPayrollError(
@@ -709,7 +1041,7 @@ const Shifts = () => {
     },
     body: {
       width: "100%",
-      maxWidth: "1100px",
+      maxWidth: "1400px",
       flex: 1,
       display: "flex",
       flexDirection: "column",
@@ -958,7 +1290,39 @@ const Shifts = () => {
       color: theme.text,
       outline: "none",
     },
+    toggleButton: {
+      padding: "6px 10px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "4px",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    },
+    toggleButtonActive: {
+      padding: "6px 10px",
+      fontSize: "0.85rem",
+      fontWeight: 600,
+      border: `1px solid ${theme.active || "#2196f3"}`,
+      borderRadius: "4px",
+      backgroundColor: theme.active || "#2196f3",
+      color: "#ffffff",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    },
     summary: { fontSize: "0.9rem", color: theme.textSecondary },
+  };
+
+  const handleRestart = () => {
+    resetFromStep2();
+    setFiles([]);
+    setSelectedRestaurant("");
+    setSelectedPayroll("new");
+    setPayrollOptions([]);
+    setLoadPayrollError(null);
+    setStep(1);
   };
 
   // ---------- Renderers ----------
@@ -983,37 +1347,106 @@ const Shifts = () => {
           </React.Fragment>
         );
       })}
+      <button
+        type="button"
+        onClick={handleRestart}
+        title="Restart — clear everything and go back to step 1"
+        aria-label="Restart"
+        style={{
+          marginLeft: "16px",
+          width: "32px",
+          height: "32px",
+          borderRadius: "50%",
+          border: `1px solid ${theme.border}`,
+          backgroundColor: theme.surface,
+          color: theme.text,
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "16px",
+          lineHeight: 1,
+        }}
+      >
+        ↻
+      </button>
     </div>
   );
 
   const renderStep1 = () => (
     <div style={styles.card}>
-      <div style={styles.selectWrapper}>
-        <label htmlFor="shift-restaurant-select" style={styles.label}>
-          Select Restaurant
-        </label>
-        <select
-          id="shift-restaurant-select"
-          style={styles.select}
-          value={selectedRestaurant}
-          onChange={(e) => {
-            setSelectedRestaurant(e.target.value);
-            setFiles([]);
-            resetFromStep2();
-          }}
-        >
-          <option value="">-- Choose a restaurant --</option>
-          {availableGroups.map((group) => (
-            <optgroup key={group.label} label={group.label}>
-              {group.items.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
+      <div
+        style={{
+          display: "flex",
+          gap: "24px",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={styles.selectWrapper}>
+          <label htmlFor="shift-restaurant-select" style={styles.label}>
+            Select Restaurant
+          </label>
+          <select
+            id="shift-restaurant-select"
+            style={styles.select}
+            value={selectedRestaurant}
+            onChange={(e) => {
+              setSelectedRestaurant(e.target.value);
+              setFiles([]);
+              resetFromStep2();
+            }}
+          >
+            <option value="">-- Choose a restaurant --</option>
+            {availableGroups.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.items.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {selectedRestaurant && (
+          <div style={styles.selectWrapper}>
+            <label htmlFor="shift-payroll-select" style={styles.label}>
+              Payroll
+            </label>
+            <select
+              id="shift-payroll-select"
+              style={styles.select}
+              value={selectedPayroll}
+              onChange={(e) => handleSelectPayroll(e.target.value)}
+              disabled={loadingPayrolls || loadingExistingPayroll}
+            >
+              <option value="new">— New payroll —</option>
+              {payrollOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
                 </option>
               ))}
-            </optgroup>
-          ))}
-        </select>
+            </select>
+          </div>
+        )}
       </div>
+      {loadingExistingPayroll && (
+        <div style={{ marginTop: "12px", color: theme.textSecondary }}>
+          Loading payroll…
+        </div>
+      )}
+      {loadPayrollError && (
+        <div
+          style={{
+            marginTop: "12px",
+            color: theme.error || "#e53935",
+          }}
+        >
+          {loadPayrollError}
+        </div>
+      )}
     </div>
   );
 
@@ -1201,6 +1634,7 @@ const Shifts = () => {
                 <th style={styles.th}>hourly_wage</th>
                 <th style={styles.th}>wage_type</th>
                 <th style={styles.th}>travel</th>
+                <th style={styles.th}>contractor</th>
                 <th style={styles.th}>role</th>
                 <th style={styles.th}>hourly wage (per role)</th>
               </tr>
@@ -1300,6 +1734,24 @@ const Shifts = () => {
                                 updateTravel(empIdx, ev.target.value)
                               }
                             />
+                          </td>
+                          <td
+                            rowSpan={roles.length}
+                            style={styles.tdEmpBoundary}
+                          >
+                            <button
+                              type="button"
+                              aria-pressed={!!emp.contractor}
+                              onClick={() => toggleContractor(empIdx)}
+                              style={
+                                emp.contractor
+                                  ? styles.toggleButtonActive
+                                  : styles.toggleButton
+                              }
+                              title="Mark as contractor (קבלן)"
+                            >
+                              {emp.contractor ? "קבלן" : "שכיר"}
+                            </button>
                           </td>
                         </>
                       ) : null}
@@ -1598,8 +2050,266 @@ const Shifts = () => {
     4: renderStep4,
   };
 
+  const renderLaborDialog = () => {
+    if (!showLaborDialog) return null;
+    const [y, m] = (month || "").split("-").map((n) => parseInt(n, 10));
+    const daysInMonth =
+      Number.isFinite(y) && Number.isFinite(m)
+        ? new Date(y, m, 0).getDate()
+        : 31;
+    const byDay = new Map();
+    for (const it of laborSummary?.items || []) {
+      const d = parseInt(String(it.date || "").slice(-2), 10);
+      if (Number.isFinite(d)) byDay.set(d, it);
+    }
+    const chartData = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const it = byDay.get(d);
+      chartData.push({
+        day: d,
+        percentage: it && it.percentage != null ? Number(it.percentage) : 0,
+        labor_cost: it ? Number(it.labor_cost || 0) : 0,
+        total: it ? Number(it.total || 0) : 0,
+      });
+    }
+    const totals = laborSummary?.totals || {
+      total: 0,
+      labor_cost: 0,
+      percentage: null,
+    };
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          zIndex: 2100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+        onClick={() => setShowLaborDialog(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: theme.surface,
+            color: theme.text,
+            borderRadius: "10px",
+            padding: "20px",
+            width: "100%",
+            maxWidth: "900px",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "12px",
+            }}
+          >
+            <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+              Labor cost · {selectedLabel || ""} · {month || ""}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLaborDialog(false)}
+              aria-label="Close"
+              style={{
+                background: "none",
+                border: "none",
+                color: theme.text,
+                cursor: "pointer",
+                fontSize: "1.4rem",
+                lineHeight: 1,
+                padding: "2px 8px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {loadingLaborSummary && (
+            <div style={{ padding: "20px 0", color: theme.textSecondary }}>
+              Loading labor cost summary…
+            </div>
+          )}
+          {laborSummaryError && (
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: "6px",
+                backgroundColor: theme.errorBg || "rgba(229,57,53,0.1)",
+                color: theme.error || "#e53935",
+                border: `1px solid ${theme.errorBorder || "#e53935"}`,
+                marginBottom: "12px",
+              }}
+            >
+              <strong>Error:</strong> {laborSummaryError}
+            </div>
+          )}
+
+          {!loadingLaborSummary && !laborSummaryError && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "16px",
+                  marginBottom: "12px",
+                  fontSize: "0.95rem",
+                }}
+              >
+                <div>
+                  <span style={{ color: theme.textSecondary }}>
+                    Total income:
+                  </span>{" "}
+                  <strong>{Math.round(totals.total).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span style={{ color: theme.textSecondary }}>
+                    Total labor cost:
+                  </span>{" "}
+                  <strong>
+                    {Math.round(totals.labor_cost).toLocaleString()}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: theme.textSecondary }}>
+                    Labor cost %:
+                  </span>{" "}
+                  <strong>
+                    {totals.percentage == null
+                      ? "—"
+                      : `${totals.percentage.toFixed(2)}%`}
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ width: "100%", height: 320 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={theme.border}
+                    />
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fill: theme.text, fontSize: 12 }}
+                      label={{
+                        value: "Day of month",
+                        position: "insideBottom",
+                        offset: -2,
+                        fill: theme.textSecondary,
+                      }}
+                    />
+                    <YAxis
+                      tick={{ fill: theme.text, fontSize: 12 }}
+                      tickFormatter={(v) => `${v}%`}
+                      label={{
+                        value: "Labor cost %",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: theme.textSecondary,
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme.surface,
+                        border: `1px solid ${theme.border}`,
+                        color: theme.text,
+                      }}
+                      formatter={(value, name, ctx) => {
+                        if (name === "percentage") {
+                          return [`${Number(value).toFixed(2)}%`, "Labor %"];
+                        }
+                        return [value, name];
+                      }}
+                      labelFormatter={(d) => `Day ${d}`}
+                    />
+                    <Bar
+                      dataKey="percentage"
+                      fill={theme.active || "#2196f3"}
+                      radius={[3, 3, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+
+          <div
+            style={{
+              marginTop: "16px",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowLaborDialog(false)}
+              style={{
+                padding: "8px 16px",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                border: `1px solid ${theme.border}`,
+                borderRadius: "6px",
+                backgroundColor: theme.active || "#2196f3",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={styles.container}>
+      {renderLaborDialog()}
+      {savingPayroll && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            zIndex: 2000,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: "1.1rem",
+            gap: "12px",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            style={{
+              width: "44px",
+              height: "44px",
+              border: "4px solid rgba(255,255,255,0.3)",
+              borderTopColor: "#fff",
+              borderRadius: "50%",
+              animation: "spin 0.9s linear infinite",
+            }}
+          />
+          <div>Calculating daily labor cost and saving payroll…</div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
       {renderStepper()}
       <div style={styles.body}>
         {stepRenderers[step]()}

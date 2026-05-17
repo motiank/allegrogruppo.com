@@ -37,7 +37,10 @@ ALTER TABLE employees
   ADD COLUMN wage_type ENUM('gross','net') NULL AFTER hourly_wage;
 
 ALTER TABLE employees
-  ADD COLUMN travel DECIMAL(10,2) NULL AFTER `hourly_wage`;                                                                           
+  ADD COLUMN travel DECIMAL(10,2) NULL AFTER `hourly_wage`;
+
+ALTER TABLE employees
+  ADD COLUMN contractor BOOLEAN NOT NULL DEFAULT FALSE AFTER travel;
 
 
 delete from employees where rest = '65bb40ae6729db482e2ed6f2';

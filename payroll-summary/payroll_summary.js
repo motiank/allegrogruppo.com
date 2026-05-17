@@ -612,6 +612,194 @@ function findSummaryRows(worksheet, headerRowNumber) {
   return found;
 }
 
+// Walk the data rows and emit per-date entries with the row's own
+// hours100/125/150, tip, completion, and best-guess role. Multiple
+// entries per date are allowed (multi-shift days). Returns
+// { 'YYYY-MM-DD': [{role, h100, h125, h150, tip, completion}, ...] }.
+function collectDailyBreakdown(worksheet, headerInfo, summaryRowNumbers) {
+  const out = {};
+  if (!headerInfo) return out;
+  const cols = headerInfo.columns || {};
+  const headerRow = headerInfo.row;
+  const blocks = findShiftBlocks(worksheet, headerRow);
+
+  let dateCol = null;
+  worksheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+    const t = normalize(getCellText(cell));
+    if (t === "תאריך" || t.includes("תאריך")) {
+      if (dateCol == null) dateCol = col;
+    }
+  });
+  if (dateCol == null) dateCol = cols.date || 2;
+
+  const last = worksheet.rowCount || 0;
+  for (let r = headerRow + 1; r <= last; r++) {
+    if (summaryRowNumbers && summaryRowNumbers.has(r)) continue;
+    const row = worksheet.getRow(r);
+    const date = getCellDateKey(row.getCell(dateCol));
+    if (!date) continue;
+
+    const rowData = {
+      hours100: cols.hours100
+        ? getCellNumber(row.getCell(cols.hours100))
+        : null,
+      hours125: cols.hours125
+        ? getCellNumber(row.getCell(cols.hours125))
+        : null,
+      hours150: cols.hours150
+        ? getCellNumber(row.getCell(cols.hours150))
+        : null,
+      shabbat: cols.shabbat ? getCellNumber(row.getCell(cols.shabbat)) : null,
+      hag: cols.hag ? getCellNumber(row.getCell(cols.hag)) : null,
+      shabbatHag: cols.shabbatHag
+        ? getCellNumber(row.getCell(cols.shabbatHag))
+        : null,
+      tip: cols.tip ? getCellNumber(row.getCell(cols.tip)) : null,
+      completion: cols.completion
+        ? getCellNumber(row.getCell(cols.completion))
+        : null,
+    };
+    const { value: h150 } = normalize150(rowData, headerInfo);
+
+    let role = null;
+    for (const b of blocks) {
+      if (!b.role) continue;
+      const txt = normalize(getCellText(row.getCell(b.role)));
+      if (txt) {
+        role = txt;
+        break;
+      }
+    }
+
+    const h100 = rowData.hours100 || 0;
+    const h125 = rowData.hours125 || 0;
+    const h150v = h150 || 0;
+    const tipv = rowData.tip || 0;
+    const compv = rowData.completion || 0;
+    if (h100 === 0 && h125 === 0 && h150v === 0 && tipv === 0 && compv === 0) {
+      continue;
+    }
+
+    if (!out[date]) out[date] = [];
+    out[date].push({
+      role: role,
+      h100,
+      h125,
+      h150: h150v,
+      tip: tipv,
+      completion: compv,
+    });
+  }
+  return out;
+}
+
+// Parse a time-bearing cell (Date with UTC HH:MM, or "HH:MM" string)
+// into minutes-from-midnight, or null if unparseable.
+function timeCellToMinutes(cell) {
+  if (!cell) return null;
+  const v = cell.value;
+  if (v == null) return null;
+  if (v instanceof Date) {
+    return v.getUTCHours() * 60 + v.getUTCMinutes();
+  }
+  if (typeof v === "number") {
+    // Excel serial fraction-of-day (0..1).
+    if (v >= 0 && v < 2) {
+      const total = Math.round(v * 24 * 60);
+      return total;
+    }
+  }
+  const s = String(v);
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+// Walk the data rows and return { 'YYYY-MM-DD': totalHoursForThatDay }
+// computed from כניסה/יציאה times across every complete shift block on
+// the row. Wraps past midnight (exit < entry → +24h).
+function collectDailyHours(worksheet, headerInfo, summaryRowNumbers) {
+  const out = {};
+  if (!headerInfo) return out;
+  const headerRow = headerInfo.row;
+  const blocks = findShiftBlocks(worksheet, headerRow);
+  if (blocks.length === 0) return out;
+
+  let dateCol = null;
+  worksheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+    const t = normalize(getCellText(cell));
+    if (t === "תאריך" || t.includes("תאריך")) {
+      if (dateCol == null) dateCol = col;
+    }
+  });
+  if (dateCol == null) dateCol = (headerInfo.columns || {}).date || 2;
+
+  const last = worksheet.rowCount || 0;
+  for (let r = headerRow + 1; r <= last; r++) {
+    if (summaryRowNumbers && summaryRowNumbers.has(r)) continue;
+    const row = worksheet.getRow(r);
+    const date = getCellDateKey(row.getCell(dateCol));
+    if (!date) continue;
+    let rowHours = 0;
+    for (const b of blocks) {
+      if (!b.entry || !b.exit) continue;
+      const entryCell = row.getCell(b.entry);
+      const exitCell = row.getCell(b.exit);
+      if (isCellEmpty(entryCell) || isCellEmpty(exitCell)) continue;
+      const e = timeCellToMinutes(entryCell);
+      const x = timeCellToMinutes(exitCell);
+      if (e == null || x == null) continue;
+      let diff = x - e;
+      if (diff < 0) diff += 24 * 60;
+      // Sanity cap (single shift > 18h → likely parsing artifact).
+      if (diff <= 0 || diff > 18 * 60) continue;
+      rowHours += diff / 60;
+    }
+    if (rowHours > 0) out[date] = (out[date] || 0) + rowHours;
+  }
+  return out;
+}
+
+// Collect YYYY-MM-DD strings for every data row that has at least one
+// complete shift block (both כניסה and יציאה filled in). Used for
+// per-day labor cost allocation. Returns Set<string>.
+function collectWorkDates(worksheet, headerInfo, summaryRowNumbers) {
+  const result = new Set();
+  if (!headerInfo) return result;
+  const headerRow = headerInfo.row;
+  const blocks = findShiftBlocks(worksheet, headerRow);
+  if (blocks.length === 0) return result;
+  let dateCol = null;
+  worksheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+    const t = normalize(getCellText(cell));
+    if (t === "תאריך" || t.includes("תאריך")) {
+      if (dateCol == null) dateCol = col;
+    }
+  });
+  if (dateCol == null) dateCol = headerInfo.columns.date || 2;
+  const last = worksheet.rowCount || 0;
+  for (let r = headerRow + 1; r <= last; r++) {
+    if (summaryRowNumbers && summaryRowNumbers.has(r)) continue;
+    const row = worksheet.getRow(r);
+    const dateKey = getCellDateKey(row.getCell(dateCol));
+    if (!dateKey) continue;
+    for (const b of blocks) {
+      const entryCell = b.entry ? row.getCell(b.entry) : null;
+      const exitCell = b.exit ? row.getCell(b.exit) : null;
+      if (
+        entryCell &&
+        exitCell &&
+        !isCellEmpty(entryCell) &&
+        !isCellEmpty(exitCell)
+      ) {
+        result.add(dateKey);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 // Count distinct work days from a "תאריך"-style column, ignoring summary
 // rows. Returns null if there's no date column or no recognizable dates.
 function countUniqueDatesInSheet(worksheet, headerInfo, summaryRowNumbers) {
@@ -861,6 +1049,19 @@ function getOrCreateEmployee(employees, name) {
       normalizationNotes: new Set(),
       notes: new Set(),
       issues: new Set(), // dedup'd messages → exceptions
+      // Unique YYYY-MM-DD dates the employee was on the floor (any shift
+      // block with both כניסה and יציאה filled in). Used to allocate
+      // monthly labor cost to days.
+      workDates: new Set(),
+      // Per-date row buckets keyed by 'YYYY-MM-DD' → array of entries
+      // [{role, h100, h125, h150, tip, completion}, ...]. Used for
+      // per-day labor cost computation.
+      dailyBreakdown: new Map(),
+      // Per-date raw hours computed from entry/exit times across all
+      // shift blocks on that row. Used to allocate the employee's
+      // monthly cost proportionally to each day's hours when the data
+      // rows don't carry hours100/125/150 cells.
+      dailyHours: new Map(),
     });
   }
   return employees.get(name);
@@ -1173,6 +1374,17 @@ async function processWorkbookSheets(
       const emp = getOrCreateEmployee(employees, employeeName);
       emp.sheetsSeen.add(sheetKey);
       if (sheetGlobal) emp.global = true;
+      const dates = collectWorkDates(sheet, headerInfo, summaryRowNumbers);
+      for (const d of dates) emp.workDates.add(d);
+      const daily = collectDailyBreakdown(sheet, headerInfo, summaryRowNumbers);
+      for (const [d, entries] of Object.entries(daily)) {
+        if (!emp.dailyBreakdown.has(d)) emp.dailyBreakdown.set(d, []);
+        emp.dailyBreakdown.get(d).push(...entries);
+      }
+      const dailyHrs = collectDailyHours(sheet, headerInfo, summaryRowNumbers);
+      for (const [d, hrs] of Object.entries(dailyHrs)) {
+        emp.dailyHours.set(d, (emp.dailyHours.get(d) || 0) + hrs);
+      }
 
       // National ID (ת.ז. / תעודת זהות) — distinct from employee number.
       let extractedIdNum = findInlineLabelValueInHeader(
@@ -1620,6 +1832,9 @@ async function extractEmployees(items, configMap = {}) {
       workdays: workdays || null,
       global: !!emp.global,
       netGross: emp.netGross || null,
+      work_dates: Array.from(emp.workDates).sort(),
+      daily_breakdown: Object.fromEntries(emp.dailyBreakdown),
+      daily_hours: Object.fromEntries(emp.dailyHours),
     };
   });
   list.sort((a, b) => a.name.localeCompare(b.name, "he"));
