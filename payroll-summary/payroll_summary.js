@@ -548,6 +548,24 @@ function findIncompleteShifts({
   const headerRow = headerInfo.row;
   const blocks = findShiftBlocks(worksheet, headerRow);
   if (blocks.length === 0) return [];
+  // Skip "today" — shifts opened today may legitimately have an entry
+  // without an exit because the staffer is still on the floor.
+  const todayKey = (() => {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jerusalem",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+      const y = parts.find((p) => p.type === "year")?.value;
+      const m = parts.find((p) => p.type === "month")?.value;
+      const d = parts.find((p) => p.type === "day")?.value;
+      return y && m && d ? `${y}-${m}-${d}` : null;
+    } catch {
+      return new Date().toISOString().slice(0, 10);
+    }
+  })();
   // Find the תאריך column directly — the generic "date" detection may have
   // claimed יום (day name) which doesn't carry a date value.
   let dateCol = null;
@@ -564,6 +582,7 @@ function findIncompleteShifts({
     if (summaryRowNumbers && summaryRowNumbers.has(r)) continue;
     const row = worksheet.getRow(r);
     const dateKey = getCellDateKey(row.getCell(dateCol)) || "";
+    if (todayKey && dateKey === todayKey) continue;
     blocks.forEach((b, idx) => {
       const entryCell = b.entry ? row.getCell(b.entry) : null;
       const exitCell = b.exit ? row.getCell(b.exit) : null;

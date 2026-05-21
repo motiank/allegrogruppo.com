@@ -39,11 +39,23 @@ const Employees = () => {
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
-  const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [viewFilter, setViewFilter] = useState("active");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [menuOpenFor, setMenuOpenFor] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [duplicateDialogFor, setDuplicateDialogFor] = useState(null);
+  const [duplicateSearch, setDuplicateSearch] = useState("");
+  const [markingDuplicateId, setMarkingDuplicateId] = useState(null);
+
+  useEffect(() => {
+    if (menuOpenFor == null) return;
+    const close = () => setMenuOpenFor(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuOpenFor]);
 
   const selectedLabel = useMemo(
     () => findRestaurantLabel(selectedRestaurant),
@@ -65,20 +77,40 @@ const Employees = () => {
     return true;
   };
 
+  const isActive = (emp) => emp.active !== false && emp.duplicate == null;
+  const isRemoved = (emp) => emp.active === false;
+  const isDuplicate = (emp) => emp.duplicate != null;
   const matchesMissingFilter = (emp) =>
-    !hasWageValue(emp.global) && !hasWageValue(emp.hourly_wage);
+    isActive(emp) &&
+    !hasWageValue(emp.global) &&
+    !hasWageValue(emp.hourly_wage);
 
-  const missingCount = useMemo(
-    () => employees.filter(matchesMissingFilter).length,
-    [employees],
-  );
+  const counts = useMemo(() => {
+    let active = 0;
+    let missing = 0;
+    let removed = 0;
+    let dup = 0;
+    for (const e of employees) {
+      if (isActive(e)) active += 1;
+      if (matchesMissingFilter(e)) missing += 1;
+      if (isRemoved(e)) removed += 1;
+      if (isDuplicate(e)) dup += 1;
+    }
+    return { active, missing, removed, duplicate: dup };
+  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     const indexed = employees.map((emp, origIdx) => ({ emp, origIdx }));
     const q = search.trim().toLowerCase();
     let result = indexed;
-    if (showMissingOnly) {
+    if (viewFilter === "active") {
+      result = result.filter(({ emp }) => isActive(emp));
+    } else if (viewFilter === "missing") {
       result = result.filter(({ emp }) => matchesMissingFilter(emp));
+    } else if (viewFilter === "removed") {
+      result = result.filter(({ emp }) => isRemoved(emp));
+    } else if (viewFilter === "duplicate") {
+      result = result.filter(({ emp }) => isDuplicate(emp));
     }
     if (q) {
       result = result.filter(({ emp }) => {
@@ -97,7 +129,7 @@ const Employees = () => {
       });
     }
     return result;
-  }, [employees, search, showMissingOnly]);
+  }, [employees, search, viewFilter]);
 
   const loadEmployees = useCallback(async (rest) => {
     if (!rest) {
@@ -110,11 +142,11 @@ const Employees = () => {
     setSaveError(null);
     setDirty(false);
     setSearch("");
-    setShowMissingOnly(false);
+    setViewFilter("active");
     try {
       const res = await axios.post(
         "/admin/payroll/wages",
-        { rest },
+        { rest, scope: "all" },
         { withCredentials: true },
       );
       const list = (res.data?.employees || [])
@@ -127,9 +159,11 @@ const Employees = () => {
         name: e.name,
         global: e.global == null ? "" : String(e.global),
         hourly_wage: e.hourly_wage == null ? "" : String(e.hourly_wage),
-        wage_type: e.wage_type || "",
+        wage_type: e.wage_type === "net" ? "net" : "gross",
         travel: e.travel == null ? "" : String(e.travel),
         contractor: !!e.contractor,
+        active: e.active !== false,
+        duplicate: e.duplicate == null ? null : Number(e.duplicate),
         roles:
           e.roles && e.roles.length > 0
             ? e.roles.map((r) => ({
@@ -214,6 +248,66 @@ const Employees = () => {
     });
     setDirty(true);
     setSaveResult(null);
+  };
+
+  const openDuplicateDialog = (emp) => {
+    setMenuOpenFor(null);
+    setDuplicateSearch("");
+    setDuplicateDialogFor(emp);
+  };
+
+  const handleMarkDuplicate = async (target) => {
+    if (markingDuplicateId != null) return;
+    const source = duplicateDialogFor;
+    if (!source || !target || source.employee_id === target.employee_id) return;
+    setMarkingDuplicateId(source.employee_id);
+    setSaveError(null);
+    try {
+      await axios.post(
+        "/admin/payroll/employees/duplicate-with",
+        {
+          employee_id: source.employee_id,
+          duplicate_of: target.employee_id,
+        },
+        { withCredentials: true },
+      );
+      setEmployees((prev) =>
+        prev.filter((e) => e.employee_id !== source.employee_id),
+      );
+      setDuplicateDialogFor(null);
+    } catch (err) {
+      setSaveError(
+        err.response?.data?.error || err.message || "Mark duplicate failed",
+      );
+    } finally {
+      setMarkingDuplicateId(null);
+    }
+  };
+
+  const handleRemove = async (emp) => {
+    if (removingId != null) return;
+    if (!emp?.employee_id) return;
+    const ok = window.confirm(
+      `Remove ${emp.name || "this employee"}? They will no longer appear in this list.`,
+    );
+    if (!ok) return;
+    setRemovingId(emp.employee_id);
+    setMenuOpenFor(null);
+    setSaveError(null);
+    try {
+      await axios.post(
+        "/admin/payroll/employees/deactivate",
+        { employee_id: emp.employee_id },
+        { withCredentials: true },
+      );
+      setEmployees((prev) =>
+        prev.filter((e) => e.employee_id !== emp.employee_id),
+      );
+    } catch (err) {
+      setSaveError(err.response?.data?.error || err.message || "Remove failed");
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   const handleUpdate = async () => {
@@ -410,6 +504,132 @@ const Employees = () => {
       fontSize: "0.95rem",
       padding: "32px 0",
     },
+    actionsCell: {
+      padding: "8px 4px",
+      borderBottom: `2px solid ${theme.border}`,
+      color: theme.text,
+      verticalAlign: "middle",
+      textAlign: "center",
+      width: "40px",
+      position: "relative",
+    },
+    kebabButton: {
+      width: "32px",
+      height: "32px",
+      padding: 0,
+      border: `1px solid ${theme.border}`,
+      background: theme.surface,
+      color: theme.text,
+      cursor: "pointer",
+      fontSize: "1.4rem",
+      fontWeight: 700,
+      lineHeight: 1,
+      borderRadius: "4px",
+    },
+    menu: {
+      position: "absolute",
+      top: "32px",
+      right: "4px",
+      minWidth: "120px",
+      backgroundColor: theme.surface,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      zIndex: 10,
+      overflow: "hidden",
+    },
+    menuItem: {
+      display: "block",
+      width: "100%",
+      padding: "8px 12px",
+      border: "none",
+      background: "transparent",
+      color: theme.error || "#e53935",
+      textAlign: "left",
+      fontSize: "0.9rem",
+      cursor: "pointer",
+    },
+    menuItemNeutral: {
+      display: "block",
+      width: "100%",
+      padding: "8px 12px",
+      border: "none",
+      background: "transparent",
+      color: theme.text,
+      textAlign: "left",
+      fontSize: "0.9rem",
+      cursor: "pointer",
+      borderBottom: `1px solid ${theme.border}`,
+    },
+    modalBackdrop: {
+      position: "fixed",
+      inset: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+    },
+    modal: {
+      width: "min(480px, 92vw)",
+      maxHeight: "80vh",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "8px",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    },
+    modalHeader: {
+      padding: "14px 16px",
+      borderBottom: `1px solid ${theme.border}`,
+      fontWeight: 600,
+      fontSize: "1rem",
+    },
+    modalBody: {
+      padding: "12px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+      overflow: "hidden",
+    },
+    modalList: {
+      overflowY: "auto",
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      maxHeight: "50vh",
+    },
+    modalListItem: {
+      display: "block",
+      width: "100%",
+      padding: "10px 12px",
+      border: "none",
+      borderBottom: `1px solid ${theme.border}`,
+      background: "transparent",
+      color: theme.text,
+      textAlign: "left",
+      fontSize: "0.95rem",
+      cursor: "pointer",
+    },
+    modalFooter: {
+      padding: "10px 16px",
+      borderTop: `1px solid ${theme.border}`,
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: "8px",
+    },
+    secondaryButton: {
+      padding: "8px 14px",
+      fontSize: "0.9rem",
+      fontWeight: 600,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      cursor: "pointer",
+    },
   };
 
   return (
@@ -473,23 +693,27 @@ const Employees = () => {
                 value={search}
                 onChange={(ev) => setSearch(ev.target.value)}
               />
-              <button
-                type="button"
-                aria-pressed={showMissingOnly}
-                onClick={() => setShowMissingOnly((v) => !v)}
-                style={
-                  showMissingOnly
-                    ? styles.toggleButtonActive
-                    : styles.toggleButton
-                }
-                title="Show only employees with no global, hourly, or per-role wage set"
+              <select
+                style={styles.select}
+                value={viewFilter}
+                onChange={(ev) => setViewFilter(ev.target.value)}
               >
-                {showMissingOnly ? "Showing missing wages" : "Missing wages"}
-                {missingCount > 0 ? ` (${missingCount})` : ""}
-              </button>
+                <option value="active">
+                  Active employees ({counts.active})
+                </option>
+                <option value="missing">
+                  Missing wages ({counts.missing})
+                </option>
+                <option value="removed">
+                  Removed employees ({counts.removed})
+                </option>
+                <option value="duplicate">
+                  Duplicate employees ({counts.duplicate})
+                </option>
+              </select>
             </div>
             <div style={styles.summary}>
-              {search.trim() || showMissingOnly ? (
+              {search.trim() || viewFilter !== "active" ? (
                 <>
                   <strong style={{ color: theme.text }}>
                     {filteredEmployees.length}
@@ -500,7 +724,13 @@ const Employees = () => {
                   </strong>{" "}
                   employee{employees.length === 1 ? "" : "s"} for{" "}
                   <strong style={{ color: theme.text }}>{selectedLabel}</strong>
-                  {showMissingOnly ? " — missing wages only" : ""}
+                  {viewFilter === "missing"
+                    ? " — missing wages"
+                    : viewFilter === "removed"
+                      ? " — removed"
+                      : viewFilter === "duplicate"
+                        ? " — duplicates"
+                        : ""}
                 </>
               ) : (
                 <>
@@ -526,6 +756,7 @@ const Employees = () => {
                     <th style={styles.th}>contractor</th>
                     <th style={styles.th}>role</th>
                     <th style={styles.th}>hourly wage (per role)</th>
+                    <th style={styles.th}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -568,7 +799,7 @@ const Employees = () => {
                               >
                                 <input
                                   type="number"
-                                  step="0.01"
+                                  step="any"
                                   min="0"
                                   placeholder="—"
                                   style={styles.wageInput}
@@ -584,7 +815,7 @@ const Employees = () => {
                               >
                                 <input
                                   type="number"
-                                  step="0.01"
+                                  step="any"
                                   min="0"
                                   placeholder="—"
                                   style={styles.wageInput}
@@ -605,7 +836,6 @@ const Employees = () => {
                                     updateWageType(empIdx, ev.target.value)
                                   }
                                 >
-                                  <option value="">—</option>
                                   <option value="gross">gross</option>
                                   <option value="net">net</option>
                                 </select>
@@ -616,7 +846,7 @@ const Employees = () => {
                               >
                                 <input
                                   type="number"
-                                  step="0.01"
+                                  step="any"
                                   min="0"
                                   placeholder="—"
                                   style={styles.wageInput}
@@ -651,7 +881,7 @@ const Employees = () => {
                             {r.role ? (
                               <input
                                 type="number"
-                                step="0.01"
+                                step="any"
                                 min="0"
                                 placeholder="—"
                                 style={styles.wageInput}
@@ -664,6 +894,58 @@ const Employees = () => {
                               "—"
                             )}
                           </td>
+                          {isFirst ? (
+                            <td
+                              rowSpan={roles.length}
+                              style={styles.actionsCell}
+                            >
+                              <button
+                                type="button"
+                                aria-label="Row actions"
+                                aria-haspopup="menu"
+                                aria-expanded={menuOpenFor === emp.employee_id}
+                                disabled={removingId === emp.employee_id}
+                                style={styles.kebabButton}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setMenuOpenFor((cur) =>
+                                    cur === emp.employee_id
+                                      ? null
+                                      : emp.employee_id,
+                                  );
+                                }}
+                              >
+                                ⋮
+                              </button>
+                              {menuOpenFor === emp.employee_id && (
+                                <div
+                                  role="menu"
+                                  style={styles.menu}
+                                  onClick={(ev) => ev.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    style={styles.menuItemNeutral}
+                                    onClick={() => openDuplicateDialog(emp)}
+                                  >
+                                    Duplicate with…
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    style={styles.menuItem}
+                                    disabled={removingId === emp.employee_id}
+                                    onClick={() => handleRemove(emp)}
+                                  >
+                                    {removingId === emp.employee_id
+                                      ? "Removing…"
+                                      : "Remove"}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          ) : null}
                         </tr>
                       );
                     });
@@ -709,6 +991,84 @@ const Employees = () => {
           </>
         )}
       </div>
+
+      {duplicateDialogFor && (
+        <div
+          style={styles.modalBackdrop}
+          onClick={() => setDuplicateDialogFor(null)}
+        >
+          <div style={styles.modal} onClick={(ev) => ev.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              Mark{" "}
+              <span style={{ color: theme.active || "#2196f3" }}>
+                {duplicateDialogFor.name || "(no name)"}
+              </span>{" "}
+              as duplicate of…
+            </div>
+            <div style={styles.modalBody}>
+              <input
+                type="search"
+                placeholder="Search by name, mic_nmbr, ID…"
+                style={styles.searchInput}
+                value={duplicateSearch}
+                onChange={(ev) => setDuplicateSearch(ev.target.value)}
+                autoFocus
+              />
+              <div style={styles.modalList}>
+                {(() => {
+                  const q = duplicateSearch.trim().toLowerCase();
+                  const candidates = employees.filter(
+                    (e) =>
+                      e.employee_id !== duplicateDialogFor.employee_id &&
+                      (!q ||
+                        [e.name, e.mic_nmbr, e.ID_nmbr]
+                          .filter(Boolean)
+                          .join(" ")
+                          .toLowerCase()
+                          .includes(q)),
+                  );
+                  if (candidates.length === 0) {
+                    return (
+                      <div
+                        style={{
+                          padding: "12px",
+                          color: theme.textSecondary,
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        No matching employees.
+                      </div>
+                    );
+                  }
+                  return candidates.map((e) => (
+                    <button
+                      key={e.employee_id}
+                      type="button"
+                      style={styles.modalListItem}
+                      disabled={markingDuplicateId != null}
+                      onClick={() => handleMarkDuplicate(e)}
+                    >
+                      <strong>{e.name || "(no name)"}</strong>
+                      {e.mic_nmbr ? ` — mic ${e.mic_nmbr}` : ""}
+                      {e.ID_nmbr ? ` — id ${e.ID_nmbr}` : ""}
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setDuplicateDialogFor(null)}
+                disabled={markingDuplicateId != null}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

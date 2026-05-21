@@ -177,10 +177,7 @@ const Router = () => {
           emp.hourly_wage === "" || emp.hourly_wage == null
             ? null
             : Number(emp.hourly_wage);
-        const wageType =
-          emp.wage_type === "gross" || emp.wage_type === "net"
-            ? emp.wage_type
-            : null;
+        const wageType = emp.wage_type === "net" ? "net" : "gross";
         const travelVal =
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
         try {
@@ -218,10 +215,16 @@ const Router = () => {
     try {
       const rest = String(req.body?.rest || "").trim();
       if (!rest) return res.status(400).json({ error: "missing rest" });
-      const [rows] = await executeSql(
-        "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest",
-        { rest },
-      );
+      // scope=all returns every row with active+duplicate status fields
+      // (used by the Employees admin page to drive filter dropdowns).
+      // Default keeps the active+non-duplicate behavior expected by the
+      // payroll wizard.
+      const scope = String(req.body?.scope || "").trim();
+      const sql =
+        scope === "all"
+          ? "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
+          : "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
+      const [rows] = await executeSql(sql, { rest });
       const out = [];
       for (const r of rows || []) {
         let roles = [];
@@ -232,18 +235,24 @@ const Router = () => {
             roles = [];
           }
         }
-        out.push({
+        const asDecimalString = (v) => (v == null ? null : String(v));
+        const entry = {
           employee_id: r.employee_id,
           mic_nmbr: r.mic_nmbr,
           ID_nmbr: r.ID_nmbr,
           name: r.name,
           roles: Array.isArray(roles) ? roles : [],
-          global: r.global == null ? null : Number(r.global),
-          hourly_wage: r.hourly_wage == null ? null : Number(r.hourly_wage),
+          global: asDecimalString(r.global),
+          hourly_wage: asDecimalString(r.hourly_wage),
           wage_type: r.wage_type || null,
-          travel: r.travel == null ? null : Number(r.travel),
+          travel: asDecimalString(r.travel),
           contractor: !!r.contractor,
-        });
+        };
+        if (scope === "all") {
+          entry.active = r.active == null ? true : !!Number(r.active);
+          entry.duplicate = r.duplicate == null ? null : Number(r.duplicate);
+        }
+        out.push(entry);
       }
       res.json({ employees: out });
     } catch (err) {
@@ -258,6 +267,15 @@ const Router = () => {
       if (list.length === 0) {
         return res.status(400).json({ error: "No employees in request body" });
       }
+      // Normalize a money value to a DECIMAL-safe string (avoid JS Number
+      // float drift on the way to MySQL DECIMAL columns).
+      const toDecimalString = (v) => {
+        if (v === "" || v == null) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+        return s;
+      };
       let updated = 0;
       const errors = [];
       for (const emp of list) {
@@ -272,22 +290,14 @@ const Router = () => {
                 .filter((r) => r && r.role)
                 .map((r) => ({
                   role: String(r.role).trim(),
-                  wage: r.wage === "" || r.wage == null ? null : Number(r.wage),
+                  wage: toDecimalString(r.wage),
                 }))
             : [],
         );
-        const globalVal =
-          emp.global === "" || emp.global == null ? null : Number(emp.global);
-        const hourlyWageVal =
-          emp.hourly_wage === "" || emp.hourly_wage == null
-            ? null
-            : Number(emp.hourly_wage);
-        const wageType =
-          emp.wage_type === "gross" || emp.wage_type === "net"
-            ? emp.wage_type
-            : null;
-        const travelVal =
-          emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
+        const globalVal = toDecimalString(emp.global);
+        const hourlyWageVal = toDecimalString(emp.hourly_wage);
+        const wageType = emp.wage_type === "net" ? "net" : "gross";
+        const travelVal = toDecimalString(emp.travel);
         try {
           const [result] = await executeSql(
             `UPDATE employees
@@ -318,6 +328,56 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/employees/update error:", err);
       res.status(500).json({ error: err.message || "update failed" });
+    }
+  });
+
+  router.post("/employees/duplicate-with", async (req, res) => {
+    try {
+      const id = Number(req.body?.employee_id);
+      const dupOf = Number(req.body?.duplicate_of);
+      if (!Number.isFinite(id) || !Number.isFinite(dupOf)) {
+        return res
+          .status(400)
+          .json({ error: "missing employee_id or duplicate_of" });
+      }
+      if (id === dupOf) {
+        return res
+          .status(400)
+          .json({ error: "employee cannot be a duplicate of itself" });
+      }
+      const [result] = await executeSql(
+        "UPDATE employees SET duplicate = :dupOf WHERE employee_id = :id",
+        { id, dupOf },
+      );
+      if (!result || result.affectedRows < 1) {
+        return res.status(404).json({ error: "employee not found" });
+      }
+      res.json({ employee_id: id, duplicate: dupOf });
+    } catch (err) {
+      console.error("payroll/employees/duplicate-with error:", err);
+      res
+        .status(500)
+        .json({ error: err.message || "mark-as-duplicate failed" });
+    }
+  });
+
+  router.post("/employees/deactivate", async (req, res) => {
+    try {
+      const id = Number(req.body?.employee_id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ error: "missing employee_id" });
+      }
+      const [result] = await executeSql(
+        "UPDATE employees SET active = 0 WHERE employee_id = :id",
+        { id },
+      );
+      if (!result || result.affectedRows < 1) {
+        return res.status(404).json({ error: "employee not found" });
+      }
+      res.json({ employee_id: id, active: false });
+    } catch (err) {
+      console.error("payroll/employees/deactivate error:", err);
+      res.status(500).json({ error: err.message || "deactivate failed" });
     }
   });
 

@@ -1,71 +1,79 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { useTheme } from './context/ThemeContext';
+import React, { useState } from "react";
+import axios from "axios";
+import { useTheme } from "./context/ThemeContext";
 
 const Login = ({ onLoginSuccess }) => {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
+    username: "",
+    password: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-    setError('');
+    setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (!formData.username || !formData.password) {
-      setError('Please enter both username and password');
+      setError("Please enter both username and password");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       // Create FormData for passport-local strategy (expects username and password fields)
       const loginData = new URLSearchParams();
-      loginData.append('username', formData.username);
-      loginData.append('password', formData.password);
+      loginData.append("username", formData.username);
+      loginData.append("password", formData.password);
 
-      const response = await axios.post('/auth/login', loginData, {
+      const response = await axios.post("/auth/login", loginData, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         withCredentials: true, // Important for cookies
       });
 
-      if (response.data && response.data.content && response.data.content.status === 'logged-in') {
-        console.log('Login successful:', response.data.content.user);
+      if (
+        response.data &&
+        response.data.content &&
+        response.data.content.status === "logged-in"
+      ) {
+        console.log("Login successful:", response.data.content.user);
         // Call the success callback if provided, otherwise redirect
         if (onLoginSuccess) {
           onLoginSuccess();
         } else {
-          window.location.href = '/admin';
+          window.location.href = "/admin";
         }
       } else {
-        setError(response.data?.flash_error?.[0] || 'Login failed. Please check your credentials.');
+        setError(
+          response.data?.flash_error?.[0] ||
+            "Login failed. Please check your credentials.",
+        );
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error("Login error:", err);
       if (err.response && err.response.data) {
-        const errorMsg = err.response.data.flash_error?.[0] || 
-                        err.response.data.message || 
-                        err.response.data.meta?.err ||
-                        'Login failed. Please try again.';
+        const errorMsg =
+          err.response.data.flash_error?.[0] ||
+          err.response.data.message ||
+          err.response.data.meta?.err ||
+          "Login failed. Please try again.";
         setError(errorMsg);
       } else {
-        setError('Network error. Please make sure the server is running.');
+        setError("Network error. Please make sure the server is running.");
       }
     } finally {
       setLoading(false);
@@ -74,86 +82,86 @@ const Login = ({ onLoginSuccess }) => {
 
   const styles = {
     container: {
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      minHeight: "100vh",
       backgroundColor: theme.background,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      transition: 'background-color 0.3s ease',
+      transition: "background-color 0.3s ease",
     },
     loginBox: {
       backgroundColor: theme.surface,
-      padding: '2.5rem',
-      borderRadius: '8px',
+      padding: "2.5rem",
+      borderRadius: "8px",
       boxShadow: `0 2px 10px ${theme.shadow}`,
-      width: '100%',
-      maxWidth: '400px',
+      width: "100%",
+      maxWidth: "400px",
       border: `1px solid ${theme.border}`,
-      transition: 'background-color 0.3s ease, border-color 0.3s ease',
+      transition: "background-color 0.3s ease, border-color 0.3s ease",
     },
     title: {
-      margin: '0 0 2rem 0',
-      fontSize: '1.75rem',
-      fontWeight: '600',
+      margin: "0 0 2rem 0",
+      fontSize: "1.75rem",
+      fontWeight: "600",
       color: theme.text,
-      textAlign: 'center',
+      textAlign: "center",
     },
     form: {
-      display: 'flex',
-      flexDirection: 'column',
+      display: "flex",
+      flexDirection: "column",
     },
     formGroup: {
-      marginBottom: '1.5rem',
+      marginBottom: "1.5rem",
     },
     label: {
-      display: 'block',
-      marginBottom: '0.5rem',
-      fontSize: '0.875rem',
-      fontWeight: '500',
+      display: "block",
+      marginBottom: "0.5rem",
+      fontSize: "0.875rem",
+      fontWeight: "500",
       color: theme.textSecondary,
     },
     input: {
-      width: '100%',
-      padding: '0.75rem',
-      fontSize: '1rem',
+      width: "100%",
+      padding: "0.75rem",
+      fontSize: "1rem",
       border: `1px solid ${theme.border}`,
-      borderRadius: '4px',
-      boxSizing: 'border-box',
-      transition: 'border-color 0.2s',
-      backgroundColor: theme.mode === 'dark' ? theme.surfaceSecondary : theme.surface,
+      borderRadius: "4px",
+      boxSizing: "border-box",
+      transition: "border-color 0.2s",
+      backgroundColor:
+        theme.mode === "dark" ? theme.surfaceSecondary : theme.surface,
       color: theme.text,
     },
     inputFocus: {
-      outline: 'none',
+      outline: "none",
       borderColor: theme.primary,
     },
     error: {
       color: theme.error,
-      fontSize: '0.875rem',
-      marginBottom: '1rem',
-      padding: '0.5rem',
+      fontSize: "0.875rem",
+      marginBottom: "1rem",
+      padding: "0.5rem",
       backgroundColor: theme.errorBg,
-      borderRadius: '4px',
+      borderRadius: "4px",
       border: `1px solid ${theme.errorBorder}`,
     },
     button: {
-      padding: '0.75rem 1.5rem',
-      fontSize: '1rem',
-      fontWeight: '500',
-      color: '#ffffff',
+      padding: "0.75rem 1.5rem",
+      fontSize: "1rem",
+      fontWeight: "500",
+      color: "#ffffff",
       backgroundColor: theme.primary,
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s',
+      border: "none",
+      borderRadius: "4px",
+      cursor: "pointer",
+      transition: "background-color 0.2s",
     },
     buttonHover: {
       backgroundColor: theme.primaryHover,
     },
     buttonDisabled: {
       opacity: 0.6,
-      cursor: 'not-allowed',
+      cursor: "not-allowed",
     },
   };
 
@@ -173,7 +181,7 @@ const Login = ({ onLoginSuccess }) => {
               value={formData.username}
               onChange={handleChange}
               onFocus={(e) => {
-                e.target.style.outline = 'none';
+                e.target.style.outline = "none";
                 e.target.style.borderColor = theme.primary;
               }}
               onBlur={(e) => {
@@ -184,7 +192,7 @@ const Login = ({ onLoginSuccess }) => {
               autoComplete="username"
             />
           </div>
-          
+
           <div style={styles.formGroup}>
             <label htmlFor="password" style={styles.label}>
               Password
@@ -196,7 +204,7 @@ const Login = ({ onLoginSuccess }) => {
               value={formData.password}
               onChange={handleChange}
               onFocus={(e) => {
-                e.target.style.outline = 'none';
+                e.target.style.outline = "none";
                 e.target.style.borderColor = theme.primary;
               }}
               onBlur={(e) => {
@@ -210,8 +218,8 @@ const Login = ({ onLoginSuccess }) => {
 
           {error && <div style={styles.error}>{error}</div>}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             onMouseEnter={(e) => {
               if (!loading) {
                 e.target.style.backgroundColor = theme.primaryHover;
@@ -220,10 +228,13 @@ const Login = ({ onLoginSuccess }) => {
             onMouseLeave={(e) => {
               e.target.style.backgroundColor = theme.primary;
             }}
-            style={{...styles.button, ...(loading ? styles.buttonDisabled : {})}}
+            style={{
+              ...styles.button,
+              ...(loading ? styles.buttonDisabled : {}),
+            }}
             disabled={loading}
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
       </div>
@@ -232,4 +243,3 @@ const Login = ({ onLoginSuccess }) => {
 };
 
 export default Login;
-

@@ -42,5 +42,12 @@ ALTER TABLE employees
 ALTER TABLE employees
   ADD COLUMN contractor BOOLEAN NOT NULL DEFAULT FALSE AFTER travel;
 
+ALTER TABLE employees
+  ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE AFTER contractor;
+
+ALTER TABLE employees
+  ADD COLUMN duplicate INT NULL AFTER active,
+  ADD KEY idx_duplicate (duplicate);
+
 
 delete from employees where rest = '65bb40ae6729db482e2ed6f2';
