@@ -25,8 +25,9 @@ import useCurrentUser from "../hooks/useCurrentUser";
 const STEPS = [
   { id: 1, label: "Select restaurant" },
   { id: 2, label: "Add shift files" },
-  { id: 3, label: "New employees" },
-  { id: 4, label: "Full payroll" },
+  { id: 3, label: "Employee data" },
+  { id: 4, label: "New employees" },
+  { id: 5, label: "Full payroll" },
 ];
 
 const formatBytes = (n) => {
@@ -46,7 +47,7 @@ const fmtNum = (n, decimals = 2) => {
 // configured hourly wage is the special marker -1.
 const MIN_HOURLY_WAGE = 34.42;
 
-// Build a per-employee record map keyed by mic_nmbr / ID_nmbr / name.
+// Build a per-employee record map keyed by ID_nmbr / name.
 // Each entry: { roles: { role: wage }, hourly_wage, wage_type, global, travel }
 const buildWageMap = (employeesFromDb) => {
   const map = new Map();
@@ -63,7 +64,6 @@ const buildWageMap = (employeesFromDb) => {
       travel: e.travel == null ? null : Number(e.travel),
       contractor: !!e.contractor,
     };
-    if (e.mic_nmbr) map.set(`mic:${String(e.mic_nmbr).trim()}`, rec);
     if (e.ID_nmbr) map.set(`id:${String(e.ID_nmbr).trim()}`, rec);
     if (e.name) map.set(`name:${String(e.name).trim()}`, rec);
   }
@@ -72,7 +72,6 @@ const buildWageMap = (employeesFromDb) => {
 
 const lookupEmpData = (wageMap, emp) => {
   const candidates = [];
-  if (emp.mic_nmbr) candidates.push(`mic:${String(emp.mic_nmbr).trim()}`);
   if (emp.ID_nmbr) candidates.push(`id:${String(emp.ID_nmbr).trim()}`);
   if (emp.name) candidates.push(`name:${String(emp.name).trim()}`);
   for (const k of candidates) {
@@ -155,6 +154,188 @@ const Shifts = () => {
   // Step 2 → 3 (extract)
   const [processing, setProcessing] = useState(false);
   const [extractError, setExtractError] = useState(null);
+
+  // Step 3 — Employee data upload (attach phones); supports multiple .xlsx
+  // files dropped/selected at once. Each file is posted independently to the
+  // attach-phones endpoint and the results are aggregated.
+  const empDataFileRef = useRef(null);
+  const empDataKeyRef = useRef(0);
+  const [empDataFiles, setEmpDataFiles] = useState([]);
+  const [empDataIsDragging, setEmpDataIsDragging] = useState(false);
+  const [empDataUploading, setEmpDataUploading] = useState(false);
+  const [empDataResults, setEmpDataResults] = useState([]); // one per file
+  const [empDataError, setEmpDataError] = useState(null);
+
+  const addEmpDataFiles = useCallback((incoming) => {
+    if (!incoming || incoming.length === 0) return;
+    const next = Array.from(incoming)
+      .filter((f) => /\.xlsx$/i.test(f.name))
+      .map((file) => ({ key: ++empDataKeyRef.current, file }));
+    if (next.length === 0) return;
+    setEmpDataFiles((prev) => [...prev, ...next]);
+    setEmpDataResults([]);
+    setEmpDataError(null);
+  }, []);
+  const handleEmpDataFileInput = (e) => {
+    addEmpDataFiles(e.target.files);
+    e.target.value = "";
+  };
+  const handleEmpDataDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEmpDataIsDragging(false);
+    addEmpDataFiles(e.dataTransfer.files);
+  };
+  const handleEmpDataDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!empDataIsDragging) setEmpDataIsDragging(true);
+  };
+  const handleEmpDataDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (empDataIsDragging) setEmpDataIsDragging(false);
+  };
+  const removeEmpDataFile = (key) => {
+    setEmpDataFiles((prev) => prev.filter((f) => f.key !== key));
+  };
+
+  const runEmpDataAttach = async () => {
+    if (empDataUploading) return;
+    if (!selectedRestaurant) {
+      setEmpDataError("No restaurant selected");
+      return;
+    }
+    if (empDataFiles.length === 0) return;
+    setEmpDataUploading(true);
+    setEmpDataError(null);
+    setEmpDataResults([]);
+
+    // Normalize name for matching. Use explicit \uXXXX escapes so a code
+    // formatter can't silently flip these into other glyphs.
+    //   - strip Unicode bidi/format/zero-width controls:
+    //     200B-200F, 202A-202E, 2066-2069, FEFF.
+    //   - strip the geresh / apostrophe family (Hebrew geresh 05F3,
+    //     ASCII ' 0027, curly ' ' 2018 2019, low/high single 201A 201B,
+    //     backtick 0060, acute 00B4, prime 02B9, modifier letter apostrophe
+    //     family 02BB-02BF) — Tabit may keep e.g. "ג׳סיקה" while the shift
+    //     sheet writes it without the geresh.
+    //   - lowercase + collapse whitespace.
+    const BIDI_CTRL_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
+    const APOSTROPHE_RE = /[׳'‘’‚‛`´ʹʻ-ʿ]/g;
+    const stripGereshAndCtrl = (s) =>
+      String(s == null ? "" : s)
+        .replace(BIDI_CTRL_RE, "")
+        .replace(APOSTROPHE_RE, "");
+    const normName = (s) =>
+      stripGereshAndCtrl(s)
+        .normalize("NFC")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+
+    // Build a phone map keyed by exactly "שם פרטי + ' ' + שם משפחה" (in that
+    // order, whitespace-normalized). The shift's `emp.name` is compared
+    // against the same normalized form.
+    const fileResults = [];
+    const phoneByFullName = new Map();
+    try {
+      for (const { file } of empDataFiles) {
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        try {
+          const res = await axios.post(
+            "/admin/payroll/employees/parse-phone-xlsx",
+            fd,
+            { withCredentials: true },
+          );
+          const entries = res.data?.entries || [];
+          let kept = 0;
+          let dropped = 0;
+          for (const e of entries) {
+            if (!e.active) {
+              dropped += 1;
+              continue;
+            }
+            if (!e.phone) {
+              dropped += 1;
+              continue;
+            }
+            const fullName = normName(`${e.name || ""} ${e.family || ""}`);
+            if (!fullName) {
+              dropped += 1;
+              continue;
+            }
+            phoneByFullName.set(fullName, e.phone);
+            kept += 1;
+          }
+          fileResults.push({
+            file: file.name,
+            parsed: entries.length,
+            kept,
+            dropped,
+            headerRow: res.data?.headerRow,
+          });
+        } catch (err) {
+          fileResults.push({
+            file: file.name,
+            error: err.response?.data?.error || err.message || "Parse failed",
+          });
+        }
+      }
+
+      const phoneFor = (emp) => {
+        const key = normName(emp.name);
+        if (key && phoneByFullName.has(key)) return phoneByFullName.get(key);
+        return null;
+      };
+
+      // Do the matching outside React's state updaters so counters and
+      // sample arrays are populated synchronously (React 18 / StrictMode
+      // can otherwise call the updater twice or defer it, mangling the
+      // counters we read on the next line).
+      let matchedNew = 0;
+      let matchedExisting = 0;
+      const unmatchedNew = [];
+      const unmatchedExisting = [];
+
+      const nextNewEmployees = newEmployees.map((e) => {
+        const p = phoneFor(e);
+        if (p) {
+          matchedNew += 1;
+          return { ...e, phone: p };
+        }
+        unmatchedNew.push(e.name || "(no name)");
+        return e;
+      });
+      const nextAllEmployees = allEmployees.map((e) => {
+        const p = phoneFor(e);
+        if (p) {
+          matchedExisting += 1;
+          return { ...e, phone: p };
+        }
+        unmatchedExisting.push(e.name || "(no name)");
+        return e;
+      });
+
+      setNewEmployees(nextNewEmployees);
+      setAllEmployees(nextAllEmployees);
+
+      setEmpDataResults([
+        ...fileResults,
+        {
+          file: "__summary__",
+          summary: true,
+          matchedNew,
+          matchedExisting,
+          unmatchedNew,
+          unmatchedExisting,
+        },
+      ]);
+    } finally {
+      setEmpDataUploading(false);
+    }
+  };
 
   // Step 3
   const [newEmployees, setNewEmployees] = useState([]); // with {role,wage} forms
@@ -402,9 +583,9 @@ const Shifts = () => {
       const payload = {
         employees: newEmployees.map((e) => ({
           rest: selectedRestaurant,
-          mic_nmbr: e.mic_nmbr,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
+          phone: e.phone || null,
           roles: e.roles,
           global: e.global,
           hourly_wage: e.hourly_wage,
@@ -680,7 +861,6 @@ const Shifts = () => {
         rest: selectedRestaurant,
         month,
         employees: allEmployees.map((e) => ({
-          mic_nmbr: e.mic_nmbr,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
           payroll_data: e.payroll_data || {},
@@ -759,7 +939,6 @@ const Shifts = () => {
           }
           return {
             name: e.name,
-            mic_nmbr: e.mic_nmbr,
             ID_nmbr: e.ID_nmbr,
             payroll_data: e.payroll_data || {},
             role_extras: e.role_extras || {},
@@ -801,7 +980,10 @@ const Shifts = () => {
   const canAdvance = () => {
     if (step === 1) return !!selectedRestaurant;
     if (step === 2) return files.length > 0;
-    if (step === 3) {
+    if (step === 3) return true; // Employee data — optional, can skip
+    if (step === 4) {
+      // New employees step — shift issues must be acknowledged and any new
+      // employees must have been saved (or there were none to begin with).
       if (shiftIssues.length > 0 && !shiftIssuesAcknowledged) return false;
       return employeesAllSaved || noNewEmployees;
     }
@@ -815,8 +997,10 @@ const Shifts = () => {
       const ok = await runExtract();
       if (ok) setStep(3);
     } else if (step === 3) {
-      await loadWages();
       setStep(4);
+    } else if (step === 4) {
+      await loadWages();
+      setStep(5);
     }
   };
   const goBack = () => {
@@ -828,15 +1012,15 @@ const Shifts = () => {
       setStep(target);
       return;
     }
-    // Forward jump only if all intermediate gates are satisfied.
     if (target === 2 && selectedRestaurant) setStep(2);
     if (target === 3 && allEmployees.length > 0) setStep(3);
+    if (target === 4 && allEmployees.length > 0) setStep(4);
     if (
-      target === 4 &&
+      target === 5 &&
       (employeesAllSaved || noNewEmployees) &&
       allEmployees.length > 0
     )
-      setStep(4);
+      setStep(5);
   };
 
   // ---------- Step 4: build payroll table rows + warnings ----------
@@ -916,7 +1100,6 @@ const Shifts = () => {
           isTotal: false,
           empty: true,
           name: emp.name,
-          mic_nmbr: emp.mic_nmbr,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -934,7 +1117,6 @@ const Shifts = () => {
           last: i === roleRows.length - 1 && roleRows.length === 1,
           isTotal: false,
           name: emp.name,
-          mic_nmbr: emp.mic_nmbr,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -1627,7 +1809,6 @@ const Shifts = () => {
           <table style={{ ...styles.table, ...styles.ltrTable }}>
             <thead>
               <tr>
-                <th style={styles.th}>mic_nmbr</th>
                 <th style={styles.th}>name</th>
                 <th style={styles.th}>ID_nmbr</th>
                 <th style={styles.th}>global wage</th>
@@ -1636,7 +1817,7 @@ const Shifts = () => {
                 <th style={styles.th}>travel</th>
                 <th style={styles.th}>contractor</th>
                 <th style={styles.th}>role</th>
-                <th style={styles.th}>hourly wage (per role)</th>
+                <th style={styles.th}>role wage</th>
               </tr>
             </thead>
             <tbody>
@@ -1653,12 +1834,6 @@ const Shifts = () => {
                     <tr key={`${empIdx}-${roleIdx}`}>
                       {isFirst ? (
                         <>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            {emp.mic_nmbr || "—"}
-                          </td>
                           <td
                             rowSpan={roles.length}
                             style={styles.tdEmpBoundary}
@@ -2031,7 +2206,6 @@ const Shifts = () => {
                 {payrollResult.unresolved.map((u, i) => (
                   <li key={i}>
                     {u.name || "(no name)"}
-                    {u.mic_nmbr ? ` · mic ${u.mic_nmbr}` : ""}
                     {u.ID_nmbr ? ` · ID ${u.ID_nmbr}` : ""}
                   </li>
                 ))}
@@ -2043,11 +2217,176 @@ const Shifts = () => {
     </div>
   );
 
+  const renderStepEmployeeData = () => (
+    <div style={styles.card}>
+      <div style={{ fontWeight: 600, fontSize: "1.05rem", marginBottom: 6 }}>
+        Employee data (optional)
+      </div>
+      <p style={{ color: theme.textSecondary, marginBottom: 12 }}>
+        Upload the Tabit "רשימת עובדים" .xlsx files (or any sheet whose header
+        row has שם פרטי, שם משפחה and טלפון נייד). Phones get attached to
+        employees of the current restaurant, matched by name. Inactive rows
+        (פעיל ≠ פעיל) are skipped. You can also skip the whole step.
+      </p>
+      <div
+        style={styles.dropZone}
+        onClick={() => empDataFileRef.current?.click()}
+        onDrop={handleEmpDataDrop}
+        onDragOver={handleEmpDataDragOver}
+        onDragLeave={handleEmpDataDragLeave}
+        onDragEnter={handleEmpDataDragOver}
+        role="button"
+        tabIndex={0}
+      >
+        <div style={styles.dropZoneTitle}>
+          {empDataIsDragging
+            ? "Drop files here"
+            : "Drag & drop .xlsx files here"}
+        </div>
+        <div style={styles.dropZoneHint}>or</div>
+        <button
+          type="button"
+          style={styles.addBtn}
+          onClick={(e) => {
+            e.stopPropagation();
+            empDataFileRef.current?.click();
+          }}
+        >
+          Add file
+        </button>
+        <input
+          ref={empDataFileRef}
+          type="file"
+          multiple
+          accept=".xlsx"
+          onChange={handleEmpDataFileInput}
+          style={{ display: "none" }}
+        />
+      </div>
+      {empDataFiles.length > 0 && (
+        <ul style={{ ...styles.fileList, marginTop: "16px" }}>
+          {empDataFiles.map(({ key, file }) => (
+            <li key={key} style={styles.fileItem}>
+              <div style={styles.fileMeta}>
+                <div style={styles.fileName} title={file.name}>
+                  {file.name}
+                </div>
+                <div style={styles.fileSize}>{formatBytes(file.size)}</div>
+              </div>
+              <button
+                type="button"
+                style={styles.deleteBtn}
+                onClick={() => removeEmpDataFile(key)}
+                disabled={empDataUploading}
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {empDataFiles.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            style={{
+              ...styles.primaryButton,
+              opacity: empDataUploading ? 0.6 : 1,
+              cursor: empDataUploading ? "wait" : "pointer",
+            }}
+            onClick={runEmpDataAttach}
+            disabled={empDataUploading}
+          >
+            {empDataUploading
+              ? `Attaching ${empDataFiles.length} file${empDataFiles.length === 1 ? "" : "s"}…`
+              : `Attach ${empDataFiles.length} file${empDataFiles.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      )}
+      {empDataError && (
+        <div style={{ ...styles.errorBox, marginTop: 12 }}>
+          <strong>Error:</strong> {empDataError}
+        </div>
+      )}
+      {empDataResults.length > 0 && (
+        <div
+          style={{
+            marginTop: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          {empDataResults.map((r, idx) => {
+            if (r.error) {
+              return (
+                <div key={idx} style={styles.errorBox}>
+                  <strong>{r.file}:</strong> {r.error}
+                </div>
+              );
+            }
+            if (r.summary) {
+              return (
+                <div key={idx} style={styles.successBox}>
+                  Attached <strong>{r.matchedNew}</strong> phone
+                  {r.matchedNew === 1 ? "" : "s"} to new employees ·{" "}
+                  <strong>{r.matchedExisting}</strong> existing employee row
+                  {r.matchedExisting === 1 ? "" : "s"} matched (in-memory). New
+                  phones will be saved when you commit the next step.
+                  {r.unmatchedNew && r.unmatchedNew.length > 0 && (
+                    <details style={{ marginTop: 6 }}>
+                      <summary style={{ cursor: "pointer" }}>
+                        Unmatched new employees ({r.unmatchedNew.length})
+                      </summary>
+                      <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+                        {r.unmatchedNew.slice(0, 100).map((n, i) => (
+                          <li key={i}>{n}</li>
+                        ))}
+                        {r.unmatchedNew.length > 100 && (
+                          <li>…and {r.unmatchedNew.length - 100} more</li>
+                        )}
+                      </ul>
+                    </details>
+                  )}
+                  {r.unmatchedExisting && r.unmatchedExisting.length > 0 && (
+                    <details style={{ marginTop: 6 }}>
+                      <summary style={{ cursor: "pointer" }}>
+                        Unmatched existing employees (
+                        {r.unmatchedExisting.length})
+                      </summary>
+                      <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+                        {r.unmatchedExisting.slice(0, 100).map((n, i) => (
+                          <li key={i}>{n}</li>
+                        ))}
+                        {r.unmatchedExisting.length > 100 && (
+                          <li>…and {r.unmatchedExisting.length - 100} more</li>
+                        )}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div key={idx} style={styles.successBox}>
+                <strong>{r.file}</strong>: parsed {r.parsed} row
+                {r.parsed === 1 ? "" : "s"} · kept {r.kept} · dropped{" "}
+                {r.dropped || 0}
+                {r.headerRow ? ` · header row ${r.headerRow}` : ""}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   const stepRenderers = {
     1: renderStep1,
     2: renderStep2,
-    3: renderStep3,
-    4: renderStep4,
+    3: renderStepEmployeeData,
+    4: renderStep3,
+    5: renderStep4,
   };
 
   const renderLaborDialog = () => {
@@ -2325,7 +2664,7 @@ const Shifts = () => {
           >
             ← Back
           </button>
-          {step < 4 && (
+          {step < 5 && (
             <button
               type="button"
               style={{

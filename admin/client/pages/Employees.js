@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
 import {
@@ -40,6 +46,10 @@ const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [viewFilter, setViewFilter] = useState("active");
+  // Frozen set of employee_ids currently visible under the "missing wages"
+  // filter. Recomputed only when the user changes the filter, reloads, or
+  // clicks Update — so editing a wage doesn't make the row vanish.
+  const [missingFrozenIds, setMissingFrozenIds] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null);
@@ -49,6 +59,10 @@ const Employees = () => {
   const [duplicateDialogFor, setDuplicateDialogFor] = useState(null);
   const [duplicateSearch, setDuplicateSearch] = useState("");
   const [markingDuplicateId, setMarkingDuplicateId] = useState(null);
+  const [micpalSyncing, setMicpalSyncing] = useState(false);
+  const [micpalResult, setMicpalResult] = useState(null);
+  const [micpalError, setMicpalError] = useState(null);
+  const micpalFileInputRef = useRef(null);
 
   useEffect(() => {
     if (menuOpenFor == null) return;
@@ -99,6 +113,28 @@ const Employees = () => {
     return { active, missing, removed, duplicate: dup };
   }, [employees]);
 
+  // (Re)build the frozen "missing wages" set whenever:
+  //   - the filter switches to / away from "missing"
+  //   - the employees list is reloaded for a different restaurant
+  // The set is *not* rebuilt on every edit, so a row stays visible while the
+  // user types wages — only handleUpdate refreshes it after a successful save.
+  useEffect(() => {
+    if (viewFilter !== "missing") {
+      if (missingFrozenIds !== null) setMissingFrozenIds(null);
+      return;
+    }
+    if (missingFrozenIds == null) {
+      const ids = new Set();
+      for (const e of employees) {
+        if (matchesMissingFilter(e)) ids.add(e.employee_id);
+      }
+      setMissingFrozenIds(ids);
+    }
+    // intentionally not depending on `employees` — we don't want edits to
+    // shrink the frozen set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewFilter]);
+
   const filteredEmployees = useMemo(() => {
     const indexed = employees.map((emp, origIdx) => ({ emp, origIdx }));
     const q = search.trim().toLowerCase();
@@ -106,7 +142,15 @@ const Employees = () => {
     if (viewFilter === "active") {
       result = result.filter(({ emp }) => isActive(emp));
     } else if (viewFilter === "missing") {
-      result = result.filter(({ emp }) => matchesMissingFilter(emp));
+      // Use the frozen set when present so editing a wage doesn't make
+      // the row disappear immediately.
+      if (missingFrozenIds) {
+        result = result.filter(({ emp }) =>
+          missingFrozenIds.has(emp.employee_id),
+        );
+      } else {
+        result = result.filter(({ emp }) => matchesMissingFilter(emp));
+      }
     } else if (viewFilter === "removed") {
       result = result.filter(({ emp }) => isRemoved(emp));
     } else if (viewFilter === "duplicate") {
@@ -116,8 +160,8 @@ const Employees = () => {
       result = result.filter(({ emp }) => {
         const haystack = [
           emp.name,
-          emp.mic_nmbr,
           emp.ID_nmbr,
+          emp.phone,
           emp.employee_id,
           emp.wage_type,
           ...(emp.roles || []).map((r) => r.role),
@@ -129,7 +173,7 @@ const Employees = () => {
       });
     }
     return result;
-  }, [employees, search, viewFilter]);
+  }, [employees, search, viewFilter, missingFrozenIds]);
 
   const loadEmployees = useCallback(async (rest) => {
     if (!rest) {
@@ -143,6 +187,7 @@ const Employees = () => {
     setDirty(false);
     setSearch("");
     setViewFilter("active");
+    setMissingFrozenIds(null);
     try {
       const res = await axios.post(
         "/admin/payroll/wages",
@@ -154,8 +199,8 @@ const Employees = () => {
         .sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
       const shaped = list.map((e) => ({
         employee_id: e.employee_id,
-        mic_nmbr: e.mic_nmbr,
         ID_nmbr: e.ID_nmbr,
+        phone: e.phone || "",
         name: e.name,
         global: e.global == null ? "" : String(e.global),
         hourly_wage: e.hourly_wage == null ? "" : String(e.hourly_wage),
@@ -250,6 +295,310 @@ const Employees = () => {
     setSaveResult(null);
   };
 
+  const handleMicpalPick = () => {
+    if (micpalSyncing) return;
+    setMicpalResult(null);
+    setMicpalError(null);
+    if (micpalFileInputRef.current) {
+      micpalFileInputRef.current.value = "";
+      micpalFileInputRef.current.click();
+    }
+  };
+
+  const handleMicpalFileChange = async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    setMicpalSyncing(true);
+    setMicpalResult(null);
+    setMicpalError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      const res = await axios.post("/admin/payroll/micpal/sync", fd, {
+        withCredentials: true,
+      });
+      setMicpalResult(res.data);
+    } catch (err) {
+      setMicpalError(
+        err.response?.data?.error || err.message || "Micpal sync failed",
+      );
+    } finally {
+      setMicpalSyncing(false);
+    }
+  };
+
+  // ---------- Match dialog (employees ↔ micpal) ----------
+  const normalizeName = (s) =>
+    String(s == null ? "" : s)
+      .trim()
+      .replace(/\s+/g, " ");
+
+  const buildMicpalNameIndex = useCallback((rows) => {
+    const idx = new Map();
+    for (const m of rows || []) {
+      const n = normalizeName(m.name);
+      const f = normalizeName(m.family);
+      if (!n && !f) continue;
+      const keys = new Set();
+      if (n && f) {
+        keys.add(`${n} ${f}`);
+        keys.add(`${f} ${n}`);
+      } else if (n) {
+        keys.add(n);
+      } else if (f) {
+        keys.add(f);
+      }
+      for (const k of keys) {
+        const arr = idx.get(k) || [];
+        arr.push(m);
+        idx.set(k, arr);
+      }
+    }
+    return idx;
+  }, []);
+
+  // Returns [{ keyName, name, family, ID_nmbr, score }, …] for a single
+  // employee against the micpal index. Only score=100 matches.
+  const searchMicpal = (index, employeeName) => {
+    const key = normalizeName(employeeName);
+    if (!key) return [];
+    return (index.get(key) || []).map((m) => ({
+      keyName: m.keyName,
+      name: m.name,
+      family: m.family,
+      ID_nmbr: m.ID_nmbr,
+      score: 100,
+    }));
+  };
+
+  // Scored search used by the manual-match panel. Walks the full list and
+  // returns rows with score > 0:
+  //   100 — exact (name+family or family+name) == query
+  //    80 — all query tokens appear in (name + " " + family)
+  //    50 — at least one query token appears in (name + " " + family)
+  const searchMicpalScored = (list, query) => {
+    const q = normalizeName(query).toLowerCase();
+    if (!q) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const out = [];
+    for (const m of list || []) {
+      const n = normalizeName(m.name).toLowerCase();
+      const f = normalizeName(m.family).toLowerCase();
+      const a = `${n} ${f}`.trim();
+      const b = `${f} ${n}`.trim();
+      let score = 0;
+      if (q === a || q === b) score = 100;
+      else {
+        const combined = `${n} ${f}`;
+        let hit = 0;
+        for (const t of tokens) {
+          if (combined.includes(t)) hit += 1;
+        }
+        if (hit > 0) score = hit === tokens.length ? 80 : 50;
+      }
+      if (score > 0) out.push({ ...m, score });
+    }
+    out.sort((a, b) => b.score - a.score);
+    return out;
+  };
+
+  const [matchDialogOpen, setMatchDialogOpen] = useState(false);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState(null);
+  const [matchRows, setMatchRows] = useState([]); // perfect matches
+  const [matchSelected, setMatchSelected] = useState({}); // employee_id -> bool
+  const [matchUpdating, setMatchUpdating] = useState(false);
+  const [matchResult, setMatchResult] = useState(null);
+  const [matchMode, setMatchMode] = useState("perfect"); // 'perfect' | 'manual'
+  const [micpalList, setMicpalList] = useState([]);
+  const [selectedManualEmp, setSelectedManualEmp] = useState(null);
+  const [manualSearch, setManualSearch] = useState("");
+  const [manualSelectedKeyName, setManualSelectedKeyName] = useState(null);
+
+  const manualUnmatched = useMemo(
+    () =>
+      employees.filter(
+        (e) =>
+          e.active !== false &&
+          e.duplicate == null &&
+          !(e.ID_nmbr && String(e.ID_nmbr).trim()),
+      ),
+    [employees],
+  );
+
+  const manualResults = useMemo(() => {
+    if (!manualSearch.trim()) return [];
+    return searchMicpalScored(micpalList, manualSearch).slice(0, 200);
+  }, [micpalList, manualSearch]);
+
+  const openMatchDialog = async () => {
+    if (matchLoading) return;
+    setMatchDialogOpen(true);
+    setMatchLoading(true);
+    setMatchError(null);
+    setMatchRows([]);
+    setMatchSelected({});
+    setMatchResult(null);
+    setMatchMode("perfect");
+    setSelectedManualEmp(null);
+    setManualSearch("");
+    setManualSelectedKeyName(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/micpal/list",
+        {},
+        { withCredentials: true },
+      );
+      const micpal = res.data?.rows || [];
+      setMicpalList(micpal);
+      const index = buildMicpalNameIndex(micpal);
+
+      // Restrict to active, non-duplicate employees missing ID_nmbr.
+      const candidates = employees.filter(
+        (e) =>
+          e.active !== false &&
+          e.duplicate == null &&
+          !(e.ID_nmbr && String(e.ID_nmbr).trim()),
+      );
+
+      const perfect = [];
+      for (const emp of candidates) {
+        const matches = searchMicpal(index, emp.name);
+        const valid = matches.filter(
+          (m) => m.ID_nmbr && String(m.ID_nmbr).trim(),
+        );
+        if (valid.length === 1) {
+          perfect.push({ emp, match: valid[0] });
+        }
+      }
+      setMatchRows(perfect);
+      const sel = {};
+      for (const row of perfect) sel[row.emp.employee_id] = true;
+      setMatchSelected(sel);
+      // No perfect matches → drop straight into the manual tool.
+      if (perfect.length === 0) setMatchMode("manual");
+    } catch (err) {
+      setMatchError(
+        err.response?.data?.error || err.message || "Failed to load micpal",
+      );
+    } finally {
+      setMatchLoading(false);
+    }
+  };
+
+  const pickManualEmp = (emp) => {
+    setSelectedManualEmp(emp);
+    setManualSearch(emp?.name || "");
+    setManualSelectedKeyName(null);
+  };
+
+  const handleManualUpdate = async () => {
+    if (matchUpdating) return;
+    if (!selectedManualEmp || !manualSelectedKeyName) return;
+    const chosen = manualResults.find(
+      (m) => m.keyName === manualSelectedKeyName,
+    );
+    if (!chosen || !chosen.ID_nmbr) return;
+    setMatchUpdating(true);
+    setMatchError(null);
+    setMatchResult(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/employees/set-id-nmbr",
+        {
+          updates: [
+            {
+              employee_id: selectedManualEmp.employee_id,
+              ID_nmbr: chosen.ID_nmbr,
+            },
+          ],
+        },
+        { withCredentials: true },
+      );
+      setMatchResult(res.data);
+      setEmployees((prev) =>
+        prev.map((e) =>
+          e.employee_id === selectedManualEmp.employee_id
+            ? { ...e, ID_nmbr: chosen.ID_nmbr }
+            : e,
+        ),
+      );
+      // Reset the right pane for the next pick.
+      setSelectedManualEmp(null);
+      setManualSearch("");
+      setManualSelectedKeyName(null);
+    } catch (err) {
+      setMatchError(
+        err.response?.data?.error || err.message || "Update failed",
+      );
+    } finally {
+      setMatchUpdating(false);
+    }
+  };
+
+  const toggleMatchSelected = (employee_id) => {
+    setMatchSelected((prev) => ({
+      ...prev,
+      [employee_id]: !prev[employee_id],
+    }));
+  };
+
+  const toggleMatchSelectAll = () => {
+    const allOn = matchRows.every((r) => matchSelected[r.emp.employee_id]);
+    const next = {};
+    for (const r of matchRows) next[r.emp.employee_id] = !allOn;
+    setMatchSelected(next);
+  };
+
+  const handleMatchUpdate = async () => {
+    if (matchUpdating) return;
+    const updates = matchRows
+      .filter((r) => matchSelected[r.emp.employee_id])
+      .map((r) => ({
+        employee_id: r.emp.employee_id,
+        ID_nmbr: r.match.ID_nmbr,
+      }));
+    if (updates.length === 0) return;
+    setMatchUpdating(true);
+    setMatchError(null);
+    setMatchResult(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/employees/set-id-nmbr",
+        { updates },
+        { withCredentials: true },
+      );
+      setMatchResult(res.data);
+      // Reflect changes locally so the dialog and table show the new ID_nmbr.
+      const applied = new Set(updates.map((u) => u.employee_id));
+      setEmployees((prev) =>
+        prev.map((e) =>
+          applied.has(e.employee_id)
+            ? {
+                ...e,
+                ID_nmbr:
+                  updates.find((u) => u.employee_id === e.employee_id)
+                    ?.ID_nmbr || e.ID_nmbr,
+              }
+            : e,
+        ),
+      );
+      // Drop updated rows from the dialog list; if nothing left to confirm,
+      // switch to the manual-match tool so the user can keep going.
+      setMatchRows((prev) => {
+        const next = prev.filter((r) => !applied.has(r.emp.employee_id));
+        if (next.length === 0) setMatchMode("manual");
+        return next;
+      });
+    } catch (err) {
+      setMatchError(
+        err.response?.data?.error || err.message || "Update failed",
+      );
+    } finally {
+      setMatchUpdating(false);
+    }
+  };
+
   const openDuplicateDialog = (emp) => {
     setMenuOpenFor(null);
     setDuplicateSearch("");
@@ -332,6 +681,15 @@ const Employees = () => {
       });
       setSaveResult(res.data);
       setDirty(false);
+      // Refresh the "missing wages" frozen set: rows that now have a wage
+      // drop out, rows that became missing are added.
+      if (viewFilter === "missing") {
+        const ids = new Set();
+        for (const e of employees) {
+          if (matchesMissingFilter(e)) ids.add(e.employee_id);
+        }
+        setMissingFrozenIds(ids);
+      }
     } catch (err) {
       setSaveError(err.response?.data?.error || err.message || "Update failed");
     } finally {
@@ -353,7 +711,25 @@ const Employees = () => {
       maxWidth: "1400px",
       display: "flex",
       justifyContent: "center",
+      alignItems: "flex-end",
+      gap: "16px",
       padding: "16px 0 24px",
+      position: "relative",
+    },
+    iconButton: {
+      width: "40px",
+      height: "40px",
+      padding: 0,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "6px",
+      backgroundColor: theme.surface,
+      color: theme.text,
+      cursor: "pointer",
+      fontSize: "1.2rem",
+      lineHeight: 1,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     selectWrapper: {
       display: "flex",
@@ -517,8 +893,8 @@ const Employees = () => {
       width: "32px",
       height: "32px",
       padding: 0,
-      border: `1px solid ${theme.border}`,
-      background: theme.surface,
+      border: "none",
+      background: "transparent",
       color: theme.text,
       cursor: "pointer",
       fontSize: "1.4rem",
@@ -657,7 +1033,57 @@ const Employees = () => {
             ))}
           </select>
         </div>
+        <button
+          type="button"
+          title="Sync Micpal — pick an .xlsx file"
+          aria-label="Sync Micpal"
+          style={{
+            ...styles.iconButton,
+            opacity: micpalSyncing ? 0.6 : 1,
+            cursor: micpalSyncing ? "wait" : "pointer",
+          }}
+          onClick={handleMicpalPick}
+          disabled={micpalSyncing}
+        >
+          {micpalSyncing ? "…" : "↻"}
+        </button>
+        <input
+          ref={micpalFileInputRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          style={{ display: "none" }}
+          onChange={handleMicpalFileChange}
+        />
       </div>
+
+      {(micpalResult || micpalError) && (
+        <div style={{ width: "100%", maxWidth: "1400px", marginBottom: 12 }}>
+          {micpalError && (
+            <div style={styles.errorBox}>
+              <strong>Micpal sync error:</strong> {micpalError}
+            </div>
+          )}
+          {micpalResult && (
+            <div style={styles.successBox}>
+              Micpal sync: upserted <strong>{micpalResult.upserted}</strong> row
+              {micpalResult.upserted === 1 ? "" : "s"}
+              {micpalResult.skipped ? ` · skipped ${micpalResult.skipped}` : ""}
+              {micpalResult.errors && micpalResult.errors.length > 0 && (
+                <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
+                  {micpalResult.errors.slice(0, 5).map((e, i) => (
+                    <li key={i}>
+                      row {e.row} ({e.keyName}): {e.issue}
+                    </li>
+                  ))}
+                  {micpalResult.errors.length > 5 && (
+                    <li>…and {micpalResult.errors.length - 5} more</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={styles.body}>
         {!selectedRestaurant && (
@@ -688,7 +1114,7 @@ const Employees = () => {
             <div style={styles.searchRow}>
               <input
                 type="search"
-                placeholder="Search by name, mic_nmbr, ID, role…"
+                placeholder="Search by name, ID, role…"
                 style={styles.searchInput}
                 value={search}
                 onChange={(ev) => setSearch(ev.target.value)}
@@ -711,6 +1137,26 @@ const Employees = () => {
                   Duplicate employees ({counts.duplicate})
                 </option>
               </select>
+              <button
+                type="button"
+                title="Match employees ↔ micpal"
+                aria-label="Match with Micpal"
+                style={{
+                  ...styles.toggleButton,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  opacity: matchLoading ? 0.6 : 1,
+                  cursor: matchLoading ? "wait" : "pointer",
+                }}
+                onClick={openMatchDialog}
+                disabled={matchLoading}
+              >
+                <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>
+                  {matchLoading ? "…" : "↻"}
+                </span>
+                <span>micpal</span>
+              </button>
             </div>
             <div style={styles.summary}>
               {search.trim() || viewFilter !== "active" ? (
@@ -746,7 +1192,6 @@ const Employees = () => {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>mic_nmbr</th>
                     <th style={styles.th}>name</th>
                     <th style={styles.th}>ID_nmbr</th>
                     <th style={styles.th}>global wage</th>
@@ -755,7 +1200,7 @@ const Employees = () => {
                     <th style={styles.th}>travel</th>
                     <th style={styles.th}>contractor</th>
                     <th style={styles.th}>role</th>
-                    <th style={styles.th}>hourly wage (per role)</th>
+                    <th style={styles.th}>role wage</th>
                     <th style={styles.th}></th>
                   </tr>
                 </thead>
@@ -775,12 +1220,6 @@ const Employees = () => {
                         <tr key={`${emp.employee_id}-${roleIdx}`}>
                           {isFirst ? (
                             <>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                {emp.mic_nmbr || "—"}
-                              </td>
                               <td
                                 rowSpan={roles.length}
                                 style={styles.tdEmpBoundary}
@@ -992,6 +1431,390 @@ const Employees = () => {
         )}
       </div>
 
+      {matchDialogOpen && (
+        <div
+          style={styles.modalBackdrop}
+          onClick={() => setMatchDialogOpen(false)}
+        >
+          <div
+            style={{
+              ...styles.modal,
+              width:
+                matchMode === "manual"
+                  ? "min(960px, 96vw)"
+                  : "min(820px, 96vw)",
+            }}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div style={styles.modalHeader}>
+              {matchMode === "manual"
+                ? "Match employees ↔ Micpal — manual tool"
+                : "Match employees ↔ Micpal — perfect matches (100)"}
+            </div>
+            <div style={styles.modalBody}>
+              {matchLoading && (
+                <div style={{ color: theme.textSecondary }}>
+                  Loading micpal…
+                </div>
+              )}
+              {matchError && (
+                <div style={styles.errorBox}>
+                  <strong>Error:</strong> {matchError}
+                </div>
+              )}
+
+              {!matchLoading && matchMode === "perfect" && (
+                <>
+                  {matchRows.length === 0 && !matchError && (
+                    <div
+                      style={{
+                        padding: "12px",
+                        color: theme.textSecondary,
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      No perfect matches found among employees missing ID.
+                    </div>
+                  )}
+                  {matchRows.length > 0 && (
+                    <div style={{ ...styles.modalList, maxHeight: "60vh" }}>
+                      <table style={{ ...styles.table, borderRadius: 0 }}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>
+                              <input
+                                type="checkbox"
+                                checked={matchRows.every(
+                                  (r) => matchSelected[r.emp.employee_id],
+                                )}
+                                onChange={toggleMatchSelectAll}
+                                aria-label="Select all"
+                              />
+                            </th>
+                            <th style={styles.th}>Micpal name</th>
+                            <th style={styles.th}>Employee name</th>
+                            <th style={styles.th}>ID number</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {matchRows.map(({ emp, match }) => (
+                            <tr key={emp.employee_id}>
+                              <td style={styles.td}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!matchSelected[emp.employee_id]}
+                                  onChange={() =>
+                                    toggleMatchSelected(emp.employee_id)
+                                  }
+                                  aria-label={`Select ${emp.name}`}
+                                />
+                              </td>
+                              <td style={styles.td}>
+                                {[match.name, match.family]
+                                  .filter(Boolean)
+                                  .join(" ") || "—"}
+                              </td>
+                              <td style={styles.td}>{emp.name || "—"}</td>
+                              <td style={styles.td}>{match.ID_nmbr || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!matchLoading && matchMode === "manual" && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(220px, 1fr) 2fr",
+                    gap: "12px",
+                    minHeight: "300px",
+                  }}
+                >
+                  {/* Left: unmatched employees */}
+                  <div
+                    style={{
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      maxHeight: "60vh",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        borderBottom: `1px solid ${theme.border}`,
+                        fontWeight: 600,
+                        fontSize: "0.9rem",
+                        backgroundColor:
+                          theme.surfaceSecondary || theme.surface,
+                      }}
+                    >
+                      Unmatched ({manualUnmatched.length})
+                    </div>
+                    <div style={{ overflowY: "auto" }}>
+                      {manualUnmatched.length === 0 && (
+                        <div
+                          style={{
+                            padding: "12px",
+                            color: theme.textSecondary,
+                            fontSize: "0.9rem",
+                          }}
+                        >
+                          Nothing to match.
+                        </div>
+                      )}
+                      {manualUnmatched.map((emp) => {
+                        const active =
+                          selectedManualEmp &&
+                          selectedManualEmp.employee_id === emp.employee_id;
+                        const rawPhone = String(emp.phone || "").trim();
+                        // Build a wa.me URL. Israeli locals starting with "0"
+                        // get the leading 0 stripped and a 972 country prefix;
+                        // anything starting with "+" / "972" is used as-is.
+                        let waPhone = "";
+                        if (rawPhone) {
+                          const digits = rawPhone.replace(/[^\d]/g, "");
+                          if (digits) {
+                            if (digits.startsWith("972")) waPhone = digits;
+                            else if (digits.startsWith("0"))
+                              waPhone = "972" + digits.slice(1);
+                            else waPhone = digits;
+                          }
+                        }
+                        return (
+                          <div
+                            key={emp.employee_id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => pickManualEmp(emp)}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Enter" || ev.key === " ") {
+                                ev.preventDefault();
+                                pickManualEmp(emp);
+                              }
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "8px",
+                              width: "100%",
+                              textAlign: "left",
+                              padding: "8px 12px",
+                              borderBottom: `1px solid ${theme.border}`,
+                              background: active
+                                ? theme.active || "#2196f3"
+                                : "transparent",
+                              color: active ? "#ffffff" : theme.text,
+                              cursor: "pointer",
+                              fontSize: "0.92rem",
+                            }}
+                          >
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              {emp.name || "(no name)"}
+                            </span>
+                            {waPhone ? (
+                              <a
+                                href={`https://web.whatsapp.com/send/?phone=${waPhone}&text&type=phone_number&app_absent=0`}
+                                target="whatsapp"
+                                rel="noopener noreferrer"
+                                onClick={(ev) => ev.stopPropagation()}
+                                style={{
+                                  color: active ? "#ffffff" : "#25d366",
+                                  textDecoration: "underline",
+                                  fontSize: "0.85rem",
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={`Open WhatsApp chat with ${rawPhone}`}
+                              >
+                                {rawPhone}
+                              </a>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right: search + results */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      minHeight: 0,
+                    }}
+                  >
+                    <input
+                      type="search"
+                      placeholder={
+                        selectedManualEmp
+                          ? `Search Micpal for "${selectedManualEmp.name}"…`
+                          : "Pick an employee on the left, then search…"
+                      }
+                      style={styles.searchInput}
+                      value={manualSearch}
+                      onChange={(ev) => {
+                        setManualSearch(ev.target.value);
+                        setManualSelectedKeyName(null);
+                      }}
+                      disabled={!selectedManualEmp}
+                    />
+                    <div
+                      style={{
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: "6px",
+                        overflow: "hidden",
+                        flex: 1,
+                        minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <div style={{ overflowY: "auto", maxHeight: "55vh" }}>
+                        <table style={{ ...styles.table, borderRadius: 0 }}>
+                          <thead>
+                            <tr>
+                              <th style={styles.th}></th>
+                              <th style={styles.th}>Name</th>
+                              <th style={styles.th}>ID number</th>
+                              <th style={styles.th}>Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {manualResults.length === 0 && (
+                              <tr>
+                                <td
+                                  colSpan={4}
+                                  style={{
+                                    ...styles.td,
+                                    color: theme.textSecondary,
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {selectedManualEmp
+                                    ? "No matches."
+                                    : "Pick an employee to search."}
+                                </td>
+                              </tr>
+                            )}
+                            {manualResults.map((m) => (
+                              <tr key={m.keyName}>
+                                <td style={styles.td}>
+                                  <input
+                                    type="radio"
+                                    name="manual-pick"
+                                    checked={
+                                      manualSelectedKeyName === m.keyName
+                                    }
+                                    onChange={() =>
+                                      setManualSelectedKeyName(m.keyName)
+                                    }
+                                    disabled={
+                                      !m.ID_nmbr || !String(m.ID_nmbr).trim()
+                                    }
+                                    aria-label={`Pick ${m.name} ${m.family}`}
+                                  />
+                                </td>
+                                <td style={styles.td}>
+                                  {[m.name, m.family]
+                                    .filter(Boolean)
+                                    .join(" ") || "—"}
+                                </td>
+                                <td style={styles.td}>{m.ID_nmbr || "—"}</td>
+                                <td style={styles.td}>{m.score}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {matchResult && (
+                <div style={styles.successBox}>
+                  Updated <strong>{matchResult.updated}</strong> of{" "}
+                  {matchResult.attempted}
+                  {matchResult.errors && matchResult.errors.length > 0 && (
+                    <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
+                      {matchResult.errors.slice(0, 5).map((e, i) => (
+                        <li key={i}>
+                          emp {e.employee_id}: {e.issue}
+                        </li>
+                      ))}
+                      {matchResult.errors.length > 5 && (
+                        <li>…and {matchResult.errors.length - 5} more</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setMatchDialogOpen(false)}
+                disabled={matchUpdating}
+              >
+                Close
+              </button>
+              {matchMode === "perfect" ? (
+                <button
+                  type="button"
+                  style={{
+                    ...styles.primaryButton,
+                    opacity:
+                      matchUpdating ||
+                      matchRows.every((r) => !matchSelected[r.emp.employee_id])
+                        ? 0.6
+                        : 1,
+                    cursor: matchUpdating ? "wait" : "pointer",
+                  }}
+                  onClick={handleMatchUpdate}
+                  disabled={
+                    matchUpdating ||
+                    matchRows.every((r) => !matchSelected[r.emp.employee_id])
+                  }
+                >
+                  {matchUpdating ? "Updating…" : "Update"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  style={{
+                    ...styles.primaryButton,
+                    opacity:
+                      matchUpdating ||
+                      !selectedManualEmp ||
+                      !manualSelectedKeyName
+                        ? 0.6
+                        : 1,
+                    cursor: matchUpdating ? "wait" : "pointer",
+                  }}
+                  onClick={handleManualUpdate}
+                  disabled={
+                    matchUpdating ||
+                    !selectedManualEmp ||
+                    !manualSelectedKeyName
+                  }
+                >
+                  {matchUpdating ? "Updating…" : "Update"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {duplicateDialogFor && (
         <div
           style={styles.modalBackdrop}
@@ -1008,7 +1831,7 @@ const Employees = () => {
             <div style={styles.modalBody}>
               <input
                 type="search"
-                placeholder="Search by name, mic_nmbr, ID…"
+                placeholder="Search by name, ID…"
                 style={styles.searchInput}
                 value={duplicateSearch}
                 onChange={(ev) => setDuplicateSearch(ev.target.value)}
@@ -1021,7 +1844,7 @@ const Employees = () => {
                     (e) =>
                       e.employee_id !== duplicateDialogFor.employee_id &&
                       (!q ||
-                        [e.name, e.mic_nmbr, e.ID_nmbr]
+                        [e.name, e.ID_nmbr]
                           .filter(Boolean)
                           .join(" ")
                           .toLowerCase()
@@ -1049,7 +1872,6 @@ const Employees = () => {
                       onClick={() => handleMarkDuplicate(e)}
                     >
                       <strong>{e.name || "(no name)"}</strong>
-                      {e.mic_nmbr ? ` — mic ${e.mic_nmbr}` : ""}
                       {e.ID_nmbr ? ` — id ${e.ID_nmbr}` : ""}
                     </button>
                   ));

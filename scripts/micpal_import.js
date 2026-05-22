@@ -11,13 +11,9 @@
 //
 // Mapping per row:
 //   rest      = chosen restaurant value (Mongo ObjectId-style string)
-//   mic_nmbr  = column "מספר עובד"
 //   name      = column "שם פרטי" + " " + column "שם משפחה"
 //   ID_nmbr   = column "מספר זהות"  (also accepts "תעודת זהות" / 'ת"ז' / "תז")
 //   t101      = TRUE
-//
-// Inserts use ON DUPLICATE KEY UPDATE on (rest, mic_nmbr) — re-running
-// refreshes name/ID_nmbr/t101 for the same employee number.
 
 import dotenv from "dotenv";
 import path from "path";
@@ -36,7 +32,6 @@ dotenv.config({ path: path.join(repoRoot, ".env") });
 const INPUT_DIR = process.argv[2] || "/home/moti/alegro/micpal";
 
 const NAME_COL_LABELS = {
-  mic: ["מספר עובד"],
   first: ["שם פרטי"],
   last: ["שם משפחה"],
   id: ["מספר זהות", "תעודת זהות", "ת.ז.", 'ת"ז', "תז"],
@@ -55,7 +50,8 @@ function findCandidates(filename) {
   const seen = new Set();
   for (const group of RESTAURANT_GROUPS) {
     const groupNorm = normHeb(group.label);
-    const groupHit = stripped.includes(groupNorm) || groupNorm.includes(stripped);
+    const groupHit =
+      stripped.includes(groupNorm) || groupNorm.includes(stripped);
     for (const r of group.items) {
       const labelNorm = normHeb(r.label);
       const labelHit =
@@ -126,7 +122,8 @@ function getCellString(cell) {
   if (v == null) return "";
   if (typeof v === "object") {
     if (v.text != null) return String(v.text);
-    if (Array.isArray(v.richText)) return v.richText.map((t) => t.text).join("");
+    if (Array.isArray(v.richText))
+      return v.richText.map((t) => t.text).join("");
     if (v.result != null) return String(v.result);
     return "";
   }
@@ -156,25 +153,16 @@ async function importFile(pool, filepath, restValue) {
       skipped++;
       continue;
     }
-    const mic = cols.mic
-      ? getCellString(row.getCell(cols.mic)).trim() || null
-      : null;
     const idn = cols.id
       ? getCellString(row.getCell(cols.id)).trim() || null
       : null;
     try {
       const [result] = await pool.execute(
-        `INSERT INTO employees (rest, mic_nmbr, name, ID_nmbr, t101, roles)
-         VALUES (?, ?, ?, ?, 1, JSON_ARRAY())
-         ON DUPLICATE KEY UPDATE
-           name = VALUES(name),
-           ID_nmbr = VALUES(ID_nmbr),
-           t101 = 1`,
-        [restValue, mic, name, idn],
+        `INSERT INTO employees (rest, name, ID_nmbr, t101, roles)
+         VALUES (?, ?, ?, 1, JSON_ARRAY())`,
+        [restValue, name, idn],
       );
-      // affectedRows: 1 = inserted, 2 = updated, 0 = identical existing row
       if (result.affectedRows === 1) inserted++;
-      else if (result.affectedRows >= 2) updated++;
       else skipped++;
     } catch (e) {
       console.log(`    row ${r} (${name}): ${e.message}`);

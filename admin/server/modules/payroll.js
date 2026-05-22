@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { createRequire } from "module";
-import { executeSql } from "../sources/dbpool.js";
+import { executeSql, getDbPool } from "../sources/dbpool.js";
 
 const require = createRequire(import.meta.url);
 const {
@@ -19,35 +19,44 @@ const upload = multer({
 
 const parseUpload = upload.array("files");
 
+// Build the set of identity keys for a single employee record. A row is
+// considered "the same employee" if any of its keys intersects another's.
+// Both an ID-based key and a name-based key are emitted when available, so
+// that a DB row stored only by name still matches an xlsx row that now has
+// an ID (and vice versa).
+const matchKeysOf = (e) => {
+  const out = new Set();
+  const idn = String(e.ID_nmbr == null ? "" : e.ID_nmbr).trim();
+  const nm = String(e.name == null ? "" : e.name)
+    .trim()
+    .replace(/\s+/g, " ");
+  if (idn) out.add(`id:${idn}`);
+  if (nm) out.add(`name:${nm}`);
+  return out;
+};
+
+// Back-compat single-key helper for callers that just need any one key.
 const matchKey = (e) => {
-  if (e.mic_nmbr) return `mic:${String(e.mic_nmbr).trim()}`;
-  if (e.ID_nmbr) return `id:${String(e.ID_nmbr).trim()}`;
-  return `name:${String(e.name || "").trim()}`;
+  const keys = matchKeysOf(e);
+  return keys.values().next().value || `name:`;
 };
 
 async function fetchExistingKeys(rest) {
   if (!rest) return new Set();
   const [rows] = await executeSql(
-    "SELECT mic_nmbr, ID_nmbr, name FROM employees WHERE rest = :rest",
+    "SELECT ID_nmbr, name FROM employees WHERE rest = :rest",
     { rest },
   );
   const set = new Set();
   for (const r of rows || []) {
-    set.add(
-      matchKey({ mic_nmbr: r.mic_nmbr, ID_nmbr: r.ID_nmbr, name: r.name }),
-    );
+    for (const k of matchKeysOf({ ID_nmbr: r.ID_nmbr, name: r.name })) {
+      set.add(k);
+    }
   }
   return set;
 }
 
 async function resolveEmployeeId(rest, emp) {
-  if (emp.mic_nmbr) {
-    const [rows] = await executeSql(
-      "SELECT employee_id FROM employees WHERE rest = :rest AND mic_nmbr = :mic LIMIT 1",
-      { rest, mic: String(emp.mic_nmbr).trim() },
-    );
-    if (rows && rows[0]) return rows[0].employee_id;
-  }
   if (emp.ID_nmbr) {
     const [rows] = await executeSql(
       "SELECT employee_id FROM employees WHERE rest = :rest AND ID_nmbr = :id LIMIT 1",
@@ -95,11 +104,15 @@ const Router = () => {
           await extractEmployees(items);
 
         const existingKeys = await fetchExistingKeys(rest);
-        const newOnly = employees.filter((e) => !existingKeys.has(matchKey(e)));
+        const newOnly = employees.filter((e) => {
+          for (const k of matchKeysOf(e)) {
+            if (existingKeys.has(k)) return false;
+          }
+          return true;
+        });
 
         const newRows = newOnly.map((e) => ({
           rest,
-          mic_nmbr: e.mic_nmbr,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
           roles: e.roles,
@@ -108,7 +121,6 @@ const Router = () => {
 
         const allRows = employees.map((e) => ({
           rest,
-          mic_nmbr: e.mic_nmbr,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
           roles: e.roles,
@@ -182,13 +194,13 @@ const Router = () => {
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
         try {
           await executeSql(
-            `INSERT INTO employees (rest, mic_nmbr, name, ID_nmbr, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
-             VALUES (:rest, :mic_nmbr, :name, :ID_nmbr, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
+            `INSERT INTO employees (rest, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
+             VALUES (:rest, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
             {
               rest,
-              mic_nmbr: emp.mic_nmbr || null,
               name,
               ID_nmbr: emp.ID_nmbr || null,
+              phone: emp.phone ? String(emp.phone).trim() || null : null,
               roles: rolesJson,
               t101: emp.t101 ? 1 : 0,
               gbl: globalVal,
@@ -222,8 +234,8 @@ const Router = () => {
       const scope = String(req.body?.scope || "").trim();
       const sql =
         scope === "all"
-          ? "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
-          : "SELECT employee_id, mic_nmbr, ID_nmbr, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
+          ? "SELECT employee_id, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
+          : "SELECT employee_id, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
       const [rows] = await executeSql(sql, { rest });
       const out = [];
       for (const r of rows || []) {
@@ -238,8 +250,8 @@ const Router = () => {
         const asDecimalString = (v) => (v == null ? null : String(v));
         const entry = {
           employee_id: r.employee_id,
-          mic_nmbr: r.mic_nmbr,
           ID_nmbr: r.ID_nmbr,
+          phone: r.phone || null,
           name: r.name,
           roles: Array.isArray(roles) ? roles : [],
           global: asDecimalString(r.global),
@@ -361,6 +373,359 @@ const Router = () => {
     }
   });
 
+  // Parse a Tabit-style employee xlsx and return the entries. No DB writes —
+  // used by the wizard's "Employee data" step which attaches phones to the
+  // in-memory new-employee list before commit.
+  const parseEmpXlsx = upload.single("file");
+  router.post("/employees/parse-phone-xlsx", (req, res) => {
+    parseEmpXlsx(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res
+          .status(400)
+          .json({ error: uploadErr.message || "upload failed" });
+      }
+      try {
+        const f = req.file;
+        if (!f || !f.buffer) {
+          return res.status(400).json({ error: "no file uploaded" });
+        }
+        if (!/\.xlsx$/i.test(f.originalname || "")) {
+          return res.status(400).json({ error: "expected an .xlsx file" });
+        }
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(f.buffer);
+        const sheet = wb.worksheets[0];
+        if (!sheet || sheet.rowCount < 2) {
+          return res.status(400).json({ error: "empty workbook" });
+        }
+        const HEADERS = {
+          username: ["שם משתמש"],
+          active: ["פעיל"],
+          name: ["שם פרטי", "שם מלא"],
+          family: ["שם משפחה"],
+          phone: ["טלפון נייד", "טלפון", "נייד", "פלאפון", "מספר טלפון"],
+          id: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+        };
+        const norm = (s) => String(s == null ? "" : s).trim();
+        const cellText = (c) => {
+          if (c == null) return "";
+          const v = c.value;
+          if (v == null) return "";
+          if (typeof v === "object") {
+            if (typeof v.text === "string") return v.text;
+            if (v.richText) return v.richText.map((p) => p.text || "").join("");
+            if (v.result != null) return String(v.result);
+          }
+          return String(v);
+        };
+        const scoreHeaderRow = (rowIdx) => {
+          let hits = 0;
+          sheet.getRow(rowIdx).eachCell({ includeEmpty: false }, (cell) => {
+            const t = norm(cellText(cell));
+            for (const labels of Object.values(HEADERS)) {
+              if (labels.some((l) => t === l)) hits += 1;
+            }
+          });
+          return hits;
+        };
+        let headerRowIdx = 1;
+        let best = 0;
+        for (let r = 1; r <= Math.min(sheet.rowCount, 15); r++) {
+          const h = scoreHeaderRow(r);
+          if (h > best) {
+            best = h;
+            headerRowIdx = r;
+          }
+        }
+        const cols = {};
+        sheet
+          .getRow(headerRowIdx)
+          .eachCell({ includeEmpty: false }, (cell, col) => {
+            const t = norm(cellText(cell));
+            for (const [key, labels] of Object.entries(HEADERS)) {
+              if (cols[key]) continue;
+              if (labels.some((l) => t === l || t.includes(l))) cols[key] = col;
+            }
+          });
+        if (!cols.phone) {
+          return res.status(400).json({
+            error: "no phone column found (טלפון נייד / טלפון / נייד)",
+          });
+        }
+        const cleanPhone = (s) => norm(s).replace(/[^\d+]/g, "");
+        const entries = [];
+        for (let r = headerRowIdx + 1; r <= sheet.rowCount; r++) {
+          const row = sheet.getRow(r);
+          const activeRaw = cols.active
+            ? norm(cellText(row.getCell(cols.active)))
+            : "";
+          const phone = cleanPhone(cellText(row.getCell(cols.phone)));
+          if (!phone) continue;
+          const first = cols.name ? norm(cellText(row.getCell(cols.name))) : "";
+          const family = cols.family
+            ? norm(cellText(row.getCell(cols.family)))
+            : "";
+          const ID_nmbr = cols.id ? norm(cellText(row.getCell(cols.id))) : "";
+          entries.push({
+            name: first,
+            family,
+            phone,
+            ID_nmbr: ID_nmbr || null,
+            active: !activeRaw || activeRaw === "פעיל",
+          });
+        }
+        res.json({
+          file: f.originalname,
+          headerRow: headerRowIdx,
+          entries,
+          scannedRows: sheet.rowCount - headerRowIdx,
+        });
+      } catch (err) {
+        console.error("payroll/employees/parse-phone-xlsx error:", err);
+        res.status(500).json({ error: err.message || "parse failed" });
+      }
+    });
+  });
+
+  const parseAttachPhones = upload.single("file");
+  router.post("/employees/attach-phones", (req, res) => {
+    parseAttachPhones(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res
+          .status(400)
+          .json({ error: uploadErr.message || "upload failed" });
+      }
+      try {
+        const rest = String(req.body?.rest || "").trim();
+        if (!rest) return res.status(400).json({ error: "missing rest" });
+        const f = req.file;
+        if (!f || !f.buffer) {
+          return res.status(400).json({ error: "no file uploaded" });
+        }
+        if (!/\.xlsx$/i.test(f.originalname || "")) {
+          return res.status(400).json({ error: "expected an .xlsx file" });
+        }
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(f.buffer);
+        const sheet = wb.worksheets[0];
+        if (!sheet || sheet.rowCount < 2) {
+          return res.status(400).json({ error: "empty workbook" });
+        }
+
+        // Matches the Tabit-style "רשימת עובדים" export: a title row at the
+        // top, an empty row, then the real header row (typically row 4) with
+        // columns: שם משתמש, קבוצה, פעיל, שם פרטי, שם משפחה, טלפון נייד, …
+        const HEADERS = {
+          username: ["שם משתמש"],
+          active: ["פעיל"],
+          name: ["שם פרטי", "שם מלא"],
+          family: ["שם משפחה"],
+          phone: ["טלפון נייד", "טלפון", "נייד", "פלאפון", "מספר טלפון"],
+          id: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+        };
+        const norm = (s) => String(s == null ? "" : s).trim();
+        const cellText = (c) => {
+          if (c == null) return "";
+          const v = c.value;
+          if (v == null) return "";
+          if (typeof v === "object") {
+            if (typeof v.text === "string") return v.text;
+            if (v.richText) return v.richText.map((p) => p.text || "").join("");
+            if (v.result != null) return String(v.result);
+          }
+          return String(v);
+        };
+
+        // Find the header row: first row in the top 15 that contains either
+        // "שם פרטי" or "טלפון נייד" exactly.
+        const scoreHeaderRow = (rowIdx) => {
+          let hits = 0;
+          sheet.getRow(rowIdx).eachCell({ includeEmpty: false }, (cell) => {
+            const t = norm(cellText(cell));
+            for (const labels of Object.values(HEADERS)) {
+              if (labels.some((l) => t === l)) hits += 1;
+            }
+          });
+          return hits;
+        };
+        let headerRowIdx = 1;
+        let best = 0;
+        for (let r = 1; r <= Math.min(sheet.rowCount, 15); r++) {
+          const h = scoreHeaderRow(r);
+          if (h > best) {
+            best = h;
+            headerRowIdx = r;
+          }
+        }
+        const cols = {};
+        sheet
+          .getRow(headerRowIdx)
+          .eachCell({ includeEmpty: false }, (cell, col) => {
+            const t = norm(cellText(cell));
+            for (const [key, labels] of Object.entries(HEADERS)) {
+              if (cols[key]) continue;
+              if (labels.some((l) => t === l || t.includes(l))) cols[key] = col;
+            }
+          });
+        if (!cols.phone) {
+          return res.status(400).json({
+            error: "no phone column found (טלפון נייד / טלפון / נייד)",
+          });
+        }
+        if (!cols.name && !cols.id) {
+          return res.status(400).json({ error: "no name or ID column found" });
+        }
+
+        // Load this restaurant's employees once and build lookup maps.
+        const [empRows] = await executeSql(
+          "SELECT employee_id, name, ID_nmbr FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+          { rest },
+        );
+        const byId = new Map();
+        const byName = new Map();
+        for (const r of empRows || []) {
+          if (r.ID_nmbr) byId.set(String(r.ID_nmbr).trim(), r.employee_id);
+          if (r.name)
+            byName.set(
+              String(r.name).trim().replace(/\s+/g, " "),
+              r.employee_id,
+            );
+        }
+
+        // Strip non-digits from phone (Tabit exports often have spaces/dashes).
+        const cleanPhone = (s) => norm(s).replace(/[^\d+]/g, "");
+
+        let updated = 0;
+        let unmatched = 0;
+        let skipped = 0;
+        const errors = [];
+        const unmatchedNames = [];
+        for (let r = headerRowIdx + 1; r <= sheet.rowCount; r++) {
+          const row = sheet.getRow(r);
+          // Skip rows that aren't real records — e.g. the active column says
+          // anything other than "פעיל" (active). Inactive employees in Tabit
+          // shouldn't have their phone written into our employees table.
+          if (cols.active) {
+            const a = norm(cellText(row.getCell(cols.active)));
+            if (a && a !== "פעיל") {
+              skipped += 1;
+              continue;
+            }
+          }
+          const phone = cleanPhone(cellText(row.getCell(cols.phone)));
+          if (!phone) {
+            skipped += 1;
+            continue;
+          }
+          let employee_id = null;
+          if (cols.id) {
+            const idn = norm(cellText(row.getCell(cols.id)));
+            if (idn && byId.has(idn)) employee_id = byId.get(idn);
+          }
+          if (!employee_id && (cols.name || cols.family)) {
+            const first = cols.name
+              ? norm(cellText(row.getCell(cols.name)))
+              : "";
+            const fam = cols.family
+              ? norm(cellText(row.getCell(cols.family)))
+              : "";
+            for (const candidate of [
+              `${first} ${fam}`,
+              `${fam} ${first}`,
+              first,
+              fam,
+            ]) {
+              const key = candidate.trim().replace(/\s+/g, " ");
+              if (key && byName.has(key)) {
+                employee_id = byName.get(key);
+                break;
+              }
+            }
+            if (!employee_id) {
+              unmatchedNames.push(`${first} ${fam}`.trim());
+            }
+          }
+          if (!employee_id) {
+            unmatched += 1;
+            continue;
+          }
+          try {
+            const [result] = await executeSql(
+              "UPDATE employees SET phone = :phone WHERE employee_id = :id",
+              { id: employee_id, phone },
+            );
+            if (result && result.affectedRows >= 1) updated += 1;
+          } catch (e) {
+            errors.push({ row: r, employee_id, issue: e.message });
+          }
+        }
+
+        res.json({
+          file: f.originalname,
+          updated,
+          unmatched,
+          skipped,
+          unmatchedNames,
+          errors,
+          headerRow: headerRowIdx,
+          scannedRows: sheet.rowCount - headerRowIdx,
+        });
+      } catch (err) {
+        console.error("payroll/employees/attach-phones error:", err);
+        res.status(500).json({ error: err.message || "attach failed" });
+      }
+    });
+  });
+
+  router.post("/micpal/list", async (_req, res) => {
+    try {
+      const [rows] = await executeSql(
+        "SELECT keyName, name, family, ID_nmbr FROM micpal",
+        {},
+      );
+      res.json({ rows: rows || [] });
+    } catch (err) {
+      console.error("payroll/micpal/list error:", err);
+      res.status(500).json({ error: err.message || "micpal list failed" });
+    }
+  });
+
+  router.post("/employees/set-id-nmbr", async (req, res) => {
+    try {
+      const list = Array.isArray(req.body?.updates) ? req.body.updates : [];
+      if (list.length === 0) {
+        return res.status(400).json({ error: "no updates in body" });
+      }
+      let updated = 0;
+      const errors = [];
+      for (const u of list) {
+        const id = Number(u.employee_id);
+        const idNmbr = String(u.ID_nmbr || "").trim();
+        if (!Number.isFinite(id) || !idNmbr) {
+          errors.push({
+            employee_id: u.employee_id,
+            issue: "missing employee_id or ID_nmbr",
+          });
+          continue;
+        }
+        try {
+          const [result] = await executeSql(
+            "UPDATE employees SET ID_nmbr = :idNmbr WHERE employee_id = :id",
+            { id, idNmbr },
+          );
+          if (result && result.affectedRows >= 1) updated += 1;
+          else errors.push({ employee_id: id, issue: "no row updated" });
+        } catch (e) {
+          errors.push({ employee_id: id, issue: e.message || "update failed" });
+        }
+      }
+      res.json({ updated, attempted: list.length, errors });
+    } catch (err) {
+      console.error("payroll/employees/set-id-nmbr error:", err);
+      res.status(500).json({ error: err.message || "update failed" });
+    }
+  });
+
   router.post("/employees/deactivate", async (req, res) => {
     try {
       const id = Number(req.body?.employee_id);
@@ -379,6 +744,130 @@ const Router = () => {
       console.error("payroll/employees/deactivate error:", err);
       res.status(500).json({ error: err.message || "deactivate failed" });
     }
+  });
+
+  // Sync the `micpal` table from a Micpal xlsx export uploaded by the
+  // user via a file picker in the Employees page.
+  const parseMicpalUpload = upload.single("file");
+  router.post("/micpal/sync", (req, res) => {
+    parseMicpalUpload(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res
+          .status(400)
+          .json({ error: uploadErr.message || "upload failed" });
+      }
+      try {
+        const f = req.file;
+        if (!f || !f.buffer) {
+          return res.status(400).json({ error: "no file uploaded" });
+        }
+        if (!/\.xlsx$/i.test(f.originalname || "")) {
+          return res.status(400).json({ error: "expected an .xlsx file" });
+        }
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(f.buffer);
+        const sheet = wb.worksheets[0];
+        if (!sheet || sheet.rowCount < 2) {
+          return res.status(400).json({ error: "empty workbook" });
+        }
+
+        // Map headers (Hebrew) -> our column names.
+        const HEADERS = {
+          keyName: ["מספר עובד"],
+          name: ["שם פרטי"],
+          family: ["שם משפחה"],
+          ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+        };
+        const norm = (s) => String(s == null ? "" : s).trim();
+        const cellText = (c) => {
+          if (c == null) return "";
+          const v = c.value;
+          if (v == null) return "";
+          if (typeof v === "object") {
+            if (typeof v.text === "string") return v.text;
+            if (v.richText) return v.richText.map((p) => p.text || "").join("");
+            if (v.result != null) return String(v.result);
+          }
+          return String(v);
+        };
+        const cols = {};
+        const header = sheet.getRow(1);
+        header.eachCell({ includeEmpty: false }, (cell, colNum) => {
+          const t = norm(cellText(cell));
+          for (const [key, labels] of Object.entries(HEADERS)) {
+            if (cols[key]) continue;
+            if (labels.some((l) => t === l || t.includes(l)))
+              cols[key] = colNum;
+          }
+        });
+        if (!cols.keyName) {
+          return res
+            .status(400)
+            .json({ error: 'header "מספר עובד" not found in row 1' });
+        }
+
+        let skipped = 0;
+        const items = [];
+        for (let r = 2; r <= sheet.rowCount; r++) {
+          const row = sheet.getRow(r);
+          const keyName = norm(cellText(row.getCell(cols.keyName)));
+          if (!keyName) {
+            skipped += 1;
+            continue;
+          }
+          items.push([
+            keyName,
+            cols.name ? norm(cellText(row.getCell(cols.name))) || null : null,
+            cols.family
+              ? norm(cellText(row.getCell(cols.family))) || null
+              : null,
+            cols.ID_nmbr
+              ? norm(cellText(row.getCell(cols.ID_nmbr))) || null
+              : null,
+          ]);
+        }
+
+        // One INSERT per ~2000 rows — handful of statements at most, stays
+        // safely under MySQL's max_allowed_packet (default 64MB).
+        let upserted = 0;
+        const errors = [];
+        const CHUNK = 2000;
+        const pool = getDbPool();
+        for (let i = 0; i < items.length; i += CHUNK) {
+          const chunk = items.slice(i, i + CHUNK);
+          const placeholders = chunk.map(() => "(?,?,?,?)").join(",");
+          try {
+            await pool.query(
+              `INSERT INTO micpal (keyName, name, family, ID_nmbr)
+               VALUES ${placeholders}
+               ON DUPLICATE KEY UPDATE
+                 name = VALUES(name),
+                 family = VALUES(family),
+                 ID_nmbr = VALUES(ID_nmbr)`,
+              chunk.flat(),
+            );
+            upserted += chunk.length;
+          } catch (e) {
+            errors.push({
+              chunkStart: i,
+              chunkSize: chunk.length,
+              issue: e.message || "bulk upsert failed",
+            });
+          }
+        }
+
+        res.json({
+          file: f.originalname,
+          upserted,
+          skipped,
+          errors,
+          scannedRows: sheet.rowCount - 1,
+        });
+      } catch (err) {
+        console.error("payroll/micpal/sync error:", err);
+        res.status(500).json({ error: err.message || "micpal sync failed" });
+      }
+    });
   });
 
   router.post("/payrolls", async (req, res) => {
@@ -413,7 +902,7 @@ const Router = () => {
 
       const [rows] = await executeSql(
         `SELECT p.employee_id, p.payroll_data,
-                e.mic_nmbr, e.ID_nmbr, e.name
+                e.ID_nmbr, e.name
            FROM payroll p
            JOIN employees e ON e.employee_id = p.employee_id
           WHERE p.rest = :rest AND p.month = :month`,
@@ -433,7 +922,6 @@ const Router = () => {
           raw && typeof raw === "object" && "payroll_data" in raw;
         const pd = hasWrapper ? raw.payroll_data || {} : raw || {};
         return {
-          mic_nmbr: r.mic_nmbr,
           ID_nmbr: r.ID_nmbr,
           name: r.name,
           payroll_data: pd,
@@ -482,7 +970,6 @@ const Router = () => {
         if (!employee_id) {
           unresolved.push({
             name: emp.name,
-            mic_nmbr: emp.mic_nmbr,
             ID_nmbr: emp.ID_nmbr,
           });
           continue;
@@ -664,9 +1151,7 @@ const Router = () => {
           .map((s) => String(s || "").trim())
           .filter(Boolean),
       );
-      const isFlagged = (emp) =>
-        flagged.has(String(emp.name || "").trim()) ||
-        (emp.mic_nmbr && flagged.has(String(emp.mic_nmbr).trim()));
+      const isFlagged = (emp) => flagged.has(String(emp.name || "").trim());
 
       const wb = new ExcelJS.Workbook();
       wb.creator = "allegro-payroll";
@@ -676,7 +1161,6 @@ const Router = () => {
       });
       ws.columns = [
         { header: "שם", key: "name", width: 22 },
-        { header: "מספר עובד", key: "mic", width: 12 },
         { header: "תפקיד", key: "role", width: 14 },
         { header: "שכר שעתי", key: "rate", width: 12 },
         { header: "ימי עבודה", key: "workdays", width: 10 },
@@ -700,9 +1184,9 @@ const Router = () => {
       //     (F + G*1.25 + H*1.5) * D
       // Manual completion (L) and travel (M) are displayed but never summed.
       const totalFormula = (r) =>
-        `IFERROR(IF(OR(IFERROR(J${r},0)>0,IFERROR(K${r},0)>0),` +
-        `IF(ISNUMBER(J${r}),J${r},0)+IF(ISNUMBER(K${r}),K${r},0),` +
-        `(IF(ISNUMBER(F${r}),F${r},0)+IF(ISNUMBER(G${r}),G${r},0)*1.25+IF(ISNUMBER(H${r}),H${r},0)*1.5)*IF(ISNUMBER(D${r}),D${r},0)),0)`;
+        `IFERROR(IF(OR(IFERROR(I${r},0)>0,IFERROR(J${r},0)>0),` +
+        `IF(ISNUMBER(I${r}),I${r},0)+IF(ISNUMBER(J${r}),J${r},0),` +
+        `(IF(ISNUMBER(E${r}),E${r},0)+IF(ISNUMBER(F${r}),F${r},0)*1.25+IF(ISNUMBER(G${r}),G${r},0)*1.5)*IF(ISNUMBER(C${r}),C${r},0)),0)`;
 
       const MIN_HOURLY_WAGE = 34.42;
       const wageTypeLabel = (t) =>
@@ -833,7 +1317,6 @@ const Router = () => {
 
           const added = ws.addRow({
             name: isFirst ? emp.name || "" : "",
-            mic: isFirst ? emp.mic_nmbr || "" : "",
             role: r.role || "",
             rate: r.wage,
             workdays: isFirst ? (emp.workdays ?? null) : null,

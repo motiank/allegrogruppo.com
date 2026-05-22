@@ -1841,7 +1841,6 @@ async function extractEmployees(items, configMap = {}) {
     }
     return {
       name: emp.name,
-      mic_nmbr: emp.employeeNumber || null,
       ID_nmbr: emp.idNumber || null,
       roles: Array.from(new Set([...emp.rolesData.keys()])).filter(
         (r) => r && r !== "כללי",

@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS employees (
   employee_id   INT NOT NULL AUTO_INCREMENT,
   rest          VARCHAR(64)  NOT NULL,
-  mic_nmbr      VARCHAR(32)  NULL,
   name          VARCHAR(128) NOT NULL,
   ID_nmbr       VARCHAR(32)  NULL,
   roles         JSON         NULL,
@@ -12,7 +11,6 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (employee_id),
-  UNIQUE KEY uniq_rest_mic (rest, mic_nmbr),
   KEY idx_rest (rest),
   KEY idx_id_nmbr (ID_nmbr)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -49,5 +47,25 @@ ALTER TABLE employees
   ADD COLUMN duplicate INT NULL AFTER active,
   ADD KEY idx_duplicate (duplicate);
 
+ALTER TABLE employees
+  DROP INDEX uniq_rest_mic,
+  DROP COLUMN mic_nmbr;
 
-delete from employees where rest = '65bb40ae6729db482e2ed6f2';
+ALTER TABLE employees
+  ADD COLUMN phone VARCHAR(32) NULL AFTER ID_nmbr;
+
+CREATE TABLE IF NOT EXISTS micpal (
+  keyName   VARCHAR(64)  NOT NULL,
+  name      VARCHAR(128) NULL,
+  family    VARCHAR(128) NULL,
+  ID_nmbr   VARCHAR(32)  NULL,
+  updated_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (keyName),
+  KEY idx_id_nmbr (ID_nmbr)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+delete from employees where rest = '5ff419934676f0fddabaef3a';
+
+
+5ff419934676f0fddabaef3a
