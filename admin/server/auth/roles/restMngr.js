@@ -26,6 +26,7 @@ const restrictRestaurant = async (req, res, next) => {
       .status(403)
       .json({ error: "no restaurants assigned to this user" });
   }
+  if (allowed.includes("*")) return next();
   const requested =
     (req.body && typeof req.body.rest === "string" && req.body.rest.trim()) ||
     (req.query &&

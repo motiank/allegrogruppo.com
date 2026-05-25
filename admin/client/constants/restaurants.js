@@ -47,6 +47,7 @@ export const findRestaurantLabel = (value) => {
 
 export const filterRestaurantGroups = (allowed) => {
   if (!Array.isArray(allowed) || allowed.length === 0) return RESTAURANT_GROUPS;
+  if (allowed.includes("*")) return RESTAURANT_GROUPS;
   const set = new Set(allowed);
   return RESTAURANT_GROUPS.map((group) => ({
     ...group,

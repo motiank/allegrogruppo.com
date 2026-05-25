@@ -17,5 +17,15 @@
     "role": "restMngr",
     "restaurants": ["5ff419934676f0fddabaef3a"],
     "status": "active"
+  },
+  {
+    "user_id": 3,
+    "id": 3,
+    "email": "moria",
+    "password": "moremix",
+    "authKey": "f7e48cc46d691c91da5076b43386c14e",
+    "role": "restMngr",
+    "restaurants": ["*"],
+    "status": "active"
   }
 ]
