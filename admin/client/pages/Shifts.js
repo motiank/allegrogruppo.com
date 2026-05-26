@@ -200,6 +200,12 @@ const Shifts = () => {
     setEmpDataFiles((prev) => prev.filter((f) => f.key !== key));
   };
 
+  useEffect(() => {
+    if (empDataFiles.length > 0 && !empDataUploading && selectedRestaurant) {
+      runEmpDataAttach();
+    }
+  }, [empDataFiles]);
+
   const runEmpDataAttach = async () => {
     if (empDataUploading) return;
     if (!selectedRestaurant) {
@@ -211,34 +217,8 @@ const Shifts = () => {
     setEmpDataError(null);
     setEmpDataResults([]);
 
-    // Normalize name for matching. Use explicit \uXXXX escapes so a code
-    // formatter can't silently flip these into other glyphs.
-    //   - strip Unicode bidi/format/zero-width controls:
-    //     200B-200F, 202A-202E, 2066-2069, FEFF.
-    //   - strip the geresh / apostrophe family (Hebrew geresh 05F3,
-    //     ASCII ' 0027, curly ' ' 2018 2019, low/high single 201A 201B,
-    //     backtick 0060, acute 00B4, prime 02B9, modifier letter apostrophe
-    //     family 02BB-02BF) — Tabit may keep e.g. "ג׳סיקה" while the shift
-    //     sheet writes it without the geresh.
-    //   - lowercase + collapse whitespace.
-    const BIDI_CTRL_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
-    const APOSTROPHE_RE = /[׳'‘’‚‛`´ʹʻ-ʿ]/g;
-    const stripGereshAndCtrl = (s) =>
-      String(s == null ? "" : s)
-        .replace(BIDI_CTRL_RE, "")
-        .replace(APOSTROPHE_RE, "");
-    const normName = (s) =>
-      stripGereshAndCtrl(s)
-        .normalize("NFC")
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, " ");
-
-    // Build a phone map keyed by exactly "שם פרטי + ' ' + שם משפחה" (in that
-    // order, whitespace-normalized). The shift's `emp.name` is compared
-    // against the same normalized form.
     const fileResults = [];
-    const phoneByFullName = new Map();
+    const phoneByName = new Map();
     try {
       for (const { file } of empDataFiles) {
         const fd = new FormData();
@@ -261,12 +241,15 @@ const Shifts = () => {
               dropped += 1;
               continue;
             }
-            const fullName = normName(`${e.name || ""} ${e.family || ""}`);
-            if (!fullName) {
+            const first = (e.name || "").trim();
+            const fam = (e.family || "").trim();
+            const full = `${first} ${fam}`.trim();
+            if (!full) {
               dropped += 1;
               continue;
             }
-            phoneByFullName.set(fullName, e.phone);
+            phoneByName.set(full, e.phone);
+            if (first && fam) phoneByName.set(`${fam} ${first}`, e.phone);
             kept += 1;
           }
           fileResults.push({
@@ -284,23 +267,18 @@ const Shifts = () => {
         }
       }
 
-      const phoneFor = (emp) => {
-        const key = normName(emp.name);
-        if (key && phoneByFullName.has(key)) return phoneByFullName.get(key);
-        return null;
+      const phoneFor = (name) => {
+        const n = (name || "").trim();
+        return phoneByName.get(n) || null;
       };
 
-      // Do the matching outside React's state updaters so counters and
-      // sample arrays are populated synchronously (React 18 / StrictMode
-      // can otherwise call the updater twice or defer it, mangling the
-      // counters we read on the next line).
       let matchedNew = 0;
       let matchedExisting = 0;
       const unmatchedNew = [];
       const unmatchedExisting = [];
 
       const nextNewEmployees = newEmployees.map((e) => {
-        const p = phoneFor(e);
+        const p = phoneFor(e.name);
         if (p) {
           matchedNew += 1;
           return { ...e, phone: p };
@@ -309,7 +287,7 @@ const Shifts = () => {
         return e;
       });
       const nextAllEmployees = allEmployees.map((e) => {
-        const p = phoneFor(e);
+        const p = phoneFor(e.name);
         if (p) {
           matchedExisting += 1;
           return { ...e, phone: p };
@@ -320,6 +298,24 @@ const Shifts = () => {
 
       setNewEmployees(nextNewEmployees);
       setAllEmployees(nextAllEmployees);
+      setDiffSummary(null);
+      setDiffSummary(null);
+
+      // Also persist phones to DB directly for existing employees.
+      let dbUpdated = 0;
+      for (const { file } of empDataFiles) {
+        try {
+          const fd2 = new FormData();
+          fd2.append("rest", selectedRestaurant);
+          fd2.append("file", file, file.name);
+          const r2 = await axios.post(
+            "/admin/payroll/employees/attach-phones",
+            fd2,
+            { withCredentials: true },
+          );
+          dbUpdated += r2.data?.updated || 0;
+        } catch (_) {}
+      }
 
       setEmpDataResults([
         ...fileResults,
@@ -330,6 +326,7 @@ const Shifts = () => {
           matchedExisting,
           unmatchedNew,
           unmatchedExisting,
+          dbUpdated,
         },
       ]);
     } finally {
@@ -369,9 +366,9 @@ const Shifts = () => {
   }, [selectedRestaurant]);
 
   const employeesAllSaved =
-    saveResult &&
-    saveResult.attempted > 0 &&
-    saveResult.inserted === saveResult.attempted;
+    saveResult != null &&
+    (saveResult.inserted || 0) + (saveResult.updated || 0) ===
+      saveResult.attempted;
 
   const noNewEmployees = newEmployees && newEmployees.length === 0;
 
@@ -429,6 +426,7 @@ const Shifts = () => {
     setExceptions([]);
     setSaveResult(null);
     setSaveError(null);
+    setDiffSummary(null);
     setExtractError(null);
     setWageMap(new Map());
     setPayrollResult(null);
@@ -504,6 +502,7 @@ const Shifts = () => {
       setShiftIssuesAcknowledged(false);
       setSaveResult(null);
       setSaveError(null);
+      setDiffSummary(null);
       return true;
     } catch (err) {
       console.error("extract error:", err);
@@ -571,33 +570,101 @@ const Shifts = () => {
     });
   };
 
+  const [diffSummary, setDiffSummary] = useState(null);
+
+  const buildDiff = useCallback(async () => {
+    if (!selectedRestaurant) return [];
+    const dbRes = await axios.post(
+      "/admin/payroll/wages",
+      { rest: selectedRestaurant, scope: "all" },
+      { withCredentials: true },
+    );
+    const dbByName = new Map();
+    for (const e of dbRes.data?.employees || []) {
+      dbByName.set((e.name || "").trim(), e);
+    }
+
+    const inserts = [];
+    const updates = [];
+    let existing = 0;
+    const seen = new Set();
+
+    // allEmployees has shift data + phones (merged in Step 3)
+    for (const emp of [...newEmployees, ...allEmployees]) {
+      const name = (emp.name || "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      const db = dbByName.get(name);
+      if (!db) {
+        inserts.push({
+          rest: selectedRestaurant,
+          name,
+          ID_nmbr: emp.ID_nmbr || null,
+          phone: emp.phone || null,
+          roles: emp.roles || [],
+          global: emp.global,
+          hourly_wage: emp.hourly_wage,
+          wage_type: emp.wage_type,
+          travel: emp.travel,
+          contractor: !!emp.contractor,
+          t101: false,
+        });
+      } else {
+        const needsPhone = emp.phone && !db.phone;
+        const needsId = emp.ID_nmbr && !db.ID_nmbr;
+        if (needsPhone || needsId) {
+          updates.push({
+            rest: selectedRestaurant,
+            name,
+            ID_nmbr: emp.ID_nmbr || db.ID_nmbr || null,
+            phone: emp.phone || db.phone || null,
+          });
+        } else {
+          existing += 1;
+        }
+      }
+    }
+
+    const sample = [...newEmployees, ...allEmployees].slice(0, 3);
+    console.log("[buildDiff]", {
+      newEmp: newEmployees.length,
+      allEmp: allEmployees.length,
+      dbEmp: dbByName.size,
+      samplePhones: sample.map((e) => ({ name: e.name, phone: e.phone })),
+      inserts: inserts.length,
+      updates: updates.length,
+      existing,
+    });
+    setDiffSummary({
+      inserts: inserts.length,
+      updates: updates.length,
+      existing,
+    });
+    return [...inserts, ...updates];
+  }, [selectedRestaurant, newEmployees, allEmployees]);
+
+  // Auto-run diff when entering Step 4 or when allEmployees changes (e.g. phones merged)
+  useEffect(() => {
+    if (step === 4 && allEmployees.length > 0 && !saveResult) {
+      buildDiff().catch((err) => console.error("auto-diff error:", err));
+    }
+  }, [step, allEmployees, saveResult, buildDiff]);
+
   const handleSaveEmployees = async () => {
     if (saving) return;
-    if (noNewEmployees) {
-      setSaveResult({ inserted: 0, attempted: 0, errors: [] });
-      return;
-    }
     setSaving(true);
     setSaveError(null);
     try {
-      const payload = {
-        employees: newEmployees.map((e) => ({
-          rest: selectedRestaurant,
-          name: e.name,
-          ID_nmbr: e.ID_nmbr,
-          phone: e.phone || null,
-          roles: e.roles,
-          global: e.global,
-          hourly_wage: e.hourly_wage,
-          wage_type: e.wage_type,
-          travel: e.travel,
-          contractor: !!e.contractor,
-          t101: false,
-        })),
-      };
-      const res = await axios.post("/admin/payroll/employees", payload, {
-        withCredentials: true,
-      });
+      const toUpsert = await buildDiff();
+      if (toUpsert.length === 0) {
+        setSaveResult({ inserted: 0, updated: 0, attempted: 0, errors: [] });
+        return;
+      }
+      const res = await axios.post(
+        "/admin/payroll/employees",
+        { employees: toUpsert },
+        { withCredentials: true },
+      );
       setSaveResult(res.data);
     } catch (err) {
       console.error("save error:", err);
@@ -982,10 +1049,11 @@ const Shifts = () => {
     if (step === 2) return files.length > 0;
     if (step === 3) return true; // Employee data — optional, can skip
     if (step === 4) {
-      // New employees step — shift issues must be acknowledged and any new
-      // employees must have been saved (or there were none to begin with).
       if (shiftIssues.length > 0 && !shiftIssuesAcknowledged) return false;
-      return employeesAllSaved || noNewEmployees;
+      if (employeesAllSaved) return true;
+      if (diffSummary && diffSummary.inserts === 0 && diffSummary.updates === 0)
+        return true;
+      return false;
     }
     return false;
   };
@@ -997,8 +1065,12 @@ const Shifts = () => {
       const ok = await runExtract();
       if (ok) setStep(3);
     } else if (step === 3) {
+      if (empDataFiles.length > 0 && empDataResults.length === 0) {
+        await runEmpDataAttach();
+      }
       setStep(4);
     } else if (step === 4) {
+      await handleSaveEmployees();
       await loadWages();
       setStep(5);
     }
@@ -1783,8 +1855,31 @@ const Shifts = () => {
         Restaurant:{" "}
         <strong style={{ color: theme.text }}>{selectedLabel}</strong>
         {" · "}
-        {noNewEmployees ? (
-          <span>No new employees.</span>
+        {diffSummary ? (
+          <span>
+            <strong style={{ color: theme.text }}>{diffSummary.inserts}</strong>{" "}
+            new ·{" "}
+            <strong style={{ color: theme.text }}>{diffSummary.updates}</strong>{" "}
+            to update ·{" "}
+            <strong style={{ color: theme.text }}>
+              {diffSummary.existing}
+            </strong>{" "}
+            unchanged
+          </span>
+        ) : noNewEmployees ? (
+          <span>
+            {allEmployees.length > 0 ? (
+              <>
+                <strong style={{ color: theme.text }}>
+                  {allEmployees.length}
+                </strong>{" "}
+                employee{allEmployees.length === 1 ? "" : "s"} — click Update to
+                compare with DB
+              </>
+            ) : (
+              "No employees."
+            )}
+          </span>
         ) : (
           <>
             <strong style={{ color: theme.text }}>{newEmployees.length}</strong>{" "}
@@ -1972,14 +2067,22 @@ const Shifts = () => {
             cursor: saving ? "wait" : "pointer",
           }}
           onClick={handleSaveEmployees}
-          disabled={saving || employeesAllSaved}
+          disabled={
+            saving ||
+            employeesAllSaved ||
+            (diffSummary &&
+              diffSummary.inserts === 0 &&
+              diffSummary.updates === 0)
+          }
         >
           {saving
             ? "Saving…"
-            : noNewEmployees
-              ? "Skip"
-              : employeesAllSaved
-                ? "Saved"
+            : employeesAllSaved
+              ? "Saved"
+              : diffSummary &&
+                  diffSummary.inserts === 0 &&
+                  diffSummary.updates === 0
+                ? "Nothing to update"
                 : "Update"}
         </button>
       </div>
@@ -1991,8 +2094,13 @@ const Shifts = () => {
       )}
       {saveResult && (
         <div style={{ ...styles.successBox, marginTop: "12px" }}>
-          Inserted <strong>{saveResult.inserted}</strong> of{" "}
-          {saveResult.attempted} employee
+          Inserted <strong>{saveResult.inserted || 0}</strong>
+          {saveResult.updated ? (
+            <>
+              , updated <strong>{saveResult.updated}</strong>
+            </>
+          ) : null}{" "}
+          of {saveResult.attempted} employee
           {saveResult.attempted === 1 ? "" : "s"}
           {saveResult.errors && saveResult.errors.length > 0 && (
             <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
@@ -2285,22 +2393,10 @@ const Shifts = () => {
           ))}
         </ul>
       )}
-      {empDataFiles.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            style={{
-              ...styles.primaryButton,
-              opacity: empDataUploading ? 0.6 : 1,
-              cursor: empDataUploading ? "wait" : "pointer",
-            }}
-            onClick={runEmpDataAttach}
-            disabled={empDataUploading}
-          >
-            {empDataUploading
-              ? `Attaching ${empDataFiles.length} file${empDataFiles.length === 1 ? "" : "s"}…`
-              : `Attach ${empDataFiles.length} file${empDataFiles.length === 1 ? "" : "s"}`}
-          </button>
+      {empDataUploading && (
+        <div style={{ marginTop: 12, color: theme.textSecondary }}>
+          Attaching {empDataFiles.length} file
+          {empDataFiles.length === 1 ? "" : "s"}…
         </div>
       )}
       {empDataError && (
@@ -2331,8 +2427,14 @@ const Shifts = () => {
                   Attached <strong>{r.matchedNew}</strong> phone
                   {r.matchedNew === 1 ? "" : "s"} to new employees ·{" "}
                   <strong>{r.matchedExisting}</strong> existing employee row
-                  {r.matchedExisting === 1 ? "" : "s"} matched (in-memory). New
-                  phones will be saved when you commit the next step.
+                  {r.matchedExisting === 1 ? "" : "s"} matched
+                  {r.dbUpdated > 0 && (
+                    <>
+                      {" "}
+                      · <strong>{r.dbUpdated}</strong> phone
+                      {r.dbUpdated === 1 ? "" : "s"} saved to DB
+                    </>
+                  )}
                   {r.unmatchedNew && r.unmatchedNew.length > 0 && (
                     <details style={{ marginTop: 6 }}>
                       <summary style={{ cursor: "pointer" }}>

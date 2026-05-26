@@ -27,5 +27,15 @@
     "role": "restMngr",
     "restaurants": ["*"],
     "status": "active"
+  },
+  {
+    "user_id": 4,
+    "id": 4,
+    "email": "matan",
+    "password": "mtnrch",
+    "authKey": "f0208f21d7045708a46626940ff4ee7d",
+    "role": "restMngr",
+    "restaurants": ["64be1926335ee46a739a1ba2"],
+    "status": "active"
   }
 ]

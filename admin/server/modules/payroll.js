@@ -19,6 +19,19 @@ const upload = multer({
 
 const parseUpload = upload.array("files");
 
+// Normalize a name for comparison: strip Hebrew geresh, bidi/zero-width
+// control characters, apostrophe-family glyphs, then NFC-normalize, trim,
+// and collapse whitespace.  Mirrors the client-side normalization in
+// Shifts.js so server-side matching (attach-phones, extract dedup) agrees
+// with what the user sees in the wizard.
+const normName = (s) =>
+  String(s == null ? "" : s)
+    .replace(/[​-‏‪-‮⁦-⁩﻿]/g, "")
+    .replace(/[׳'‘’‚‛`´ʹʻ-ʿ]/g, "")
+    .normalize("NFC")
+    .trim()
+    .replace(/\s+/g, " ");
+
 // Build the set of identity keys for a single employee record. A row is
 // considered "the same employee" if any of its keys intersects another's.
 // Both an ID-based key and a name-based key are emitted when available, so
@@ -27,9 +40,7 @@ const parseUpload = upload.array("files");
 const matchKeysOf = (e) => {
   const out = new Set();
   const idn = String(e.ID_nmbr == null ? "" : e.ID_nmbr).trim();
-  const nm = String(e.name == null ? "" : e.name)
-    .trim()
-    .replace(/\s+/g, " ");
+  const nm = normName(e.name);
   if (idn) out.add(`id:${idn}`);
   if (nm) out.add(`name:${nm}`);
   return out;
@@ -165,6 +176,7 @@ const Router = () => {
       }
 
       let inserted = 0;
+      let updated = 0;
       const errors = [];
       for (const emp of list) {
         const rest = (emp.rest || "").trim();
@@ -192,31 +204,61 @@ const Router = () => {
         const wageType = emp.wage_type === "net" ? "net" : "gross";
         const travelVal =
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
+        const phoneVal = emp.phone ? String(emp.phone).trim() || null : null;
+        const companyVal = emp.company
+          ? String(emp.company).trim() || null
+          : null;
+        const idNmbr = emp.ID_nmbr || null;
         try {
-          await executeSql(
-            `INSERT INTO employees (rest, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
-             VALUES (:rest, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
-            {
-              rest,
-              name,
-              ID_nmbr: emp.ID_nmbr || null,
-              phone: emp.phone ? String(emp.phone).trim() || null : null,
-              roles: rolesJson,
-              t101: emp.t101 ? 1 : 0,
-              gbl: globalVal,
-              hw: hourlyWageVal,
-              wt: wageType,
-              tr: travelVal,
-              ctr: emp.contractor ? 1 : 0,
-            },
-          );
-          inserted += 1;
+          const existingId = await resolveEmployeeId(rest, emp);
+          if (existingId) {
+            const sets = [];
+            if (phoneVal) sets.push("phone = :phone");
+            if (idNmbr) sets.push("ID_nmbr = :ID_nmbr");
+            if (companyVal) sets.push("company = :company");
+            if (rolesJson !== "[]") sets.push("roles = CAST(:roles AS JSON)");
+            if (sets.length === 0) {
+              updated += 1;
+            } else {
+              const [result] = await executeSql(
+                `UPDATE employees SET ${sets.join(", ")} WHERE employee_id = :id`,
+                {
+                  id: existingId,
+                  phone: phoneVal,
+                  ID_nmbr: idNmbr,
+                  company: companyVal,
+                  roles: rolesJson,
+                },
+              );
+              if (result && result.affectedRows >= 1) updated += 1;
+            }
+          } else {
+            await executeSql(
+              `INSERT INTO employees (rest, company, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
+               VALUES (:rest, :company, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
+              {
+                rest,
+                company: companyVal,
+                name,
+                ID_nmbr: idNmbr,
+                phone: phoneVal,
+                roles: rolesJson,
+                t101: emp.t101 ? 1 : 0,
+                gbl: globalVal,
+                hw: hourlyWageVal,
+                wt: wageType,
+                tr: travelVal,
+                ctr: emp.contractor ? 1 : 0,
+              },
+            );
+            inserted += 1;
+          }
         } catch (e) {
-          errors.push({ name, issue: e.message || "insert failed" });
+          errors.push({ name, issue: e.message || "upsert failed" });
         }
       }
 
-      res.json({ inserted, attempted: list.length, errors });
+      res.json({ inserted, updated, attempted: list.length, errors });
     } catch (err) {
       console.error("payroll/employees error:", err);
       res.status(500).json({ error: err.message || "save failed" });
@@ -234,8 +276,8 @@ const Router = () => {
       const scope = String(req.body?.scope || "").trim();
       const sql =
         scope === "all"
-          ? "SELECT employee_id, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
-          : "SELECT employee_id, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
+          ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
+          : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
       const [rows] = await executeSql(sql, { rest });
       const out = [];
       for (const r of rows || []) {
@@ -250,6 +292,7 @@ const Router = () => {
         const asDecimalString = (v) => (v == null ? null : String(v));
         const entry = {
           employee_id: r.employee_id,
+          company: r.company || null,
           ID_nmbr: r.ID_nmbr,
           phone: r.phone || null,
           name: r.name,
@@ -311,9 +354,12 @@ const Router = () => {
         const wageType = emp.wage_type === "net" ? "net" : "gross";
         const travelVal = toDecimalString(emp.travel);
         try {
+          const companyVal =
+            emp.company != null ? String(emp.company).trim() || null : null;
           const [result] = await executeSql(
             `UPDATE employees
-             SET roles = CAST(:roles AS JSON),
+             SET company = :company,
+                 roles = CAST(:roles AS JSON),
                  \`global\` = :gbl,
                  hourly_wage = :hw,
                  wage_type = :wt,
@@ -322,6 +368,7 @@ const Router = () => {
              WHERE employee_id = :id`,
             {
               id,
+              company: companyVal,
               roles: rolesJson,
               gbl: globalVal,
               hw: hourlyWageVal,
@@ -585,11 +632,7 @@ const Router = () => {
         const byName = new Map();
         for (const r of empRows || []) {
           if (r.ID_nmbr) byId.set(String(r.ID_nmbr).trim(), r.employee_id);
-          if (r.name)
-            byName.set(
-              String(r.name).trim().replace(/\s+/g, " "),
-              r.employee_id,
-            );
+          if (r.name) byName.set(normName(r.name), r.employee_id);
         }
 
         // Strip non-digits from phone (Tabit exports often have spaces/dashes).
@@ -635,7 +678,7 @@ const Router = () => {
               first,
               fam,
             ]) {
-              const key = candidate.trim().replace(/\s+/g, " ");
+              const key = normName(candidate);
               if (key && byName.has(key)) {
                 employee_id = byName.get(key);
                 break;

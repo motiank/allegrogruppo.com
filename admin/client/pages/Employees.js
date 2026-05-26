@@ -160,6 +160,7 @@ const Employees = () => {
       result = result.filter(({ emp }) => {
         const haystack = [
           emp.name,
+          emp.company,
           emp.ID_nmbr,
           emp.phone,
           emp.employee_id,
@@ -199,6 +200,7 @@ const Employees = () => {
         .sort((a, b) => (a.name || "").localeCompare(b.name || "", "he"));
       const shaped = list.map((e) => ({
         employee_id: e.employee_id,
+        company: e.company || "",
         ID_nmbr: e.ID_nmbr,
         phone: e.phone || "",
         name: e.name,
@@ -669,6 +671,7 @@ const Employees = () => {
       const payload = {
         employees: employees.map((e) => ({
           employee_id: e.employee_id,
+          company: e.company,
           name: e.name,
           roles: e.roles,
           global: e.global,

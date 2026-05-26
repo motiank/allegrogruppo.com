@@ -54,6 +54,9 @@ ALTER TABLE employees
 ALTER TABLE employees
   ADD COLUMN phone VARCHAR(32) NULL AFTER ID_nmbr;
 
+ALTER TABLE employees
+  ADD COLUMN company VARCHAR(128) NULL AFTER employee_id;
+
 CREATE TABLE IF NOT EXISTS micpal (
   keyName   VARCHAR(64)  NOT NULL,
   name      VARCHAR(128) NULL,
