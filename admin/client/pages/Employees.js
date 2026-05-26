@@ -384,15 +384,17 @@ const Employees = () => {
     for (const m of list || []) {
       const n = normalizeName(m.name).toLowerCase();
       const f = normalizeName(m.family).toLowerCase();
+      const idStr = String(m.ID_nmbr || "").trim();
       const a = `${n} ${f}`.trim();
       const b = `${f} ${n}`.trim();
       let score = 0;
       if (q === a || q === b) score = 100;
+      else if (idStr && idStr.includes(q)) score = 90;
       else {
         const combined = `${n} ${f}`;
         let hit = 0;
         for (const t of tokens) {
-          if (combined.includes(t)) hit += 1;
+          if (combined.includes(t) || idStr.includes(t)) hit += 1;
         }
         if (hit > 0) score = hit === tokens.length ? 80 : 50;
       }
@@ -1656,7 +1658,7 @@ const Employees = () => {
                       placeholder={
                         selectedManualEmp
                           ? `Search Micpal for "${selectedManualEmp.name}"…`
-                          : "Pick an employee on the left, then search…"
+                          : "Search Micpal…"
                       }
                       style={styles.searchInput}
                       value={manualSearch}
@@ -1664,7 +1666,6 @@ const Employees = () => {
                         setManualSearch(ev.target.value);
                         setManualSelectedKeyName(null);
                       }}
-                      disabled={!selectedManualEmp}
                     />
                     <div
                       style={{
