@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
+import MicpImportXL from "./MicpImportXL.js";
 
 const require = createRequire(import.meta.url);
 const {
@@ -204,6 +205,10 @@ const Router = () => {
         const wageType = emp.wage_type === "net" ? "net" : "gross";
         const travelVal =
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
+        const maxTravelVal =
+          emp.maxTravel === "" || emp.maxTravel == null
+            ? null
+            : Number(emp.maxTravel);
         const phoneVal = emp.phone ? String(emp.phone).trim() || null : null;
         const companyVal = emp.company
           ? String(emp.company).trim() || null
@@ -234,8 +239,8 @@ const Router = () => {
             }
           } else {
             await executeSql(
-              `INSERT INTO employees (rest, company, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, contractor)
-               VALUES (:rest, :company, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :ctr)`,
+              `INSERT INTO employees (rest, company, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, maxTravel, contractor)
+               VALUES (:rest, :company, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :mtr, :ctr)`,
               {
                 rest,
                 company: companyVal,
@@ -248,6 +253,7 @@ const Router = () => {
                 hw: hourlyWageVal,
                 wt: wageType,
                 tr: travelVal,
+                mtr: maxTravelVal,
                 ctr: emp.contractor ? 1 : 0,
               },
             );
@@ -276,8 +282,8 @@ const Router = () => {
       const scope = String(req.body?.scope || "").trim();
       const sql =
         scope === "all"
-          ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor, active, duplicate FROM employees WHERE rest = :rest"
-          : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
+          ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, maxTravel, contractor, active, duplicate FROM employees WHERE rest = :rest"
+          : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, maxTravel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
       const [rows] = await executeSql(sql, { rest });
       const out = [];
       for (const r of rows || []) {
@@ -301,6 +307,7 @@ const Router = () => {
           hourly_wage: asDecimalString(r.hourly_wage),
           wage_type: r.wage_type || null,
           travel: asDecimalString(r.travel),
+          maxTravel: asDecimalString(r.maxTravel),
           contractor: !!r.contractor,
         };
         if (scope === "all") {
@@ -353,6 +360,7 @@ const Router = () => {
         const hourlyWageVal = toDecimalString(emp.hourly_wage);
         const wageType = emp.wage_type === "net" ? "net" : "gross";
         const travelVal = toDecimalString(emp.travel);
+        const maxTravelVal = toDecimalString(emp.maxTravel);
         try {
           const companyVal =
             emp.company != null ? String(emp.company).trim() || null : null;
@@ -364,6 +372,7 @@ const Router = () => {
                  hourly_wage = :hw,
                  wage_type = :wt,
                  travel = :tr,
+                 maxTravel = :mtr,
                  contractor = :ctr
              WHERE employee_id = :id`,
             {
@@ -374,6 +383,7 @@ const Router = () => {
               hw: hourlyWageVal,
               wt: wageType,
               tr: travelVal,
+              mtr: maxTravelVal,
               ctr: emp.contractor ? 1 : 0,
             },
           );
@@ -860,6 +870,7 @@ const Router = () => {
           }
           items.push([
             keyName,
+            keyName,
             cols.name ? norm(cellText(row.getCell(cols.name))) || null : null,
             cols.family
               ? norm(cellText(row.getCell(cols.family))) || null
@@ -876,19 +887,49 @@ const Router = () => {
         const errors = [];
         const CHUNK = 2000;
         const pool = getDbPool();
+
+        const [[{ cnt: countBefore }]] = await pool.query(
+          "SELECT COUNT(*) AS cnt FROM micpal",
+        );
+        const [createResult] = await pool.query("SHOW CREATE TABLE micpal");
+        console.log(`micpal table DDL:`, createResult[0]?.["Create Table"]);
+        console.log(
+          `micpal sync: ${items.length} items to upsert, ${countBefore} rows in table before`,
+        );
+        // Log sample items and check for duplicate keyNames
+        const keySet = new Set();
+        let dupCount = 0;
+        for (const it of items) {
+          if (keySet.has(it[0])) dupCount++;
+          keySet.add(it[0]);
+        }
+        console.log(
+          `micpal sync: unique keyNames in file: ${keySet.size}, duplicates: ${dupCount}`,
+        );
+        console.log(`micpal sync: first 5 items:`, items.slice(0, 5));
+        console.log(`micpal sync: last 5 items:`, items.slice(-5));
+
         for (let i = 0; i < items.length; i += CHUNK) {
           const chunk = items.slice(i, i + CHUNK);
-          const placeholders = chunk.map(() => "(?,?,?,?)").join(",");
+          const placeholders = chunk.map(() => "(?,?,?,?,?)").join(",");
           try {
-            await pool.query(
-              `INSERT INTO micpal (keyName, name, family, ID_nmbr)
-               VALUES ${placeholders}
+            const [result] = await pool.query(
+              `INSERT INTO micpal (keyName, mic_nmbr, name, family, ID_nmbr)
+               VALUES ${placeholders} AS new_vals
                ON DUPLICATE KEY UPDATE
-                 name = VALUES(name),
-                 family = VALUES(family),
-                 ID_nmbr = VALUES(ID_nmbr)`,
+                 mic_nmbr = new_vals.mic_nmbr,
+                 name = new_vals.name,
+                 family = new_vals.family,
+                 ID_nmbr = new_vals.ID_nmbr`,
               chunk.flat(),
             );
+            console.log(
+              `micpal sync chunk ${i}-${i + chunk.length}: affectedRows=${result.affectedRows}, changedRows=${result.changedRows}, insertId=${result.insertId}, info=${result.info}`,
+            );
+            const [warnings] = await pool.query("SHOW WARNINGS");
+            if (warnings.length > 0) {
+              console.log(`micpal sync warnings:`, warnings);
+            }
             upserted += chunk.length;
           } catch (e) {
             errors.push({
@@ -897,6 +938,47 @@ const Router = () => {
               issue: e.message || "bulk upsert failed",
             });
           }
+        }
+
+        const [[{ cnt: countAfter }]] = await pool.query(
+          "SELECT COUNT(*) AS cnt FROM micpal",
+        );
+        console.log(
+          `micpal sync: ${countAfter} rows in table after (was ${countBefore})`,
+        );
+        if (countAfter === countBefore) {
+          console.log(
+            "micpal sync: WARNING — row count unchanged! Checking overlap...",
+          );
+          const [[{ overlap }]] = await pool.query(
+            `SELECT COUNT(*) AS overlap FROM micpal WHERE keyName IN (${items.map(() => "?").join(",")})`,
+            items.map((it) => it[0]),
+          );
+          console.log(
+            `micpal sync: ${overlap} of ${items.length} file keyNames already exist in table`,
+          );
+          const fileKeys = new Set(items.map((it) => it[0]));
+          const [existingRows] = await pool.query("SELECT keyName FROM micpal");
+          const dbKeys = new Set(existingRows.map((r) => r.keyName));
+          const missingFromDb = [...fileKeys].filter((k) => !dbKeys.has(k));
+          console.log(
+            `micpal sync: ${missingFromDb.length} keyNames in file but NOT in table:`,
+            missingFromDb,
+          );
+          // Check for ID_nmbr collisions among the missing keys
+          const missingItems = items.filter((it) =>
+            missingFromDb.includes(it[0]),
+          );
+          const missingIdNmbrs = missingItems.map((it) => ({
+            keyName: it[0],
+            name: it[1],
+            family: it[2],
+            ID_nmbr: it[3],
+          }));
+          console.log(
+            `micpal sync: missing keyNames with their data:`,
+            missingIdNmbrs,
+          );
         }
 
         res.json({
@@ -1231,7 +1313,7 @@ const Router = () => {
         `IF(ISNUMBER(I${r}),I${r},0)+IF(ISNUMBER(J${r}),J${r},0),` +
         `(IF(ISNUMBER(E${r}),E${r},0)+IF(ISNUMBER(F${r}),F${r},0)*1.25+IF(ISNUMBER(G${r}),G${r},0)*1.5)*IF(ISNUMBER(C${r}),C${r},0)),0)`;
 
-      const MIN_HOURLY_WAGE = 34.42;
+      const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 34.42;
       const wageTypeLabel = (t) =>
         t === "gross" ? "ברוטו" : t === "net" ? "נטו" : "";
       const resolveWage = (emp, role) => {
@@ -1450,6 +1532,137 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/export-xlsx error:", err);
       res.status(500).json({ error: err.message || "export failed" });
+    }
+  });
+
+  router.post("/export-micpal", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      const company = String(req.body?.company || "").trim();
+      const restLabel = String(req.body?.restLabel || rest);
+      const list = Array.isArray(req.body?.employees) ? req.body.employees : [];
+      if (list.length === 0) {
+        return res.status(400).json({ error: "No employees in body" });
+      }
+
+      // Load employee records from DB (ID_nmbr, travel, maxTravel)
+      const [empRows] = await executeSql(
+        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+        { rest },
+      );
+      const empByName = new Map();
+      for (const e of empRows || []) {
+        if (e.name) empByName.set(String(e.name).trim(), e);
+      }
+
+      // Load micpal keyName mapping by ID_nmbr
+      const [micpalRows] = await executeSql(
+        "SELECT keyName, ID_nmbr FROM micpal WHERE ID_nmbr IS NOT NULL",
+        {},
+      );
+      const micpalByIdNmbr = new Map();
+      for (const m of micpalRows || []) {
+        if (m.ID_nmbr) micpalByIdNmbr.set(String(m.ID_nmbr).trim(), m.keyName);
+      }
+
+      const [y, m] = month.split("-");
+      const xl = new MicpImportXL({
+        company,
+        year: y || "",
+        month: m ? String(Number(m)) : "",
+      });
+
+      const employees = list.map((emp) => {
+        const payroll = emp.payroll_data || {};
+        let h100 = 0,
+          h125 = 0,
+          h150 = 0,
+          shabbat = 0,
+          holiday = 0,
+          tip = 0,
+          completion = 0;
+        for (const [, payload] of Object.entries(payroll)) {
+          const hours = (payload && payload.hours) || [];
+          h100 += Number(hours[0] || 0);
+          h125 += Number(hours[1] || 0);
+          h150 += Number(hours[2] || 0);
+          shabbat += Number(hours[3] || 0);
+          holiday += Number(hours[4] || 0);
+          tip += Number((payload && payload.tip) || 0);
+          completion += Number((payload && payload.completion) || 0);
+        }
+        const name = (emp.name || "").trim();
+        const dbEmp = empByName.get(name) || {};
+        const idNmbr = dbEmp.ID_nmbr
+          ? String(dbEmp.ID_nmbr).trim()
+          : emp.ID_nmbr
+            ? String(emp.ID_nmbr).trim()
+            : "";
+        const hourlyWage =
+          dbEmp.hourly_wage != null
+            ? Number(dbEmp.hourly_wage)
+            : emp.hourly_wage != null
+              ? Number(emp.hourly_wage)
+              : null;
+        const dailyTravel =
+          dbEmp.travel != null
+            ? Number(dbEmp.travel)
+            : emp.travel != null && emp.travel !== ""
+              ? Number(emp.travel)
+              : null;
+        const maxTravel =
+          dbEmp.maxTravel != null
+            ? Number(dbEmp.maxTravel)
+            : emp.maxTravel != null && emp.maxTravel !== ""
+              ? Number(emp.maxTravel)
+              : null;
+        const workdays = emp.workdays != null ? Number(emp.workdays) : 0;
+        let travelAmount = "";
+        if (maxTravel != null) {
+          if (dailyTravel == null || dailyTravel * workdays > maxTravel) {
+            travelAmount = maxTravel;
+          } else {
+            travelAmount = dailyTravel * workdays;
+          }
+        } else if (dailyTravel != null) {
+          travelAmount = dailyTravel * workdays;
+        }
+        return {
+          keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
+          ID_nmbr: idNmbr,
+          vacation: "",
+          hourlyWage:
+            hourlyWage === -1
+              ? Number(process.env.MIN_HOURLY_WAGE) || 34.42
+              : (hourlyWage ?? ""),
+          workdays: workdays || "",
+          hours100: h100 || "",
+          hours125: h125 || "",
+          hours150: h150 || "",
+          shabbat: shabbat || "",
+          holiday: holiday || "",
+          net: emp.wage_type === "net" ? "כן" : "",
+          travel: travelAmount,
+          completion: tip + completion || "",
+        };
+      });
+
+      const buf = await xl.generate(employees);
+      const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
+      const filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(filename)}"`,
+      );
+      res.send(Buffer.from(buf));
+    } catch (err) {
+      console.error("payroll/export-micpal error:", err);
+      res.status(500).json({ error: err.message || "micpal export failed" });
     }
   });
 

@@ -208,6 +208,7 @@ const Employees = () => {
         hourly_wage: e.hourly_wage == null ? "" : String(e.hourly_wage),
         wage_type: e.wage_type === "net" ? "net" : "gross",
         travel: e.travel == null ? "" : String(e.travel),
+        maxTravel: e.maxTravel == null ? "" : String(e.maxTravel),
         contractor: !!e.contractor,
         active: e.active !== false,
         duplicate: e.duplicate == null ? null : Number(e.duplicate),
@@ -281,6 +282,16 @@ const Employees = () => {
     setEmployees((prev) => {
       const next = prev.slice();
       next[empIdx] = { ...next[empIdx], travel: val };
+      return next;
+    });
+    setDirty(true);
+    setSaveResult(null);
+  };
+
+  const updateMaxTravel = (empIdx, val) => {
+    setEmployees((prev) => {
+      const next = prev.slice();
+      next[empIdx] = { ...next[empIdx], maxTravel: val };
       return next;
     });
     setDirty(true);
@@ -678,6 +689,7 @@ const Employees = () => {
           hourly_wage: e.hourly_wage,
           wage_type: e.wage_type,
           travel: e.travel,
+          maxTravel: e.maxTravel,
           contractor: !!e.contractor,
         })),
       };
@@ -1203,6 +1215,7 @@ const Employees = () => {
                     <th style={styles.th}>hourly_wage</th>
                     <th style={styles.th}>wage_type</th>
                     <th style={styles.th}>travel</th>
+                    <th style={styles.th}>maxTravel</th>
                     <th style={styles.th}>contractor</th>
                     <th style={styles.th}>role</th>
                     <th style={styles.th}>role wage</th>
@@ -1297,6 +1310,22 @@ const Employees = () => {
                                   value={emp.travel}
                                   onChange={(ev) =>
                                     updateTravel(empIdx, ev.target.value)
+                                  }
+                                />
+                              </td>
+                              <td
+                                rowSpan={roles.length}
+                                style={styles.tdEmpBoundary}
+                              >
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  placeholder="—"
+                                  style={styles.wageInput}
+                                  value={emp.maxTravel}
+                                  onChange={(ev) =>
+                                    updateMaxTravel(empIdx, ev.target.value)
                                   }
                                 />
                               </td>

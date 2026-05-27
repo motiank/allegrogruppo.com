@@ -38,7 +38,10 @@ ALTER TABLE employees
   ADD COLUMN travel DECIMAL(10,2) NULL AFTER `hourly_wage`;
 
 ALTER TABLE employees
-  ADD COLUMN contractor BOOLEAN NOT NULL DEFAULT FALSE AFTER travel;
+  ADD COLUMN maxTravel DECIMAL(10,2) NULL AFTER travel;
+
+ALTER TABLE employees
+  ADD COLUMN contractor BOOLEAN NOT NULL DEFAULT FALSE AFTER maxTravel;
 
 ALTER TABLE employees
   ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE AFTER contractor;
@@ -67,6 +70,12 @@ CREATE TABLE IF NOT EXISTS micpal (
   KEY idx_id_nmbr (ID_nmbr)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+ALTER TABLE micpal
+  ADD COLUMN mic_nmbr VARCHAR(64) NULL AFTER keyName;
+
+ALTER TABLE micpal  
+  ADD UNIQUE KEY idx_id_nmbr (ID_nmbr, mic_nmbr);
 
 delete from employees where rest = '5ff419934676f0fddabaef3a';
 

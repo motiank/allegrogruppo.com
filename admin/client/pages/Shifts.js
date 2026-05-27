@@ -45,7 +45,7 @@ const fmtNum = (n, decimals = 2) => {
 
 // National minimum hourly wage — used as a substitute when an employee's
 // configured hourly wage is the special marker -1.
-const MIN_HOURLY_WAGE = 34.42;
+const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 34.42;
 
 // Build a per-employee record map keyed by ID_nmbr / name.
 // Each entry: { roles: { role: wage }, hourly_wage, wage_type, global, travel }
@@ -62,6 +62,7 @@ const buildWageMap = (employeesFromDb) => {
       wage_type: e.wage_type || null,
       global: e.global == null ? null : Number(e.global),
       travel: e.travel == null ? null : Number(e.travel),
+      maxTravel: e.maxTravel == null ? null : Number(e.maxTravel),
       contractor: !!e.contractor,
     };
     if (e.ID_nmbr) map.set(`id:${String(e.ID_nmbr).trim()}`, rec);
@@ -996,31 +997,22 @@ const Shifts = () => {
         rest: selectedRestaurant,
         restLabel: selectedLabel,
         month,
-        flaggedEmployees: Array.from(flaggedNames),
         employees: allEmployees.map((e) => {
           const empData = lookupEmpData(wageMap, e);
-          const wages = {};
-          for (const role of Object.keys(e.payroll_data || {})) {
-            const w = empData?.roles?.[role];
-            if (w != null) wages[role] = Number(w);
-          }
           return {
             name: e.name,
             ID_nmbr: e.ID_nmbr,
             payroll_data: e.payroll_data || {},
             role_extras: e.role_extras || {},
             workdays: e.workdays,
-            global: e.global,
-            wages,
-            // Per-employee DB fields for wage resolution + display
             hourly_wage: empData?.hourly_wage ?? null,
             wage_type: empData?.wage_type ?? null,
-            global_amount: empData?.global ?? null,
             travel: empData?.travel ?? null,
+            maxTravel: empData?.maxTravel ?? null,
           };
         }),
       };
-      const res = await axios.post("/admin/payroll/export-xlsx", payload, {
+      const res = await axios.post("/admin/payroll/export-micpal", payload, {
         withCredentials: true,
         responseType: "blob",
       });
@@ -1030,13 +1022,13 @@ const Shifts = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `payroll_summary_${month || "month"}.xlsx`;
+      a.download = `micpal_import_${month || "month"}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
-      console.error("export-xlsx error:", err);
+      console.error("export-micpal error:", err);
       setDownloadError(err.message || "download failed");
     } finally {
       setDownloadingXlsx(false);
@@ -1108,8 +1100,21 @@ const Shifts = () => {
           ? Number(empData.global)
           : null;
       const wageType = empData?.wage_type || null;
-      const empTravel =
+      const dailyTravel =
         empData && empData.travel != null ? Number(empData.travel) : null;
+      const maxTravel =
+        empData && empData.maxTravel != null ? Number(empData.maxTravel) : null;
+      const wd = emp.workdays != null ? Number(emp.workdays) : 0;
+      let empTravel = null;
+      if (maxTravel != null) {
+        if (dailyTravel == null || dailyTravel * wd > maxTravel) {
+          empTravel = maxTravel;
+        } else {
+          empTravel = dailyTravel * wd;
+        }
+      } else if (dailyTravel != null) {
+        empTravel = dailyTravel * wd;
+      }
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
