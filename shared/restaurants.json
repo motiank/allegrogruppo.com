@@ -1,0 +1,55 @@
+[
+  {
+    "key": "eatalia",
+    "label": "פרימיום איטליה",
+    "companyId": "64251a17042cbcc5928813fd",
+    "payroll_id": "80",
+    "payroll_soft": "shik",
+    "branches": [
+      { "id": "64be1926335ee46a739a1ba2", "name": "ג'ויה", "ontopo": 5, "astrateg": 5 },
+      { "id": "65cda80518611cc1cab248ca", "name": "לה בראצ׳ה", "ontopo": 7, "astrateg": 6 },
+      { "id": "64251a9f37dc3d5093d7ab53", "name": "פיאמונטה", "ontopo": 6, "astrateg": 7 },
+      { "id": "64ddcfdc674a1d497fe49bf8", "name": "פסקרה", "ontopo": 8, "astrateg": 10 }
+    ]
+  },
+  {
+    "key": "pastaLina",
+    "label": "פסטה לינה",
+    "companyId": "5fd7022862f93c0cf1df8b63",
+    "payroll_id": "096",
+    "payroll_soft": "mic",
+    "branches": [
+      { "id": "5fd7030f4f421bfe0e2e13bd", "name": "הרצליה", "ontopo": 2, "astrateg": 0 },
+      { "id": "5ff419934676f0fddabaef3a", "name": "רעננה", "ontopo": 3, "astrateg": 9 },
+      { "id": "6012624f0d491ef6429e127c", "name": "רמת החיל", "ontopo": 0, "astrateg": 1 },
+      { "id": "655ef6eb9df0c279bbfb7482", "name": "ראש פינה", "ontopo": -1, "astrateg": 2 }
+    ]
+  },
+  {
+    "key": "onu",
+    "label": "ורדה אונו",
+    "companyId": "60335c8306f5f03947387bd0",
+    "branches": [
+      { "id": "60335d23cac0e25c17fe0544", "name": "תל אביב", "ontopo": 1, "astrateg": 8 },
+      { "id": "6322b93aaf5f6e3b92830433", "name": "פתח תקווה", "ontopo": 4, "astrateg": 3 }
+    ]
+  },
+  {
+    "key": "shay",
+    "label": "שי",
+    "companyId": "60b46a83a62b1748e7b3d8a1",
+    "branches": [
+      { "id": "60b46ca4e8418d9c860b2b2f", "name": "נתניה", "ontopo": 10, "astrateg": -1 },
+      { "id": "62f48ec8ab47895a757e1c76", "name": "מודיעין", "ontopo": 11, "astrateg": -1 },
+      { "id": "67b6c458d809d6fa30bbdcaa", "name": "רעות", "ontopo": -1, "astrateg": -1 }
+    ]
+  },
+  {
+    "key": "oryam",
+    "label": "אור ים",
+    "companyId": "65bb3fe41ed2912aa9034a18",
+    "branches": [
+      { "id": "65bb40ae6729db482e2ed6f2", "name": "אור ים", "ontopo": 9, "astrateg": 4 }
+    ]
+  }
+]
