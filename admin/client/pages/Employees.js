@@ -304,7 +304,7 @@ const Employees = () => {
   };
 
   const handleMicpalPick = () => {
-    if (micpalSyncing) return;
+    if (micpalSyncing || !selectedRestaurant) return;
     setMicpalResult(null);
     setMicpalError(null);
     if (micpalFileInputRef.current) {
@@ -316,20 +316,23 @@ const Employees = () => {
   const handleMicpalFileChange = async (ev) => {
     const file = ev.target.files && ev.target.files[0];
     if (!file) return;
+    if (!selectedRestaurant) {
+      setMicpalError("select a restaurant first");
+      return;
+    }
     setMicpalSyncing(true);
     setMicpalResult(null);
     setMicpalError(null);
     try {
       const fd = new FormData();
       fd.append("file", file, file.name);
+      fd.append("rest", selectedRestaurant);
       const res = await axios.post("/admin/payroll/micpal/sync", fd, {
         withCredentials: true,
       });
       setMicpalResult(res.data);
     } catch (err) {
-      setMicpalError(
-        err.response?.data?.error || err.message || "Micpal sync failed",
-      );
+      setMicpalError(err.response?.data?.error || err.message || "Sync failed");
     } finally {
       setMicpalSyncing(false);
     }
@@ -456,7 +459,7 @@ const Employees = () => {
     try {
       const res = await axios.post(
         "/admin/payroll/micpal/list",
-        {},
+        { rest: selectedRestaurant },
         { withCredentials: true },
       );
       const micpal = res.data?.rows || [];
@@ -1046,15 +1049,23 @@ const Employees = () => {
         </div>
         <button
           type="button"
-          title="Sync Micpal — pick an .xlsx file"
-          aria-label="Sync Micpal"
+          title={
+            !selectedRestaurant
+              ? "Select a restaurant first"
+              : "Sync payroll-software index — pick an .xlsx file"
+          }
+          aria-label="Sync payroll-software index"
           style={{
             ...styles.iconButton,
-            opacity: micpalSyncing ? 0.6 : 1,
-            cursor: micpalSyncing ? "wait" : "pointer",
+            opacity: micpalSyncing || !selectedRestaurant ? 0.6 : 1,
+            cursor: micpalSyncing
+              ? "wait"
+              : !selectedRestaurant
+                ? "not-allowed"
+                : "pointer",
           }}
           onClick={handleMicpalPick}
-          disabled={micpalSyncing}
+          disabled={micpalSyncing || !selectedRestaurant}
         >
           {micpalSyncing ? "…" : "↻"}
         </button>

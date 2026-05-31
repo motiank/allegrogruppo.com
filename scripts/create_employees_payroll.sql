@@ -112,3 +112,17 @@ WHERE `global` IS NOT NULL OR hourly_wage IS NOT NULL;
 -- Rename micpal -> payroll_soft_ix (the table now backs all payroll-software
 -- employee indexes, not only Micpal).
 RENAME TABLE micpal TO payroll_soft_ix;
+
+-- Swap the primary key to a synthetic auto-increment `id`. keyName keeps a
+-- UNIQUE index so the INSERT … ON DUPLICATE KEY upsert in /micpal/sync still
+-- collides on it.
+ALTER TABLE payroll_soft_ix
+  DROP PRIMARY KEY,
+  ADD COLUMN id INT NOT NULL AUTO_INCREMENT FIRST,
+  ADD PRIMARY KEY (id),
+  ADD UNIQUE KEY uniq_keyName (keyName);
+
+ALTER TABLE payroll_soft_ix
+  ADD COLUMN company VARCHAR(16) NULL AFTER id;
+
+    update payroll_soft_ix set company = '096';

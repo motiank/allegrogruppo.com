@@ -12,6 +12,7 @@
       "companyId": "64251a17042cbcc5928813fd",
       "payroll_id": "80",
       "payroll_soft": "shik",
+      "mic_company": "60",
       "branches": [
         { "id": "64be1926335ee46a739a1ba2", "name": "ג'ויה", "ontopo": 5, "astrateg": 5 },
         { "id": "65cda80518611cc1cab248ca", "name": "לה בראצ׳ה", "ontopo": 7, "astrateg": 6 },

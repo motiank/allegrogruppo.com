@@ -3,6 +3,7 @@ import multer from "multer";
 import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import MicpImportXL from "./MicpImportXL.js";
+import ShikImportXL from "./ShikImportXL.js";
 
 const require = createRequire(import.meta.url);
 const {
@@ -32,6 +33,129 @@ const workingDaysFor = (month) => {
 const workingHoursFor = (month) => {
   const v = RESTAURANTS.working_hours?.[month];
   return Number.isFinite(Number(v)) ? Number(v) : null;
+};
+
+// payroll_soft (e.g. "mic" / "shik") for a given branch id. Returns null if
+// the group has no payroll_soft set or the branch isn't found.
+const payrollSoftForBranch = (branchId) => {
+  for (const g of RESTAURANT_GROUPS) {
+    if ((g.branches || []).some((b) => b.id === branchId))
+      return g.payroll_soft || null;
+  }
+  return null;
+};
+
+// Build the per-employee row shape consumed by both MicpImportXL and
+// ShikImportXL. Pulled out of /export-micpal so the two exporters share the
+// same calculated fields (hourlyWage, hours buckets, bonus, travel, …) and
+// only differ on output format.
+//
+// ctx: { empByName, micpalByIdNmbr, stdDays, stdHours, minHourlyWage }.
+export const buildExportRow = (emp, ctx) => {
+  const empByName = ctx.empByName || new Map();
+  const micpalByIdNmbr = ctx.micpalByIdNmbr || new Map();
+  const stdDays = ctx.stdDays;
+  const stdHours = ctx.stdHours;
+  const MIN_HOURLY_WAGE = Number(ctx.minHourlyWage) || 35.4;
+
+  const payroll = emp.payroll_data || {};
+  let h100 = 0,
+    h125 = 0,
+    h150 = 0,
+    shabbat = 0,
+    holiday = 0,
+    tip = 0,
+    completion = 0;
+  for (const [, payload] of Object.entries(payroll)) {
+    const hours = (payload && payload.hours) || [];
+    h100 += Number(hours[0] || 0);
+    h125 += Number(hours[1] || 0);
+    h150 += Number(hours[2] || 0);
+    shabbat += Number(hours[3] || 0);
+    holiday += Number(hours[4] || 0);
+    tip += Number((payload && payload.tip) || 0);
+    completion += Number((payload && payload.completion) || 0);
+  }
+  const name = (emp.name || "").trim();
+  const dbEmp = empByName.get(name) || {};
+  const idNmbr = dbEmp.ID_nmbr
+    ? String(dbEmp.ID_nmbr).trim()
+    : emp.ID_nmbr
+      ? String(emp.ID_nmbr).trim()
+      : "";
+  const newWageType = dbEmp.new_wage_type || null;
+  const wageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
+
+  let hourlyWage = null;
+  if (newWageType && newWageType.startsWith("hourly_min_")) {
+    hourlyWage = MIN_HOURLY_WAGE;
+  } else if (newWageType && newWageType.startsWith("hourly_")) {
+    hourlyWage = wageVal;
+  }
+  let bonus = "";
+  if (
+    newWageType &&
+    newWageType.startsWith("hourly_min_") &&
+    wageVal != null &&
+    wageVal > 0
+  ) {
+    const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
+    bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
+  }
+  const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
+  const isGlobal = !!newWageType && newWageType.startsWith("global_");
+  const amount = isGlobal && wageVal != null ? wageVal : "";
+
+  const dailyTravel =
+    dbEmp.travel != null
+      ? Number(dbEmp.travel)
+      : emp.travel != null && emp.travel !== ""
+        ? Number(emp.travel)
+        : null;
+  const maxTravel =
+    dbEmp.maxTravel != null
+      ? Number(dbEmp.maxTravel)
+      : emp.maxTravel != null && emp.maxTravel !== ""
+        ? Number(emp.maxTravel)
+        : null;
+  const workdays = emp.workdays != null ? Number(emp.workdays) : 0;
+  let travelAmount = "";
+  if (maxTravel != null) {
+    if (dailyTravel == null || dailyTravel * workdays > maxTravel) {
+      travelAmount = maxTravel;
+    } else {
+      travelAmount = dailyTravel * workdays;
+    }
+  } else if (dailyTravel != null) {
+    travelAmount = dailyTravel * workdays;
+  }
+
+  return {
+    name,
+    keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
+    ID_nmbr: idNmbr,
+    isGlobal,
+    new_wage_type: newWageType,
+    vacation: "",
+    hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
+    workdays: isGlobal ? "" : workdays || "",
+    workdaysRaw: workdays || 0,
+    hours100: isGlobal ? "" : h100 || "",
+    wage125: !isGlobal && hourlyWage != null ? hourlyWage * 1.25 : "",
+    hours125: isGlobal ? "" : h125 || "",
+    wage150: !isGlobal && hourlyWage != null ? hourlyWage * 1.5 : "",
+    hours150: isGlobal ? "" : h150 || "",
+    hoursSum: isGlobal ? "" : h100 + h125 + h150 || "",
+    shabbat: isGlobal ? "" : shabbat || "",
+    holiday: isGlobal ? "" : holiday || "",
+    net: netFlag,
+    travel: travelAmount,
+    completion: tip + completion || "",
+    bonus,
+    amount,
+    standardDays: stdDays ?? "",
+    standardHours: stdHours ?? "",
+  };
 };
 
 const upload = multer({
@@ -784,13 +908,17 @@ const Router = () => {
     });
   });
 
-  router.post("/micpal/list", async (_req, res) => {
+  router.post("/micpal/list", async (req, res) => {
     try {
-      const [rows] = await executeSql(
-        "SELECT keyName, name, family, ID_nmbr FROM payroll_soft_ix",
-        {},
-      );
-      res.json({ rows: rows || [] });
+      // Filter the index by the restaurant's company so matching only sees
+      // employees that belong to the same payroll-software company.
+      const rest = String(req.body?.rest || "").trim();
+      const company = rest ? micCompanyForBranch(rest) : "";
+      const sql = company
+        ? "SELECT keyName, name, family, ID_nmbr, company FROM payroll_soft_ix WHERE company = :company"
+        : "SELECT keyName, name, family, ID_nmbr, company FROM payroll_soft_ix";
+      const [rows] = await executeSql(sql, company ? { company } : {});
+      res.json({ rows: rows || [], company: company || null });
     } catch (err) {
       console.error("payroll/micpal/list error:", err);
       res.status(500).json({ error: err.message || "micpal list failed" });
@@ -856,6 +984,128 @@ const Router = () => {
   // Sync the `micpal` table from a Micpal xlsx export uploaded by the
   // user via a file picker in the Employees page.
   const parseMicpalUpload = upload.single("file");
+  // Shared cell readers used by both Micpal and Siklulit parsers.
+  const _norm = (s) => String(s == null ? "" : s).trim();
+  const _cellText = (c) => {
+    if (c == null) return "";
+    const v = c.value;
+    if (v == null) return "";
+    if (typeof v === "object") {
+      if (typeof v.text === "string") return v.text;
+      if (v.richText) return v.richText.map((p) => p.text || "").join("");
+      if (v.result != null) return String(v.result);
+    }
+    return String(v);
+  };
+
+  // Micpal index file: headers in row 1, data row 2+. No per-file company.
+  // Returns { items, scannedRows, skipped, company } or { error }.
+  const parseMicpalSheet = (sheet) => {
+    const HEADERS = {
+      keyName: ["מספר עובד"],
+      name: ["שם פרטי"],
+      family: ["שם משפחה"],
+      ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+    };
+    const cols = {};
+    sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNum) => {
+      const t = _norm(_cellText(cell));
+      for (const [key, labels] of Object.entries(HEADERS)) {
+        if (cols[key]) continue;
+        if (labels.some((l) => t === l || t.includes(l))) cols[key] = colNum;
+      }
+    });
+    if (!cols.keyName) {
+      return { error: 'header "מספר עובד" not found in row 1 (Micpal format)' };
+    }
+    let skipped = 0;
+    const items = [];
+    for (let r = 2; r <= sheet.rowCount; r++) {
+      const row = sheet.getRow(r);
+      const keyName = _norm(_cellText(row.getCell(cols.keyName)));
+      if (!keyName) {
+        skipped += 1;
+        continue;
+      }
+      items.push([
+        keyName,
+        keyName,
+        cols.name ? _norm(_cellText(row.getCell(cols.name))) || null : null,
+        cols.family ? _norm(_cellText(row.getCell(cols.family))) || null : null,
+        cols.ID_nmbr
+          ? _norm(_cellText(row.getCell(cols.ID_nmbr))) || null
+          : null,
+      ]);
+    }
+    return {
+      items,
+      scannedRows: sheet.rowCount - 1,
+      skipped,
+      company: null,
+    };
+  };
+
+  // Siklulit (שיקלולית) employee index file: header row 7, data 8+.
+  // A1 reads "חברה NNN: <label>"; "באמצעות \"שיקלולית" appears in row 5.
+  // Returns { items, scannedRows, skipped, company } or { error }.
+  const parseSiklulitSheet = (sheet) => {
+    if (sheet.rowCount < 8) {
+      return { error: "Siklulit file is too short (need headers in row 7)" };
+    }
+    const a1 = _norm(_cellText(sheet.getRow(1).getCell(1)));
+    const r5 = _norm(_cellText(sheet.getRow(5).getCell(1)));
+    if (!/שיקלולית/.test(`${a1} ${r5}`)) {
+      return { error: 'not a Siklulit file (missing "שיקלולית" marker)' };
+    }
+    const companyMatch = a1.match(/חברה\s+(\d+)/);
+    const company = companyMatch ? companyMatch[1] : null;
+
+    const HEADERS = {
+      keyName: ["מספר עובד"],
+      ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+      family: ["שם משפחה"],
+      name: ["שם פרטי"],
+    };
+    const cols = {};
+    sheet.getRow(7).eachCell({ includeEmpty: false }, (cell, colNum) => {
+      const t = _norm(_cellText(cell));
+      for (const [key, labels] of Object.entries(HEADERS)) {
+        if (cols[key]) continue;
+        if (labels.some((l) => t === l || t.includes(l))) cols[key] = colNum;
+      }
+    });
+    if (!cols.keyName) {
+      return {
+        error: 'header "מספר עובד" not found in row 7 (Siklulit format)',
+      };
+    }
+    let skipped = 0;
+    const items = [];
+    for (let r = 8; r <= sheet.rowCount; r++) {
+      const row = sheet.getRow(r);
+      const keyName = _norm(_cellText(row.getCell(cols.keyName)));
+      if (!keyName) {
+        skipped += 1;
+        continue;
+      }
+      items.push([
+        keyName,
+        keyName,
+        cols.name ? _norm(_cellText(row.getCell(cols.name))) || null : null,
+        cols.family ? _norm(_cellText(row.getCell(cols.family))) || null : null,
+        cols.ID_nmbr
+          ? _norm(_cellText(row.getCell(cols.ID_nmbr))) || null
+          : null,
+      ]);
+    }
+    return {
+      items,
+      scannedRows: sheet.rowCount - 7,
+      skipped,
+      company,
+    };
+  };
+
   router.post("/micpal/sync", (req, res) => {
     parseMicpalUpload(req, res, async (uploadErr) => {
       if (uploadErr) {
@@ -871,6 +1121,18 @@ const Router = () => {
         if (!/\.xlsx$/i.test(f.originalname || "")) {
           return res.status(400).json({ error: "expected an .xlsx file" });
         }
+        const rest = String(req.body?.rest || "").trim();
+        if (!rest) {
+          return res
+            .status(400)
+            .json({ error: "missing rest — select a restaurant first" });
+        }
+        const payrollSoft = payrollSoftForBranch(rest);
+        if (!payrollSoft) {
+          return res.status(400).json({
+            error: `no payroll_soft configured for restaurant ${rest}`,
+          });
+        }
         const wb = new ExcelJS.Workbook();
         await wb.xlsx.load(f.buffer);
         const sheet = wb.worksheets[0];
@@ -878,62 +1140,20 @@ const Router = () => {
           return res.status(400).json({ error: "empty workbook" });
         }
 
-        // Map headers (Hebrew) -> our column names.
-        const HEADERS = {
-          keyName: ["מספר עובד"],
-          name: ["שם פרטי"],
-          family: ["שם משפחה"],
-          ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
-        };
-        const norm = (s) => String(s == null ? "" : s).trim();
-        const cellText = (c) => {
-          if (c == null) return "";
-          const v = c.value;
-          if (v == null) return "";
-          if (typeof v === "object") {
-            if (typeof v.text === "string") return v.text;
-            if (v.richText) return v.richText.map((p) => p.text || "").join("");
-            if (v.result != null) return String(v.result);
-          }
-          return String(v);
-        };
-        const cols = {};
-        const header = sheet.getRow(1);
-        header.eachCell({ includeEmpty: false }, (cell, colNum) => {
-          const t = norm(cellText(cell));
-          for (const [key, labels] of Object.entries(HEADERS)) {
-            if (cols[key]) continue;
-            if (labels.some((l) => t === l || t.includes(l)))
-              cols[key] = colNum;
-          }
-        });
-        if (!cols.keyName) {
+        let parsed;
+        if (payrollSoft === "shik") parsed = parseSiklulitSheet(sheet);
+        else if (payrollSoft === "mic") parsed = parseMicpalSheet(sheet);
+        else
           return res
             .status(400)
-            .json({ error: 'header "מספר עובד" not found in row 1' });
+            .json({ error: `unsupported payroll_soft "${payrollSoft}"` });
+        if (parsed.error) {
+          return res.status(400).json({ error: parsed.error });
         }
-
-        let skipped = 0;
-        const items = [];
-        for (let r = 2; r <= sheet.rowCount; r++) {
-          const row = sheet.getRow(r);
-          const keyName = norm(cellText(row.getCell(cols.keyName)));
-          if (!keyName) {
-            skipped += 1;
-            continue;
-          }
-          items.push([
-            keyName,
-            keyName,
-            cols.name ? norm(cellText(row.getCell(cols.name))) || null : null,
-            cols.family
-              ? norm(cellText(row.getCell(cols.family))) || null
-              : null,
-            cols.ID_nmbr
-              ? norm(cellText(row.getCell(cols.ID_nmbr))) || null
-              : null,
-          ]);
-        }
+        const { items, scannedRows, skipped, company: parsedCompany } = parsed;
+        // Micpal files don't carry a company in-sheet — fall back to the
+        // mic_company configured for this restaurant in shared/restaurants.json.
+        const company = parsedCompany || micCompanyForBranch(rest) || null;
 
         // One INSERT per ~2000 rows — handful of statements at most, stays
         // safely under MySQL's max_allowed_packet (default 64MB).
@@ -967,17 +1187,23 @@ const Router = () => {
 
         for (let i = 0; i < items.length; i += CHUNK) {
           const chunk = items.slice(i, i + CHUNK);
-          const placeholders = chunk.map(() => "(?,?,?,?,?)").join(",");
+          const placeholders = chunk.map(() => "(?,?,?,?,?,?)").join(",");
+          // Inject the file-level company into each row.
+          const flat = [];
+          for (const it of chunk) {
+            flat.push(it[0], it[1], company, it[2], it[3], it[4]);
+          }
           try {
             const [result] = await pool.query(
-              `INSERT INTO payroll_soft_ix (keyName, mic_nmbr, name, family, ID_nmbr)
+              `INSERT INTO payroll_soft_ix (keyName, mic_nmbr, company, name, family, ID_nmbr)
                VALUES ${placeholders} AS new_vals
                ON DUPLICATE KEY UPDATE
                  mic_nmbr = new_vals.mic_nmbr,
+                 company = COALESCE(new_vals.company, payroll_soft_ix.company),
                  name = new_vals.name,
                  family = new_vals.family,
                  ID_nmbr = new_vals.ID_nmbr`,
-              chunk.flat(),
+              flat,
             );
             console.log(
               `micpal sync chunk ${i}-${i + chunk.length}: affectedRows=${result.affectedRows}, changedRows=${result.changedRows}, insertId=${result.insertId}, info=${result.info}`,
@@ -1029,9 +1255,9 @@ const Router = () => {
           );
           const missingIdNmbrs = missingItems.map((it) => ({
             keyName: it[0],
-            name: it[1],
-            family: it[2],
-            ID_nmbr: it[3],
+            name: it[2],
+            family: it[3],
+            ID_nmbr: it[4],
           }));
           console.log(
             `micpal sync: missing keyNames with their data:`,
@@ -1044,7 +1270,9 @@ const Router = () => {
           upserted,
           skipped,
           errors,
-          scannedRows: sheet.rowCount - 1,
+          scannedRows,
+          payrollSoft,
+          company,
         });
       } catch (err) {
         console.error("payroll/micpal/sync error:", err);
@@ -1632,118 +1860,18 @@ const Router = () => {
       }
 
       const [y, m] = month.split("-");
-      const xl = new MicpImportXL({
-        company,
-        year: y || "",
-        month: m ? String(Number(m)) : "",
-      });
+      const monthInt = m ? String(Number(m)) : "";
+      const ctx = {
+        empByName,
+        micpalByIdNmbr,
+        stdDays,
+        stdHours,
+        minHourlyWage: Number(process.env.MIN_HOURLY_WAGE) || 35.4,
+      };
+      const employees = list.map((emp) => buildExportRow(emp, ctx));
 
-      const employees = list.map((emp) => {
-        const payroll = emp.payroll_data || {};
-        let h100 = 0,
-          h125 = 0,
-          h150 = 0,
-          shabbat = 0,
-          holiday = 0,
-          tip = 0,
-          completion = 0;
-        for (const [, payload] of Object.entries(payroll)) {
-          const hours = (payload && payload.hours) || [];
-          h100 += Number(hours[0] || 0);
-          h125 += Number(hours[1] || 0);
-          h150 += Number(hours[2] || 0);
-          shabbat += Number(hours[3] || 0);
-          holiday += Number(hours[4] || 0);
-          tip += Number((payload && payload.tip) || 0);
-          completion += Number((payload && payload.completion) || 0);
-        }
-        const name = (emp.name || "").trim();
-        const dbEmp = empByName.get(name) || {};
-        const idNmbr = dbEmp.ID_nmbr
-          ? String(dbEmp.ID_nmbr).trim()
-          : emp.ID_nmbr
-            ? String(emp.ID_nmbr).trim()
-            : "";
-        const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 35.4;
-        const newWageType = dbEmp.new_wage_type || null;
-        const wageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
-        // Hourly rate written to the export's שכר שעתי column:
-        //   hourly_min_* → MIN_HOURLY_WAGE (the bonus pays the difference)
-        //   hourly_*     → the wage field
-        //   global_* / unset → blank (no hourly rate)
-        let hourlyWage = null;
-        if (newWageType && newWageType.startsWith("hourly_min_")) {
-          hourlyWage = MIN_HOURLY_WAGE;
-        } else if (newWageType && newWageType.startsWith("hourly_")) {
-          hourlyWage = wageVal;
-        }
-        // Bonus = (wage − MIN_HOURLY_WAGE) × (h100 + 1.25·h125 + 1.5·h150)
-        // Only emitted for hourly_min_* types where a real wage is set.
-        let bonus = "";
-        if (
-          newWageType &&
-          newWageType.startsWith("hourly_min_") &&
-          wageVal != null &&
-          wageVal > 0
-        ) {
-          const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
-          bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
-        }
-        const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
-        // For global types the salary is a fixed monthly amount → goes into
-        // "סכום". Hours and hourly wage columns stay empty for those rows.
-        const isGlobal = !!newWageType && newWageType.startsWith("global_");
-        const amount = isGlobal && wageVal != null ? wageVal : "";
-        const dailyTravel =
-          dbEmp.travel != null
-            ? Number(dbEmp.travel)
-            : emp.travel != null && emp.travel !== ""
-              ? Number(emp.travel)
-              : null;
-        const maxTravel =
-          dbEmp.maxTravel != null
-            ? Number(dbEmp.maxTravel)
-            : emp.maxTravel != null && emp.maxTravel !== ""
-              ? Number(emp.maxTravel)
-              : null;
-        const workdays = emp.workdays != null ? Number(emp.workdays) : 0;
-        let travelAmount = "";
-        if (maxTravel != null) {
-          if (dailyTravel == null || dailyTravel * workdays > maxTravel) {
-            travelAmount = maxTravel;
-          } else {
-            travelAmount = dailyTravel * workdays;
-          }
-        } else if (dailyTravel != null) {
-          travelAmount = dailyTravel * workdays;
-        }
-        return {
-          name,
-          keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
-          ID_nmbr: idNmbr,
-          vacation: "",
-          hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
-          workdays: isGlobal ? "" : workdays || "",
-          hours100: isGlobal ? "" : h100 || "",
-          wage125: !isGlobal && hourlyWage != null ? hourlyWage * 1.25 : "",
-          hours125: isGlobal ? "" : h125 || "",
-          wage150: !isGlobal && hourlyWage != null ? hourlyWage * 1.5 : "",
-          hours150: isGlobal ? "" : h150 || "",
-          hoursSum: isGlobal ? "" : h100 + h125 + h150 || "",
-          shabbat: isGlobal ? "" : shabbat || "",
-          holiday: isGlobal ? "" : holiday || "",
-          net: netFlag,
-          travel: travelAmount,
-          completion: tip + completion || "",
-          bonus,
-          amount,
-          standardDays: stdDays ?? "",
-          standardHours: stdHours ?? "",
-        };
-      });
-
-      // Split: rows missing a Micpal keyName (מס עובד) are reported back to
-      // the UI instead of being written to the xlsx.
+      // Split: rows missing a payroll-soft employee number (מס עובד) are
+      // reported back to the UI instead of being written to the xlsx.
       const exportable = [];
       const missing = [];
       for (const row of employees) {
@@ -1753,12 +1881,33 @@ const Router = () => {
           exportable.push(row);
         }
       }
-      const buf = await xl.generate(exportable);
+
+      // Dispatch by the restaurant's payroll software.
+      const payrollSoft = payrollSoftForBranch(rest) || "mic";
       const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
-      const filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+      let buf;
+      let filename;
+      if (payrollSoft === "shik") {
+        const shikRows = exportable.map((r) => ({
+          ...r,
+          employeeNumber: Number(r.keyName),
+        }));
+        const xl = new ShikImportXL({ year: y || "", month: monthInt });
+        buf = await xl.generate(shikRows);
+        filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
+      } else {
+        const xl = new MicpImportXL({
+          company,
+          year: y || "",
+          month: monthInt,
+        });
+        buf = await xl.generate(exportable);
+        filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+      }
       res.json({
         filename,
         xlsxBase64: Buffer.from(buf).toString("base64"),
+        payrollSoft,
         missing,
         exported: exportable.length,
       });
