@@ -45,7 +45,7 @@ const fmtNum = (n, decimals = 2) => {
 
 // National minimum hourly wage — used as a substitute when an employee's
 // configured hourly wage is the special marker -1.
-const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 34.42;
+const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 35.40;
 
 // Build a per-employee record map keyed by ID_nmbr / name.
 // Each entry: { roles: { role: wage }, hourly_wage, wage_type, global, travel }
@@ -84,7 +84,7 @@ const lookupEmpData = (wageMap, emp) => {
 // Wage resolution per spec:
 //   1. role-level wage from employees.roles JSON
 //   2. fallback: employees.hourly_wage
-//   3. -1 → 34.42 (national minimum)
+//   3. -1 → 35.40 (national minimum)
 const resolveHourlyWage = (empData, role) => {
   let wage = empData?.roles?.[role];
   if (wage == null) wage = empData?.hourly_wage;
@@ -352,6 +352,9 @@ const Shifts = () => {
   const [payrollError, setPayrollError] = useState(null);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  // After a Micpal XL download: employees that were skipped because no
+  // Micpal keyName (מס עובד) was found for them.
+  const [micpalMissing, setMicpalMissing] = useState(null);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
 
   // Shift validation
@@ -1014,19 +1017,27 @@ const Shifts = () => {
       };
       const res = await axios.post("/admin/payroll/export-micpal", payload, {
         withCredentials: true,
-        responseType: "blob",
       });
-      const blob = new Blob([res.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `micpal_import_${month || "month"}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const { xlsxBase64, filename, missing } = res.data || {};
+      if (xlsxBase64) {
+        const binary = atob(xlsxBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || `micpal_import_${month || "month"}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      if (Array.isArray(missing) && missing.length > 0) {
+        setMicpalMissing(missing);
+      }
     } catch (err) {
       console.error("export-micpal error:", err);
       setDownloadError(err.message || "download failed");
@@ -2721,9 +2732,129 @@ const Shifts = () => {
     );
   };
 
+  const renderMicpalMissingDialog = () => {
+    if (!micpalMissing || micpalMissing.length === 0) return null;
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          zIndex: 2100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+        onClick={() => setMicpalMissing(null)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: theme.surface,
+            color: theme.text,
+            borderRadius: "10px",
+            padding: "20px",
+            width: "100%",
+            maxWidth: "560px",
+            maxHeight: "80vh",
+            overflowY: "auto",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "12px",
+            }}
+          >
+            <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+              Micpal missing employees ({micpalMissing.length})
+            </div>
+            <button
+              type="button"
+              onClick={() => setMicpalMissing(null)}
+              aria-label="Close"
+              style={{
+                background: "none",
+                border: "none",
+                color: theme.text,
+                cursor: "pointer",
+                fontSize: "1.4rem",
+                lineHeight: 1,
+                padding: "2px 8px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: "0.9rem",
+              color: theme.textSecondary,
+              marginBottom: "10px",
+            }}
+          >
+            These employees have no Micpal employee number (מס עובד) and were
+            skipped in the export.
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    textAlign: "right",
+                    padding: "6px 8px",
+                    borderBottom: `1px solid ${theme.border}`,
+                  }}
+                >
+                  Name
+                </th>
+                <th
+                  style={{
+                    textAlign: "right",
+                    padding: "6px 8px",
+                    borderBottom: `1px solid ${theme.border}`,
+                  }}
+                >
+                  ID number
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {micpalMissing.map((m, i) => (
+                <tr key={i}>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      borderBottom: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    {m.name || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      borderBottom: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    {m.ID_nmbr || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={styles.container}>
       {renderLaborDialog()}
+      {renderMicpalMissingDialog()}
       {savingPayroll && (
         <div
           style={{

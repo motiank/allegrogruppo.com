@@ -9,6 +9,30 @@ const {
   extractEmployees,
 } = require("../../../payroll-summary/payroll_summary.js");
 const ExcelJS = require("exceljs");
+const RESTAURANTS = require("../../../shared/restaurants.json");
+
+const RESTAURANT_GROUPS = RESTAURANTS.restaurants || [];
+
+// Find the mic_company code for a given branch id. Returns "" if not mapped.
+const micCompanyForBranch = (branchId) => {
+  for (const g of RESTAURANT_GROUPS) {
+    if (!g.mic_company) continue;
+    if ((g.branches || []).some((b) => b.id === branchId)) return g.mic_company;
+  }
+  return "";
+};
+
+// Global working days for a YYYY-MM. Returns null if not configured.
+const workingDaysFor = (month) => {
+  const v = RESTAURANTS.working_days?.[month];
+  return Number.isFinite(Number(v)) ? Number(v) : null;
+};
+
+// Global working hours for a YYYY-MM. Returns null if not configured.
+const workingHoursFor = (month) => {
+  const v = RESTAURANTS.working_hours?.[month];
+  return Number.isFinite(Number(v)) ? Number(v) : null;
+};
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -282,8 +306,8 @@ const Router = () => {
       const scope = String(req.body?.scope || "").trim();
       const sql =
         scope === "all"
-          ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, maxTravel, contractor, active, duplicate FROM employees WHERE rest = :rest"
-          : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, travel, maxTravel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
+          ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, new_wage_type, wage, travel, maxTravel, contractor, active, duplicate FROM employees WHERE rest = :rest"
+          : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, new_wage_type, wage, travel, maxTravel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
       const [rows] = await executeSql(sql, { rest });
       const out = [];
       for (const r of rows || []) {
@@ -306,6 +330,8 @@ const Router = () => {
           global: asDecimalString(r.global),
           hourly_wage: asDecimalString(r.hourly_wage),
           wage_type: r.wage_type || null,
+          new_wage_type: r.new_wage_type || null,
+          wage: asDecimalString(r.wage),
           travel: asDecimalString(r.travel),
           maxTravel: asDecimalString(r.maxTravel),
           contractor: !!r.contractor,
@@ -356,9 +382,33 @@ const Router = () => {
                 }))
             : [],
         );
-        const globalVal = toDecimalString(emp.global);
-        const hourlyWageVal = toDecimalString(emp.hourly_wage);
-        const wageType = emp.wage_type === "net" ? "net" : "gross";
+        const NEW_WAGE_TYPES = new Set([
+          "global_net",
+          "global_gross",
+          "hourly_net",
+          "hourly_gross",
+          "hourly_min_net",
+          "hourly_min_gross",
+        ]);
+        const newWageType = NEW_WAGE_TYPES.has(emp.new_wage_type)
+          ? emp.new_wage_type
+          : null;
+        const wageVal = toDecimalString(emp.wage);
+        // Derive legacy columns (global / hourly_wage / wage_type) from the
+        // new compound type + wage so older readers keep working.
+        let globalVal = null;
+        let hourlyWageVal = null;
+        let wageType = null;
+        if (newWageType) {
+          wageType = newWageType.endsWith("_net") ? "net" : "gross";
+          if (newWageType.startsWith("global_")) {
+            globalVal = wageVal;
+          } else if (newWageType.startsWith("hourly_min_")) {
+            hourlyWageVal = "-1";
+          } else {
+            hourlyWageVal = wageVal;
+          }
+        }
         const travelVal = toDecimalString(emp.travel);
         const maxTravelVal = toDecimalString(emp.maxTravel);
         try {
@@ -371,6 +421,8 @@ const Router = () => {
                  \`global\` = :gbl,
                  hourly_wage = :hw,
                  wage_type = :wt,
+                 new_wage_type = :nwt,
+                 wage = :wage,
                  travel = :tr,
                  maxTravel = :mtr,
                  contractor = :ctr
@@ -382,6 +434,8 @@ const Router = () => {
               gbl: globalVal,
               hw: hourlyWageVal,
               wt: wageType,
+              nwt: newWageType,
+              wage: wageVal,
               tr: travelVal,
               mtr: maxTravelVal,
               ctr: emp.contractor ? 1 : 0,
@@ -733,7 +787,7 @@ const Router = () => {
   router.post("/micpal/list", async (_req, res) => {
     try {
       const [rows] = await executeSql(
-        "SELECT keyName, name, family, ID_nmbr FROM micpal",
+        "SELECT keyName, name, family, ID_nmbr FROM payroll_soft_ix",
         {},
       );
       res.json({ rows: rows || [] });
@@ -889,9 +943,11 @@ const Router = () => {
         const pool = getDbPool();
 
         const [[{ cnt: countBefore }]] = await pool.query(
-          "SELECT COUNT(*) AS cnt FROM micpal",
+          "SELECT COUNT(*) AS cnt FROM payroll_soft_ix",
         );
-        const [createResult] = await pool.query("SHOW CREATE TABLE micpal");
+        const [createResult] = await pool.query(
+          "SHOW CREATE TABLE payroll_soft_ix",
+        );
         console.log(`micpal table DDL:`, createResult[0]?.["Create Table"]);
         console.log(
           `micpal sync: ${items.length} items to upsert, ${countBefore} rows in table before`,
@@ -914,7 +970,7 @@ const Router = () => {
           const placeholders = chunk.map(() => "(?,?,?,?,?)").join(",");
           try {
             const [result] = await pool.query(
-              `INSERT INTO micpal (keyName, mic_nmbr, name, family, ID_nmbr)
+              `INSERT INTO payroll_soft_ix (keyName, mic_nmbr, name, family, ID_nmbr)
                VALUES ${placeholders} AS new_vals
                ON DUPLICATE KEY UPDATE
                  mic_nmbr = new_vals.mic_nmbr,
@@ -941,7 +997,7 @@ const Router = () => {
         }
 
         const [[{ cnt: countAfter }]] = await pool.query(
-          "SELECT COUNT(*) AS cnt FROM micpal",
+          "SELECT COUNT(*) AS cnt FROM payroll_soft_ix",
         );
         console.log(
           `micpal sync: ${countAfter} rows in table after (was ${countBefore})`,
@@ -951,14 +1007,16 @@ const Router = () => {
             "micpal sync: WARNING — row count unchanged! Checking overlap...",
           );
           const [[{ overlap }]] = await pool.query(
-            `SELECT COUNT(*) AS overlap FROM micpal WHERE keyName IN (${items.map(() => "?").join(",")})`,
+            `SELECT COUNT(*) AS overlap FROM payroll_soft_ix WHERE keyName IN (${items.map(() => "?").join(",")})`,
             items.map((it) => it[0]),
           );
           console.log(
             `micpal sync: ${overlap} of ${items.length} file keyNames already exist in table`,
           );
           const fileKeys = new Set(items.map((it) => it[0]));
-          const [existingRows] = await pool.query("SELECT keyName FROM micpal");
+          const [existingRows] = await pool.query(
+            "SELECT keyName FROM payroll_soft_ix",
+          );
           const dbKeys = new Set(existingRows.map((r) => r.keyName));
           const missingFromDb = [...fileKeys].filter((k) => !dbKeys.has(k));
           console.log(
@@ -1313,7 +1371,7 @@ const Router = () => {
         `IF(ISNUMBER(I${r}),I${r},0)+IF(ISNUMBER(J${r}),J${r},0),` +
         `(IF(ISNUMBER(E${r}),E${r},0)+IF(ISNUMBER(F${r}),F${r},0)*1.25+IF(ISNUMBER(G${r}),G${r},0)*1.5)*IF(ISNUMBER(C${r}),C${r},0)),0)`;
 
-      const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 34.42;
+      const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 35.4;
       const wageTypeLabel = (t) =>
         t === "gross" ? "ברוטו" : t === "net" ? "נטו" : "";
       const resolveWage = (emp, role) => {
@@ -1539,8 +1597,15 @@ const Router = () => {
     try {
       const rest = String(req.body?.rest || "").trim();
       const month = String(req.body?.month || "").trim();
-      const company = String(req.body?.company || "").trim();
+      // A2 in the Micpal xlsx is the mic_company code, looked up by branch id
+      // from shared/restaurants.json. Falls back to the optional body field.
+      const company =
+        micCompanyForBranch(rest) || String(req.body?.company || "").trim();
       const restLabel = String(req.body?.restLabel || rest);
+      // Standard working days/hours for this branch+month from
+      // shared/restaurants.json. תקן שעות = 8 × תקן ימים.
+      const stdDays = workingDaysFor(month);
+      const stdHours = workingHoursFor(month);
       const list = Array.isArray(req.body?.employees) ? req.body.employees : [];
       if (list.length === 0) {
         return res.status(400).json({ error: "No employees in body" });
@@ -1548,7 +1613,7 @@ const Router = () => {
 
       // Load employee records from DB (ID_nmbr, travel, maxTravel)
       const [empRows] = await executeSql(
-        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
         { rest },
       );
       const empByName = new Map();
@@ -1558,7 +1623,7 @@ const Router = () => {
 
       // Load micpal keyName mapping by ID_nmbr
       const [micpalRows] = await executeSql(
-        "SELECT keyName, ID_nmbr FROM micpal WHERE ID_nmbr IS NOT NULL",
+        "SELECT keyName, ID_nmbr FROM payroll_soft_ix WHERE ID_nmbr IS NOT NULL",
         {},
       );
       const micpalByIdNmbr = new Map();
@@ -1599,12 +1664,36 @@ const Router = () => {
           : emp.ID_nmbr
             ? String(emp.ID_nmbr).trim()
             : "";
-        const hourlyWage =
-          dbEmp.hourly_wage != null
-            ? Number(dbEmp.hourly_wage)
-            : emp.hourly_wage != null
-              ? Number(emp.hourly_wage)
-              : null;
+        const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 35.4;
+        const newWageType = dbEmp.new_wage_type || null;
+        const wageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
+        // Hourly rate written to the export's שכר שעתי column:
+        //   hourly_min_* → MIN_HOURLY_WAGE (the bonus pays the difference)
+        //   hourly_*     → the wage field
+        //   global_* / unset → blank (no hourly rate)
+        let hourlyWage = null;
+        if (newWageType && newWageType.startsWith("hourly_min_")) {
+          hourlyWage = MIN_HOURLY_WAGE;
+        } else if (newWageType && newWageType.startsWith("hourly_")) {
+          hourlyWage = wageVal;
+        }
+        // Bonus = (wage − MIN_HOURLY_WAGE) × (h100 + 1.25·h125 + 1.5·h150)
+        // Only emitted for hourly_min_* types where a real wage is set.
+        let bonus = "";
+        if (
+          newWageType &&
+          newWageType.startsWith("hourly_min_") &&
+          wageVal != null &&
+          wageVal > 0
+        ) {
+          const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
+          bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
+        }
+        const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
+        // For global types the salary is a fixed monthly amount → goes into
+        // "סכום". Hours and hourly wage columns stay empty for those rows.
+        const isGlobal = !!newWageType && newWageType.startsWith("global_");
+        const amount = isGlobal && wageVal != null ? wageVal : "";
         const dailyTravel =
           dbEmp.travel != null
             ? Number(dbEmp.travel)
@@ -1629,37 +1718,50 @@ const Router = () => {
           travelAmount = dailyTravel * workdays;
         }
         return {
+          name,
           keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
           ID_nmbr: idNmbr,
           vacation: "",
-          hourlyWage:
-            hourlyWage === -1
-              ? Number(process.env.MIN_HOURLY_WAGE) || 34.42
-              : (hourlyWage ?? ""),
-          workdays: workdays || "",
-          hours100: h100 || "",
-          hours125: h125 || "",
-          hours150: h150 || "",
-          shabbat: shabbat || "",
-          holiday: holiday || "",
-          net: emp.wage_type === "net" ? "כן" : "",
+          hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
+          workdays: isGlobal ? "" : workdays || "",
+          hours100: isGlobal ? "" : h100 || "",
+          wage125: !isGlobal && hourlyWage != null ? hourlyWage * 1.25 : "",
+          hours125: isGlobal ? "" : h125 || "",
+          wage150: !isGlobal && hourlyWage != null ? hourlyWage * 1.5 : "",
+          hours150: isGlobal ? "" : h150 || "",
+          hoursSum: isGlobal ? "" : h100 + h125 + h150 || "",
+          shabbat: isGlobal ? "" : shabbat || "",
+          holiday: isGlobal ? "" : holiday || "",
+          net: netFlag,
           travel: travelAmount,
           completion: tip + completion || "",
+          bonus,
+          amount,
+          standardDays: stdDays ?? "",
+          standardHours: stdHours ?? "",
         };
       });
 
-      const buf = await xl.generate(employees);
+      // Split: rows missing a Micpal keyName (מס עובד) are reported back to
+      // the UI instead of being written to the xlsx.
+      const exportable = [];
+      const missing = [];
+      for (const row of employees) {
+        if (!row.keyName) {
+          missing.push({ name: row.name || "", ID_nmbr: row.ID_nmbr || "" });
+        } else {
+          exportable.push(row);
+        }
+      }
+      const buf = await xl.generate(exportable);
       const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
       const filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
-      res.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      );
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${encodeURIComponent(filename)}"`,
-      );
-      res.send(Buffer.from(buf));
+      res.json({
+        filename,
+        xlsxBase64: Buffer.from(buf).toString("base64"),
+        missing,
+        exported: exportable.length,
+      });
     } catch (err) {
       console.error("payroll/export-micpal error:", err);
       res.status(500).json({ error: err.message || "micpal export failed" });

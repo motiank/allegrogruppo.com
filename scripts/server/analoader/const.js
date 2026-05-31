@@ -1,6 +1,7 @@
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const allRestaurants = require("../../../shared/restaurants.json");
+const sharedRestaurants = require("../../../shared/restaurants.json");
+const allRestaurants = sharedRestaurants.restaurants;
 
 const rest_map = {};
 for (const g of allRestaurants) {

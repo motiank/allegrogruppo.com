@@ -3,11 +3,10 @@ const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
 
 class MicpImportXL {
-  constructor({ company, year, month, department }) {
+  constructor({ company, year, month }) {
     this.company = company || "";
     this.year = year || "";
     this.month = month || "";
-    this.department = department || "";
   }
 
   async generate(employees) {
@@ -32,6 +31,12 @@ class MicpImportXL {
     ws.getColumn(12).width = 14;
     ws.getColumn(13).width = 14;
     ws.getColumn(14).width = 14;
+    ws.getColumn(15).width = 14;
+    ws.getColumn(16).width = 14;
+    ws.getColumn(17).width = 14;
+    ws.getColumn(18).width = 14;
+    ws.getColumn(19).width = 14;
+    ws.getColumn(20).width = 14;
 
     // Row 1: labels
     const r1 = ws.getRow(1);
@@ -56,14 +61,20 @@ class MicpImportXL {
       "שכר שעתי",
       "ימי עבודה",
       "שעות 100%",
+      "שכר 125%",
       "שעות 125%",
+      "שכר 150%",
       "שעות 150%",
+      "שעות",
       "שבת",
       "חג",
+      "סכום",
       "נטו",
       "נסיעות",
       "השלמה",
-      "מחלקה",
+      "בונוס",
+      "תקן ימים",
+      "תקן שעות",
     ];
     const r4 = ws.getRow(4);
     headers.forEach((h, i) => {
@@ -76,11 +87,12 @@ class MicpImportXL {
       };
     });
 
-    const numCols = [3, 4, 6, 7, 8, 9, 10, 12, 13];
+    const numCols = [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20];
     for (const c of numCols) {
       ws.getColumn(c).numFmt = "0.00";
     }
     ws.getColumn(5).numFmt = "0";
+    ws.getColumn(19).numFmt = "0";
 
     const toNum = (v) => {
       if (v === "" || v == null) return "";
@@ -98,14 +110,20 @@ class MicpImportXL {
       row.getCell(4).value = toNum(emp.hourlyWage);
       row.getCell(5).value = toNum(emp.workdays);
       row.getCell(6).value = toNum(emp.hours100);
-      row.getCell(7).value = toNum(emp.hours125);
-      row.getCell(8).value = toNum(emp.hours150);
-      row.getCell(9).value = toNum(emp.shabbat);
-      row.getCell(10).value = toNum(emp.holiday);
-      row.getCell(11).value = emp.net ?? "";
-      row.getCell(12).value = toNum(emp.travel);
-      row.getCell(13).value = toNum(emp.completion);
-      row.getCell(14).value = this.department || "";
+      row.getCell(7).value = toNum(emp.wage125);
+      row.getCell(8).value = toNum(emp.hours125);
+      row.getCell(9).value = toNum(emp.wage150);
+      row.getCell(10).value = toNum(emp.hours150);
+      row.getCell(11).value = toNum(emp.hoursSum);
+      row.getCell(12).value = toNum(emp.shabbat);
+      row.getCell(13).value = toNum(emp.holiday);
+      row.getCell(14).value = toNum(emp.amount);
+      row.getCell(15).value = emp.net ?? "";
+      row.getCell(16).value = toNum(emp.travel);
+      row.getCell(17).value = toNum(emp.completion);
+      row.getCell(18).value = toNum(emp.bonus);
+      row.getCell(19).value = toNum(emp.standardDays);
+      row.getCell(20).value = toNum(emp.standardHours);
     }
 
     return wb.xlsx.writeBuffer();

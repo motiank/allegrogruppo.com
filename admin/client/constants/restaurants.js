@@ -1,4 +1,6 @@
-import allRestaurants from "../../../shared/restaurants.json";
+import sharedRestaurants from "../../../shared/restaurants.json";
+
+const allRestaurants = sharedRestaurants.restaurants;
 
 export const RESTAURANT_GROUPS = allRestaurants.map((g) => ({
   label: g.label,

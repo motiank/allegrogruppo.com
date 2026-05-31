@@ -63,6 +63,28 @@ const Employees = () => {
   const [micpalResult, setMicpalResult] = useState(null);
   const [micpalError, setMicpalError] = useState(null);
   const micpalFileInputRef = useRef(null);
+  // Wage dialog: { empIdx, new_wage_type, wage } when open, null otherwise.
+  const [wageDialog, setWageDialog] = useState(null);
+
+  const WAGE_TYPE_OPTIONS = [
+    { value: "global_gross", label: "Global · Gross" },
+    { value: "global_net", label: "Global · Net" },
+    { value: "hourly_gross", label: "Hourly · Gross" },
+    { value: "hourly_net", label: "Hourly · Net" },
+    { value: "hourly_min_gross", label: "Hourly min · Gross" },
+    { value: "hourly_min_net", label: "Hourly min · Net" },
+  ];
+  const wageTypeLabel = (t) =>
+    WAGE_TYPE_OPTIONS.find((o) => o.value === t)?.label || "";
+  const isMinWageType = (t) =>
+    t === "hourly_min_gross" || t === "hourly_min_net";
+  const formatWageCell = (emp) => {
+    if (!emp.new_wage_type) return "—";
+    const label = wageTypeLabel(emp.new_wage_type);
+    return emp.wage !== "" && emp.wage != null
+      ? `${emp.wage} · ${label}`
+      : label;
+  };
 
   useEffect(() => {
     if (menuOpenFor == null) return;
@@ -84,20 +106,14 @@ const Employees = () => {
     return Number.isFinite(n);
   };
 
-  const isMissingAllWages = (emp) => {
-    if (hasWageValue(emp.global)) return false;
-    if (hasWageValue(emp.hourly_wage)) return false;
-    if ((emp.roles || []).some((r) => hasWageValue(r.wage))) return false;
-    return true;
-  };
-
   const isActive = (emp) => emp.active !== false && emp.duplicate == null;
   const isRemoved = (emp) => emp.active === false;
   const isDuplicate = (emp) => emp.duplicate != null;
-  const matchesMissingFilter = (emp) =>
-    isActive(emp) &&
-    !hasWageValue(emp.global) &&
-    !hasWageValue(emp.hourly_wage);
+  // "Has a wage" means there's a new_wage_type set AND either a wage value
+  // (which can be -1 for hourly_min_*) or the type itself implies one.
+  const hasResolvedWage = (emp) =>
+    !!emp.new_wage_type && hasWageValue(emp.wage);
+  const matchesMissingFilter = (emp) => isActive(emp) && !hasResolvedWage(emp);
 
   const counts = useMemo(() => {
     let active = 0;
@@ -164,7 +180,7 @@ const Employees = () => {
           emp.ID_nmbr,
           emp.phone,
           emp.employee_id,
-          emp.wage_type,
+          emp.new_wage_type,
           ...(emp.roles || []).map((r) => r.role),
         ]
           .filter(Boolean)
@@ -204,9 +220,8 @@ const Employees = () => {
         ID_nmbr: e.ID_nmbr,
         phone: e.phone || "",
         name: e.name,
-        global: e.global == null ? "" : String(e.global),
-        hourly_wage: e.hourly_wage == null ? "" : String(e.hourly_wage),
-        wage_type: e.wage_type === "net" ? "net" : "gross",
+        new_wage_type: e.new_wage_type || "",
+        wage: e.wage == null ? "" : String(e.wage),
         travel: e.travel == null ? "" : String(e.travel),
         maxTravel: e.maxTravel == null ? "" : String(e.maxTravel),
         contractor: !!e.contractor,
@@ -248,30 +263,10 @@ const Employees = () => {
     setSaveResult(null);
   };
 
-  const updateGlobal = (empIdx, val) => {
+  const updateWageFields = (empIdx, { new_wage_type, wage }) => {
     setEmployees((prev) => {
       const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], global: val };
-      return next;
-    });
-    setDirty(true);
-    setSaveResult(null);
-  };
-
-  const updateHourlyWage = (empIdx, val) => {
-    setEmployees((prev) => {
-      const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], hourly_wage: val };
-      return next;
-    });
-    setDirty(true);
-    setSaveResult(null);
-  };
-
-  const updateWageType = (empIdx, val) => {
-    setEmployees((prev) => {
-      const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], wage_type: val };
+      next[empIdx] = { ...next[empIdx], new_wage_type, wage };
       return next;
     });
     setDirty(true);
@@ -685,9 +680,8 @@ const Employees = () => {
           company: e.company,
           name: e.name,
           roles: e.roles,
-          global: e.global,
-          hourly_wage: e.hourly_wage,
-          wage_type: e.wage_type,
+          new_wage_type: e.new_wage_type || null,
+          wage: e.wage,
           travel: e.travel,
           maxTravel: e.maxTravel,
           contractor: !!e.contractor,
@@ -1211,9 +1205,7 @@ const Employees = () => {
                   <tr>
                     <th style={styles.th}>name</th>
                     <th style={styles.th}>ID_nmbr</th>
-                    <th style={styles.th}>global wage</th>
-                    <th style={styles.th}>hourly_wage</th>
-                    <th style={styles.th}>wage_type</th>
+                    <th style={styles.th}>wage</th>
                     <th style={styles.th}>travel</th>
                     <th style={styles.th}>maxTravel</th>
                     <th style={styles.th}>contractor</th>
@@ -1254,48 +1246,20 @@ const Employees = () => {
                                 rowSpan={roles.length}
                                 style={styles.tdEmpBoundary}
                               >
-                                <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  placeholder="—"
-                                  style={styles.wageInput}
-                                  value={emp.global}
-                                  onChange={(ev) =>
-                                    updateGlobal(empIdx, ev.target.value)
+                                <button
+                                  type="button"
+                                  style={styles.toggleButton}
+                                  onClick={() =>
+                                    setWageDialog({
+                                      empIdx,
+                                      new_wage_type: emp.new_wage_type || "",
+                                      wage: emp.wage || "",
+                                    })
                                   }
-                                />
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  placeholder="—"
-                                  style={styles.wageInput}
-                                  value={emp.hourly_wage}
-                                  onChange={(ev) =>
-                                    updateHourlyWage(empIdx, ev.target.value)
-                                  }
-                                />
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <select
-                                  style={styles.wageInput}
-                                  value={emp.wage_type}
-                                  onChange={(ev) =>
-                                    updateWageType(empIdx, ev.target.value)
-                                  }
+                                  title="Set wage"
                                 >
-                                  <option value="gross">gross</option>
-                                  <option value="net">net</option>
-                                </select>
+                                  {formatWageCell(emp)}
+                                </button>
                               </td>
                               <td
                                 rowSpan={roles.length}
@@ -1843,6 +1807,78 @@ const Employees = () => {
                   {matchUpdating ? "Updating…" : "Update"}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {wageDialog && (
+        <div style={styles.modalBackdrop} onClick={() => setWageDialog(null)}>
+          <div style={styles.modal} onClick={(ev) => ev.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              Set wage for{" "}
+              <span style={{ color: theme.active || "#2196f3" }}>
+                {employees[wageDialog.empIdx]?.name || "(no name)"}
+              </span>
+            </div>
+            <div style={styles.modalBody}>
+              <label style={styles.label}>Wage type</label>
+              <select
+                style={styles.select}
+                value={wageDialog.new_wage_type}
+                onChange={(ev) =>
+                  setWageDialog((d) => ({
+                    ...d,
+                    new_wage_type: ev.target.value,
+                  }))
+                }
+                autoFocus
+              >
+                <option value="">-- choose --</option>
+                {WAGE_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <label style={styles.label}>Wage</label>
+              <input
+                type="number"
+                step="any"
+                placeholder="—"
+                style={styles.searchInput}
+                value={wageDialog.wage}
+                onChange={(ev) =>
+                  setWageDialog((d) => ({ ...d, wage: ev.target.value }))
+                }
+              />
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                type="button"
+                style={styles.secondaryButton}
+                onClick={() => setWageDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...styles.primaryButton,
+                  opacity: wageDialog.new_wage_type ? 1 : 0.6,
+                  cursor: wageDialog.new_wage_type ? "pointer" : "default",
+                }}
+                disabled={!wageDialog.new_wage_type}
+                onClick={() => {
+                  updateWageFields(wageDialog.empIdx, {
+                    new_wage_type: wageDialog.new_wage_type,
+                    wage: wageDialog.wage,
+                  });
+                  setWageDialog(null);
+                }}
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>

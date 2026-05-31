@@ -81,3 +81,34 @@ delete from employees where rest = '5ff419934676f0fddabaef3a';
 
 
 5ff419934676f0fddabaef3a
+
+ALTER TABLE employees
+  ADD COLUMN new_wage_type ENUM('global_net','global_gross','hourly_net','hourly_gross','hourly_min_net','hourly_min_gross') NULL AFTER wage_type,
+  ADD COLUMN wage DECIMAL(10,2) NULL AFTER new_wage_type;
+
+-- Backfill new_wage_type + wage from legacy columns
+-- Rules:
+--   global IS NOT NULL              -> wage = global,      new_wage_type = global_<wage_type>
+--   hourly_wage = -1                -> wage = -1,          new_wage_type = hourly_min_<wage_type>
+--   hourly_wage IS NOT NULL (other) -> wage = hourly_wage, new_wage_type = hourly_<wage_type>
+UPDATE employees
+SET
+  wage = CASE
+    WHEN `global` IS NOT NULL THEN `global`
+    WHEN hourly_wage IS NOT NULL THEN hourly_wage
+    ELSE wage
+  END,
+  new_wage_type = CASE
+    WHEN `global` IS NOT NULL AND wage_type = 'gross' THEN 'global_gross'
+    WHEN `global` IS NOT NULL AND wage_type = 'net'   THEN 'global_net'
+    WHEN hourly_wage = -1      AND wage_type = 'gross' THEN 'hourly_min_gross'
+    WHEN hourly_wage = -1      AND wage_type = 'net'   THEN 'hourly_min_net'
+    WHEN hourly_wage IS NOT NULL AND wage_type = 'gross' THEN 'hourly_gross'
+    WHEN hourly_wage IS NOT NULL AND wage_type = 'net'   THEN 'hourly_net'
+    ELSE new_wage_type
+  END
+WHERE `global` IS NOT NULL OR hourly_wage IS NOT NULL;
+
+-- Rename micpal -> payroll_soft_ix (the table now backs all payroll-software
+-- employee indexes, not only Micpal).
+RENAME TABLE micpal TO payroll_soft_ix;
