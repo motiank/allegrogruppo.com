@@ -1,7 +1,9 @@
 // Shiklulit (שיקלולית) import-format exporter.
 //
-// Long-format: one row per payroll component per employee. Header columns:
-//   workMonth, employeeNumber, recordType, componentCode, rate, quantity
+// Long-format: one row per payroll component per employee. Header columns use
+// the Hebrew field names from Tamal's import spec
+// (ייבוא-נתוני-נוכחות-מאקסל-לשיקלולית), in this order:
+//   חודש עבודה, מספר עובד, סוג רשומה, קוד רכיב, תעריף, כמות
 //
 // Record types:
 //   1 = salary components
@@ -15,13 +17,16 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
 
+// Column header labels, in order. Hebrew field names per Tamal's Shiklulit
+// import spec. The data rows are written positionally (getCell(1..6)), so these
+// strings only drive the displayed header row.
 export const SHIK_HEADERS = [
-  "workMonth",
-  "employeeNumber",
-  "recordType",
-  "componentCode",
-  "rate",
-  "quantity",
+  "חודש עבודה", // workMonth
+  "מספר עובד", // employeeNumber
+  "סוג רשומה", // recordType
+  "קוד רכיב", // componentCode
+  "תעריף", // rate
+  "כמות", // quantity
 ];
 
 export const SHIK_RECORD_TYPES = {
@@ -131,7 +136,9 @@ class ShikImportXL {
     const wb = new ExcelJS.Workbook();
     wb.creator = "allegro-payroll";
     wb.created = new Date();
-    const ws = wb.addWorksheet("Shiklulit Import");
+    const ws = wb.addWorksheet("Shiklulit Import", {
+      views: [{ rightToLeft: true }],
+    });
 
     SHIK_HEADERS.forEach((h, i) => (ws.getColumn(i + 1).width = 16));
 

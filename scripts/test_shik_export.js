@@ -147,12 +147,12 @@ console.log("✓ all assertions passed");
 
 // Header check + write a sample xlsx so it can be inspected.
 assert.deepEqual(SHIK_HEADERS, [
-  "workMonth",
-  "employeeNumber",
-  "recordType",
-  "componentCode",
-  "rate",
-  "quantity",
+  "חודש עבודה",
+  "מספר עובד",
+  "סוג רשומה",
+  "קוד רכיב",
+  "תעריף",
+  "כמות",
 ]);
 
 const xl = new ShikImportXL({ year: "2026", month: String(workMonth) });
