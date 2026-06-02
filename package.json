@@ -40,8 +40,7 @@
     "react-router-dom": "^7.10.1",
     "recharts": "^3.6.0",
     "useragent": "^2.3.0",
-    "util-promisifyall": "^1.0.0",
-    "zlib": "^1.0.5"
+    "util-promisifyall": "^1.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
