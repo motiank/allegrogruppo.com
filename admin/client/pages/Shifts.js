@@ -181,6 +181,7 @@ const Shifts = () => {
   // attach-phones endpoint and the results are aggregated.
   const empDataFileRef = useRef(null);
   const empDataKeyRef = useRef(0);
+  const payrollWrapRef = useRef(null);
   const [empDataFiles, setEmpDataFiles] = useState([]);
   const [empDataIsDragging, setEmpDataIsDragging] = useState(false);
   const [empDataUploading, setEmpDataUploading] = useState(false);
@@ -1280,6 +1281,21 @@ const Shifts = () => {
     return { rows, warnings };
   }, [allEmployees, wageMap]);
 
+  // RTL payroll table: when step 4 opens, scroll the wrapper to the inline-start
+  // (right edge) so the sticky שם + תפקיד (role) columns are visible instead of
+  // the far-left totals. Only on open — not on every wage edit — so it doesn't
+  // yank the view back while the user is editing.
+  useEffect(() => {
+    if (step !== 4) return;
+    const el = payrollWrapRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      // A large value clamps to the inline-start in RTL across browsers.
+      el.scrollLeft = el.scrollWidth;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [step]);
+
   // ---------- Styles ----------
   const styles = {
     container: {
@@ -2217,7 +2233,10 @@ const Shifts = () => {
         </div>
       )}
 
-      <div style={{ ...styles.tableWrapStep4, marginTop: "12px" }}>
+      <div
+        ref={payrollWrapRef}
+        style={{ ...styles.tableWrapStep4, marginTop: "12px" }}
+      >
         <table style={styles.tableStep4}>
           <thead>
             <tr>
