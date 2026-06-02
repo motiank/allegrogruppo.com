@@ -87,8 +87,16 @@ export const buildExportRow = (emp, ctx) => {
   const wageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
 
   let hourlyWage = null;
+  // hourly_net is paid at a reduced rate (−20%, floored, but never below 36);
+  // the gap up to the original rate is topped up via a net bonus (below).
+  const reducedHourly =
+    newWageType === "hourly_net" && wageVal != null
+      ? Math.max(36, Math.floor(wageVal * 0.8))
+      : null;
   if (newWageType && newWageType.startsWith("hourly_min_")) {
     hourlyWage = MIN_HOURLY_WAGE;
+  } else if (newWageType === "hourly_net") {
+    hourlyWage = reducedHourly;
   } else if (newWageType && newWageType.startsWith("hourly_")) {
     hourlyWage = wageVal;
   }
@@ -101,6 +109,21 @@ export const buildExportRow = (emp, ctx) => {
   ) {
     const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
     bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
+  } else if (
+    newWageType === "hourly_net" &&
+    reducedHourly != null &&
+    wageVal > 0
+  ) {
+    // Net bonus = original-rate pay on FLAT hours minus reduced-rate pay on
+    // overtime-WEIGHTED hours. Flat = h100+h125+h150 (no OT multiplier on the
+    // first term, per spec). The reduced-rate term mirrors the exported hourly
+    // columns, which use hourlyWage = reducedHourly.
+    const totalHours = h100 + h125 + h150;
+    const reducedWeighted =
+      h100 * reducedHourly +
+      h125 * reducedHourly * 1.25 +
+      h150 * reducedHourly * 1.5;
+    bonus = totalHours * wageVal - reducedWeighted;
   }
   const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
   const isGlobal = !!newWageType && newWageType.startsWith("global_");

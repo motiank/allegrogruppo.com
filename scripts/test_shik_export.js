@@ -36,6 +36,25 @@ const globalEmp = {
   workdays: 22,
   payroll_data: {},
 };
+// hourly_net: paid at reduced rate = max(36, floor(50*0.8)) = 40 + net bonus.
+// hours h100=100, h125=10, h150=5.
+const netEmp = {
+  name: "Net Nora",
+  ID_nmbr: "333",
+  workdays: 21,
+  payroll_data: {
+    week1: { hours: [100, 10, 5] },
+  },
+};
+// hourly_net with a low wage: 40*0.8 = 32 < 36, so reduced clamps to 36.
+const netLowEmp = {
+  name: "Net Ned",
+  ID_nmbr: "444",
+  workdays: 18,
+  payroll_data: {
+    week1: { hours: [100, 0, 0] },
+  },
+};
 
 // DB-side records (the shape buildExportRow expects from empByName).
 const empByName = new Map([
@@ -59,10 +78,32 @@ const empByName = new Map([
       maxTravel: null,
     },
   ],
+  [
+    "Net Nora",
+    {
+      ID_nmbr: "333",
+      new_wage_type: "hourly_net",
+      wage: 50,
+      travel: null,
+      maxTravel: null,
+    },
+  ],
+  [
+    "Net Ned",
+    {
+      ID_nmbr: "444",
+      new_wage_type: "hourly_net",
+      wage: 40,
+      travel: null,
+      maxTravel: null,
+    },
+  ],
 ]);
 const micpalByIdNmbr = new Map([
   ["111", 14],
   ["222", 27],
+  ["333", 33],
+  ["444", 44],
 ]);
 
 const ctx = {
@@ -80,9 +121,16 @@ const globalRow = buildExportRow(globalEmp, ctx);
 hourlyRow.employeeNumber = Number(hourlyRow.keyName);
 globalRow.employeeNumber = Number(globalRow.keyName);
 
+const netRow = buildExportRow(netEmp, ctx);
+netRow.employeeNumber = Number(netRow.keyName);
+const netLowRow = buildExportRow(netLowEmp, ctx);
+netLowRow.employeeNumber = Number(netLowRow.keyName);
+
 const workMonth = 5;
 const hourlyShik = buildShikRowsForEmployee(workMonth, hourlyRow);
 const globalShik = buildShikRowsForEmployee(workMonth, globalRow);
+const netShik = buildShikRowsForEmployee(workMonth, netRow);
+const netLowShik = buildShikRowsForEmployee(workMonth, netLowRow);
 
 console.log("hourly emp →", hourlyShik);
 console.log("global emp →", globalShik);
@@ -136,8 +184,30 @@ assert.equal(gworkdays[0].quantity, 22);
 assert.equal(findOne(globalShik, 38).length, 0, "no OT for global");
 assert.equal(findOne(globalShik, 39).length, 0, "no OT for global");
 
+// hourly_net: reduced rate = max(36, floor(50*0.8)) = 40; rows exported at 40.
+// Net bonus = (100+10+5)*50 − (100*40 + 10*40*1.25 + 5*40*1.5)
+//           = 115*50 − 4800 = 5750 − 4800 = 950.
+assert.equal(netRow.hourlyWage, 40, "hourly_net reduced rate");
+assert.equal(netRow.net, "נ", "hourly_net flagged net");
+const netBase = findOne(netShik, 1);
+assert.equal(netBase.length, 1, "net baseHourly row");
+assert.equal(netBase[0].rate, 40, "baseHourly at reduced rate");
+assert.equal(netBase[0].quantity, 100);
+assert.equal(findOne(netShik, 38)[0].rate, 40, "OT125 at reduced rate");
+assert.equal(findOne(netShik, 39)[0].rate, 40, "OT150 at reduced rate");
+const netBonus = findOne(netShik, 32);
+assert.equal(netBonus.length, 1, "net bonus row present");
+assert.equal(netBonus[0].rate, 950, "net bonus amount");
+assert.equal(netBonus[0].quantity, 1);
+
+// Low-wage hourly_net: 40*0.8 = 32 < 36 → reduced clamps to 36.
+// Net bonus = 100*40 − 100*36 = 4000 − 3600 = 400.
+assert.equal(netLowRow.hourlyWage, 36, "reduced rate clamped to 36");
+assert.equal(findOne(netLowShik, 1)[0].rate, 36, "baseHourly clamped to 36");
+assert.equal(findOne(netLowShik, 32)[0].rate, 400, "net bonus at clamped rate");
+
 // Every workMonth / employeeNumber must be a finite integer.
-for (const r of [...hourlyShik, ...globalShik]) {
+for (const r of [...hourlyShik, ...globalShik, ...netShik, ...netLowShik]) {
   assert.equal(Number.isInteger(r.workMonth), true);
   assert.equal(r.workMonth, workMonth);
   assert.equal(Number.isFinite(r.employeeNumber), true);
