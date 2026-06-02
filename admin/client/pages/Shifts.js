@@ -47,6 +47,26 @@ const fmtNum = (n, decimals = 2) => {
 // configured hourly wage is the special marker -1.
 const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 35.40;
 
+// Total break hours for an employee: 0.5h for each day whose total paid hours
+// (h100+h125+h150) exceed 7. Prefers the server-computed `emp.breaks`; falls
+// back to recomputing from the persisted daily_breakdown (e.g. payroll loaded
+// from DB). Mirrors the deduction in payroll_summary.js extractEmployees().
+const computeBreaks = (emp) => {
+  if (emp && typeof emp.breaks === "number") return emp.breaks;
+  const bd = emp && emp.daily_breakdown;
+  if (!bd || typeof bd !== "object") return 0;
+  let total = 0;
+  for (const entries of Object.values(bd)) {
+    let dayTotal = 0;
+    for (const e of entries || []) {
+      dayTotal +=
+        (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
+    }
+    if (dayTotal > 7) total += 0.5;
+  }
+  return total;
+};
+
 // Build a per-employee record map keyed by ID_nmbr / name.
 // Each entry: { roles: { role: wage }, hourly_wage, wage_type, global, travel }
 const buildWageMap = (employeesFromDb) => {
@@ -1126,6 +1146,7 @@ const Shifts = () => {
       } else if (dailyTravel != null) {
         empTravel = dailyTravel * wd;
       }
+      const empBreaks = computeBreaks(emp);
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
@@ -1196,6 +1217,7 @@ const Shifts = () => {
           global: emp.global,
           wage_type: wageType,
           travel: empTravel,
+          breaks: empBreaks,
           total: globalAmount,
         });
         if (globalAmount != null) grandTotal += globalAmount;
@@ -1213,6 +1235,7 @@ const Shifts = () => {
           global: emp.global,
           wage_type: wageType,
           travel: empTravel,
+          breaks: i === 0 ? empBreaks : null,
           ...r,
         });
         if (r.total != null) grandTotal += r.total;
@@ -2205,6 +2228,7 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>שעות 100%</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>שעות 125%</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>שעות 150%</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>הפסקות</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נטו/ברוטו</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>טיפ</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
@@ -2238,7 +2262,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={12}>
+                    <td style={nameCell} colSpan={13}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -2258,6 +2282,9 @@ const Shifts = () => {
                   <td style={cell}>{fmtNum(r.h100)}</td>
                   <td style={cell}>{fmtNum(r.h125)}</td>
                   <td style={cell}>{fmtNum(r.h150)}</td>
+                  <td style={cell}>
+                    {r.first && r.breaks ? fmtNum(r.breaks) : ""}
+                  </td>
                   <td style={cell}>
                     {r.first ? wageTypeLabel(r.wage_type) : ""}
                   </td>

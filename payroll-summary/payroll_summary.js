@@ -1835,6 +1835,38 @@ async function extractEmployees(items, configMap = {}) {
         rate: bucket.rate ?? null,
       };
     }
+    // --- Break deduction ---
+    // Each day whose total paid hours (h100+h125+h150) exceed 7 loses a 0.5h
+    // break (one per day, multi-shift days counted once). The break comes out
+    // of regular hours (h100) first, overflowing into 150% (h150) if regular
+    // is short. `breaks` is the per-employee total deducted.
+    let breaks = 0;
+    for (const entries of emp.dailyBreakdown.values()) {
+      let dayTotal = 0;
+      for (const e of entries) {
+        dayTotal +=
+          (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
+      }
+      if (dayTotal > 7) breaks += 0.5;
+    }
+    if (breaks > 0) {
+      const roleKeys = Object.keys(payroll_data);
+      let remaining = breaks;
+      for (const role of roleKeys) {
+        if (remaining <= 0) break;
+        const hrs = payroll_data[role].hours;
+        const take = Math.min(hrs[0] || 0, remaining);
+        hrs[0] = (hrs[0] || 0) - take;
+        remaining -= take;
+      }
+      for (const role of roleKeys) {
+        if (remaining <= 0) break;
+        const hrs = payroll_data[role].hours;
+        const take = Math.min(hrs[2] || 0, remaining);
+        hrs[2] = (hrs[2] || 0) - take;
+        remaining -= take;
+      }
+    }
     let workdays = 0;
     for (const w of emp.workdaysPerSheet.values()) {
       if (w && w.count != null) workdays += w.count;
@@ -1848,6 +1880,7 @@ async function extractEmployees(items, configMap = {}) {
       payroll_data,
       role_extras,
       workdays: workdays || null,
+      breaks,
       global: !!emp.global,
       netGross: emp.netGross || null,
       work_dates: Array.from(emp.workDates).sort(),
