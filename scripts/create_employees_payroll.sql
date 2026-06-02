@@ -126,3 +126,21 @@ ALTER TABLE payroll_soft_ix
   ADD COLUMN company VARCHAR(16) NULL AFTER id;
 
     update payroll_soft_ix set company = '096';
+
+-- ID_nmbr must hold passport numbers (which contain letters, e.g. "C4JTNWW2"),
+-- not just numeric Israeli IDs. employees.ID_nmbr is already VARCHAR(32);
+-- widen payroll_soft_ix.ID_nmbr from INT UNSIGNED to match. The composite
+-- UNIQUE KEY (ID_nmbr, mic_nmbr, company) is preserved across the type change.
+ALTER TABLE payroll_soft_ix
+  MODIFY COLUMN ID_nmbr VARCHAR(32) NULL;
+
+-- The unique key was (ID_nmbr, mic_nmbr, company), so the /micpal/sync upsert
+-- collided on ID_nmbr. When an employee's ID changed between imports (e.g.
+-- "0" -> passport) the ON DUPLICATE KEY UPDATE found no match and INSERTed a
+-- duplicate row, leaving stale "0" rows behind. The real upsert identity is
+-- (company, keyName). After de-duplicating existing rows (keep the row with a
+-- real ID_nmbr per company+keyName), swap the unique key:
+ALTER TABLE payroll_soft_ix
+  DROP INDEX `ID_nmbr`,
+  ADD UNIQUE KEY uniq_company_keyName (company, keyName),
+  ADD KEY idx_id_nmbr (ID_nmbr);

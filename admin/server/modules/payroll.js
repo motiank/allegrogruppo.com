@@ -1006,6 +1006,7 @@ const Router = () => {
       name: ["שם פרטי"],
       family: ["שם משפחה"],
       ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+      passport: ["מספר דרכון", "דרכון"],
     };
     const cols = {};
     sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNum) => {
@@ -1027,14 +1028,21 @@ const Router = () => {
         skipped += 1;
         continue;
       }
+      // מספר זהות; treat blank OR all-zeros ("0") as missing — foreign workers
+      // carry "0" here and their real number lives in מספר דרכון (passport).
+      const rawId = cols.ID_nmbr
+        ? _norm(_cellText(row.getCell(cols.ID_nmbr)))
+        : "";
+      const idNmbr = rawId && !/^0+$/.test(rawId) ? rawId : null;
+      const passport = cols.passport
+        ? _norm(_cellText(row.getCell(cols.passport))) || null
+        : null;
       items.push([
         keyName,
         keyName,
         cols.name ? _norm(_cellText(row.getCell(cols.name))) || null : null,
         cols.family ? _norm(_cellText(row.getCell(cols.family))) || null : null,
-        cols.ID_nmbr
-          ? _norm(_cellText(row.getCell(cols.ID_nmbr))) || null
-          : null,
+        idNmbr || passport,
       ]);
     }
     return {
@@ -1063,6 +1071,7 @@ const Router = () => {
     const HEADERS = {
       keyName: ["מספר עובד"],
       ID_nmbr: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+      passport: ["מספר דרכון", "דרכון"],
       family: ["שם משפחה"],
       name: ["שם פרטי"],
     };
@@ -1088,14 +1097,21 @@ const Router = () => {
         skipped += 1;
         continue;
       }
+      // מספר זהות; treat blank OR all-zeros ("0") as missing — foreign workers
+      // carry "0" here and their real number lives in מספר דרכון (passport).
+      const rawId = cols.ID_nmbr
+        ? _norm(_cellText(row.getCell(cols.ID_nmbr)))
+        : "";
+      const idNmbr = rawId && !/^0+$/.test(rawId) ? rawId : null;
+      const passport = cols.passport
+        ? _norm(_cellText(row.getCell(cols.passport))) || null
+        : null;
       items.push([
         keyName,
         keyName,
         cols.name ? _norm(_cellText(row.getCell(cols.name))) || null : null,
         cols.family ? _norm(_cellText(row.getCell(cols.family))) || null : null,
-        cols.ID_nmbr
-          ? _norm(_cellText(row.getCell(cols.ID_nmbr))) || null
-          : null,
+        idNmbr || passport,
       ]);
     }
     return {
@@ -1194,6 +1210,11 @@ const Router = () => {
             flat.push(it[0], it[1], company, it[2], it[3], it[4]);
           }
           try {
+            // Upsert collides on UNIQUE KEY uniq_company_keyName (company,
+            // keyName): a re-imported employee UPDATES their row (incl. a
+            // changed ID_nmbr) rather than inserting a duplicate. (The old
+            // unique on (ID_nmbr, mic_nmbr, company) inserted dups whenever an
+            // ID changed, e.g. "0" -> passport.)
             const [result] = await pool.query(
               `INSERT INTO payroll_soft_ix (keyName, mic_nmbr, company, name, family, ID_nmbr)
                VALUES ${placeholders} AS new_vals
