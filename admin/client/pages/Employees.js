@@ -434,6 +434,7 @@ const Employees = () => {
         (e) =>
           e.active !== false &&
           e.duplicate == null &&
+          !e.contractor &&
           !(e.ID_nmbr && String(e.ID_nmbr).trim()),
       ),
     [employees],
@@ -466,11 +467,13 @@ const Employees = () => {
       setMicpalList(micpal);
       const index = buildMicpalNameIndex(micpal);
 
-      // Restrict to active, non-duplicate employees missing ID_nmbr.
+      // Restrict to active, non-duplicate, non-contractor (קבלן) employees
+      // missing ID_nmbr.
       const candidates = employees.filter(
         (e) =>
           e.active !== false &&
           e.duplicate == null &&
+          !e.contractor &&
           !(e.ID_nmbr && String(e.ID_nmbr).trim()),
       );
 
