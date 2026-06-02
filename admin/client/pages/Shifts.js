@@ -1133,7 +1133,11 @@ const Shifts = () => {
         const hours = (payload && payload.hours) || [];
         const [h100 = 0, h125 = 0, h150 = 0] = hours;
         const tip = Number((payload && payload.tip) || 0);
-        const completion = Number((payload && payload.completion) || 0);
+        // Negative completion (השלמה) is clamped to 0 — matches the export.
+        const completion = Math.max(
+          0,
+          Number((payload && payload.completion) || 0),
+        );
         const wage = resolveHourlyWage(empData, role);
         const extras = (emp.role_extras && emp.role_extras[role]) || {};
         const hasTipOrCompletion = tip !== 0 || completion !== 0;

@@ -173,7 +173,9 @@ export const buildExportRow = (emp, ctx) => {
     holiday: isGlobal ? "" : holiday || "",
     net: netFlag,
     travel: travelAmount,
-    completion: tip + completion || "",
+    // השלמה = completion only (tips are NOT folded in), matching the final
+    // table. Negative completion is clamped to 0.
+    completion: Math.max(0, completion) || "",
     bonus,
     amount,
     standardDays: stdDays ?? "",
