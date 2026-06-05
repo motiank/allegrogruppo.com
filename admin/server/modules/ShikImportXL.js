@@ -42,7 +42,11 @@ export const SHIK_COMPONENTS = {
   travel: { recordType: 1, componentCode: 3 }, // נסיעות
   bonus: { recordType: 1, componentCode: 32 }, // בונוס
   globalSalary: { recordType: 1, componentCode: 1 }, // שכר גלובאלי
-  workDays: { recordType: 4, componentCode: 4 }, // ימי עבודה
+  // recordType 4 = employment data. These codes are NOT salary components —
+  // they are fixed attendance codes from Tamal's Shiklulit import spec.
+  paidWorkDays: { recordType: 4, componentCode: 4 }, // ימי עבודה משולמים
+  actualWorkDays: { recordType: 4, componentCode: 7 }, // ימי עבודה בפועל
+  actualWorkHours: { recordType: 4, componentCode: 5 }, // שעות עבודה בפועל
 };
 
 const toFiniteNumber = (v) => {
@@ -94,6 +98,23 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   const workdays = toFiniteNumber(
     row.workdaysRaw != null ? row.workdaysRaw : row.workdays,
   );
+  // recordType=4 employment data. actualWorkDays (distinct worked dates) and
+  // actualWorkHours (clocked hours, NOT the paid 100/125/150 bands) come from
+  // buildExportRow's derivation. A null here means the source data was absent,
+  // so the value couldn't be calculated — reject it rather than silently
+  // exporting a 0 (a real 0 stays a finite number and is just dropped below).
+  const actualWorkDays = toFiniteNumber(row.actualWorkDays);
+  const actualWorkHours = toFiniteNumber(row.actualWorkHours);
+  if (actualWorkDays == null) {
+    throw new Error(
+      `cannot calculate actualWorkDays for "${row.name || "(no name)"}" — missing distinct-worked-dates source`,
+    );
+  }
+  if (actualWorkHours == null) {
+    throw new Error(
+      `cannot calculate actualWorkHours for "${row.name || "(no name)"}" — missing actual-worked-hours source`,
+    );
+  }
 
   if (row.isGlobal) {
     if (amount != null && amount !== 0) emit("globalSalary", amount, 1);
@@ -106,7 +127,12 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   }
   if (travel != null && travel > 0) emit("travel", travel, 1);
   if (bonus != null && bonus > 0) emit("bonus", bonus, 1);
-  if (workdays != null && workdays > 0) emit("workDays", 0, workdays);
+  // Employment-data rows (recordType 4). Emitted in spec order: paid days,
+  // actual days, actual hours. Zero quantities are dropped (emit's zero-row
+  // skip), matching the existing paid-work-days behavior.
+  if (workdays != null && workdays > 0) emit("paidWorkDays", 0, workdays);
+  if (actualWorkDays > 0) emit("actualWorkDays", 0, actualWorkDays);
+  if (actualWorkHours > 0) emit("actualWorkHours", 0, actualWorkHours);
 
   return out;
 };

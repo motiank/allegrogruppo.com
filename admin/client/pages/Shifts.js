@@ -45,7 +45,7 @@ const fmtNum = (n, decimals = 2) => {
 
 // National minimum hourly wage — used as a substitute when an employee's
 // configured hourly wage is the special marker -1.
-const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 35.40;
+const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 35.4;
 
 // Total break hours for an employee: 0.5h for each day whose total paid hours
 // (h100+h125+h150) exceed 7. Prefers the server-computed `emp.breaks`; falls
@@ -1029,6 +1029,13 @@ const Shifts = () => {
             payroll_data: e.payroll_data || {},
             role_extras: e.role_extras || {},
             workdays: e.workdays,
+            // Source for the Shiklulit recordType=4 actual-attendance rows:
+            // work_dates → actual work days, daily_hours → actual work hours.
+            work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+            daily_hours:
+              e.daily_hours && typeof e.daily_hours === "object"
+                ? e.daily_hours
+                : {},
             hourly_wage: empData?.hourly_wage ?? null,
             wage_type: empData?.wage_type ?? null,
             travel: empData?.travel ?? null,

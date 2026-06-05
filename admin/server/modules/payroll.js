@@ -129,6 +129,34 @@ export const buildExportRow = (emp, ctx) => {
   const isGlobal = !!newWageType && newWageType.startsWith("global_");
   const amount = isGlobal && wageVal != null ? wageVal : "";
 
+  // Actual attendance for the Shiklulit recordType=4 employment-data rows.
+  // Kept separate from the paid 100/125/150 bands above ("actual" ≠ "paid"):
+  //   • actualWorkDays  = number of distinct worked dates (work_dates).
+  //   • actualWorkHours = total clocked hours (daily_hours, derived from
+  //     entry/exit times), which already excludes absence-only rows since
+  //     those carry no punches. Rounded to 2 decimals like the other exported
+  //     numeric values.
+  // null (not 0) signals "source absent → cannot calculate" so the exporter
+  // can raise a clear validation error instead of emitting a bogus 0.
+  const workDates = Array.isArray(emp.work_dates) ? emp.work_dates : null;
+  const dailyHours =
+    emp.daily_hours && typeof emp.daily_hours === "object"
+      ? emp.daily_hours
+      : null;
+  const actualWorkDays =
+    workDates != null
+      ? workDates.length
+      : dailyHours != null
+        ? Object.keys(dailyHours).length
+        : null;
+  const actualWorkHours =
+    dailyHours != null
+      ? Math.round(
+          Object.values(dailyHours).reduce((s, v) => s + (Number(v) || 0), 0) *
+            100,
+        ) / 100
+      : null;
+
   const dailyTravel =
     dbEmp.travel != null
       ? Number(dbEmp.travel)
@@ -163,6 +191,10 @@ export const buildExportRow = (emp, ctx) => {
     hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
     workdays: isGlobal ? "" : workdays || "",
     workdaysRaw: workdays || 0,
+    // recordType=4 attendance (see derivation above). Consumed by the
+    // Shiklulit exporter; the Micpal exporter ignores these fields.
+    actualWorkDays,
+    actualWorkHours,
     hours100: isGlobal ? "" : h100 || "",
     wage125: !isGlobal && hourlyWage != null ? hourlyWage * 1.25 : "",
     hours125: isGlobal ? "" : h125 || "",

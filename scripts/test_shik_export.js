@@ -19,11 +19,30 @@ const HOURLY_RATE = 40;
 const TRAVEL_PER_DAY = 12;
 const BONUS_AMOUNT = 0; // computed only for hourly_min types; this fixture is hourly
 
+// hourlyEmp attendance: 18 distinct worked dates (→ actualWorkDays = 18, which
+// deliberately differs from the 20 PAID days). daily_hours carries the clocked
+// hours per date — a couple fractional so the rounding helper has something to
+// do — and its sum (→ actualWorkHours) differs from the paid bands (80+8+3).
+const HOURLY_WORK_DATES = Array.from(
+  { length: 18 },
+  (_, i) => `2026-05-${String(i + 1).padStart(2, "0")}`,
+);
+const HOURLY_DAILY_HOURS = {};
+HOURLY_WORK_DATES.forEach((d, i) => {
+  HOURLY_DAILY_HOURS[d] = i < 2 ? 8.33 : 8.5; // 8.33*2 + 8.5*16 = 152.66
+});
+const HOURLY_ACTUAL_HOURS =
+  Math.round(
+    Object.values(HOURLY_DAILY_HOURS).reduce((s, v) => s + v, 0) * 100,
+  ) / 100;
+
 // Two employees: one hourly with all hour buckets + travel, one global salary.
 const hourlyEmp = {
   name: "Hourly Hannah",
   ID_nmbr: "111",
-  workdays: 20,
+  workdays: 20, // PAID work days (componentCode 4)
+  work_dates: HOURLY_WORK_DATES, // → actualWorkDays (componentCode 7)
+  daily_hours: HOURLY_DAILY_HOURS, // → actualWorkHours (componentCode 5)
   travel: TRAVEL_PER_DAY,
   payroll_data: {
     week1: { hours: [40, 5, 2] }, // h100, h125, h150
@@ -34,6 +53,8 @@ const globalEmp = {
   name: "Global Greg",
   ID_nmbr: "222",
   workdays: 22,
+  work_dates: [],
+  daily_hours: {},
   payroll_data: {},
 };
 // hourly_net: paid at reduced rate = max(36, floor(50*0.8)) = 40 + net bonus.
@@ -42,6 +63,8 @@ const netEmp = {
   name: "Net Nora",
   ID_nmbr: "333",
   workdays: 21,
+  work_dates: [],
+  daily_hours: {},
   payroll_data: {
     week1: { hours: [100, 10, 5] },
   },
@@ -51,6 +74,8 @@ const netLowEmp = {
   name: "Net Ned",
   ID_nmbr: "444",
   workdays: 18,
+  work_dates: [],
+  daily_hours: {},
   payroll_data: {
     week1: { hours: [100, 0, 0] },
   },
@@ -137,7 +162,9 @@ console.log("global emp →", globalShik);
 
 // ─── Assertions ────────────────────────────────────────────────────────────
 const findOne = (rows, componentCode, recordType = 1) =>
-  rows.filter((r) => r.componentCode === componentCode && r.recordType === recordType);
+  rows.filter(
+    (r) => r.componentCode === componentCode && r.recordType === recordType,
+  );
 
 // Hourly employee should produce: baseHourly (cc=1), overtime125 (38),
 // overtime150 (39), travel (3), workDays (cc=4 recordType=4).
@@ -161,14 +188,77 @@ assert.equal(travel.length, 1, "travel row");
 assert.equal(travel[0].rate, TRAVEL_PER_DAY * 20);
 assert.equal(travel[0].quantity, 1);
 
-const workDays = findOne(hourlyShik, 4, 4);
-assert.equal(workDays.length, 1, "workDays row");
-assert.equal(workDays[0].rate, 0);
-assert.equal(workDays[0].quantity, 20);
-assert.equal(workDays[0].recordType, 4);
+// recordType=4 employment-data rows. Paid work days (cc=4), actual work days
+// (cc=7), actual work hours (cc=5). All carry rate=0; quantities come from the
+// PAID workdays count, the distinct work_dates, and the summed daily_hours
+// respectively — three independent sources, deliberately different values.
+const paidWorkDays = findOne(hourlyShik, 4, 4);
+assert.equal(paidWorkDays.length, 1, "paidWorkDays row");
+assert.equal(paidWorkDays[0].rate, 0);
+assert.equal(paidWorkDays[0].quantity, 20);
+assert.equal(paidWorkDays[0].recordType, 4);
+
+const actualWorkDays = findOne(hourlyShik, 7, 4);
+assert.equal(actualWorkDays.length, 1, "actualWorkDays row");
+assert.equal(actualWorkDays[0].rate, 0);
+assert.equal(actualWorkDays[0].quantity, 18); // distinct work_dates, not paid days
+assert.equal(actualWorkDays[0].recordType, 4);
+
+const actualWorkHours = findOne(hourlyShik, 5, 4);
+assert.equal(actualWorkHours.length, 1, "actualWorkHours row");
+assert.equal(actualWorkHours[0].rate, 0);
+assert.equal(actualWorkHours[0].quantity, HOURLY_ACTUAL_HOURS); // 152.66, clocked ≠ paid bands
+assert.equal(actualWorkHours[0].recordType, 4);
+
+// Exact row tuples from the acceptance criteria:
+//   [workMonth, employeeNumber, 4, 4, 0, paidWorkDays]
+//   [workMonth, employeeNumber, 4, 7, 0, actualWorkDays]
+//   [workMonth, employeeNumber, 4, 5, 0, actualWorkHours]
+const tuple = (r) => [
+  r.workMonth,
+  r.employeeNumber,
+  r.recordType,
+  r.componentCode,
+  r.rate,
+  r.quantity,
+];
+assert.deepEqual(tuple(paidWorkDays[0]), [
+  workMonth,
+  hourlyRow.employeeNumber,
+  4,
+  4,
+  0,
+  20,
+]);
+assert.deepEqual(tuple(actualWorkDays[0]), [
+  workMonth,
+  hourlyRow.employeeNumber,
+  4,
+  7,
+  0,
+  18,
+]);
+assert.deepEqual(tuple(actualWorkHours[0]), [
+  workMonth,
+  hourlyRow.employeeNumber,
+  4,
+  5,
+  0,
+  HOURLY_ACTUAL_HOURS,
+]);
+
+// regularHours (cc=1), 125% (cc=38), 150% (cc=39) still present for the same
+// employee — actual attendance rows must not displace the paid-band rows.
+assert.equal(findOne(hourlyShik, 1).length, 1, "regularHours row present");
+assert.equal(findOne(hourlyShik, 38).length, 1, "125% row present");
+assert.equal(findOne(hourlyShik, 39).length, 1, "150% row present");
 
 // Bonus only appears for hourly_min_* (this fixture is hourly_gross).
-assert.equal(findOne(hourlyShik, 32).length, 0, "no bonus row for hourly_gross");
+assert.equal(
+  findOne(hourlyShik, 32).length,
+  0,
+  "no bonus row for hourly_gross",
+);
 
 // Global employee should produce: globalSalary (cc=1, rate=9000, qty=1) +
 // workDays.
@@ -212,6 +302,28 @@ for (const r of [...hourlyShik, ...globalShik, ...netShik, ...netLowShik]) {
   assert.equal(r.workMonth, workMonth);
   assert.equal(Number.isFinite(r.employeeNumber), true);
 }
+
+// Validation: a row whose actual-attendance source couldn't be calculated
+// (null, e.g. work_dates / daily_hours absent upstream) must raise a clear,
+// specific error rather than silently exporting a 0.
+assert.throws(
+  () =>
+    buildShikRowsForEmployee(workMonth, {
+      ...hourlyRow,
+      actualWorkDays: null,
+    }),
+  /cannot calculate actualWorkDays/,
+  "missing actualWorkDays source rejected",
+);
+assert.throws(
+  () =>
+    buildShikRowsForEmployee(workMonth, {
+      ...hourlyRow,
+      actualWorkHours: null,
+    }),
+  /cannot calculate actualWorkHours/,
+  "missing actualWorkHours source rejected",
+);
 
 console.log("✓ all assertions passed");
 
