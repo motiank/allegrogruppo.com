@@ -12,6 +12,10 @@
     "admin": "node admin/server/server.js",
     "adminDev": "ADMIN_PORT=3021 NODE_ENV=development node admin/server/server.js",
     "admin:test": "ADMIN_PORT=3022 NODE_ENV=test node admin/server/server.js",
+    "events": "node events/server/server.js",
+    "eventsDev": "EVENTS_PORT=3023 NODE_ENV=development node events/server/server.js",
+    "events:test": "EVENTS_PORT=3024 NODE_ENV=test node events/server/server.js",
+    "events:schema": "node events/scripts/apply-schema.js",
     "users": "node scripts/users.js"
   },
   "dependencies": {
