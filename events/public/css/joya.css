@@ -959,3 +959,69 @@ h3 {
     align-items: flex-start;
   }
 }
+
+/* ===========================================================================
+   Testimonials ("מה מספרים עלינו?")
+   =========================================================================== */
+.testimonials {
+  background: var(--cream-2);
+}
+.quote-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+.quote-card {
+  position: relative;
+  margin: 0;
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 2.4rem 1.8rem 1.6rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.quote-mark {
+  position: absolute;
+  top: 0.4rem;
+  inset-inline-start: 1.4rem;
+  font-family: var(--serif);
+  font-size: 4rem;
+  line-height: 1;
+  color: rgba(226, 59, 51, 0.18);
+}
+.quote-card blockquote {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: var(--ink);
+  flex: 1;
+}
+.quote-card figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+}
+.quote-name {
+  font-weight: 700;
+  color: var(--red);
+}
+.quote-date {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 920px) {
+  .quote-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .quote-grid {
+    grid-template-columns: 1fr;
+  }
+}

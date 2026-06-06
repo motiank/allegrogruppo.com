@@ -54,6 +54,16 @@ const FEATURES = [
   { icon: "menu", t: "ייעוץ ובניית תפריט", d: "מנהלת אירועים שמלווה אתכם עד הפרט האחרון." },
 ];
 
+// Customer feedback from joya.co.il/אירועים (section "מה מספרים עלינו?").
+const TESTIMONIALS = [
+  { quote: "היה מושלם, האוכל היה מדהים והצוות היה נעים ושירותי", name: "ענת", date: "03.12.23" },
+  { quote: "שירות — מעולה, איכות — מעולה, צוות — מעולה, אווירה — מדהימה", name: "משפחת בן שלום", date: "02.12.23" },
+  { quote: "היה מקסים, הצוות שלכם פשוט מדהים, דאג לכל פרט ופרט", name: "איילת", date: "02.12.23" },
+  { quote: "היה ערב מיוחד במינו, באווירה, ברוגע, במענה לכל עזרה", name: "אלישבע וחני", date: "29.08.24" },
+  { quote: "היה מושלם... אביחי היה בשליטה מלאה על כל האירוע", name: "יניב", date: "27.08.24" },
+  { quote: "היה אירוע מצוין!!! אנשי הצוות היו נחמדים ואדיבים מאוד", name: "קארין", date: "03.09.24" },
+];
+
 const GALLERY = Array.from({ length: 12 }, (_, i) => `/images/joya/g-${String(i + 1).padStart(2, "0")}.jpg`);
 
 const icon = (name) =>
@@ -100,6 +110,18 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
       `<figure class="gallery-item"><img src="${src}" alt="אירוע בג׳ויה ${i + 1}" loading="lazy" /></figure>`,
   ).join("");
 
+  const testimonialCards = TESTIMONIALS.map(
+    (r) => `
+        <figure class="quote-card">
+          <span class="quote-mark" aria-hidden="true">&rdquo;</span>
+          <blockquote>${escapeHtml(r.quote)}</blockquote>
+          <figcaption>
+            <span class="quote-name">${escapeHtml(r.name)}</span>
+            <span class="quote-date">${escapeHtml(r.date)}</span>
+          </figcaption>
+        </figure>`,
+  ).join("");
+
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -131,6 +153,7 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
         <a href="#services">השירות שלנו</a>
         <a href="#gallery">גלריה</a>
         <a href="#branches">סניפים</a>
+        <a href="#testimonials">המלצות</a>
         <a href="#lead">צרו קשר</a>
       </nav>
       <a class="phone-cta" href="tel:${PHONE_TEL}">
@@ -226,6 +249,18 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
         <h2>הסניפים שלנו</h2>
       </header>
       <div class="branch-grid">${branchChips}
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials section" id="testimonials">
+    <div class="container">
+      <header class="section-head">
+        <p class="section-eyebrow">לקוחות מספרים</p>
+        <h2>מה מספרים עלינו?</h2>
+      </header>
+      <div class="quote-grid">${testimonialCards}
       </div>
     </div>
   </section>
