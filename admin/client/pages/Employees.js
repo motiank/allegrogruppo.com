@@ -13,6 +13,8 @@ import {
   filterRestaurantGroups,
 } from "../constants/restaurants";
 import useCurrentUser from "../hooks/useCurrentUser";
+import WageDialog from "../components/WageDialog";
+import { formatWage, normalizeRoles } from "../../../shared/wage.js";
 
 const Employees = () => {
   const { theme } = useTheme();
@@ -63,28 +65,15 @@ const Employees = () => {
   const [micpalResult, setMicpalResult] = useState(null);
   const [micpalError, setMicpalError] = useState(null);
   const micpalFileInputRef = useRef(null);
-  // Wage dialog: { empIdx, new_wage_type, wage } when open, null otherwise.
+  // Wage dialog target: { empIdx, roleIdx } when open, null otherwise.
+  // roleIdx === undefined → editing the employee-level wage; otherwise the
+  // per-role wage at that index. Both use the same WageDialog component.
   const [wageDialog, setWageDialog] = useState(null);
 
-  const WAGE_TYPE_OPTIONS = [
-    { value: "global_gross", label: "Global · Gross" },
-    { value: "global_net", label: "Global · Net" },
-    { value: "hourly_gross", label: "Hourly · Gross" },
-    { value: "hourly_net", label: "Hourly · Net" },
-    { value: "hourly_min_gross", label: "Hourly min · Gross" },
-    { value: "hourly_min_net", label: "Hourly min · Net" },
-  ];
-  const wageTypeLabel = (t) =>
-    WAGE_TYPE_OPTIONS.find((o) => o.value === t)?.label || "";
-  const isMinWageType = (t) =>
-    t === "hourly_min_gross" || t === "hourly_min_net";
-  const formatWageCell = (emp) => {
-    if (!emp.new_wage_type) return "—";
-    const label = wageTypeLabel(emp.new_wage_type);
-    return emp.wage !== "" && emp.wage != null
-      ? `${emp.wage} · ${label}`
-      : label;
-  };
+  // Employee-level wage cell text (uses the same compound { new_wage_type, wage }
+  // shape as role wages, via the shared formatter).
+  const formatWageCell = (emp) =>
+    formatWage({ new_wage_type: emp.new_wage_type, wage: emp.wage });
 
   useEffect(() => {
     if (menuOpenFor == null) return;
@@ -227,13 +216,14 @@ const Employees = () => {
         contractor: !!e.contractor,
         active: e.active !== false,
         duplicate: e.duplicate == null ? null : Number(e.duplicate),
-        roles:
-          e.roles && e.roles.length > 0
-            ? e.roles.map((r) => ({
-                role: r.role,
-                wage: r.wage == null ? "" : String(r.wage),
-              }))
-            : [],
+        // Roles arrive normalized from the server, but normalize again here so
+        // any legacy bare-number entry becomes the compound shape and amounts
+        // are stringified for the inputs.
+        roles: normalizeRoles(e.roles).map((r) => ({
+          role: r.role,
+          new_wage_type: r.new_wage_type || "",
+          wage: r.wage == null ? "" : String(r.wage),
+        })),
       }));
       setEmployees(shaped);
     } catch (err) {
@@ -250,12 +240,13 @@ const Employees = () => {
     loadEmployees(selectedRestaurant);
   }, [selectedRestaurant, loadEmployees]);
 
-  const updateWage = (empIdx, roleIdx, wage) => {
+  // Set a role's compound wage ({ new_wage_type, wage }) from the WageDialog.
+  const updateRoleWage = (empIdx, roleIdx, { new_wage_type, wage }) => {
     setEmployees((prev) => {
       const next = prev.slice();
       const emp = { ...next[empIdx] };
       emp.roles = emp.roles.slice();
-      emp.roles[roleIdx] = { ...emp.roles[roleIdx], wage };
+      emp.roles[roleIdx] = { ...emp.roles[roleIdx], new_wage_type, wage };
       next[empIdx] = emp;
       return next;
     });
@@ -1263,13 +1254,7 @@ const Employees = () => {
                                 <button
                                   type="button"
                                   style={styles.toggleButton}
-                                  onClick={() =>
-                                    setWageDialog({
-                                      empIdx,
-                                      new_wage_type: emp.new_wage_type || "",
-                                      wage: emp.wage || "",
-                                    })
-                                  }
+                                  onClick={() => setWageDialog({ empIdx })}
                                   title="Set wage"
                                 >
                                   {formatWageCell(emp)}
@@ -1330,17 +1315,16 @@ const Employees = () => {
                           <td style={cellStyle}>{r.role || "—"}</td>
                           <td style={cellStyle}>
                             {r.role ? (
-                              <input
-                                type="number"
-                                step="any"
-                                min="0"
-                                placeholder="—"
-                                style={styles.wageInput}
-                                value={r.wage}
-                                onChange={(ev) =>
-                                  updateWage(empIdx, roleIdx, ev.target.value)
+                              <button
+                                type="button"
+                                style={styles.toggleButton}
+                                onClick={() =>
+                                  setWageDialog({ empIdx, roleIdx })
                                 }
-                              />
+                                title="Set role wage"
+                              >
+                                {formatWage(r)}
+                              </button>
                             ) : (
                               "—"
                             )}
@@ -1826,77 +1810,35 @@ const Employees = () => {
         </div>
       )}
 
-      {wageDialog && (
-        <div style={styles.modalBackdrop} onClick={() => setWageDialog(null)}>
-          <div style={styles.modal} onClick={(ev) => ev.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              Set wage for{" "}
-              <span style={{ color: theme.active || "#2196f3" }}>
-                {employees[wageDialog.empIdx]?.name || "(no name)"}
-              </span>
-            </div>
-            <div style={styles.modalBody}>
-              <label style={styles.label}>Wage type</label>
-              <select
-                style={styles.select}
-                value={wageDialog.new_wage_type}
-                onChange={(ev) =>
-                  setWageDialog((d) => ({
-                    ...d,
-                    new_wage_type: ev.target.value,
-                  }))
+      {wageDialog &&
+        (() => {
+          const emp = employees[wageDialog.empIdx];
+          if (!emp) return null;
+          const isRole = wageDialog.roleIdx != null;
+          const target = isRole ? emp.roles[wageDialog.roleIdx] : emp;
+          return (
+            <WageDialog
+              title={
+                isRole
+                  ? `Role wage · ${target?.role || ""} (${emp.name || "(no name)"})`
+                  : `Set wage for ${emp.name || "(no name)"}`
+              }
+              value={{
+                new_wage_type: target?.new_wage_type || "",
+                wage: target?.wage ?? "",
+              }}
+              allowClear={isRole}
+              onClose={() => setWageDialog(null)}
+              onSave={(next) => {
+                if (isRole) {
+                  updateRoleWage(wageDialog.empIdx, wageDialog.roleIdx, next);
+                } else {
+                  updateWageFields(wageDialog.empIdx, next);
                 }
-                autoFocus
-              >
-                <option value="">-- choose --</option>
-                {WAGE_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <label style={styles.label}>Wage</label>
-              <input
-                type="number"
-                step="any"
-                placeholder="—"
-                style={styles.searchInput}
-                value={wageDialog.wage}
-                onChange={(ev) =>
-                  setWageDialog((d) => ({ ...d, wage: ev.target.value }))
-                }
-              />
-            </div>
-            <div style={styles.modalFooter}>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => setWageDialog(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                style={{
-                  ...styles.primaryButton,
-                  opacity: wageDialog.new_wage_type ? 1 : 0.6,
-                  cursor: wageDialog.new_wage_type ? "pointer" : "default",
-                }}
-                disabled={!wageDialog.new_wage_type}
-                onClick={() => {
-                  updateWageFields(wageDialog.empIdx, {
-                    new_wage_type: wageDialog.new_wage_type,
-                    wage: wageDialog.wage,
-                  });
-                  setWageDialog(null);
-                }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              }}
+            />
+          );
+        })()}
 
       {duplicateDialogFor && (
         <div

@@ -36,11 +36,14 @@ export const SHIK_RECORD_TYPES = {
 };
 
 export const SHIK_COMPONENTS = {
-  baseHourly: { recordType: 1, componentCode: 1 }, // שכר יסוד שעתי
+  baseHourly: { recordType: 1, componentCode: 1 }, // שכר יסוד שעתי (default wage)
+  baseExtra: { recordType: 1, componentCode: 31 }, // שכר שעתי בתעריף אחר (non-default role rate)
+  baseTrainee: { recordType: 1, componentCode: 33 }, // שכר מתלמד
   overtime125: { recordType: 1, componentCode: 38 }, // שעות 125%
   overtime150: { recordType: 1, componentCode: 39 }, // שעות 150%
   travel: { recordType: 1, componentCode: 3 }, // נסיעות
   bonus: { recordType: 1, componentCode: 32 }, // בונוס
+  inAdvance: { recordType: 1, componentCode: 35 }, // מפרעה
   globalSalary: { recordType: 1, componentCode: 1 }, // שכר גלובאלי
   // recordType 4 = employment data. These codes are NOT salary components —
   // they are fixed attendance codes from Tamal's Shiklulit import spec.
@@ -118,15 +121,66 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
 
   if (row.isGlobal) {
     if (amount != null && amount !== 0) emit("globalSalary", amount, 1);
-  } else {
-    if (hourlyWage != null) {
-      if (h100 != null && h100 > 0) emit("baseHourly", hourlyWage, h100);
-      if (h125 != null && h125 > 0) emit("overtime125", hourlyWage, h125);
-      if (h150 != null && h150 > 0) emit("overtime150", hourlyWage, h150);
+  } else if (Array.isArray(row.roleBreakdown) && row.roleBreakdown.length > 0) {
+    // Base 100% component per role:
+    //   • role "מתלמד"                  → 33 (baseTrainee), per role
+    //   • role rate == employee default → 1  (baseHourly), ALL merged into one
+    //     line (hours summed; overtime merged too, at the default rate)
+    //   • any other rate                → 31 (baseExtra), per role
+    // Non-default overtime keeps codes 38/39 at the role's own rate.
+    const defaultWage = toFiniteNumber(row.defaultWage);
+    const sameRate = (a, b) =>
+      a != null && b != null && Math.abs(a - b) < 0.001;
+
+    // Accumulate the default-wage (non-trainee) roles into one bucket.
+    let def = null; // { h100, h125, h150 }
+    const others = [];
+    for (const rb of row.roleBreakdown) {
+      const rate = toFiniteNumber(rb.rate);
+      if (rate == null) continue;
+      const isTrainee = String(rb.role || "").trim() === "מתלמד";
+      const rh100 = toFiniteNumber(rb.h100) || 0;
+      const rh125 = toFiniteNumber(rb.h125) || 0;
+      const rh150 = toFiniteNumber(rb.h150) || 0;
+      if (!isTrainee && sameRate(rate, defaultWage)) {
+        if (!def) def = { h100: 0, h125: 0, h150: 0 };
+        def.h100 += rh100;
+        def.h125 += rh125;
+        def.h150 += rh150;
+      } else {
+        others.push({ isTrainee, rate, rh100, rh125, rh150 });
+      }
     }
+
+    // Merged default line(s) first.
+    if (def && defaultWage != null) {
+      if (def.h100 > 0) emit("baseHourly", defaultWage, def.h100);
+      if (def.h125 > 0) emit("overtime125", defaultWage, def.h125);
+      if (def.h150 > 0) emit("overtime150", defaultWage, def.h150);
+    }
+    // Then the per-role non-default lines (trainee → 33, other rate → 31).
+    for (const o of others) {
+      const baseComp = o.isTrainee ? "baseTrainee" : "baseExtra";
+      if (o.rh100 > 0) emit(baseComp, o.rate, o.rh100);
+      if (o.rh125 > 0) emit("overtime125", o.rate, o.rh125);
+      if (o.rh150 > 0) emit("overtime150", o.rate, o.rh150);
+    }
+  } else if (hourlyWage != null) {
+    // Legacy fallback: single aggregated base/OT at the employee wage.
+    if (h100 != null && h100 > 0) emit("baseHourly", hourlyWage, h100);
+    if (h125 != null && h125 > 0) emit("overtime125", hourlyWage, h125);
+    if (h150 != null && h150 > 0) emit("overtime150", hourlyWage, h150);
   }
   if (travel != null && travel > 0) emit("travel", travel, 1);
   if (bonus != null && bonus > 0) emit("bonus", bonus, 1);
+  // מפרעה (advance) — exported when it has any non-zero value. For employees
+  // with an hourly_min role the value is computed (shikInAdvance) and overrides
+  // any stored/manual in_advance; otherwise the stored value is used.
+  const inAdvance =
+    row.shikInAdvance != null
+      ? toFiniteNumber(row.shikInAdvance)
+      : toFiniteNumber(row.inAdvance);
+  if (inAdvance != null && inAdvance !== 0) emit("inAdvance", inAdvance, 1);
   // Employment-data rows (recordType 4). Emitted in spec order: paid days,
   // actual days, actual hours. Zero quantities are dropped (emit's zero-row
   // skip), matching the existing paid-work-days behavior.

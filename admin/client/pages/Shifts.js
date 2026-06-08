@@ -21,6 +21,12 @@ import {
   filterRestaurantGroups,
 } from "../constants/restaurants";
 import useCurrentUser from "../hooks/useCurrentUser";
+import WageDialog from "../components/WageDialog";
+import {
+  normalizeRoleWage,
+  effectiveHourlyRate,
+  formatWage,
+} from "../../../shared/wage.js";
 
 const STEPS = [
   { id: 1, label: "Select restaurant" },
@@ -68,16 +74,19 @@ const computeBreaks = (emp) => {
 };
 
 // Build a per-employee record map keyed by ID_nmbr / name.
-// Each entry: { roles: { role: wage }, hourly_wage, wage_type, global, travel }
+// Each entry: { roles: { role: { new_wage_type, wage } }, hourly_wage, ... }
 const buildWageMap = (employeesFromDb) => {
   const map = new Map();
   for (const e of employeesFromDb || []) {
     const roleWage = {};
     for (const r of e.roles || []) {
-      if (r && r.role) roleWage[r.role] = r.wage;
+      // Store the compound { new_wage_type, wage } per role (normalizing any
+      // legacy bare number) so the calc can apply per-role wage-type rules.
+      if (r && r.role) roleWage[r.role] = normalizeRoleWage(r);
     }
     const rec = {
       roles: roleWage,
+      empNumber: e.empNumber == null ? null : e.empNumber,
       hourly_wage: e.hourly_wage == null ? null : Number(e.hourly_wage),
       wage_type: e.wage_type || null,
       global: e.global == null ? null : Number(e.global),
@@ -101,13 +110,70 @@ const lookupEmpData = (wageMap, emp) => {
   return null;
 };
 
+// Normalize a roles value into a list of trimmed role-name strings. Extracted
+// employees carry roles as plain strings (allEmployees) or as { role, wage }
+// objects (newEmployees / DB), so accept both shapes.
+const roleNamesOf = (roles) =>
+  (Array.isArray(roles) ? roles : [])
+    .map((r) => (typeof r === "string" ? r : r && r.role))
+    .map((s) => String(s == null ? "" : s).trim())
+    .filter(Boolean);
+
+// Reduce a name to its base identity for matching: drop a leading "*" marker
+// and any trailing " - <role/branch>" suffix that the Tabit detailed-report
+// format bakes into the employee name (e.g. "אסף מזרחי - מלצר/ברמן" → "אסף מזרחי").
+// A dash only counts as a separator when it has whitespace on at least one
+// side, so genuinely hyphenated names (e.g. "בר-כוכבא") are left intact.
+const baseName = (s) => {
+  let t = String(s == null ? "" : s)
+    .replace(/^\*+\s*/, "")
+    .trim();
+  const m = t.match(/\s+-\s*|\s*-\s+/);
+  if (m) t = t.slice(0, m.index);
+  return t.trim();
+};
+
+// Merge role names seen in the shift files into an employee's existing DB roles.
+// Existing roles (their wage type AND amount) are preserved verbatim; only roles
+// that are new to this employee are appended, with no wage so nothing is
+// overwritten. Returns { roles: [{ role, new_wage_type, wage }], added, changed }.
+const mergeRoles = (dbRoles, shiftRoleNames) => {
+  const merged = [];
+  const seen = new Set();
+  for (const r of dbRoles || []) {
+    const name = r && r.role ? String(r.role).trim() : "";
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    // Keep the stored wage type + amount exactly as-is — untouched.
+    merged.push({
+      role: name,
+      new_wage_type: r.new_wage_type ?? null,
+      wage: r.wage ?? null,
+    });
+  }
+  const added = [];
+  for (const name of shiftRoleNames) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    merged.push({ role: name, new_wage_type: null, wage: null });
+    added.push(name);
+  }
+  return { roles: merged, added, changed: added.length > 0 };
+};
+
 // Wage resolution per spec:
-//   1. role-level wage from employees.roles JSON
-//   2. fallback: employees.hourly_wage
-//   3. -1 → 35.40 (national minimum)
+//   1. role-level compound wage from employees.roles JSON — its new_wage_type
+//      drives the rate (hourly_min → minimum, hourly_net → reduced rate, …)
+//   2. fallback: employees.hourly_wage (legacy column, -1 → minimum)
 const resolveHourlyWage = (empData, role) => {
-  let wage = empData?.roles?.[role];
-  if (wage == null) wage = empData?.hourly_wage;
+  const roleEntry = empData?.roles?.[role];
+  if (roleEntry) {
+    const rate = effectiveHourlyRate(roleEntry, {
+      minHourlyWage: MIN_HOURLY_WAGE,
+    });
+    if (rate != null) return rate;
+  }
+  const wage = empData?.hourly_wage;
   if (wage == null) return null;
   if (Number(wage) === -1) return MIN_HOURLY_WAGE;
   return Number(wage);
@@ -516,7 +582,11 @@ const Shifts = () => {
         wage_type: "",
         travel: "",
         contractor: false,
-        roles: (e.roles || []).map((role) => ({ role, wage: "" })),
+        roles: (e.roles || []).map((role) => ({
+          role,
+          new_wage_type: "",
+          wage: "",
+        })),
       }));
       setNewEmployees(fresh);
       setAllEmployees(res.data.allEmployees || []);
@@ -541,12 +611,15 @@ const Shifts = () => {
   };
 
   // ---------- Step 3: edit wage + update ----------
-  const updateWage = (empIdx, roleIdx, wage) => {
+  // Role-wage editing target for the shared WageDialog: { empIdx, roleIdx }.
+  const [roleWageDialog, setRoleWageDialog] = useState(null);
+
+  const updateRoleWage = (empIdx, roleIdx, { new_wage_type, wage }) => {
     setNewEmployees((prev) => {
       const next = prev.slice();
       const emp = { ...next[empIdx] };
       emp.roles = emp.roles.slice();
-      emp.roles[roleIdx] = { ...emp.roles[roleIdx], wage };
+      emp.roles[roleIdx] = { ...emp.roles[roleIdx], new_wage_type, wage };
       next[empIdx] = emp;
       return next;
     });
@@ -605,13 +678,24 @@ const Shifts = () => {
       { withCredentials: true },
     );
     const dbByName = new Map();
+    // Secondary index by base name (suffix/asterisk stripped). Only used as a
+    // fallback when the exact name doesn't match, and only when the base name
+    // is unambiguous (exactly one DB row), so we never merge into the wrong
+    // person.
+    const dbByBase = new Map();
     for (const e of dbRes.data?.employees || []) {
       dbByName.set((e.name || "").trim(), e);
+      const base = baseName(e.name);
+      if (base) {
+        if (dbByBase.has(base)) dbByBase.set(base, null); // ambiguous → disable
+        else dbByBase.set(base, e);
+      }
     }
 
     const inserts = [];
     const updates = [];
     let existing = 0;
+    let roleUpdates = 0;
     const seen = new Set();
 
     // allEmployees has shift data + phones (merged in Step 3)
@@ -619,7 +703,13 @@ const Shifts = () => {
       const name = (emp.name || "").trim();
       if (!name || seen.has(name)) continue;
       seen.add(name);
-      const db = dbByName.get(name);
+      let db = dbByName.get(name);
+      // Fallback: match on the base name when an exact match fails (handles the
+      // Tabit " - <role>" name suffix drifting between exports).
+      if (!db) {
+        const base = baseName(name);
+        if (base) db = dbByBase.get(base) || undefined;
+      }
       if (!db) {
         inserts.push({
           rest: selectedRestaurant,
@@ -637,12 +727,26 @@ const Shifts = () => {
       } else {
         const needsPhone = emp.phone && !db.phone;
         const needsId = emp.ID_nmbr && !db.ID_nmbr;
-        if (needsPhone || needsId) {
+        // Merge any new roles from the shift file into the existing DB roles,
+        // keeping all stored wages untouched. Only flag an update when the
+        // role set actually grew.
+        const { roles: mergedRoles, changed: rolesChanged } = mergeRoles(
+          db.roles,
+          roleNamesOf(emp.roles),
+        );
+        if (rolesChanged) roleUpdates += 1;
+        if (needsPhone || needsId || rolesChanged) {
           updates.push({
             rest: selectedRestaurant,
-            name,
+            // Use the DB row's own name so the server resolves the right row
+            // even when we matched via the base-name fallback (the shift-file
+            // name may carry a suffix the stored name doesn't).
+            name: db.name || name,
             ID_nmbr: emp.ID_nmbr || db.ID_nmbr || null,
             phone: emp.phone || db.phone || null,
+            // Only send roles when they changed, so existing rows keep their
+            // stored roles/wages when the update is phone/ID-only.
+            ...(rolesChanged ? { roles: mergedRoles } : {}),
           });
         } else {
           existing += 1;
@@ -658,11 +762,13 @@ const Shifts = () => {
       samplePhones: sample.map((e) => ({ name: e.name, phone: e.phone })),
       inserts: inserts.length,
       updates: updates.length,
+      roleUpdates,
       existing,
     });
     setDiffSummary({
       inserts: inserts.length,
       updates: updates.length,
+      roleUpdates,
       existing,
     });
     return [...inserts, ...updates];
@@ -960,6 +1066,7 @@ const Shifts = () => {
           workdays: e.workdays ?? null,
           global: e.global ?? null,
           netGross: e.netGross ?? null,
+          in_advance: e.in_advance ?? null,
           work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
           daily_breakdown:
             e.daily_breakdown && typeof e.daily_breakdown === "object"
@@ -1029,6 +1136,7 @@ const Shifts = () => {
             payroll_data: e.payroll_data || {},
             role_extras: e.role_extras || {},
             workdays: e.workdays,
+            in_advance: e.in_advance ?? null, // מפרעה
             // Source for the Shiklulit recordType=4 actual-attendance rows:
             // work_dates → actual work days, daily_hours → actual work hours.
             work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
@@ -1155,6 +1263,10 @@ const Shifts = () => {
         empTravel = dailyTravel * wd;
       }
       const empBreaks = computeBreaks(emp);
+      // Payroll-software employee number (מס עובד) for the new table column.
+      const empNumber = empData?.empNumber ?? null;
+      // מפרעה (advance) — display-only; filled later (manually/script).
+      const empInAdvance = emp.in_advance ?? null;
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
@@ -1221,6 +1333,8 @@ const Shifts = () => {
           isTotal: false,
           empty: true,
           name: emp.name,
+          empNumber,
+          inAdvance: empInAdvance,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -1239,6 +1353,8 @@ const Shifts = () => {
           last: i === roleRows.length - 1 && roleRows.length === 1,
           isTotal: false,
           name: emp.name,
+          empNumber,
+          inAdvance: empInAdvance,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -1287,6 +1403,40 @@ const Shifts = () => {
 
     return { rows, warnings };
   }, [allEmployees, wageMap]);
+
+  // Final-table filter: matches by employee name, employee number (מס' עובד),
+  // or any of the employee's roles. Whole employee blocks are kept/dropped
+  // together; the grand-total row is hidden while a filter is active.
+  const [payrollSearch, setPayrollSearch] = useState("");
+  // "Exportable only" — an employee is valid for export when it has a payroll
+  // employee number (מס' עובד); the export drops the rest as "missing".
+  const [exportableOnly, setExportableOnly] = useState(false);
+  const displayedPayrollRows = useMemo(() => {
+    const q = payrollSearch.trim().toLowerCase();
+    if (!q && !exportableOnly) return fullPayrollRows;
+    // Build per-employee haystack (name + מס' עובד + all roles) + export flag.
+    const byEmp = new Map();
+    for (const r of fullPayrollRows) {
+      if (r.isGrandTotal) continue;
+      const key = r.name || "";
+      if (!byEmp.has(key)) byEmp.set(key, { hay: [key], empNumber: "" });
+      const e = byEmp.get(key);
+      if (r.empNumber != null && r.empNumber !== "") {
+        e.hay.push(String(r.empNumber));
+        e.empNumber = String(r.empNumber);
+      }
+      if (r.role) e.hay.push(String(r.role));
+    }
+    const matched = new Set();
+    for (const [key, e] of byEmp) {
+      const textOk = !q || e.hay.join(" ").toLowerCase().includes(q);
+      const exportOk = !exportableOnly || e.empNumber !== "";
+      if (textOk && exportOk) matched.add(key);
+    }
+    return fullPayrollRows.filter(
+      (r) => !r.isGrandTotal && matched.has(r.name || ""),
+    );
+  }, [fullPayrollRows, payrollSearch, exportableOnly]);
 
   // RTL payroll table: when step 4 opens, scroll the wrapper to the inline-start
   // (right edge) so the sticky שם + תפקיד (role) columns are visible instead of
@@ -1361,7 +1511,9 @@ const Shifts = () => {
     },
     body: {
       width: "100%",
-      maxWidth: "1400px",
+      // Final step shows the wide payroll table — let it grow up to 90% of the
+      // screen width; earlier steps stay at the comfortable reading width.
+      maxWidth: step === 5 ? "90vw" : "1400px",
       flex: 1,
       display: "flex",
       flexDirection: "column",
@@ -1926,7 +2078,18 @@ const Shifts = () => {
             <strong style={{ color: theme.text }}>{diffSummary.inserts}</strong>{" "}
             new ·{" "}
             <strong style={{ color: theme.text }}>{diffSummary.updates}</strong>{" "}
-            to update ·{" "}
+            to update
+            {diffSummary.roleUpdates > 0 ? (
+              <>
+                {" "}
+                (
+                <strong style={{ color: theme.text }}>
+                  {diffSummary.roleUpdates}
+                </strong>{" "}
+                role{diffSummary.roleUpdates === 1 ? "" : "s"})
+              </>
+            ) : null}{" "}
+            ·{" "}
             <strong style={{ color: theme.text }}>
               {diffSummary.existing}
             </strong>{" "}
@@ -2094,17 +2257,16 @@ const Shifts = () => {
                       <td style={cellStyle}>{r.role || "—"}</td>
                       <td style={cellStyle}>
                         {r.role ? (
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="—"
-                            style={styles.wageInput}
-                            value={r.wage}
-                            onChange={(e) =>
-                              updateWage(empIdx, roleIdx, e.target.value)
+                          <button
+                            type="button"
+                            style={styles.toggleButton}
+                            onClick={() =>
+                              setRoleWageDialog({ empIdx, roleIdx })
                             }
-                          />
+                            title="Set role wage"
+                          >
+                            {formatWage(r)}
+                          </button>
                         ) : (
                           "—"
                         )}
@@ -2241,6 +2403,68 @@ const Shifts = () => {
       )}
 
       <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginTop: "12px",
+        }}
+      >
+        <input
+          type="search"
+          value={payrollSearch}
+          onChange={(ev) => setPayrollSearch(ev.target.value)}
+          placeholder="סינון לפי שם, מס' עובד או תפקיד…"
+          style={{
+            ...styles.select,
+            flex: "1 1 auto",
+            maxWidth: "360px",
+            cursor: "text",
+            direction: "rtl",
+          }}
+        />
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "0.9rem",
+            color: theme.text,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+          title="הצג רק עובדים בעלי מס' עובד (ניתנים לייצוא)"
+        >
+          <input
+            type="checkbox"
+            checked={exportableOnly}
+            onChange={(ev) => setExportableOnly(ev.target.checked)}
+          />
+          ניתן לייצוא בלבד
+        </label>
+        {(payrollSearch.trim() || exportableOnly) && (
+          <span style={{ fontSize: "0.85rem", color: theme.textSecondary }}>
+            {
+              new Set(
+                displayedPayrollRows
+                  .filter((r) => !r.isGrandTotal)
+                  .map((r) => r.name),
+              ).size
+            }{" "}
+            מתוך{" "}
+            {
+              new Set(
+                fullPayrollRows
+                  .filter((r) => !r.isGrandTotal)
+                  .map((r) => r.name),
+              ).size
+            }{" "}
+            עובדים
+          </span>
+        )}
+      </div>
+
+      <div
         ref={payrollWrapRef}
         style={{ ...styles.tableWrapStep4, marginTop: "12px" }}
       >
@@ -2248,6 +2472,7 @@ const Shifts = () => {
           <thead>
             <tr>
               <th style={{ ...styles.th, ...styles.stickyNameTh }}>שם</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>תפקיד</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>שכר שעתי</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>ימי עבודה</th>
@@ -2260,11 +2485,12 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נסיעות</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>עובד גלובאלי</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>מפרעה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>סה"כ</th>
             </tr>
           </thead>
           <tbody>
-            {fullPayrollRows.map((r, i) => {
+            {displayedPayrollRows.map((r, i) => {
               const baseCell = r.isGrandTotal
                 ? { ...styles.tdTotal, fontWeight: 700, fontSize: "0.95rem" }
                 : r.isTotal
@@ -2288,7 +2514,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={13}>
+                    <td style={nameCell} colSpan={15}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -2298,6 +2524,7 @@ const Shifts = () => {
               return (
                 <tr key={r.empKey + i}>
                   <td style={nameCell}>{r.first ? r.name : ""}</td>
+                  <td style={cell}>{r.first ? (r.empNumber ?? "") : ""}</td>
                   <td style={cell}>{r.role || ""}</td>
                   <td style={cell}>
                     {r.isTotal ? "" : r.wage != null ? fmtNum(r.wage) : ""}
@@ -2322,6 +2549,11 @@ const Shifts = () => {
                       : fmtNum(r.travel)}
                   </td>
                   <td style={cell}>{r.first && r.global ? "כן" : ""}</td>
+                  <td style={cell}>
+                    {r.first && r.inAdvance != null && r.inAdvance !== ""
+                      ? fmtNum(r.inAdvance)
+                      : ""}
+                  </td>
                   <td style={cell}>{r.total == null ? "" : fmtNum(r.total)}</td>
                 </tr>
               );
@@ -2982,6 +3214,31 @@ const Shifts = () => {
           )}
         </div>
       </div>
+
+      {roleWageDialog &&
+        (() => {
+          const emp = newEmployees[roleWageDialog.empIdx];
+          const role = emp?.roles?.[roleWageDialog.roleIdx];
+          if (!role) return null;
+          return (
+            <WageDialog
+              title={`Role wage · ${role.role || ""} (${emp.name || "(no name)"})`}
+              value={{
+                new_wage_type: role.new_wage_type || "",
+                wage: role.wage ?? "",
+              }}
+              allowClear
+              onClose={() => setRoleWageDialog(null)}
+              onSave={(next) =>
+                updateRoleWage(
+                  roleWageDialog.empIdx,
+                  roleWageDialog.roleIdx,
+                  next,
+                )
+              }
+            />
+          );
+        })()}
     </div>
   );
 };

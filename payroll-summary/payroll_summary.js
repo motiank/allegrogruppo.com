@@ -1837,34 +1837,68 @@ async function extractEmployees(items, configMap = {}) {
     }
     // --- Break deduction ---
     // Each day whose total paid hours (h100+h125+h150) exceed 7 loses a 0.5h
-    // break (one per day, multi-shift days counted once). The break comes out
-    // of regular hours (h100) first, overflowing into 150% (h150) if regular
-    // is short. `breaks` is the per-employee total deducted.
+    // break (one per day; a multi-shift day counts once). The break is charged
+    // to the role with the MOST hours that day, taken from that role's 100%
+    // hours first and overflowing into its 150%. `breaks` is the per-employee
+    // total deducted.
     let breaks = 0;
+    const breakByRole = new Map(); // role -> break hours to deduct
     for (const entries of emp.dailyBreakdown.values()) {
       let dayTotal = 0;
+      const dayRoleHours = new Map();
       for (const e of entries) {
-        dayTotal +=
+        const h =
           (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
+        dayTotal += h;
+        if (e.role) dayRoleHours.set(e.role, (dayRoleHours.get(e.role) || 0) + h);
       }
-      if (dayTotal > 7) breaks += 0.5;
+      if (dayTotal <= 7) continue;
+      breaks += 0.5;
+      // Pick the role with the most hours that day (first one wins on a tie).
+      let topRole = null;
+      let topHours = -1;
+      for (const [role, h] of dayRoleHours) {
+        if (h > topHours) {
+          topHours = h;
+          topRole = role;
+        }
+      }
+      if (topRole != null)
+        breakByRole.set(topRole, (breakByRole.get(topRole) || 0) + 0.5);
     }
-    if (breaks > 0) {
+    // Deduct each role's accrued break from its own hours (100% then 150%).
+    // Anything a role can't absorb (or whose name isn't a payroll bucket)
+    // overflows to the remaining roles so the full break is always removed.
+    let overflow = 0;
+    for (const [role, amount] of breakByRole) {
+      let remaining = amount;
+      const bucket = payroll_data[role];
+      if (bucket) {
+        const hrs = bucket.hours;
+        const t0 = Math.min(hrs[0] || 0, remaining);
+        hrs[0] = (hrs[0] || 0) - t0;
+        remaining -= t0;
+        const t2 = Math.min(hrs[2] || 0, remaining);
+        hrs[2] = (hrs[2] || 0) - t2;
+        remaining -= t2;
+      }
+      overflow += remaining;
+    }
+    if (overflow > 0) {
       const roleKeys = Object.keys(payroll_data);
-      let remaining = breaks;
       for (const role of roleKeys) {
-        if (remaining <= 0) break;
+        if (overflow <= 0) break;
         const hrs = payroll_data[role].hours;
-        const take = Math.min(hrs[0] || 0, remaining);
+        const take = Math.min(hrs[0] || 0, overflow);
         hrs[0] = (hrs[0] || 0) - take;
-        remaining -= take;
+        overflow -= take;
       }
       for (const role of roleKeys) {
-        if (remaining <= 0) break;
+        if (overflow <= 0) break;
         const hrs = payroll_data[role].hours;
-        const take = Math.min(hrs[2] || 0, remaining);
+        const take = Math.min(hrs[2] || 0, overflow);
         hrs[2] = (hrs[2] || 0) - take;
-        remaining -= take;
+        overflow -= take;
       }
     }
     let workdays = 0;

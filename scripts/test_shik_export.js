@@ -37,6 +37,12 @@ const HOURLY_ACTUAL_HOURS =
   ) / 100;
 
 // Two employees: one hourly with all hour buckets + travel, one global salary.
+// Roles exercising the base-component split + default-wage merge:
+//   • מלצר  @40   → default (40) ┐
+//   • ראנר  @40   → default (40) ┴ MERGED into one base code-1 line
+//   • מתלמד @35.4 → trainee                → base code 33, per role
+//   • בר    @50   → different rate         → base code 31, per role
+// Overtime: default roles' OT merged at 40; non-default OT per role at its rate.
 const hourlyEmp = {
   name: "Hourly Hannah",
   ID_nmbr: "111",
@@ -44,9 +50,12 @@ const hourlyEmp = {
   work_dates: HOURLY_WORK_DATES, // → actualWorkDays (componentCode 7)
   daily_hours: HOURLY_DAILY_HOURS, // → actualWorkHours (componentCode 5)
   travel: TRAVEL_PER_DAY,
+  in_advance: 250, // מפרעה → componentCode 35
   payroll_data: {
-    week1: { hours: [40, 5, 2] }, // h100, h125, h150
-    week2: { hours: [40, 3, 1] },
+    מלצר: { hours: [40, 5, 2] }, // default-rate role
+    ראנר: { hours: [10, 1, 0] }, // also default rate → merges with מלצר
+    מתלמד: { hours: [20, 0, 0] }, // trainee
+    בר: { hours: [20, 3, 1] }, // other rate
   },
 };
 const globalEmp = {
@@ -80,6 +89,20 @@ const netLowEmp = {
     week1: { hours: [100, 0, 0] },
   },
 };
+// hourly_min employee: Shiklulit advance is computed and overrides any manual
+// in_advance. minGross = (100 + 10*1.25 + 5*1.5) * 50 = 120*50 = 6000;
+// advance = 6000*0.95 − completion(200) = 5700 − 200 = 5500.
+const minEmp = {
+  name: "Min Mia",
+  ID_nmbr: "555",
+  workdays: 15,
+  work_dates: [],
+  daily_hours: {},
+  in_advance: 9999, // manual value — must be OVERRIDDEN for hourly_min
+  payroll_data: {
+    מלצר: { hours: [100, 10, 5], completion: 200 },
+  },
+};
 
 // DB-side records (the shape buildExportRow expects from empByName).
 const empByName = new Map([
@@ -88,9 +111,16 @@ const empByName = new Map([
     {
       ID_nmbr: "111",
       new_wage_type: "hourly_gross",
-      wage: HOURLY_RATE,
+      wage: HOURLY_RATE, // employee default = 40
       travel: TRAVEL_PER_DAY,
       maxTravel: null,
+      // Per-role wages drive the base component split.
+      rolesByName: {
+        מלצר: { role: "מלצר", new_wage_type: "hourly_gross", wage: "40" },
+        ראנר: { role: "ראנר", new_wage_type: "hourly_gross", wage: "40" },
+        מתלמד: { role: "מתלמד", new_wage_type: "hourly_gross", wage: "35.4" },
+        בר: { role: "בר", new_wage_type: "hourly_gross", wage: "50" },
+      },
     },
   ],
   [
@@ -123,12 +153,26 @@ const empByName = new Map([
       maxTravel: null,
     },
   ],
+  [
+    "Min Mia",
+    {
+      ID_nmbr: "555",
+      new_wage_type: "hourly_min_gross",
+      wage: 50,
+      travel: null,
+      maxTravel: null,
+      rolesByName: {
+        מלצר: { role: "מלצר", new_wage_type: "hourly_min_gross", wage: "50" },
+      },
+    },
+  ],
 ]);
 const micpalByIdNmbr = new Map([
   ["111", 14],
   ["222", 27],
   ["333", 33],
   ["444", 44],
+  ["555", 55],
 ]);
 
 const ctx = {
@@ -150,12 +194,15 @@ const netRow = buildExportRow(netEmp, ctx);
 netRow.employeeNumber = Number(netRow.keyName);
 const netLowRow = buildExportRow(netLowEmp, ctx);
 netLowRow.employeeNumber = Number(netLowRow.keyName);
+const minRow = buildExportRow(minEmp, ctx);
+minRow.employeeNumber = Number(minRow.keyName);
 
 const workMonth = 5;
 const hourlyShik = buildShikRowsForEmployee(workMonth, hourlyRow);
 const globalShik = buildShikRowsForEmployee(workMonth, globalRow);
 const netShik = buildShikRowsForEmployee(workMonth, netRow);
 const netLowShik = buildShikRowsForEmployee(workMonth, netLowRow);
+const minShik = buildShikRowsForEmployee(workMonth, minRow);
 
 console.log("hourly emp →", hourlyShik);
 console.log("global emp →", globalShik);
@@ -166,22 +213,43 @@ const findOne = (rows, componentCode, recordType = 1) =>
     (r) => r.componentCode === componentCode && r.recordType === recordType,
   );
 
-// Hourly employee should produce: baseHourly (cc=1), overtime125 (38),
-// overtime150 (39), travel (3), workDays (cc=4 recordType=4).
+// Hourly employee now produces:
+//   • code 1  (default 40)  ← מלצר + ראנר MERGED, qty 40+10 = 50
+//   • code 33 (trainee 35.4) ← מתלמד, qty 20
+//   • code 31 (other 50)     ← בר, qty 20
+// plus merged default OT (38/39 @40) and per-role OT for בר (@50).
 const base = findOne(hourlyShik, 1);
-assert.equal(base.length, 1, "baseHourly row");
-assert.equal(base[0].rate, HOURLY_RATE);
-assert.equal(base[0].quantity, 80); // 40+40
+assert.equal(base.length, 1, "merged default base row");
+assert.equal(base[0].rate, HOURLY_RATE); // 40
+assert.equal(base[0].quantity, 50); // מלצר 40 + ראנר 10
 
+const trainee = findOne(hourlyShik, 33);
+assert.equal(trainee.length, 1, "trainee base row (cc=33)");
+assert.equal(trainee[0].rate, 35.4);
+assert.equal(trainee[0].quantity, 20); // מתלמד h100
+
+const extra = findOne(hourlyShik, 31);
+assert.equal(extra.length, 1, "extra-rate base row (cc=31)");
+assert.equal(extra[0].rate, 50);
+assert.equal(extra[0].quantity, 20); // בר h100
+
+// OT125: one merged default line @40 (5+1=6) and one בר line @50 (3).
 const ot125 = findOne(hourlyShik, 38);
-assert.equal(ot125.length, 1, "overtime125 row");
-assert.equal(ot125[0].rate, HOURLY_RATE);
-assert.equal(ot125[0].quantity, 8); // 5+3
+assert.equal(ot125.length, 2, "overtime125 rows");
+assert.ok(
+  ot125.some((r) => r.rate === 40 && r.quantity === 6),
+  "default OT125 @40 merged (5+1)",
+);
+assert.ok(ot125.some((r) => r.rate === 50 && r.quantity === 3), "בר OT125 @50");
 
+// OT150: one merged default line @40 (2+0=2) and one בר line @50 (1).
 const ot150 = findOne(hourlyShik, 39);
-assert.equal(ot150.length, 1, "overtime150 row");
-assert.equal(ot150[0].rate, HOURLY_RATE);
-assert.equal(ot150[0].quantity, 3); // 2+1
+assert.equal(ot150.length, 2, "overtime150 rows");
+assert.ok(
+  ot150.some((r) => r.rate === 40 && r.quantity === 2),
+  "default OT150 @40 merged",
+);
+assert.ok(ot150.some((r) => r.rate === 50 && r.quantity === 1), "בר OT150 @50");
 
 const travel = findOne(hourlyShik, 3);
 assert.equal(travel.length, 1, "travel row");
@@ -250,8 +318,8 @@ assert.deepEqual(tuple(actualWorkHours[0]), [
 // regularHours (cc=1), 125% (cc=38), 150% (cc=39) still present for the same
 // employee — actual attendance rows must not displace the paid-band rows.
 assert.equal(findOne(hourlyShik, 1).length, 1, "regularHours row present");
-assert.equal(findOne(hourlyShik, 38).length, 1, "125% row present");
-assert.equal(findOne(hourlyShik, 39).length, 1, "150% row present");
+assert.equal(findOne(hourlyShik, 38).length, 2, "125% rows present");
+assert.equal(findOne(hourlyShik, 39).length, 2, "150% rows present");
 
 // Bonus only appears for hourly_min_* (this fixture is hourly_gross).
 assert.equal(
@@ -259,6 +327,14 @@ assert.equal(
   0,
   "no bonus row for hourly_gross",
 );
+
+// מפרעה (advance) → recordType 1, componentCode 35, rate = amount, qty = 1.
+const advance = findOne(hourlyShik, 35);
+assert.equal(advance.length, 1, "in_advance row (cc=35)");
+assert.equal(advance[0].rate, 250);
+assert.equal(advance[0].quantity, 1);
+// Global employee has no advance → no cc=35 row.
+assert.equal(findOne(globalShik, 35).length, 0, "no advance for global emp");
 
 // Global employee should produce: globalSalary (cc=1, rate=9000, qty=1) +
 // workDays.
@@ -274,30 +350,40 @@ assert.equal(gworkdays[0].quantity, 22);
 assert.equal(findOne(globalShik, 38).length, 0, "no OT for global");
 assert.equal(findOne(globalShik, 39).length, 0, "no OT for global");
 
-// hourly_net: reduced rate = max(36, floor(50*0.8)) = 40; rows exported at 40.
-// Net bonus = (100+10+5)*50 − (100*40 + 10*40*1.25 + 5*40*1.5)
-//           = 115*50 − 4800 = 5750 − 4800 = 950.
-assert.equal(netRow.hourlyWage, 40, "hourly_net reduced rate");
+// hourly_net: paid at the wage rate (NO reduced rate, NO net bonus); the only
+// difference from gross is the net flag.
+assert.equal(netRow.hourlyWage, 50, "hourly_net at wage rate");
 assert.equal(netRow.net, "נ", "hourly_net flagged net");
 const netBase = findOne(netShik, 1);
 assert.equal(netBase.length, 1, "net baseHourly row");
-assert.equal(netBase[0].rate, 40, "baseHourly at reduced rate");
+assert.equal(netBase[0].rate, 50, "baseHourly at wage rate");
 assert.equal(netBase[0].quantity, 100);
-assert.equal(findOne(netShik, 38)[0].rate, 40, "OT125 at reduced rate");
-assert.equal(findOne(netShik, 39)[0].rate, 40, "OT150 at reduced rate");
-const netBonus = findOne(netShik, 32);
-assert.equal(netBonus.length, 1, "net bonus row present");
-assert.equal(netBonus[0].rate, 950, "net bonus amount");
-assert.equal(netBonus[0].quantity, 1);
+assert.equal(findOne(netShik, 38)[0].rate, 50, "OT125 at wage rate");
+assert.equal(findOne(netShik, 39)[0].rate, 50, "OT150 at wage rate");
+assert.equal(findOne(netShik, 32).length, 0, "no net bonus row");
 
-// Low-wage hourly_net: 40*0.8 = 32 < 36 → reduced clamps to 36.
-// Net bonus = 100*40 − 100*36 = 4000 − 3600 = 400.
-assert.equal(netLowRow.hourlyWage, 36, "reduced rate clamped to 36");
-assert.equal(findOne(netLowShik, 1)[0].rate, 36, "baseHourly clamped to 36");
-assert.equal(findOne(netLowShik, 32)[0].rate, 400, "net bonus at clamped rate");
+// Low-wage hourly_net: still paid at the wage rate, no bonus.
+assert.equal(netLowRow.hourlyWage, 40, "hourly_net at wage rate");
+assert.equal(findOne(netLowShik, 1)[0].rate, 40, "baseHourly at wage rate");
+assert.equal(findOne(netLowShik, 32).length, 0, "no net bonus row");
+
+// hourly_min: Shiklulit advance (cc=35) is COMPUTED and overrides the manual
+// in_advance (9999). minGross = (100 + 10*1.25 + 5*1.5)*50 = 6000;
+// advance = 6000*0.95 − 200 = 5500.
+assert.equal(minRow.shikInAdvance, 5500, "computed hourly_min advance");
+const minAdv = findOne(minShik, 35);
+assert.equal(minAdv.length, 1, "hourly_min advance row (cc=35)");
+assert.equal(minAdv[0].rate, 5500, "advance overrides manual 9999");
+assert.equal(minAdv[0].quantity, 1);
 
 // Every workMonth / employeeNumber must be a finite integer.
-for (const r of [...hourlyShik, ...globalShik, ...netShik, ...netLowShik]) {
+for (const r of [
+  ...hourlyShik,
+  ...globalShik,
+  ...netShik,
+  ...netLowShik,
+  ...minShik,
+]) {
   assert.equal(Number.isInteger(r.workMonth), true);
   assert.equal(r.workMonth, workMonth);
   assert.equal(Number.isFinite(r.employeeNumber), true);

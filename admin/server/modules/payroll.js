@@ -4,8 +4,43 @@ import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import MicpImportXL from "./MicpImportXL.js";
 import ShikImportXL from "./ShikImportXL.js";
+import {
+  normalizeRoleWage,
+  normalizeRoles,
+  isValidWageType,
+  effectiveHourlyRate,
+} from "../../../shared/wage.js";
 
 const require = createRequire(import.meta.url);
+
+// Normalize a money value to a DECIMAL-safe string (avoid JS Number float
+// drift on the way to MySQL DECIMAL columns). Returns null when not a number.
+const toDecimalString = (v) => {
+  if (v === "" || v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  return s;
+};
+
+// Serialize a roles array to the compound JSON stored in employees.roles:
+// [{ role, new_wage_type, wage }]. Accepts the legacy bare-number format on
+// input (normalizeRoleWage upgrades it) so a save migrates the row in place.
+const serializeRoles = (roles) =>
+  JSON.stringify(
+    (Array.isArray(roles) ? roles : [])
+      .filter((r) => r && r.role)
+      .map((r) => {
+        const n = normalizeRoleWage(r);
+        return {
+          role: String(n.role).trim(),
+          new_wage_type: isValidWageType(n.new_wage_type)
+            ? n.new_wage_type
+            : null,
+          wage: toDecimalString(n.wage),
+        };
+      }),
+  );
 const {
   extractEmployees,
 } = require("../../../payroll-summary/payroll_summary.js");
@@ -84,19 +119,16 @@ export const buildExportRow = (emp, ctx) => {
       ? String(emp.ID_nmbr).trim()
       : "";
   const newWageType = dbEmp.new_wage_type || null;
-  const wageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
+  const rawWageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
+  // -1 is the "minimum wage" sentinel — resolve it to the national minimum.
+  const wageVal = rawWageVal === -1 ? MIN_HOURLY_WAGE : rawWageVal;
 
   let hourlyWage = null;
-  // hourly_net is paid at a reduced rate (−20%, floored, but never below 36);
-  // the gap up to the original rate is topped up via a net bonus (below).
-  const reducedHourly =
-    newWageType === "hourly_net" && wageVal != null
-      ? Math.max(36, Math.floor(wageVal * 0.8))
-      : null;
+  // hourly_* (gross AND net) is paid at the wage rate. net-ness is conveyed
+  // only by the net flag (below) — there is NO reduced rate. hourly_min_* is
+  // paid at the national minimum, with the gap topped up via a bonus.
   if (newWageType && newWageType.startsWith("hourly_min_")) {
     hourlyWage = MIN_HOURLY_WAGE;
-  } else if (newWageType === "hourly_net") {
-    hourlyWage = reducedHourly;
   } else if (newWageType && newWageType.startsWith("hourly_")) {
     hourlyWage = wageVal;
   }
@@ -109,21 +141,6 @@ export const buildExportRow = (emp, ctx) => {
   ) {
     const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
     bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
-  } else if (
-    newWageType === "hourly_net" &&
-    reducedHourly != null &&
-    wageVal > 0
-  ) {
-    // Net bonus = original-rate pay on FLAT hours minus reduced-rate pay on
-    // overtime-WEIGHTED hours. Flat = h100+h125+h150 (no OT multiplier on the
-    // first term, per spec). The reduced-rate term mirrors the exported hourly
-    // columns, which use hourlyWage = reducedHourly.
-    const totalHours = h100 + h125 + h150;
-    const reducedWeighted =
-      h100 * reducedHourly +
-      h125 * reducedHourly * 1.25 +
-      h150 * reducedHourly * 1.5;
-    bonus = totalHours * wageVal - reducedWeighted;
   }
   const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
   const isGlobal = !!newWageType && newWageType.startsWith("global_");
@@ -181,12 +198,77 @@ export const buildExportRow = (emp, ctx) => {
     travelAmount = dailyTravel * workdays;
   }
 
+  // Per-role base/OT breakdown for the Shiklulit exporter. Each role carries its
+  // OWN effective hourly rate (falling back to the employee default when the role
+  // has no wage) plus its hours from payroll_data. The exporter maps each to the
+  // right base component code: 1 (rate == employee default), 31 (other rate),
+  // 33 (role "מתלמד"). The Micpal exporter ignores this field.
+  const roleBreakdown = [];
+  if (!isGlobal) {
+    const rolesByName = dbEmp.rolesByName || {};
+    for (const [role, payload] of Object.entries(payroll)) {
+      const hrs = (payload && payload.hours) || [];
+      const rh100 = Number(hrs[0] || 0);
+      const rh125 = Number(hrs[1] || 0);
+      const rh150 = Number(hrs[2] || 0);
+      if (rh100 === 0 && rh125 === 0 && rh150 === 0) continue;
+      let rate = effectiveHourlyRate(rolesByName[role], {
+        minHourlyWage: MIN_HOURLY_WAGE,
+      });
+      if (rate == null) rate = hourlyWage; // fall back to employee default
+      roleBreakdown.push({
+        role,
+        rate: rate ?? null,
+        h100: rh100,
+        h125: rh125,
+        h150: rh150,
+      });
+    }
+  }
+
+  // Shiklulit-only advance (מפרעה) for employees with any hourly_min_* role:
+  //   sum over those roles of (h100 + h125*1.25 + h150*1.5) * wage  (full gross
+  //   at the target wage), times 95%, minus the employee's total completion.
+  // null when the employee has no hourly_min role (then the stored in_advance
+  // is used as-is). Overrides any manual value in the Shiklulit export only.
+  let shikInAdvance = null;
+  {
+    const rolesByName = dbEmp.rolesByName || {};
+    let minGross = 0;
+    let hasMin = false;
+    for (const [role, payload] of Object.entries(payroll)) {
+      const rw = rolesByName[role];
+      const t = rw && rw.new_wage_type;
+      if (!t || !t.startsWith("hourly_min_")) continue;
+      hasMin = true;
+      const hrs = (payload && payload.hours) || [];
+      const weighted =
+        (Number(hrs[0]) || 0) +
+        (Number(hrs[1]) || 0) * 1.25 +
+        (Number(hrs[2]) || 0) * 1.5;
+      let wage = rw.wage == null || rw.wage === "" ? 0 : Number(rw.wage);
+      if (wage === -1) wage = MIN_HOURLY_WAGE; // -1 = minimum wage
+      minGross += weighted * wage;
+    }
+    if (hasMin) {
+      const advance = minGross * 0.95 - Math.max(0, completion);
+      shikInAdvance = Math.round(advance * 100) / 100;
+    }
+  }
+
   return {
     name,
     keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
     ID_nmbr: idNmbr,
     isGlobal,
     new_wage_type: newWageType,
+    // Shiklulit-only computed advance (overrides stored in_advance there); null
+    // when the employee has no hourly_min role.
+    shikInAdvance,
+    // employee default effective hourly rate, used by the Shiklulit exporter to
+    // decide which roles map to base component code 1 vs 31.
+    defaultWage: hourlyWage,
+    roleBreakdown,
     vacation: "",
     hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
     workdays: isGlobal ? "" : workdays || "",
@@ -210,6 +292,12 @@ export const buildExportRow = (emp, ctx) => {
     completion: Math.max(0, completion) || "",
     bonus,
     amount,
+    // מפרעה (advance). Manual / script-filled value carried on the payroll
+    // record; exported to Micpal (last column) and Shiklulit (component 35).
+    inAdvance:
+      emp.in_advance === "" || emp.in_advance == null
+        ? ""
+        : Number(emp.in_advance),
     standardDays: stdDays ?? "",
     standardHours: stdHours ?? "",
   };
@@ -391,16 +479,7 @@ const Router = () => {
           errors.push({ name, issue: "missing rest or name" });
           continue;
         }
-        const rolesJson = JSON.stringify(
-          Array.isArray(emp.roles)
-            ? emp.roles
-                .filter((r) => r && r.role)
-                .map((r) => ({
-                  role: String(r.role).trim(),
-                  wage: r.wage === "" || r.wage == null ? null : Number(r.wage),
-                }))
-            : [],
-        );
+        const rolesJson = serializeRoles(emp.roles);
         const globalVal =
           emp.global === "" || emp.global == null ? null : Number(emp.global);
         const hourlyWageVal =
@@ -490,6 +569,20 @@ const Router = () => {
           ? "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, new_wage_type, wage, travel, maxTravel, contractor, active, duplicate FROM employees WHERE rest = :rest"
           : "SELECT employee_id, company, ID_nmbr, phone, name, roles, `global`, hourly_wage, wage_type, new_wage_type, wage, travel, maxTravel, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL";
       const [rows] = await executeSql(sql, { rest });
+
+      // Payroll-software employee number (מס עובד) keyed by ID_nmbr. Loaded
+      // separately (not joined) because employees.ID_nmbr and
+      // payroll_soft_ix.ID_nmbr use different collations — same approach the
+      // export route uses.
+      const [keyRows] = await executeSql(
+        "SELECT keyName, ID_nmbr FROM payroll_soft_ix WHERE ID_nmbr IS NOT NULL",
+        {},
+      );
+      const empNumberByIdNmbr = new Map();
+      for (const k of keyRows || []) {
+        if (k.ID_nmbr != null)
+          empNumberByIdNmbr.set(String(k.ID_nmbr).trim(), k.keyName);
+      }
       const out = [];
       for (const r of rows || []) {
         let roles = [];
@@ -505,9 +598,17 @@ const Router = () => {
           employee_id: r.employee_id,
           company: r.company || null,
           ID_nmbr: r.ID_nmbr,
+          // Payroll-software employee number (מס עובד), from payroll_soft_ix.
+          empNumber:
+            r.ID_nmbr != null
+              ? (empNumberByIdNmbr.get(String(r.ID_nmbr).trim()) ?? null)
+              : null,
           phone: r.phone || null,
           name: r.name,
-          roles: Array.isArray(roles) ? roles : [],
+          // Normalize legacy bare-number role wages to the compound
+          // { role, new_wage_type, wage } shape so the client always sees one
+          // format (old plain number → hourly_gross).
+          roles: normalizeRoles(roles),
           global: asDecimalString(r.global),
           hourly_wage: asDecimalString(r.hourly_wage),
           wage_type: r.wage_type || null,
@@ -536,15 +637,6 @@ const Router = () => {
       if (list.length === 0) {
         return res.status(400).json({ error: "No employees in request body" });
       }
-      // Normalize a money value to a DECIMAL-safe string (avoid JS Number
-      // float drift on the way to MySQL DECIMAL columns).
-      const toDecimalString = (v) => {
-        if (v === "" || v == null) return null;
-        const s = String(v).trim();
-        if (!s) return null;
-        if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
-        return s;
-      };
       let updated = 0;
       const errors = [];
       for (const emp of list) {
@@ -553,25 +645,10 @@ const Router = () => {
           errors.push({ name: emp.name, issue: "missing employee_id" });
           continue;
         }
-        const rolesJson = JSON.stringify(
-          Array.isArray(emp.roles)
-            ? emp.roles
-                .filter((r) => r && r.role)
-                .map((r) => ({
-                  role: String(r.role).trim(),
-                  wage: toDecimalString(r.wage),
-                }))
-            : [],
-        );
-        const NEW_WAGE_TYPES = new Set([
-          "global_net",
-          "global_gross",
-          "hourly_net",
-          "hourly_gross",
-          "hourly_min_net",
-          "hourly_min_gross",
-        ]);
-        const newWageType = NEW_WAGE_TYPES.has(emp.new_wage_type)
+        // Persist roles in the compound { role, new_wage_type, wage } format,
+        // upgrading any legacy bare-number entries in the process.
+        const rolesJson = serializeRoles(emp.roles);
+        const newWageType = isValidWageType(emp.new_wage_type)
           ? emp.new_wage_type
           : null;
         const wageVal = toDecimalString(emp.wage);
@@ -1418,6 +1495,7 @@ const Router = () => {
           workdays: hasWrapper ? (raw.workdays ?? null) : null,
           global: hasWrapper ? (raw.global ?? null) : null,
           netGross: hasWrapper ? (raw.netGross ?? null) : null,
+          in_advance: hasWrapper ? (raw.in_advance ?? null) : null,
           work_dates:
             hasWrapper && Array.isArray(raw.work_dates) ? raw.work_dates : [],
           daily_breakdown:
@@ -1469,6 +1547,8 @@ const Router = () => {
           workdays: emp.workdays ?? null,
           global: emp.global ?? null,
           netGross: emp.netGross ?? null,
+          // מפרעה — manual/script-filled advance, persisted on the payroll row.
+          in_advance: emp.in_advance ?? null,
           work_dates: Array.isArray(emp.work_dates) ? emp.work_dates : [],
           daily_breakdown:
             emp.daily_breakdown && typeof emp.daily_breakdown === "object"
@@ -1917,14 +1997,30 @@ const Router = () => {
         return res.status(400).json({ error: "No employees in body" });
       }
 
-      // Load employee records from DB (ID_nmbr, travel, maxTravel)
+      // Load employee records from DB (ID_nmbr, travel, maxTravel, per-role wages)
       const [empRows] = await executeSql(
-        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage, roles FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
         { rest },
       );
       const empByName = new Map();
       for (const e of empRows || []) {
-        if (e.name) empByName.set(String(e.name).trim(), e);
+        if (!e.name) continue;
+        // Parse + normalize the per-role wages into a { role: { new_wage_type,
+        // wage } } map so buildExportRow can resolve each role's own rate.
+        let roles = [];
+        if (e.roles) {
+          try {
+            roles = typeof e.roles === "string" ? JSON.parse(e.roles) : e.roles;
+          } catch {
+            roles = [];
+          }
+        }
+        const rolesByName = {};
+        for (const r of normalizeRoles(roles)) {
+          if (r && r.role) rolesByName[String(r.role).trim()] = r;
+        }
+        e.rolesByName = rolesByName;
+        empByName.set(String(e.name).trim(), e);
       }
 
       // Load micpal keyName mapping by ID_nmbr

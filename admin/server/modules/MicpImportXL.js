@@ -75,6 +75,7 @@ class MicpImportXL {
       "בונוס",
       "תקן ימים",
       "תקן שעות",
+      "מפרעה",
     ];
     const r4 = ws.getRow(4);
     headers.forEach((h, i) => {
@@ -87,7 +88,7 @@ class MicpImportXL {
       };
     });
 
-    const numCols = [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20];
+    const numCols = [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21];
     for (const c of numCols) {
       ws.getColumn(c).numFmt = "0.00";
     }
@@ -124,6 +125,7 @@ class MicpImportXL {
       row.getCell(18).value = toNum(emp.bonus);
       row.getCell(19).value = toNum(emp.standardDays);
       row.getCell(20).value = toNum(emp.standardHours);
+      row.getCell(21).value = toNum(emp.inAdvance); // מפרעה
     }
 
     return wb.xlsx.writeBuffer();
