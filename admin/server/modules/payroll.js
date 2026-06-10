@@ -226,19 +226,22 @@ export const buildExportRow = (emp, ctx) => {
     }
   }
 
-  // Shiklulit-only advance (מפרעה) for employees with any hourly_min_* role:
+  // Computed advance (מפרעה) for employees with any hourly_min_* role:
   //   sum over those roles of (h100 + h125*1.25 + h150*1.5) * wage  (full gross
   //   at the target wage), times 95%, minus the employee's total completion.
   // null when the employee has no hourly_min role (then the stored in_advance
-  // is used as-is). Overrides any manual value in the Shiklulit export only.
-  let shikInAdvance = null;
+  // is used as-is). When set it OVERRIDES the stored value in BOTH exports
+  // (Micpal and Shiklulit).
+  let computedInAdvance = null;
   {
     const rolesByName = dbEmp.rolesByName || {};
     let minGross = 0;
     let hasMin = false;
     for (const [role, payload] of Object.entries(payroll)) {
       const rw = rolesByName[role];
-      const t = rw && rw.new_wage_type;
+      // Role wage type/amount, falling back to the employee-level wage (covers
+      // min-wage employees whose roles carry no per-role type).
+      const t = (rw && rw.new_wage_type) || newWageType;
       if (!t || !t.startsWith("hourly_min_")) continue;
       hasMin = true;
       const hrs = (payload && payload.hours) || [];
@@ -246,25 +249,35 @@ export const buildExportRow = (emp, ctx) => {
         (Number(hrs[0]) || 0) +
         (Number(hrs[1]) || 0) * 1.25 +
         (Number(hrs[2]) || 0) * 1.5;
-      let wage = rw.wage == null || rw.wage === "" ? 0 : Number(rw.wage);
+      let wage =
+        rw && rw.wage != null && rw.wage !== "" ? Number(rw.wage) : wageVal;
       if (wage === -1) wage = MIN_HOURLY_WAGE; // -1 = minimum wage
       minGross += weighted * wage;
     }
     if (hasMin) {
-      const advance = minGross * 0.95 - Math.max(0, completion);
-      shikInAdvance = Math.round(advance * 100) / 100;
+      // Travel is added to the gross before the 95% factor.
+      const travelSum = Number(travelAmount) || 0;
+      const advance = (minGross + travelSum) * 0.95 - Math.max(0, completion);
+      computedInAdvance = Math.round(advance * 100) / 100;
     }
   }
+  const storedInAdvance =
+    emp.in_advance === "" || emp.in_advance == null
+      ? ""
+      : Number(emp.in_advance);
+  // Effective advance used by both exporters: computed (hourly_min) overrides
+  // the stored/manual value.
+  const effectiveInAdvance =
+    computedInAdvance != null ? computedInAdvance : storedInAdvance;
 
   return {
     name,
     keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
     ID_nmbr: idNmbr,
     isGlobal,
+    // קבלן (contractor) employees are excluded from the export entirely.
+    contractor: !!dbEmp.contractor,
     new_wage_type: newWageType,
-    // Shiklulit-only computed advance (overrides stored in_advance there); null
-    // when the employee has no hourly_min role.
-    shikInAdvance,
     // employee default effective hourly rate, used by the Shiklulit exporter to
     // decide which roles map to base component code 1 vs 31.
     defaultWage: hourlyWage,
@@ -292,12 +305,10 @@ export const buildExportRow = (emp, ctx) => {
     completion: Math.max(0, completion) || "",
     bonus,
     amount,
-    // מפרעה (advance). Manual / script-filled value carried on the payroll
-    // record; exported to Micpal (last column) and Shiklulit (component 35).
-    inAdvance:
-      emp.in_advance === "" || emp.in_advance == null
-        ? ""
-        : Number(emp.in_advance),
+    // מפרעה (advance). For hourly_min employees this is the COMPUTED advance
+    // (overrides the stored value); otherwise the stored/manual value. Used by
+    // both Micpal (last column) and Shiklulit (component 35).
+    inAdvance: effectiveInAdvance,
     standardDays: stdDays ?? "",
     standardHours: stdHours ?? "",
   };
@@ -480,13 +491,36 @@ const Router = () => {
           continue;
         }
         const rolesJson = serializeRoles(emp.roles);
-        const globalVal =
-          emp.global === "" || emp.global == null ? null : Number(emp.global);
-        const hourlyWageVal =
-          emp.hourly_wage === "" || emp.hourly_wage == null
-            ? null
-            : Number(emp.hourly_wage);
-        const wageType = emp.wage_type === "net" ? "net" : "gross";
+        // Prefer the modern compound wage ({ new_wage_type, wage }) and derive
+        // the legacy global / hourly_wage / wage_type columns from it (same
+        // mapping as /employees/update). Fall back to the legacy fields when the
+        // compound type is absent, so older callers keep working.
+        const newWageType = isValidWageType(emp.new_wage_type)
+          ? emp.new_wage_type
+          : null;
+        let wageVal = null;
+        let globalVal = null;
+        let hourlyWageVal = null;
+        let wageType = "gross";
+        if (newWageType) {
+          wageVal = toDecimalString(emp.wage);
+          wageType = newWageType.endsWith("_net") ? "net" : "gross";
+          if (newWageType.startsWith("global_")) {
+            globalVal = wageVal;
+          } else if (newWageType.startsWith("hourly_min_")) {
+            hourlyWageVal = "-1";
+          } else {
+            hourlyWageVal = wageVal;
+          }
+        } else {
+          globalVal =
+            emp.global === "" || emp.global == null ? null : Number(emp.global);
+          hourlyWageVal =
+            emp.hourly_wage === "" || emp.hourly_wage == null
+              ? null
+              : Number(emp.hourly_wage);
+          wageType = emp.wage_type === "net" ? "net" : "gross";
+        }
         const travelVal =
           emp.travel === "" || emp.travel == null ? null : Number(emp.travel);
         const maxTravelVal =
@@ -501,7 +535,14 @@ const Router = () => {
         try {
           const existingId = await resolveEmployeeId(rest, emp);
           if (existingId) {
+            // On a duplicate match the caller may pass `newName` to overwrite
+            // the stored name (the row is still resolved by the original name).
+            const newNameVal =
+              emp.newName != null && String(emp.newName).trim()
+                ? String(emp.newName).trim()
+                : null;
             const sets = [];
+            if (newNameVal) sets.push("name = :newName");
             if (phoneVal) sets.push("phone = :phone");
             if (idNmbr) sets.push("ID_nmbr = :ID_nmbr");
             if (companyVal) sets.push("company = :company");
@@ -513,6 +554,7 @@ const Router = () => {
                 `UPDATE employees SET ${sets.join(", ")} WHERE employee_id = :id`,
                 {
                   id: existingId,
+                  newName: newNameVal,
                   phone: phoneVal,
                   ID_nmbr: idNmbr,
                   company: companyVal,
@@ -523,8 +565,8 @@ const Router = () => {
             }
           } else {
             await executeSql(
-              `INSERT INTO employees (rest, company, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, travel, maxTravel, contractor)
-               VALUES (:rest, :company, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :tr, :mtr, :ctr)`,
+              `INSERT INTO employees (rest, company, name, ID_nmbr, phone, roles, t101, \`global\`, hourly_wage, wage_type, new_wage_type, wage, travel, maxTravel, contractor)
+               VALUES (:rest, :company, :name, :ID_nmbr, :phone, CAST(:roles AS JSON), :t101, :gbl, :hw, :wt, :nwt, :wage, :tr, :mtr, :ctr)`,
               {
                 rest,
                 company: companyVal,
@@ -536,6 +578,8 @@ const Router = () => {
                 gbl: globalVal,
                 hw: hourlyWageVal,
                 wt: wageType,
+                nwt: newWageType,
+                wage: wageVal,
                 tr: travelVal,
                 mtr: maxTravelVal,
                 ctr: emp.contractor ? 1 : 0,
@@ -1997,9 +2041,10 @@ const Router = () => {
         return res.status(400).json({ error: "No employees in body" });
       }
 
-      // Load employee records from DB (ID_nmbr, travel, maxTravel, per-role wages)
+      // Load employee records from DB (ID_nmbr, travel, maxTravel, per-role
+      // wages, contractor flag)
       const [empRows] = await executeSql(
-        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage, roles FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+        "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage, roles, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
         { rest },
       );
       const empByName = new Map();
@@ -2044,12 +2089,19 @@ const Router = () => {
       };
       const employees = list.map((emp) => buildExportRow(emp, ctx));
 
-      // Split: rows missing a payroll-soft employee number (מס עובד) are
-      // reported back to the UI instead of being written to the xlsx.
+      // Split: קבלן (contractor) employees are skipped entirely; rows missing a
+      // payroll-soft employee number (מס עובד) are reported back to the UI
+      // instead of being written to the xlsx.
       const exportable = [];
       const missing = [];
+      const skippedContractors = [];
       for (const row of employees) {
-        if (!row.keyName) {
+        if (row.contractor) {
+          skippedContractors.push({
+            name: row.name || "",
+            ID_nmbr: row.ID_nmbr || "",
+          });
+        } else if (!row.keyName) {
           missing.push({ name: row.name || "", ID_nmbr: row.ID_nmbr || "" });
         } else {
           exportable.push(row);
@@ -2083,6 +2135,7 @@ const Router = () => {
         xlsxBase64: Buffer.from(buf).toString("base64"),
         payrollSoft,
         missing,
+        skippedContractors,
         exported: exportable.length,
       });
     } catch (err) {

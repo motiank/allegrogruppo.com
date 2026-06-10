@@ -14,7 +14,8 @@ import {
 } from "../constants/restaurants";
 import useCurrentUser from "../hooks/useCurrentUser";
 import WageDialog from "../components/WageDialog";
-import { formatWage, normalizeRoles } from "../../../shared/wage.js";
+import EmployeeWageTable from "../components/EmployeeWageTable";
+import { normalizeRoles } from "../../../shared/wage.js";
 
 const Employees = () => {
   const { theme } = useTheme();
@@ -69,11 +70,6 @@ const Employees = () => {
   // roleIdx === undefined → editing the employee-level wage; otherwise the
   // per-role wage at that index. Both use the same WageDialog component.
   const [wageDialog, setWageDialog] = useState(null);
-
-  // Employee-level wage cell text (uses the same compound { new_wage_type, wage }
-  // shape as role wages, via the shared formatter).
-  const formatWageCell = (emp) =>
-    formatWage({ new_wage_type: emp.new_wage_type, wage: emp.wage });
 
   useEffect(() => {
     if (menuOpenFor == null) return;
@@ -167,6 +163,7 @@ const Employees = () => {
           emp.name,
           emp.company,
           emp.ID_nmbr,
+          emp.empNumber,
           emp.phone,
           emp.employee_id,
           emp.new_wage_type,
@@ -207,6 +204,8 @@ const Employees = () => {
         employee_id: e.employee_id,
         company: e.company || "",
         ID_nmbr: e.ID_nmbr,
+        // Micpal/payroll employee number (מס' עובד) from payroll_soft_ix.
+        empNumber: e.empNumber ?? null,
         phone: e.phone || "",
         name: e.name,
         new_wage_type: e.new_wage_type || "",
@@ -1204,190 +1203,27 @@ const Employees = () => {
                 </>
               )}
             </div>
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>name</th>
-                    <th style={styles.th}>ID_nmbr</th>
-                    <th style={styles.th}>wage</th>
-                    <th style={styles.th}>travel</th>
-                    <th style={styles.th}>maxTravel</th>
-                    <th style={styles.th}>contractor</th>
-                    <th style={styles.th}>role</th>
-                    <th style={styles.th}>role wage</th>
-                    <th style={styles.th}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployees.flatMap(({ emp, origIdx: empIdx }) => {
-                    const roles =
-                      emp.roles && emp.roles.length > 0
-                        ? emp.roles
-                        : [{ role: "", wage: "" }];
-                    return roles.map((r, roleIdx) => {
-                      const isFirst = roleIdx === 0;
-                      const isLast = roleIdx === roles.length - 1;
-                      const cellStyle = isLast
-                        ? styles.tdEmpBoundary
-                        : styles.td;
-                      return (
-                        <tr key={`${emp.employee_id}-${roleIdx}`}>
-                          {isFirst ? (
-                            <>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                {emp.name || "—"}
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                {emp.ID_nmbr || "—"}
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <button
-                                  type="button"
-                                  style={styles.toggleButton}
-                                  onClick={() => setWageDialog({ empIdx })}
-                                  title="Set wage"
-                                >
-                                  {formatWageCell(emp)}
-                                </button>
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  placeholder="—"
-                                  style={styles.wageInput}
-                                  value={emp.travel}
-                                  onChange={(ev) =>
-                                    updateTravel(empIdx, ev.target.value)
-                                  }
-                                />
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  placeholder="—"
-                                  style={styles.wageInput}
-                                  value={emp.maxTravel}
-                                  onChange={(ev) =>
-                                    updateMaxTravel(empIdx, ev.target.value)
-                                  }
-                                />
-                              </td>
-                              <td
-                                rowSpan={roles.length}
-                                style={styles.tdEmpBoundary}
-                              >
-                                <button
-                                  type="button"
-                                  aria-pressed={!!emp.contractor}
-                                  onClick={() => toggleContractor(empIdx)}
-                                  style={
-                                    emp.contractor
-                                      ? styles.toggleButtonActive
-                                      : styles.toggleButton
-                                  }
-                                  title="Mark as contractor (קבלן)"
-                                >
-                                  {emp.contractor ? "קבלן" : "שכיר"}
-                                </button>
-                              </td>
-                            </>
-                          ) : null}
-                          <td style={cellStyle}>{r.role || "—"}</td>
-                          <td style={cellStyle}>
-                            {r.role ? (
-                              <button
-                                type="button"
-                                style={styles.toggleButton}
-                                onClick={() =>
-                                  setWageDialog({ empIdx, roleIdx })
-                                }
-                                title="Set role wage"
-                              >
-                                {formatWage(r)}
-                              </button>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          {isFirst ? (
-                            <td
-                              rowSpan={roles.length}
-                              style={styles.actionsCell}
-                            >
-                              <button
-                                type="button"
-                                aria-label="Row actions"
-                                aria-haspopup="menu"
-                                aria-expanded={menuOpenFor === emp.employee_id}
-                                disabled={removingId === emp.employee_id}
-                                style={styles.kebabButton}
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  setMenuOpenFor((cur) =>
-                                    cur === emp.employee_id
-                                      ? null
-                                      : emp.employee_id,
-                                  );
-                                }}
-                              >
-                                ⋮
-                              </button>
-                              {menuOpenFor === emp.employee_id && (
-                                <div
-                                  role="menu"
-                                  style={styles.menu}
-                                  onClick={(ev) => ev.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    style={styles.menuItemNeutral}
-                                    onClick={() => openDuplicateDialog(emp)}
-                                  >
-                                    Duplicate with…
-                                  </button>
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    style={styles.menuItem}
-                                    disabled={removingId === emp.employee_id}
-                                    onClick={() => handleRemove(emp)}
-                                  >
-                                    {removingId === emp.employee_id
-                                      ? "Removing…"
-                                      : "Remove"}
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          ) : null}
-                        </tr>
-                      );
-                    });
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <EmployeeWageTable
+              rows={filteredEmployees.map(({ emp, origIdx }) => ({
+                emp,
+                empIdx: origIdx,
+              }))}
+              onEditEmpWage={(empIdx) => setWageDialog({ empIdx })}
+              onEditRoleWage={(empIdx, roleIdx) =>
+                setWageDialog({ empIdx, roleIdx })
+              }
+              onUpdateTravel={updateTravel}
+              onUpdateMaxTravel={updateMaxTravel}
+              onToggleContractor={toggleContractor}
+              actions={{
+                keyOf: (emp) => emp.employee_id,
+                menuOpenFor,
+                setMenuOpenFor,
+                removingId,
+                onRemove: handleRemove,
+                onDuplicate: openDuplicateDialog,
+              }}
+            />
             <div style={styles.actions}>
               <button
                 type="button"

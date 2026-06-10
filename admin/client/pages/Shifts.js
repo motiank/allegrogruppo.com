@@ -22,10 +22,10 @@ import {
 } from "../constants/restaurants";
 import useCurrentUser from "../hooks/useCurrentUser";
 import WageDialog from "../components/WageDialog";
+import EmployeeWageTable from "../components/EmployeeWageTable";
 import {
   normalizeRoleWage,
   effectiveHourlyRate,
-  formatWage,
 } from "../../../shared/wage.js";
 
 const STEPS = [
@@ -73,6 +73,37 @@ const computeBreaks = (emp) => {
   return total;
 };
 
+// Per-role break hours for an employee: same 0.5h/day rule, but attributed to
+// the role with the most hours that day (the employee works one role per day,
+// so this is exact). Returns a Map<role, hours>. Mirrors the breakByRole
+// attribution in payroll_summary.js extractEmployees().
+const computeBreaksByRole = (emp) => {
+  const map = new Map();
+  const bd = emp && emp.daily_breakdown;
+  if (!bd || typeof bd !== "object") return map;
+  for (const entries of Object.values(bd)) {
+    let dayTotal = 0;
+    const dayRoleHours = new Map();
+    for (const e of entries || []) {
+      const h =
+        (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
+      dayTotal += h;
+      if (e.role) dayRoleHours.set(e.role, (dayRoleHours.get(e.role) || 0) + h);
+    }
+    if (dayTotal <= 7) continue;
+    let topRole = null;
+    let topHours = -1;
+    for (const [role, h] of dayRoleHours) {
+      if (h > topHours) {
+        topHours = h;
+        topRole = role;
+      }
+    }
+    if (topRole != null) map.set(topRole, (map.get(topRole) || 0) + 0.5);
+  }
+  return map;
+};
+
 // Build a per-employee record map keyed by ID_nmbr / name.
 // Each entry: { roles: { role: { new_wage_type, wage } }, hourly_wage, ... }
 const buildWageMap = (employeesFromDb) => {
@@ -87,6 +118,10 @@ const buildWageMap = (employeesFromDb) => {
     const rec = {
       roles: roleWage,
       empNumber: e.empNumber == null ? null : e.empNumber,
+      // Employee-level compound wage — used as the fallback when a role has no
+      // wage type of its own (e.g. a min-wage employee with untyped roles).
+      new_wage_type: e.new_wage_type || null,
+      wage: e.wage == null || e.wage === "" ? null : Number(e.wage),
       hourly_wage: e.hourly_wage == null ? null : Number(e.hourly_wage),
       wage_type: e.wage_type || null,
       global: e.global == null ? null : Number(e.global),
@@ -442,6 +477,8 @@ const Shifts = () => {
   // After a Micpal XL download: employees that were skipped because no
   // Micpal keyName (מס עובד) was found for them.
   const [micpalMissing, setMicpalMissing] = useState(null);
+  // Employees marked קבלן (contractor) — skipped in the export, shown for info.
+  const [skippedContractors, setSkippedContractors] = useState(null);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
 
   // Shift validation
@@ -577,10 +614,10 @@ const Shifts = () => {
       });
       const fresh = (res.data.employees || []).map((e) => ({
         ...e,
-        global: "",
-        hourly_wage: "",
-        wage_type: "",
+        new_wage_type: "",
+        wage: "",
         travel: "",
+        maxTravel: "",
         contractor: false,
         roles: (e.roles || []).map((role) => ({
           role,
@@ -611,8 +648,18 @@ const Shifts = () => {
   };
 
   // ---------- Step 3: edit wage + update ----------
-  // Role-wage editing target for the shared WageDialog: { empIdx, roleIdx }.
-  const [roleWageDialog, setRoleWageDialog] = useState(null);
+  // Wage-editing target for the shared WageDialog: { empIdx } for the
+  // employee-level wage, { empIdx, roleIdx } for a per-role wage.
+  const [wageDialog, setWageDialog] = useState(null);
+  // Open row-actions (⋮) menu, keyed by the new-employee index.
+  const [menuOpenFor, setMenuOpenFor] = useState(null);
+
+  useEffect(() => {
+    if (menuOpenFor == null) return;
+    const close = () => setMenuOpenFor(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuOpenFor]);
 
   const updateRoleWage = (empIdx, roleIdx, { new_wage_type, wage }) => {
     setNewEmployees((prev) => {
@@ -625,26 +672,10 @@ const Shifts = () => {
     });
   };
 
-  const updateGlobal = (empIdx, val) => {
+  const updateWageFields = (empIdx, { new_wage_type, wage }) => {
     setNewEmployees((prev) => {
       const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], global: val };
-      return next;
-    });
-  };
-
-  const updateHourlyWage = (empIdx, val) => {
-    setNewEmployees((prev) => {
-      const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], hourly_wage: val };
-      return next;
-    });
-  };
-
-  const updateWageType = (empIdx, val) => {
-    setNewEmployees((prev) => {
-      const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], wage_type: val };
+      next[empIdx] = { ...next[empIdx], new_wage_type, wage };
       return next;
     });
   };
@@ -653,6 +684,14 @@ const Shifts = () => {
     setNewEmployees((prev) => {
       const next = prev.slice();
       next[empIdx] = { ...next[empIdx], travel: val };
+      return next;
+    });
+  };
+
+  const updateMaxTravel = (empIdx, val) => {
+    setNewEmployees((prev) => {
+      const next = prev.slice();
+      next[empIdx] = { ...next[empIdx], maxTravel: val };
       return next;
     });
   };
@@ -666,6 +705,13 @@ const Shifts = () => {
       };
       return next;
     });
+  };
+
+  // Remove a not-yet-saved new employee from the local list (by identity, since
+  // new rows have no employee_id yet).
+  const removeNewEmployee = (emp) => {
+    setNewEmployees((prev) => prev.filter((e) => e !== emp));
+    setMenuOpenFor(null);
   };
 
   const [diffSummary, setDiffSummary] = useState(null);
@@ -711,22 +757,28 @@ const Shifts = () => {
         if (base) db = dbByBase.get(base) || undefined;
       }
       if (!db) {
+        // Don't create a DB row from phone-less shift data — only insert a brand
+        // new employee when we actually have a phone for them.
+        if (!emp.phone) continue;
         inserts.push({
           rest: selectedRestaurant,
           name,
           ID_nmbr: emp.ID_nmbr || null,
           phone: emp.phone || null,
           roles: emp.roles || [],
-          global: emp.global,
-          hourly_wage: emp.hourly_wage,
-          wage_type: emp.wage_type,
+          new_wage_type: emp.new_wage_type,
+          wage: emp.wage,
           travel: emp.travel,
+          maxTravel: emp.maxTravel,
           contractor: !!emp.contractor,
           t101: false,
         });
       } else {
         const needsPhone = emp.phone && !db.phone;
         const needsId = emp.ID_nmbr && !db.ID_nmbr;
+        // On a duplicate match, overwrite the stored name with the raw shift
+        // name (handles names that drifted between exports).
+        const needsName = !!name && name !== (db.name || "").trim();
         // Merge any new roles from the shift file into the existing DB roles,
         // keeping all stored wages untouched. Only flag an update when the
         // role set actually grew.
@@ -735,13 +787,16 @@ const Shifts = () => {
           roleNamesOf(emp.roles),
         );
         if (rolesChanged) roleUpdates += 1;
-        if (needsPhone || needsId || rolesChanged) {
+        if (needsPhone || needsId || rolesChanged || needsName) {
           updates.push({
             rest: selectedRestaurant,
             // Use the DB row's own name so the server resolves the right row
             // even when we matched via the base-name fallback (the shift-file
             // name may carry a suffix the stored name doesn't).
             name: db.name || name,
+            // Raw shift name to write onto the matched row, so a drifted name
+            // gets updated to the latest export's name.
+            newName: name,
             ID_nmbr: emp.ID_nmbr || db.ID_nmbr || null,
             phone: emp.phone || db.phone || null,
             // Only send roles when they changed, so existing rows keep their
@@ -1154,7 +1209,8 @@ const Shifts = () => {
       const res = await axios.post("/admin/payroll/export-micpal", payload, {
         withCredentials: true,
       });
-      const { xlsxBase64, filename, missing } = res.data || {};
+      const { xlsxBase64, filename, missing, skippedContractors: skipped } =
+        res.data || {};
       if (xlsxBase64) {
         const binary = atob(xlsxBase64);
         const bytes = new Uint8Array(binary.length);
@@ -1173,6 +1229,9 @@ const Shifts = () => {
       }
       if (Array.isArray(missing) && missing.length > 0) {
         setMicpalMissing(missing);
+      }
+      if (Array.isArray(skipped) && skipped.length > 0) {
+        setSkippedContractors(skipped);
       }
     } catch (err) {
       console.error("export-micpal error:", err);
@@ -1263,10 +1322,47 @@ const Shifts = () => {
         empTravel = dailyTravel * wd;
       }
       const empBreaks = computeBreaks(emp);
+      const breaksByRole = computeBreaksByRole(emp);
       // Payroll-software employee number (מס עובד) for the new table column.
       const empNumber = empData?.empNumber ?? null;
-      // מפרעה (advance) — display-only; filled later (manually/script).
-      const empInAdvance = emp.in_advance ?? null;
+      // מפרעה (advance): for an employee with any hourly_min role it is computed
+      // (mirrors the export) and overrides the stored value; otherwise the
+      // stored/manual value is shown.
+      //   advance = Σ(hourly_min roles) (h100 + h125*1.25 + h150*1.5) * wage
+      //             * 0.95 − total completion.
+      let empInAdvance = emp.in_advance ?? null;
+      {
+        let minGross = 0;
+        let hasMin = false;
+        let comp = 0;
+        for (const [role, payload] of Object.entries(emp.payroll_data || {})) {
+          comp += Number(payload && payload.completion) || 0;
+          const rw = empData?.roles?.[role];
+          // Role wage type/amount, falling back to the employee-level wage.
+          const t = (rw && rw.new_wage_type) || empData?.new_wage_type;
+          if (!t || !t.startsWith("hourly_min_")) continue;
+          hasMin = true;
+          const hrs = (payload && payload.hours) || [];
+          const weighted =
+            (Number(hrs[0]) || 0) +
+            (Number(hrs[1]) || 0) * 1.25 +
+            (Number(hrs[2]) || 0) * 1.5;
+          let wage =
+            rw && rw.wage != null && rw.wage !== ""
+              ? Number(rw.wage)
+              : (empData?.wage ?? 0);
+          if (wage === -1) wage = MIN_HOURLY_WAGE;
+          minGross += weighted * wage;
+        }
+        if (hasMin) {
+          // Travel is added to the gross before the 95% factor.
+          const travelSum = Number(empTravel) || 0;
+          empInAdvance =
+            Math.round(
+              ((minGross + travelSum) * 0.95 - Math.max(0, comp)) * 100,
+            ) / 100;
+        }
+      }
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
@@ -1359,7 +1455,7 @@ const Shifts = () => {
           global: emp.global,
           wage_type: wageType,
           travel: empTravel,
-          breaks: i === 0 ? empBreaks : null,
+          breaks: breaksByRole.get(r.role) || null,
           ...r,
         });
         if (r.total != null) grandTotal += r.total;
@@ -1384,6 +1480,7 @@ const Shifts = () => {
           manualCompletion: sum("manualCompletion"),
           travel: sum("travel"),
           wage_type: wageType,
+          breaks: empBreaks,
           total: roleRows.reduce((s, r) => s + (Number(r.total) || 0), 0),
         });
       }
@@ -2129,154 +2226,25 @@ const Shifts = () => {
       </div>
 
       {newEmployees.length > 0 && (
-        <div style={{ ...styles.tableWrap, marginTop: "12px" }}>
-          <table style={{ ...styles.table, ...styles.ltrTable }}>
-            <thead>
-              <tr>
-                <th style={styles.th}>name</th>
-                <th style={styles.th}>ID_nmbr</th>
-                <th style={styles.th}>global wage</th>
-                <th style={styles.th}>hourly_wage</th>
-                <th style={styles.th}>wage_type</th>
-                <th style={styles.th}>travel</th>
-                <th style={styles.th}>contractor</th>
-                <th style={styles.th}>role</th>
-                <th style={styles.th}>role wage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {newEmployees.flatMap((emp, empIdx) => {
-                const roles =
-                  emp.roles && emp.roles.length > 0
-                    ? emp.roles
-                    : [{ role: "", wage: "" }];
-                return roles.map((r, roleIdx) => {
-                  const isFirst = roleIdx === 0;
-                  const isLast = roleIdx === roles.length - 1;
-                  const cellStyle = isLast ? styles.tdEmpBoundary : styles.td;
-                  return (
-                    <tr key={`${empIdx}-${roleIdx}`}>
-                      {isFirst ? (
-                        <>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            {emp.name || "—"}
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            {emp.ID_nmbr || "—"}
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="—"
-                              style={styles.wageInput}
-                              value={emp.global || ""}
-                              onChange={(ev) =>
-                                updateGlobal(empIdx, ev.target.value)
-                              }
-                            />
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="—"
-                              style={styles.wageInput}
-                              value={emp.hourly_wage || ""}
-                              onChange={(ev) =>
-                                updateHourlyWage(empIdx, ev.target.value)
-                              }
-                            />
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            <select
-                              style={styles.wageInput}
-                              value={emp.wage_type || ""}
-                              onChange={(ev) =>
-                                updateWageType(empIdx, ev.target.value)
-                              }
-                            >
-                              <option value="">—</option>
-                              <option value="gross">gross</option>
-                              <option value="net">net</option>
-                            </select>
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="—"
-                              style={styles.wageInput}
-                              value={emp.travel || ""}
-                              onChange={(ev) =>
-                                updateTravel(empIdx, ev.target.value)
-                              }
-                            />
-                          </td>
-                          <td
-                            rowSpan={roles.length}
-                            style={styles.tdEmpBoundary}
-                          >
-                            <button
-                              type="button"
-                              aria-pressed={!!emp.contractor}
-                              onClick={() => toggleContractor(empIdx)}
-                              style={
-                                emp.contractor
-                                  ? styles.toggleButtonActive
-                                  : styles.toggleButton
-                              }
-                              title="Mark as contractor (קבלן)"
-                            >
-                              {emp.contractor ? "קבלן" : "שכיר"}
-                            </button>
-                          </td>
-                        </>
-                      ) : null}
-                      <td style={cellStyle}>{r.role || "—"}</td>
-                      <td style={cellStyle}>
-                        {r.role ? (
-                          <button
-                            type="button"
-                            style={styles.toggleButton}
-                            onClick={() =>
-                              setRoleWageDialog({ empIdx, roleIdx })
-                            }
-                            title="Set role wage"
-                          >
-                            {formatWage(r)}
-                          </button>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  );
-                });
-              })}
-            </tbody>
-          </table>
+        <div style={{ marginTop: "12px" }}>
+          <EmployeeWageTable
+            rows={newEmployees.map((emp, empIdx) => ({ emp, empIdx }))}
+            onEditEmpWage={(empIdx) => setWageDialog({ empIdx })}
+            onEditRoleWage={(empIdx, roleIdx) =>
+              setWageDialog({ empIdx, roleIdx })
+            }
+            onUpdateTravel={updateTravel}
+            onUpdateMaxTravel={updateMaxTravel}
+            onToggleContractor={toggleContractor}
+            actions={{
+              keyOf: (emp) => emp,
+              menuOpenFor,
+              setMenuOpenFor,
+              removingId: null,
+              onRemove: removeNewEmployee,
+              onDuplicate: null,
+            }}
+          />
         </div>
       )}
 
@@ -2535,9 +2503,7 @@ const Shifts = () => {
                   <td style={cell}>{fmtNum(r.h100)}</td>
                   <td style={cell}>{fmtNum(r.h125)}</td>
                   <td style={cell}>{fmtNum(r.h150)}</td>
-                  <td style={cell}>
-                    {r.first && r.breaks ? fmtNum(r.breaks) : ""}
-                  </td>
+                  <td style={cell}>{r.breaks ? fmtNum(r.breaks) : ""}</td>
                   <td style={cell}>
                     {r.first ? wageTypeLabel(r.wage_type) : ""}
                   </td>
@@ -3022,7 +2988,13 @@ const Shifts = () => {
   };
 
   const renderMicpalMissingDialog = () => {
-    if (!micpalMissing || micpalMissing.length === 0) return null;
+    const hasMissing = micpalMissing && micpalMissing.length > 0;
+    const hasContractors = skippedContractors && skippedContractors.length > 0;
+    if (!hasMissing && !hasContractors) return null;
+    const closeDialog = () => {
+      setMicpalMissing(null);
+      setSkippedContractors(null);
+    };
     return (
       <div
         style={{
@@ -3035,7 +3007,7 @@ const Shifts = () => {
           justifyContent: "center",
           padding: "20px",
         }}
-        onClick={() => setMicpalMissing(null)}
+        onClick={closeDialog}
       >
         <div
           onClick={(e) => e.stopPropagation()}
@@ -3060,11 +3032,11 @@ const Shifts = () => {
             }}
           >
             <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-              Micpal missing employees ({micpalMissing.length})
+              עובדים שלא יוצאו
             </div>
             <button
               type="button"
-              onClick={() => setMicpalMissing(null)}
+              onClick={closeDialog}
               aria-label="Close"
               style={{
                 background: "none",
@@ -3079,62 +3051,65 @@ const Shifts = () => {
               ×
             </button>
           </div>
-          <div
-            style={{
-              fontSize: "0.9rem",
-              color: theme.textSecondary,
-              marginBottom: "10px",
-            }}
-          >
-            These employees have no Micpal employee number (מס עובד) and were
-            skipped in the export.
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th
+          {(() => {
+            const th = {
+              textAlign: "right",
+              padding: "6px 8px",
+              borderBottom: `1px solid ${theme.border}`,
+            };
+            const td = {
+              padding: "6px 8px",
+              borderBottom: `1px solid ${theme.border}`,
+            };
+            const section = (title, note, rows) => (
+              <div style={{ marginBottom: "14px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "4px" }}>
+                  {title} ({rows.length})
+                </div>
+                <div
                   style={{
-                    textAlign: "right",
-                    padding: "6px 8px",
-                    borderBottom: `1px solid ${theme.border}`,
+                    fontSize: "0.9rem",
+                    color: theme.textSecondary,
+                    marginBottom: "8px",
                   }}
                 >
-                  Name
-                </th>
-                <th
-                  style={{
-                    textAlign: "right",
-                    padding: "6px 8px",
-                    borderBottom: `1px solid ${theme.border}`,
-                  }}
-                >
-                  ID number
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {micpalMissing.map((m, i) => (
-                <tr key={i}>
-                  <td
-                    style={{
-                      padding: "6px 8px",
-                      borderBottom: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    {m.name || "—"}
-                  </td>
-                  <td
-                    style={{
-                      padding: "6px 8px",
-                      borderBottom: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    {m.ID_nmbr || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  {note}
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={th}>שם</th>
+                      <th style={th}>ת"ז</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((m, i) => (
+                      <tr key={i}>
+                        <td style={td}>{m.name || "—"}</td>
+                        <td style={td}>{m.ID_nmbr || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+            return (
+              <>
+                {hasContractors &&
+                  section(
+                    "קבלנים שדולגו",
+                    "עובדים המסומנים כקבלן — לא נכללים בקובץ הייצוא.",
+                    skippedContractors,
+                  )}
+                {hasMissing &&
+                  section(
+                    "חסר מספר עובד",
+                    "אין מספר עובד (מס עובד) — דולגו בייצוא.",
+                    micpalMissing,
+                  )}
+              </>
+            );
+          })()}
         </div>
       </div>
     );
@@ -3215,27 +3190,33 @@ const Shifts = () => {
         </div>
       </div>
 
-      {roleWageDialog &&
+      {wageDialog &&
         (() => {
-          const emp = newEmployees[roleWageDialog.empIdx];
-          const role = emp?.roles?.[roleWageDialog.roleIdx];
-          if (!role) return null;
+          const emp = newEmployees[wageDialog.empIdx];
+          if (!emp) return null;
+          const isRole = wageDialog.roleIdx != null;
+          const target = isRole ? emp.roles?.[wageDialog.roleIdx] : emp;
+          if (!target) return null;
           return (
             <WageDialog
-              title={`Role wage · ${role.role || ""} (${emp.name || "(no name)"})`}
-              value={{
-                new_wage_type: role.new_wage_type || "",
-                wage: role.wage ?? "",
-              }}
-              allowClear
-              onClose={() => setRoleWageDialog(null)}
-              onSave={(next) =>
-                updateRoleWage(
-                  roleWageDialog.empIdx,
-                  roleWageDialog.roleIdx,
-                  next,
-                )
+              title={
+                isRole
+                  ? `Role wage · ${target.role || ""} (${emp.name || "(no name)"})`
+                  : `Set wage for ${emp.name || "(no name)"}`
               }
+              value={{
+                new_wage_type: target.new_wage_type || "",
+                wage: target.wage ?? "",
+              }}
+              allowClear={isRole}
+              onClose={() => setWageDialog(null)}
+              onSave={(next) => {
+                if (isRole) {
+                  updateRoleWage(wageDialog.empIdx, wageDialog.roleIdx, next);
+                } else {
+                  updateWageFields(wageDialog.empIdx, next);
+                }
+              }}
             />
           );
         })()}

@@ -58,6 +58,16 @@ const toFiniteNumber = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// Overtime is paid at a premium over the hourly wage: 125% bands at 1.25× the
+// rate and 150% bands at 1.5×. Tamal expects the *premium* rate in the row, not
+// the base wage. Round to 2 decimals to avoid float artifacts (e.g. 62.5).
+const OT_MULTIPLIER = { overtime125: 1.25, overtime150: 1.5 };
+const otRate = (compKey, wage) => {
+  if (wage == null) return wage;
+  const m = OT_MULTIPLIER[compKey] || 1;
+  return Math.round(wage * m * 100) / 100;
+};
+
 // Build the Siklulit rows for a single employee given the shared per-employee
 // row shape produced by buildExportRow() in payroll.js (hourlyWage, h100, h125,
 // h150, travelAmount, bonus, amount, workdays, isGlobal, ...).
@@ -155,31 +165,28 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
     // Merged default line(s) first.
     if (def && defaultWage != null) {
       if (def.h100 > 0) emit("baseHourly", defaultWage, def.h100);
-      if (def.h125 > 0) emit("overtime125", defaultWage, def.h125);
-      if (def.h150 > 0) emit("overtime150", defaultWage, def.h150);
+      if (def.h125 > 0) emit("overtime125", otRate("overtime125", defaultWage), def.h125);
+      if (def.h150 > 0) emit("overtime150", otRate("overtime150", defaultWage), def.h150);
     }
     // Then the per-role non-default lines (trainee → 33, other rate → 31).
     for (const o of others) {
       const baseComp = o.isTrainee ? "baseTrainee" : "baseExtra";
       if (o.rh100 > 0) emit(baseComp, o.rate, o.rh100);
-      if (o.rh125 > 0) emit("overtime125", o.rate, o.rh125);
-      if (o.rh150 > 0) emit("overtime150", o.rate, o.rh150);
+      if (o.rh125 > 0) emit("overtime125", otRate("overtime125", o.rate), o.rh125);
+      if (o.rh150 > 0) emit("overtime150", otRate("overtime150", o.rate), o.rh150);
     }
   } else if (hourlyWage != null) {
     // Legacy fallback: single aggregated base/OT at the employee wage.
     if (h100 != null && h100 > 0) emit("baseHourly", hourlyWage, h100);
-    if (h125 != null && h125 > 0) emit("overtime125", hourlyWage, h125);
-    if (h150 != null && h150 > 0) emit("overtime150", hourlyWage, h150);
+    if (h125 != null && h125 > 0) emit("overtime125", otRate("overtime125", hourlyWage), h125);
+    if (h150 != null && h150 > 0) emit("overtime150", otRate("overtime150", hourlyWage), h150);
   }
   if (travel != null && travel > 0) emit("travel", travel, 1);
   if (bonus != null && bonus > 0) emit("bonus", bonus, 1);
-  // מפרעה (advance) — exported when it has any non-zero value. For employees
-  // with an hourly_min role the value is computed (shikInAdvance) and overrides
-  // any stored/manual in_advance; otherwise the stored value is used.
-  const inAdvance =
-    row.shikInAdvance != null
-      ? toFiniteNumber(row.shikInAdvance)
-      : toFiniteNumber(row.inAdvance);
+  // מפרעה (advance) — exported when it has any non-zero value. row.inAdvance is
+  // already the effective value (computed advance for hourly_min employees,
+  // otherwise the stored/manual value) — see buildExportRow.
+  const inAdvance = toFiniteNumber(row.inAdvance);
   if (inAdvance != null && inAdvance !== 0) emit("inAdvance", inAdvance, 1);
   // Employment-data rows (recordType 4). Emitted in spec order: paid days,
   // actual days, actual hours. Zero quantities are dropped (emit's zero-row
