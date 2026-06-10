@@ -125,7 +125,9 @@ class MicpImportXL {
       row.getCell(18).value = toNum(emp.bonus);
       row.getCell(19).value = toNum(emp.standardDays);
       row.getCell(20).value = toNum(emp.standardHours);
-      row.getCell(21).value = toNum(emp.inAdvance); // מפרעה
+      // מפרעה — column kept for layout, but always exported empty (the advance
+      // is no longer emitted; it was being read as tips).
+      row.getCell(21).value = "";
     }
 
     return wb.xlsx.writeBuffer();

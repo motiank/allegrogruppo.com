@@ -342,6 +342,19 @@ const Shifts = () => {
 
     const fileResults = [];
     const phoneByName = new Map();
+    const phoneByClockId = new Map();
+    // Name key for matching: drop everything that isn't a Hebrew/Latin letter,
+    // digit, or space (apostrophes, geresh ׳, gershayim ״, quotes, dots, dashes,
+    // asterisks…), lowercase, and collapse whitespace. Makes "ג׳אן" == "גאן",
+    // "מלצר.ית" == "מלצרית", etc.
+    const stripForMatch = (s) =>
+      String(s == null ? "" : s)
+        .replace(/[​-‏‪-‮⁦-⁩﻿]/g, "")
+        .toLowerCase()
+        // keep only base Hebrew letters (א-ת, incl. finals), Latin, digits, space
+        .replace(/[^0-9a-zא-ת ]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
     try {
       for (const { file } of empDataFiles) {
         const fd = new FormData();
@@ -364,15 +377,21 @@ const Shifts = () => {
               dropped += 1;
               continue;
             }
+            const clock = e.clockId != null ? String(e.clockId).trim() : "";
+            if (clock) phoneByClockId.set(clock, e.phone);
             const first = (e.name || "").trim();
             const fam = (e.family || "").trim();
             const full = `${first} ${fam}`.trim();
-            if (!full) {
+            if (!full && !clock) {
               dropped += 1;
               continue;
             }
-            phoneByName.set(full, e.phone);
-            if (first && fam) phoneByName.set(`${fam} ${first}`, e.phone);
+            const fullKey = stripForMatch(full);
+            if (fullKey) phoneByName.set(fullKey, e.phone);
+            if (first && fam) {
+              const revKey = stripForMatch(`${fam} ${first}`);
+              if (revKey) phoneByName.set(revKey, e.phone);
+            }
             kept += 1;
           }
           fileResults.push({
@@ -390,9 +409,13 @@ const Shifts = () => {
         }
       }
 
-      const phoneFor = (name) => {
-        const n = (name || "").trim();
-        return phoneByName.get(n) || null;
+      // Match by clock id (מזהה שעון) first — exact and name-independent — then
+      // fall back to the special-char-stripped name.
+      const phoneFor = (emp) => {
+        const clock = emp && emp.clockId != null ? String(emp.clockId).trim() : "";
+        if (clock && phoneByClockId.has(clock)) return phoneByClockId.get(clock);
+        const key = stripForMatch(emp && emp.name);
+        return (key && phoneByName.get(key)) || null;
       };
 
       let matchedNew = 0;
@@ -401,7 +424,7 @@ const Shifts = () => {
       const unmatchedExisting = [];
 
       const nextNewEmployees = newEmployees.map((e) => {
-        const p = phoneFor(e.name);
+        const p = phoneFor(e);
         if (p) {
           matchedNew += 1;
           return { ...e, phone: p };
@@ -410,7 +433,7 @@ const Shifts = () => {
         return e;
       });
       const nextAllEmployees = allEmployees.map((e) => {
-        const p = phoneFor(e.name);
+        const p = phoneFor(e);
         if (p) {
           matchedExisting += 1;
           return { ...e, phone: p };
@@ -474,6 +497,9 @@ const Shifts = () => {
   const [payrollError, setPayrollError] = useState(null);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  // Export chooser dialog: "all" vs a comma-separated list of mic numbers.
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportEmpNumbers, setExportEmpNumbers] = useState("");
   // After a Micpal XL download: employees that were skipped because no
   // Micpal keyName (מס עובד) was found for them.
   const [micpalMissing, setMicpalMissing] = useState(null);
@@ -757,9 +783,8 @@ const Shifts = () => {
         if (base) db = dbByBase.get(base) || undefined;
       }
       if (!db) {
-        // Don't create a DB row from phone-less shift data — only insert a brand
-        // new employee when we actually have a phone for them.
-        if (!emp.phone) continue;
+        // Insert every new shift employee, even without a phone — people who
+        // worked shifts but aren't in the phone list should still reach the DB.
         inserts.push({
           rest: selectedRestaurant,
           name,
@@ -1170,12 +1195,27 @@ const Shifts = () => {
   };
 
   // ---------- Step 4: XL download ----------
-  const handleDownloadXlsx = async () => {
+  // micNumbers: optional array of mic numbers (מס' עובד). When provided, only
+  // employees whose empNumber is in the list are exported; otherwise everyone.
+  const handleDownloadXlsx = async (micNumbers = null) => {
     if (downloadingXlsx) return;
     if (!allEmployees || allEmployees.length === 0) {
       setDownloadError("no extracted employees to export");
       return;
     }
+    let source = allEmployees;
+    if (Array.isArray(micNumbers)) {
+      const set = new Set(micNumbers.map((n) => String(n).trim()));
+      source = allEmployees.filter((e) => {
+        const n = lookupEmpData(wageMap, e)?.empNumber;
+        return n != null && set.has(String(n).trim());
+      });
+      if (source.length === 0) {
+        setDownloadError("no employees match those numbers");
+        return;
+      }
+    }
+    setShowExportDialog(false);
     setDownloadingXlsx(true);
     setDownloadError(null);
     try {
@@ -1183,7 +1223,7 @@ const Shifts = () => {
         rest: selectedRestaurant,
         restLabel: selectedLabel,
         month,
-        employees: allEmployees.map((e) => {
+        employees: source.map((e) => {
           const empData = lookupEmpData(wageMap, e);
           return {
             name: e.name,
@@ -1325,44 +1365,6 @@ const Shifts = () => {
       const breaksByRole = computeBreaksByRole(emp);
       // Payroll-software employee number (מס עובד) for the new table column.
       const empNumber = empData?.empNumber ?? null;
-      // מפרעה (advance): for an employee with any hourly_min role it is computed
-      // (mirrors the export) and overrides the stored value; otherwise the
-      // stored/manual value is shown.
-      //   advance = Σ(hourly_min roles) (h100 + h125*1.25 + h150*1.5) * wage
-      //             * 0.95 − total completion.
-      let empInAdvance = emp.in_advance ?? null;
-      {
-        let minGross = 0;
-        let hasMin = false;
-        let comp = 0;
-        for (const [role, payload] of Object.entries(emp.payroll_data || {})) {
-          comp += Number(payload && payload.completion) || 0;
-          const rw = empData?.roles?.[role];
-          // Role wage type/amount, falling back to the employee-level wage.
-          const t = (rw && rw.new_wage_type) || empData?.new_wage_type;
-          if (!t || !t.startsWith("hourly_min_")) continue;
-          hasMin = true;
-          const hrs = (payload && payload.hours) || [];
-          const weighted =
-            (Number(hrs[0]) || 0) +
-            (Number(hrs[1]) || 0) * 1.25 +
-            (Number(hrs[2]) || 0) * 1.5;
-          let wage =
-            rw && rw.wage != null && rw.wage !== ""
-              ? Number(rw.wage)
-              : (empData?.wage ?? 0);
-          if (wage === -1) wage = MIN_HOURLY_WAGE;
-          minGross += weighted * wage;
-        }
-        if (hasMin) {
-          // Travel is added to the gross before the 95% factor.
-          const travelSum = Number(empTravel) || 0;
-          empInAdvance =
-            Math.round(
-              ((minGross + travelSum) * 0.95 - Math.max(0, comp)) * 100,
-            ) / 100;
-        }
-      }
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
@@ -1430,7 +1432,6 @@ const Shifts = () => {
           empty: true,
           name: emp.name,
           empNumber,
-          inAdvance: empInAdvance,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -1450,7 +1451,6 @@ const Shifts = () => {
           isTotal: false,
           name: emp.name,
           empNumber,
-          inAdvance: empInAdvance,
           workdays: emp.workdays,
           global: emp.global,
           wage_type: wageType,
@@ -2453,7 +2453,6 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נסיעות</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>עובד גלובאלי</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>מפרעה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>סה"כ</th>
             </tr>
           </thead>
@@ -2482,7 +2481,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={15}>
+                    <td style={nameCell} colSpan={14}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -2515,11 +2514,6 @@ const Shifts = () => {
                       : fmtNum(r.travel)}
                   </td>
                   <td style={cell}>{r.first && r.global ? "כן" : ""}</td>
-                  <td style={cell}>
-                    {r.first && r.inAdvance != null && r.inAdvance !== ""
-                      ? fmtNum(r.inAdvance)
-                      : ""}
-                  </td>
                   <td style={cell}>{r.total == null ? "" : fmtNum(r.total)}</td>
                 </tr>
               );
@@ -2543,7 +2537,7 @@ const Shifts = () => {
             opacity: downloadingXlsx ? 0.7 : 1,
             cursor: downloadingXlsx ? "wait" : "pointer",
           }}
-          onClick={handleDownloadXlsx}
+          onClick={() => setShowExportDialog(true)}
           disabled={downloadingXlsx || allEmployees.length === 0}
         >
           {downloadingXlsx ? "Building…" : "XL download"}
@@ -2987,6 +2981,123 @@ const Shifts = () => {
     );
   };
 
+  const renderExportDialog = () => {
+    if (!showExportDialog) return null;
+    const close = () => setShowExportDialog(false);
+    const parsedNumbers = exportEmpNumbers
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const inputStyle = {
+      width: "100%",
+      boxSizing: "border-box",
+      padding: "8px 10px",
+      fontSize: "0.95rem",
+      borderRadius: "6px",
+      border: `1px solid ${theme.border}`,
+      backgroundColor: theme.surface,
+      color: theme.text,
+      outline: "none",
+      marginTop: "6px",
+    };
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          zIndex: 2100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+        onClick={close}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: theme.surface,
+            color: theme.text,
+            borderRadius: "10px",
+            padding: "20px",
+            width: "100%",
+            maxWidth: "440px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "16px",
+            }}
+          >
+            <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>ייצוא / Export</div>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close"
+              style={{
+                background: "none",
+                border: "none",
+                color: theme.text,
+                fontSize: "1.4rem",
+                lineHeight: 1,
+                cursor: "pointer",
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <button
+            type="button"
+            style={{ ...styles.primaryButton, width: "100%" }}
+            onClick={() => handleDownloadXlsx()}
+          >
+            ייצוא הכל / Export all
+          </button>
+
+          <div
+            style={{
+              borderTop: `1px solid ${theme.border}`,
+              margin: "18px 0 14px",
+            }}
+          />
+
+          <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>
+            ייצוא לפי מספר עובד (מס' עובד), מופרד בפסיקים:
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="444, 264, 398"
+            value={exportEmpNumbers}
+            onChange={(e) => setExportEmpNumbers(e.target.value)}
+            style={inputStyle}
+            autoFocus
+          />
+          <button
+            type="button"
+            style={{
+              ...styles.secondaryButton,
+              width: "100%",
+              marginTop: "10px",
+              opacity: parsedNumbers.length === 0 ? 0.6 : 1,
+              cursor: parsedNumbers.length === 0 ? "not-allowed" : "pointer",
+            }}
+            disabled={parsedNumbers.length === 0}
+            onClick={() => handleDownloadXlsx(parsedNumbers)}
+          >
+            ייצוא נבחרים / Export selected
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderMicpalMissingDialog = () => {
     const hasMissing = micpalMissing && micpalMissing.length > 0;
     const hasContractors = skippedContractors && skippedContractors.length > 0;
@@ -3118,6 +3229,7 @@ const Shifts = () => {
   return (
     <div style={styles.container}>
       {renderLaborDialog()}
+      {renderExportDialog()}
       {renderMicpalMissingDialog()}
       {savingPayroll && (
         <div

@@ -94,13 +94,13 @@ export const buildExportRow = (emp, ctx) => {
   const MIN_HOURLY_WAGE = Number(ctx.minHourlyWage) || 35.4;
 
   const payroll = emp.payroll_data || {};
+  // Tips and completion (השלמה) are intentionally NOT exported in either
+  // format, so they are not accumulated here.
   let h100 = 0,
     h125 = 0,
     h150 = 0,
     shabbat = 0,
-    holiday = 0,
-    tip = 0,
-    completion = 0;
+    holiday = 0;
   for (const [, payload] of Object.entries(payroll)) {
     const hours = (payload && payload.hours) || [];
     h100 += Number(hours[0] || 0);
@@ -108,8 +108,6 @@ export const buildExportRow = (emp, ctx) => {
     h150 += Number(hours[2] || 0);
     shabbat += Number(hours[3] || 0);
     holiday += Number(hours[4] || 0);
-    tip += Number((payload && payload.tip) || 0);
-    completion += Number((payload && payload.completion) || 0);
   }
   const name = (emp.name || "").trim();
   const dbEmp = empByName.get(name) || {};
@@ -226,49 +224,9 @@ export const buildExportRow = (emp, ctx) => {
     }
   }
 
-  // Computed advance (מפרעה) for employees with any hourly_min_* role:
-  //   sum over those roles of (h100 + h125*1.25 + h150*1.5) * wage  (full gross
-  //   at the target wage), times 95%, minus the employee's total completion.
-  // null when the employee has no hourly_min role (then the stored in_advance
-  // is used as-is). When set it OVERRIDES the stored value in BOTH exports
-  // (Micpal and Shiklulit).
-  let computedInAdvance = null;
-  {
-    const rolesByName = dbEmp.rolesByName || {};
-    let minGross = 0;
-    let hasMin = false;
-    for (const [role, payload] of Object.entries(payroll)) {
-      const rw = rolesByName[role];
-      // Role wage type/amount, falling back to the employee-level wage (covers
-      // min-wage employees whose roles carry no per-role type).
-      const t = (rw && rw.new_wage_type) || newWageType;
-      if (!t || !t.startsWith("hourly_min_")) continue;
-      hasMin = true;
-      const hrs = (payload && payload.hours) || [];
-      const weighted =
-        (Number(hrs[0]) || 0) +
-        (Number(hrs[1]) || 0) * 1.25 +
-        (Number(hrs[2]) || 0) * 1.5;
-      let wage =
-        rw && rw.wage != null && rw.wage !== "" ? Number(rw.wage) : wageVal;
-      if (wage === -1) wage = MIN_HOURLY_WAGE; // -1 = minimum wage
-      minGross += weighted * wage;
-    }
-    if (hasMin) {
-      // Travel is added to the gross before the 95% factor.
-      const travelSum = Number(travelAmount) || 0;
-      const advance = (minGross + travelSum) * 0.95 - Math.max(0, completion);
-      computedInAdvance = Math.round(advance * 100) / 100;
-    }
-  }
-  const storedInAdvance =
-    emp.in_advance === "" || emp.in_advance == null
-      ? ""
-      : Number(emp.in_advance);
-  // Effective advance used by both exporters: computed (hourly_min) overrides
-  // the stored/manual value.
-  const effectiveInAdvance =
-    computedInAdvance != null ? computedInAdvance : storedInAdvance;
+  // מפרעה (advance) is no longer exported (it was being read as tips in the
+  // Shiklulit import) — neither the computed hourly_min advance nor the stored
+  // manual value is emitted to either export file.
 
   return {
     name,
@@ -300,15 +258,12 @@ export const buildExportRow = (emp, ctx) => {
     holiday: isGlobal ? "" : holiday || "",
     net: netFlag,
     travel: travelAmount,
-    // השלמה = completion only (tips are NOT folded in), matching the final
-    // table. Negative completion is clamped to 0.
-    completion: Math.max(0, completion) || "",
+    // השלמה (completion) is intentionally excluded from the export — always
+    // blank. The Micpal exporter keeps the column but emits no value; tips are
+    // likewise never exported.
+    completion: "",
     bonus,
     amount,
-    // מפרעה (advance). For hourly_min employees this is the COMPUTED advance
-    // (overrides the stored value); otherwise the stored/manual value. Used by
-    // both Micpal (last column) and Shiklulit (component 35).
-    inAdvance: effectiveInAdvance,
     standardDays: stdDays ?? "",
     standardHours: stdHours ?? "",
   };
@@ -431,6 +386,7 @@ const Router = () => {
           rest,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
+          clockId: e.clockId ?? null,
           roles: e.roles,
           payroll_data: e.payroll_data,
         }));
@@ -439,6 +395,7 @@ const Router = () => {
           rest,
           name: e.name,
           ID_nmbr: e.ID_nmbr,
+          clockId: e.clockId ?? null,
           roles: e.roles,
           payroll_data: e.payroll_data,
           role_extras: e.role_extras || {},
@@ -818,6 +775,7 @@ const Router = () => {
           family: ["שם משפחה"],
           phone: ["טלפון נייד", "טלפון", "נייד", "פלאפון", "מספר טלפון"],
           id: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+          clockId: ["מזהה שעון"],
         };
         const norm = (s) => String(s == null ? "" : s).trim();
         const cellText = (c) => {
@@ -879,11 +837,15 @@ const Router = () => {
             ? norm(cellText(row.getCell(cols.family)))
             : "";
           const ID_nmbr = cols.id ? norm(cellText(row.getCell(cols.id))) : "";
+          const clockId = cols.clockId
+            ? norm(cellText(row.getCell(cols.clockId)))
+            : "";
           entries.push({
             name: first,
             family,
             phone,
             ID_nmbr: ID_nmbr || null,
+            clockId: clockId || null,
             active: !activeRaw || activeRaw === "פעיל",
           });
         }

@@ -55,6 +55,9 @@ const EMPLOYEE_NUMBER_LABELS = [
 ];
 const WORK_DAYS_LABELS = ["מספר ימי עבודה", "ימי עבודה"];
 const ID_NUMBER_LABELS = ["ת.ז.", 'ת"ז', "תז", "תעודת זהות", "ת.ז"];
+// Tabit time-clock id ("מזהה שעון: 896"). A stable per-employee key that also
+// appears in the employee-list export, so it joins the two reliably by-id.
+const CLOCK_ID_LABELS = ["מזהה שעון"];
 const MONTH_LABELS = ["חודש", "תקופה"];
 const HEBREW_MONTHS = {
   ינואר: 1,
@@ -1052,6 +1055,7 @@ function getOrCreateEmployee(employees, name) {
       name,
       employeeNumber: null,
       idNumber: null,
+      clockId: null,
       netGross: null,
       global: false,
       // Per-role hour buckets (insertion order preserved). Keys are the
@@ -1418,9 +1422,24 @@ async function processWorkbookSheets(
         });
       }
 
+      // Tabit time-clock id ("מזהה שעון: 896") — used to join shifts to the
+      // employee-list export regardless of name spelling.
+      let extractedClockId = findInlineLabelValueInHeader(
+        sheet,
+        headerRow,
+        CLOCK_ID_LABELS,
+      );
+      if (!extractedClockId) {
+        extractedClockId = findValueNextToLabel(sheet, CLOCK_ID_LABELS, {
+          number: false,
+          maxRows: headerScanLimit,
+        });
+      }
+
       // Employee-level enrichment (first non-empty wins).
       emp.employeeNumber = chooseFirst(emp.employeeNumber, extractedEmpNum);
       emp.idNumber = chooseFirst(emp.idNumber, extractedIdNum);
+      emp.clockId = chooseFirst(emp.clockId, extractedClockId);
       emp.netGross = chooseFirst(emp.netGross, sheetNetGross);
       if (cfg && cfg.netGross)
         emp.netGross = chooseFirst(emp.netGross, cfg.netGross);
@@ -1908,6 +1927,7 @@ async function extractEmployees(items, configMap = {}) {
     return {
       name: emp.name,
       ID_nmbr: emp.idNumber || null,
+      clockId: emp.clockId || null,
       roles: Array.from(new Set([...emp.rolesData.keys()])).filter(
         (r) => r && r !== "כללי",
       ),

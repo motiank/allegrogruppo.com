@@ -43,7 +43,6 @@ export const SHIK_COMPONENTS = {
   overtime150: { recordType: 1, componentCode: 39 }, // שעות 150%
   travel: { recordType: 1, componentCode: 3 }, // נסיעות
   bonus: { recordType: 1, componentCode: 32 }, // בונוס
-  inAdvance: { recordType: 1, componentCode: 35 }, // מפרעה
   globalSalary: { recordType: 1, componentCode: 1 }, // שכר גלובאלי
   // recordType 4 = employment data. These codes are NOT salary components —
   // they are fixed attendance codes from Tamal's Shiklulit import spec.
@@ -183,11 +182,8 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   }
   if (travel != null && travel > 0) emit("travel", travel, 1);
   if (bonus != null && bonus > 0) emit("bonus", bonus, 1);
-  // מפרעה (advance) — exported when it has any non-zero value. row.inAdvance is
-  // already the effective value (computed advance for hourly_min employees,
-  // otherwise the stored/manual value) — see buildExportRow.
-  const inAdvance = toFiniteNumber(row.inAdvance);
-  if (inAdvance != null && inAdvance !== 0) emit("inAdvance", inAdvance, 1);
+  // מפרעה (advance, component 35) is intentionally NOT emitted — the payroll
+  // software reads code 35 as tips, so the advance must never appear in the file.
   // Employment-data rows (recordType 4). Emitted in spec order: paid days,
   // actual days, actual hours. Zero quantities are dropped (emit's zero-row
   // skip), matching the existing paid-work-days behavior.

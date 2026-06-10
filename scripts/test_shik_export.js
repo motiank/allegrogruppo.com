@@ -50,7 +50,7 @@ const hourlyEmp = {
   work_dates: HOURLY_WORK_DATES, // → actualWorkDays (componentCode 7)
   daily_hours: HOURLY_DAILY_HOURS, // → actualWorkHours (componentCode 5)
   travel: TRAVEL_PER_DAY,
-  in_advance: 250, // מפרעה → componentCode 35
+  in_advance: 250, // מפרעה — no longer exported (advance removed)
   payroll_data: {
     מלצר: { hours: [40, 5, 2] }, // default-rate role
     ראנר: { hours: [10, 1, 0] }, // also default rate → merges with מלצר
@@ -89,9 +89,9 @@ const netLowEmp = {
     week1: { hours: [100, 0, 0] },
   },
 };
-// hourly_min employee: Shiklulit advance is computed and overrides any manual
-// in_advance. minGross = (100 + 10*1.25 + 5*1.5) * 50 = 120*50 = 6000;
-// advance = 6000*0.95 − completion(200) = 5700 − 200 = 5500.
+// hourly_min employee. The advance (מפרעה) is no longer computed or exported,
+// so the manual in_advance (9999) and the completion(200) in the data have no
+// effect on the export.
 const minEmp = {
   name: "Min Mia",
   ID_nmbr: "555",
@@ -369,12 +369,10 @@ assert.equal(
   "no bonus row for hourly_gross",
 );
 
-// מפרעה (advance) → recordType 1, componentCode 35, rate = amount, qty = 1.
-const advance = findOne(hourlyShik, 35);
-assert.equal(advance.length, 1, "in_advance row (cc=35)");
-assert.equal(advance[0].rate, 250);
-assert.equal(advance[0].quantity, 1);
-// Global employee has no advance → no cc=35 row.
+// מפרעה (advance, componentCode 35) is no longer exported — the payroll
+// software reads code 35 as tips, so the advance must never appear. No employee
+// gets a cc=35 row, regardless of any stored/manual in_advance value.
+assert.equal(findOne(hourlyShik, 35).length, 0, "no advance row (cc=35)");
 assert.equal(findOne(globalShik, 35).length, 0, "no advance for global emp");
 
 // Global employee should produce: globalSalary (cc=1, rate=9000, qty=1) +
@@ -408,19 +406,14 @@ assert.equal(netLowRow.hourlyWage, 40, "hourly_net at wage rate");
 assert.equal(findOne(netLowShik, 1)[0].rate, 40, "baseHourly at wage rate");
 assert.equal(findOne(netLowShik, 32).length, 0, "no net bonus row");
 
-// hourly_min: advance is COMPUTED and overrides the manual in_advance (9999),
-// in BOTH exports. minGross = (100 + 10*1.25 + 5*1.5)*50 = 6000;
-// advance = 6000*0.95 − 200 = 5500. (minRow.inAdvance feeds Micpal too.)
-assert.equal(minRow.inAdvance, 5500, "computed hourly_min advance (Micpal too)");
-const minAdv = findOne(minShik, 35);
-assert.equal(minAdv.length, 1, "hourly_min advance row (cc=35)");
-assert.equal(minAdv[0].rate, 5500, "advance overrides manual 9999");
-assert.equal(minAdv[0].quantity, 1);
+// hourly_min: the advance is no longer computed or exported, even though the
+// fixture carries a manual in_advance (9999). No cc=35 row, and the export row
+// no longer exposes an inAdvance field.
+assert.equal(minRow.inAdvance, undefined, "no inAdvance field on export row");
+assert.equal(findOne(minShik, 35).length, 0, "no advance row (cc=35) for hourly_min");
 
-// hourly_min set at the EMPLOYEE level with untyped roles → advance still
-// computed (roles inherit the employee wage). minGross = (50 + 30)*50 = 4000;
-// travel = 30*12 = 360; advance = (4000 + 360)*0.95 − 100 = 4142 − 100 = 4042.
-assert.equal(minLevelRow.inAdvance, 4042, "employee-level min-wage advance + travel");
+// Employee-level min-wage employee: same — no advance computed or exported.
+assert.equal(minLevelRow.inAdvance, undefined, "no inAdvance field (employee-level min)");
 
 // Every workMonth / employeeNumber must be a finite integer.
 for (const r of [
