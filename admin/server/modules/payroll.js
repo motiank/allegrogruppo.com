@@ -13,6 +13,10 @@ import {
 
 const require = createRequire(import.meta.url);
 
+// Flat worth (NIS) of a single served meal — one meal per break-day. Exported
+// as שווי ארוחות (Micpal column / Shiklulit recordType 2 cc 21 rate).
+const MEAL_WORTH = 15;
+
 // Normalize a money value to a DECIMAL-safe string (avoid JS Number float
 // drift on the way to MySQL DECIMAL columns). Returns null when not a number.
 const toDecimalString = (v) => {
@@ -54,6 +58,18 @@ const micCompanyForBranch = (branchId) => {
   for (const g of RESTAURANT_GROUPS) {
     if (!g.mic_company) continue;
     if ((g.branches || []).some((b) => b.id === branchId)) return g.mic_company;
+  }
+  return "";
+};
+
+// Find the companyId for a given branch id. The shift-employee roster is keyed
+// at the company level (one roster shared across all of a company's branches),
+// so callers pass a selected branch and we derive its company. Returns "" if
+// the branch isn't found.
+const companyIdForBranch = (branchId) => {
+  for (const g of RESTAURANT_GROUPS) {
+    if ((g.branches || []).some((b) => b.id === branchId))
+      return g.companyId || "";
   }
   return "";
 };
@@ -228,6 +244,13 @@ export const buildExportRow = (emp, ctx) => {
   // Shiklulit import) — neither the computed hourly_min advance nor the stored
   // manual value is emitted to either export file.
 
+  // שווי ארוחות (meal worth): one meal is served per break-day, and each
+  // break-day contributes exactly 0.5h of break — so meals = breaks / 0.5. Each
+  // meal is worth a flat MEAL_WORTH. `breaks` (total break hours) is supplied by
+  // the caller (computed from the daily breakdown).
+  const breaks = Number(emp.breaks) || 0;
+  const meals = Math.round(breaks / 0.5);
+
   return {
     name,
     keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
@@ -264,6 +287,11 @@ export const buildExportRow = (emp, ctx) => {
     completion: "",
     bonus,
     amount,
+    // ארוחות (meal count) + שווי ארוחות (per-meal worth). Shiklulit: recordType
+    // 2 / componentCode 21, rate = mealWorth, qty = meals. Micpal: appended
+    // ארוחות / שווי ארוחות columns.
+    meals,
+    mealWorth: MEAL_WORTH,
     standardDays: stdDays ?? "",
     standardHours: stdHours ?? "",
   };
@@ -310,6 +338,206 @@ const matchKeysOf = (e) => {
 const matchKey = (e) => {
   const keys = matchKeysOf(e);
   return keys.values().next().value || `name:`;
+};
+
+// ── Shift-employee roster (Tabit "רשימת עובדים" export) ────────────────────
+// A single parser shared by /employees/parse-phone-xlsx (phone attachment) and
+// the /shift-employees/* loader. The sheet has a title row, a blank row, then a
+// header row (~row 4) with: שם משתמש / קבוצה / פעיל / שם פרטי / שם משפחה /
+// כתובת אימייל / טלפון נייד / מזהה שעון / תפקידים.
+//
+// Tabit bakes a leading "*" onto the first name and a " - <role/branch>" suffix
+// onto the family name (see the tabit-name-suffix note). We keep BOTH the raw,
+// in-sheet names (so existing name-matching against shift sheets still works)
+// and cleaned first/family + the stripped suffix (for the roster display).
+const ROSTER_HEADERS = {
+  username: ["שם משתמש"],
+  active: ["פעיל"],
+  name: ["שם פרטי", "שם מלא"],
+  family: ["שם משפחה"],
+  email: ["כתובת אימייל", "אימייל", "מייל", 'דוא"ל'],
+  phone: ["טלפון נייד", "טלפון", "נייד", "פלאפון", "מספר טלפון"],
+  id: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
+  clockId: ["מזהה שעון"],
+  roles: ["תפקידים", "תפקיד"],
+};
+
+const rosterNorm = (s) => String(s == null ? "" : s).trim();
+const rosterCellText = (c) => {
+  if (c == null) return "";
+  const v = c.value;
+  if (v == null) return "";
+  if (typeof v === "object") {
+    if (typeof v.text === "string") return v.text;
+    if (v.richText) return v.richText.map((p) => p.text || "").join("");
+    if (v.result != null) return String(v.result);
+  }
+  return String(v);
+};
+// Strip the leading "*" Tabit adds to first names.
+const stripNameStar = (s) => rosterNorm(s).replace(/^\*+\s*/, "");
+// Split "ברקוביץ - מלצר לה בראצה" into { family, suffix }.
+const splitFamilySuffix = (s) => {
+  const v = rosterNorm(s);
+  const idx = v.indexOf(" - ");
+  if (idx === -1) return { family: v, suffix: "" };
+  return { family: v.slice(0, idx).trim(), suffix: v.slice(idx + 3).trim() };
+};
+const cleanPhoneDigits = (s) => rosterNorm(s).replace(/[^\d+]/g, "");
+
+// Parse a roster workbook buffer. Returns { headerRow, cols, rows } where each
+// row keeps a record only when it carries at least one identity key
+// (username / phone / clock_id). Throws on an empty workbook.
+async function parseEmployeeRosterXlsx(buffer) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const sheet = wb.worksheets[0];
+  if (!sheet || sheet.rowCount < 2) {
+    throw new Error("empty workbook");
+  }
+  const scoreHeaderRow = (rowIdx) => {
+    let hits = 0;
+    sheet.getRow(rowIdx).eachCell({ includeEmpty: false }, (cell) => {
+      const t = rosterNorm(rosterCellText(cell));
+      for (const labels of Object.values(ROSTER_HEADERS)) {
+        if (labels.some((l) => t === l)) hits += 1;
+      }
+    });
+    return hits;
+  };
+  let headerRow = 1;
+  let best = 0;
+  for (let r = 1; r <= Math.min(sheet.rowCount, 15); r++) {
+    const h = scoreHeaderRow(r);
+    if (h > best) {
+      best = h;
+      headerRow = r;
+    }
+  }
+  const cols = {};
+  sheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+    const t = rosterNorm(rosterCellText(cell));
+    for (const [key, labels] of Object.entries(ROSTER_HEADERS)) {
+      if (cols[key]) continue;
+      if (labels.some((l) => t === l || t.includes(l))) cols[key] = col;
+    }
+  });
+  const rows = [];
+  for (let r = headerRow + 1; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    const cellOf = (key) =>
+      cols[key] ? rosterNorm(rosterCellText(row.getCell(cols[key]))) : "";
+    const username = cellOf("username");
+    const phone = cleanPhoneDigits(cellOf("phone"));
+    const clock_id = cellOf("clockId");
+    // Skip title / spacer / junk rows: a real employee carries at least one key.
+    if (!username && !phone && !clock_id) continue;
+    const firstRaw = cellOf("name");
+    const familyRaw = cellOf("family");
+    const { family } = splitFamilySuffix(familyRaw);
+    const activeRaw = cellOf("active");
+    rows.push({
+      // Roster fields (the only ones persisted): keys + cleaned names.
+      username: username || null,
+      first_name: stripNameStar(firstRaw) || null,
+      family_name: family || null,
+      clock_id: clock_id || null,
+      phone: phone || null,
+      // Extra fields kept only for the legacy parse-phone-xlsx consumer; not
+      // stored in shift_employees.
+      first_name_raw: firstRaw || null,
+      family_name_raw: familyRaw || null,
+      id_nmbr: cellOf("id") || null,
+      active: !activeRaw || activeRaw === "פעיל",
+    });
+  }
+  return { headerRow, cols, rows };
+}
+
+// Normalize a username for comparison (trim + lowercase; usernames are often an
+// email local-part or a phone, so case-fold to be safe).
+const normUser = (s) => String(s == null ? "" : s).trim().toLowerCase();
+
+// Categorize parsed roster rows against the company's existing roster.
+// Keys: clock_id, phone, username. See the plan's matching model.
+//   NEW       – no existing row shares any key
+//   UPDATE    – exactly one match, all shared keys agree, some stored field differs
+//   UNCHANGED – exactly one match, everything equal
+//   CONFLICT  – a shared key differs, or the row matches >1 existing record
+const NON_KEY_FIELDS = ["first_name", "family_name"];
+const categorizeRoster = (incomingRows, existingRows) => {
+  const byClock = new Map();
+  const byPhone = new Map();
+  const byUser = new Map();
+  const push = (map, k, v) => {
+    if (!k) return;
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(v);
+  };
+  for (const e of existingRows) {
+    push(byClock, e.clock_id ? String(e.clock_id).trim() : "", e);
+    push(byPhone, e.phone ? String(e.phone).trim() : "", e);
+    push(byUser, e.username ? normUser(e.username) : "", e);
+  }
+  const news = [];
+  const updates = [];
+  let unchanged = 0;
+  const conflicts = [];
+
+  for (const inc of incomingRows) {
+    const cand = new Map();
+    for (const m of byClock.get(inc.clock_id ? String(inc.clock_id).trim() : "") || [])
+      cand.set(m.id, m);
+    for (const m of byPhone.get(inc.phone ? String(inc.phone).trim() : "") || [])
+      cand.set(m.id, m);
+    for (const m of byUser.get(inc.username ? normUser(inc.username) : "") || [])
+      cand.set(m.id, m);
+    const matches = [...cand.values()];
+
+    if (matches.length === 0) {
+      news.push(inc);
+      continue;
+    }
+
+    // For a single match, look at the keys present on BOTH sides.
+    const differingKeysFor = (m) => {
+      const diff = [];
+      if (inc.clock_id && m.clock_id && String(inc.clock_id) !== String(m.clock_id))
+        diff.push("clock_id");
+      if (inc.phone && m.phone && String(inc.phone) !== String(m.phone))
+        diff.push("phone");
+      if (inc.username && m.username && normUser(inc.username) !== normUser(m.username))
+        diff.push("username");
+      return diff;
+    };
+
+    if (matches.length === 1) {
+      const m = matches[0];
+      const keyDiff = differingKeysFor(m);
+      if (keyDiff.length === 0) {
+        const changed = NON_KEY_FIELDS.filter(
+          (f) => (inc[f] || "") !== (m[f] || ""),
+        );
+        if (changed.length === 0) {
+          unchanged += 1;
+        } else {
+          updates.push({ id: m.id, changed, incoming: inc, existing: m });
+        }
+        continue;
+      }
+    }
+    // A key changed, or the row collides with several existing records.
+    conflicts.push({
+      incoming: inc,
+      matches: matches.map((m) => ({
+        id: m.id,
+        row: m,
+        differingKeys: differingKeysFor(m),
+      })),
+      suggested: matches.length === 1 ? "update" : "create",
+    });
+  }
+  return { news, updates, unchanged, conflicts };
 };
 
 async function fetchExistingKeys(rest) {
@@ -762,104 +990,203 @@ const Router = () => {
         if (!/\.xlsx$/i.test(f.originalname || "")) {
           return res.status(400).json({ error: "expected an .xlsx file" });
         }
-        const wb = new ExcelJS.Workbook();
-        await wb.xlsx.load(f.buffer);
-        const sheet = wb.worksheets[0];
-        if (!sheet || sheet.rowCount < 2) {
-          return res.status(400).json({ error: "empty workbook" });
-        }
-        const HEADERS = {
-          username: ["שם משתמש"],
-          active: ["פעיל"],
-          name: ["שם פרטי", "שם מלא"],
-          family: ["שם משפחה"],
-          phone: ["טלפון נייד", "טלפון", "נייד", "פלאפון", "מספר טלפון"],
-          id: ["מספר זהות", "תעודת זהות", 'ת"ז', "ת.ז.", "תז"],
-          clockId: ["מזהה שעון"],
-        };
-        const norm = (s) => String(s == null ? "" : s).trim();
-        const cellText = (c) => {
-          if (c == null) return "";
-          const v = c.value;
-          if (v == null) return "";
-          if (typeof v === "object") {
-            if (typeof v.text === "string") return v.text;
-            if (v.richText) return v.richText.map((p) => p.text || "").join("");
-            if (v.result != null) return String(v.result);
-          }
-          return String(v);
-        };
-        const scoreHeaderRow = (rowIdx) => {
-          let hits = 0;
-          sheet.getRow(rowIdx).eachCell({ includeEmpty: false }, (cell) => {
-            const t = norm(cellText(cell));
-            for (const labels of Object.values(HEADERS)) {
-              if (labels.some((l) => t === l)) hits += 1;
-            }
-          });
-          return hits;
-        };
-        let headerRowIdx = 1;
-        let best = 0;
-        for (let r = 1; r <= Math.min(sheet.rowCount, 15); r++) {
-          const h = scoreHeaderRow(r);
-          if (h > best) {
-            best = h;
-            headerRowIdx = r;
-          }
-        }
-        const cols = {};
-        sheet
-          .getRow(headerRowIdx)
-          .eachCell({ includeEmpty: false }, (cell, col) => {
-            const t = norm(cellText(cell));
-            for (const [key, labels] of Object.entries(HEADERS)) {
-              if (cols[key]) continue;
-              if (labels.some((l) => t === l || t.includes(l))) cols[key] = col;
-            }
-          });
+        const { headerRow, cols, rows } = await parseEmployeeRosterXlsx(
+          f.buffer,
+        );
         if (!cols.phone) {
           return res.status(400).json({
             error: "no phone column found (טלפון נייד / טלפון / נייד)",
           });
         }
-        const cleanPhone = (s) => norm(s).replace(/[^\d+]/g, "");
-        const entries = [];
-        for (let r = headerRowIdx + 1; r <= sheet.rowCount; r++) {
-          const row = sheet.getRow(r);
-          const activeRaw = cols.active
-            ? norm(cellText(row.getCell(cols.active)))
-            : "";
-          const phone = cleanPhone(cellText(row.getCell(cols.phone)));
-          if (!phone) continue;
-          const first = cols.name ? norm(cellText(row.getCell(cols.name))) : "";
-          const family = cols.family
-            ? norm(cellText(row.getCell(cols.family)))
-            : "";
-          const ID_nmbr = cols.id ? norm(cellText(row.getCell(cols.id))) : "";
-          const clockId = cols.clockId
-            ? norm(cellText(row.getCell(cols.clockId)))
-            : "";
-          entries.push({
-            name: first,
-            family,
-            phone,
-            ID_nmbr: ID_nmbr || null,
-            clockId: clockId || null,
-            active: !activeRaw || activeRaw === "פעיל",
-          });
-        }
+        // Legacy contract: phone-bearing rows with the RAW (in-sheet) names, so
+        // Shifts.js name-matching against the suffixed shift sheets is unchanged.
+        const entries = rows
+          .filter((r) => r.phone)
+          .map((r) => ({
+            name: r.first_name_raw || "",
+            family: r.family_name_raw || "",
+            phone: r.phone,
+            ID_nmbr: r.id_nmbr || null,
+            clockId: r.clock_id || null,
+            active: r.active,
+          }));
         res.json({
           file: f.originalname,
-          headerRow: headerRowIdx,
+          headerRow,
           entries,
-          scannedRows: sheet.rowCount - headerRowIdx,
+          scannedRows: rows.length,
         });
       } catch (err) {
         console.error("payroll/employees/parse-phone-xlsx error:", err);
         res.status(500).json({ error: err.message || "parse failed" });
       }
     });
+  });
+
+  // ── Standalone shift-employee roster loader ──────────────────────────────
+  // Company-keyed roster in `shift_employees`, loaded from the Tabit
+  // "רשימת עובדים" export and independent of the payroll `employees` table.
+  const parseRosterUpload = upload.single("file");
+
+  const fetchRoster = async (company) => {
+    const [rows] = await executeSql(
+      "SELECT * FROM shift_employees WHERE company = :company ORDER BY family_name, first_name",
+      { company },
+    );
+    return rows || [];
+  };
+
+  // Preview: parse the upload, derive the company from the selected branch, and
+  // categorize every row against the existing roster (news / updates /
+  // unchanged / conflicts). No DB writes.
+  router.post("/shift-employees/preview", (req, res) => {
+    parseRosterUpload(req, res, async (uploadErr) => {
+      if (uploadErr) {
+        return res
+          .status(400)
+          .json({ error: uploadErr.message || "upload failed" });
+      }
+      try {
+        const rest = String(req.body?.rest || "").trim();
+        if (!rest) return res.status(400).json({ error: "missing rest" });
+        const company = companyIdForBranch(rest);
+        if (!company) {
+          return res
+            .status(400)
+            .json({ error: "could not resolve company for restaurant" });
+        }
+        const f = req.file;
+        if (!f || !f.buffer) {
+          return res.status(400).json({ error: "no file uploaded" });
+        }
+        if (!/\.xlsx$/i.test(f.originalname || "")) {
+          return res.status(400).json({ error: "expected an .xlsx file" });
+        }
+        const { headerRow, rows } = await parseEmployeeRosterXlsx(f.buffer);
+        const existing = await fetchRoster(company);
+        const { news, updates, unchanged, conflicts } = categorizeRoster(
+          rows,
+          existing,
+        );
+        res.json({
+          file: f.originalname,
+          company,
+          headerRow,
+          counts: {
+            parsed: rows.length,
+            news: news.length,
+            updates: updates.length,
+            unchanged,
+            conflicts: conflicts.length,
+          },
+          news,
+          updates,
+          conflicts,
+        });
+      } catch (err) {
+        console.error("payroll/shift-employees/preview error:", err);
+        res.status(500).json({ error: err.message || "preview failed" });
+      }
+    });
+  });
+
+  // Commit: apply the resolved set. `inserts` are full roster rows to INSERT,
+  // `updates` are { id, row } pairs to overwrite. The company is derived from
+  // `rest` server-side and stamped on every row (clients never pick it).
+  router.post("/shift-employees/commit", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      const company = companyIdForBranch(rest);
+      if (!company) {
+        return res
+          .status(400)
+          .json({ error: "could not resolve company for restaurant" });
+      }
+      const inserts = Array.isArray(req.body?.inserts) ? req.body.inserts : [];
+      const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
+
+      const rowParams = (row) => ({
+        company,
+        rest,
+        username: row.username || null,
+        first_name: row.first_name || null,
+        family_name: row.family_name || null,
+        clock_id: row.clock_id != null ? String(row.clock_id) : null,
+        phone: row.phone != null ? String(row.phone) : null,
+      });
+
+      let inserted = 0;
+      let updated = 0;
+      const errors = [];
+
+      for (const row of inserts) {
+        try {
+          await executeSql(
+            `INSERT INTO shift_employees
+               (company, rest, username, first_name, family_name, clock_id, phone)
+             VALUES (:company, :rest, :username, :first_name, :family_name, :clock_id, :phone)`,
+            rowParams(row),
+          );
+          inserted += 1;
+        } catch (e) {
+          errors.push({
+            username: row.username || row.first_name || "",
+            issue: e.message || "insert failed",
+          });
+        }
+      }
+
+      for (const up of updates) {
+        const id = Number(up && up.id);
+        if (!id || !up.row) {
+          errors.push({ id: up && up.id, issue: "missing id or row" });
+          continue;
+        }
+        try {
+          const [result] = await executeSql(
+            `UPDATE shift_employees SET
+               rest = :rest, username = :username, first_name = :first_name,
+               family_name = :family_name, clock_id = :clock_id, phone = :phone
+             WHERE id = :id AND company = :company`,
+            { ...rowParams(up.row), id },
+          );
+          if (result && result.affectedRows >= 1) updated += 1;
+        } catch (e) {
+          errors.push({ id, issue: e.message || "update failed" });
+        }
+      }
+
+      res.json({
+        inserted,
+        updated,
+        skipped: 0,
+        attempted: inserts.length + updates.length,
+        errors,
+      });
+    } catch (err) {
+      console.error("payroll/shift-employees/commit error:", err);
+      res.status(500).json({ error: err.message || "commit failed" });
+    }
+  });
+
+  // List the current roster for the selected branch's company (table view).
+  router.post("/shift-employees/list", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      const company = companyIdForBranch(rest);
+      if (!company) {
+        return res
+          .status(400)
+          .json({ error: "could not resolve company for restaurant" });
+      }
+      const rows = await fetchRoster(company);
+      res.json({ company, rows });
+    } catch (err) {
+      console.error("payroll/shift-employees/list error:", err);
+      res.status(500).json({ error: err.message || "list failed" });
+    }
   });
 
   const parseAttachPhones = upload.single("file");
@@ -1193,18 +1520,28 @@ const Router = () => {
     };
   };
 
-  // Siklulit (שיקלולית) employee index file: header row 7, data 8+.
-  // A1 reads "חברה NNN: <label>"; "באמצעות \"שיקלולית" appears in row 5.
+  // Siklulit (שיקלולית) employee index file. The metadata block and header row
+  // position vary between report variants (e.g. the "עובדים חדשים" report shifts
+  // everything down one row), so the marker and header row are detected
+  // dynamically rather than assumed to be on fixed rows.
+  // A1 reads "חברה NNN: <label>"; "שיקלולית" appears in a metadata row (5 or 6).
   // Returns { items, scannedRows, skipped, company } or { error }.
   const parseSiklulitSheet = (sheet) => {
-    if (sheet.rowCount < 8) {
-      return { error: "Siklulit file is too short (need headers in row 7)" };
+    if (sheet.rowCount < 2) {
+      return { error: "Siklulit file is too short" };
     }
-    const a1 = _norm(_cellText(sheet.getRow(1).getCell(1)));
-    const r5 = _norm(_cellText(sheet.getRow(5).getCell(1)));
-    if (!/שיקלולית/.test(`${a1} ${r5}`)) {
+    // "שיקלולית" marker may sit in any of the top metadata rows.
+    let markerFound = false;
+    const topRows = Math.min(sheet.rowCount, 12);
+    for (let r = 1; r <= topRows && !markerFound; r++) {
+      sheet.getRow(r).eachCell({ includeEmpty: false }, (cell) => {
+        if (/שיקלולית/.test(_norm(_cellText(cell)))) markerFound = true;
+      });
+    }
+    if (!markerFound) {
       return { error: 'not a Siklulit file (missing "שיקלולית" marker)' };
     }
+    const a1 = _norm(_cellText(sheet.getRow(1).getCell(1)));
     const companyMatch = a1.match(/חברה\s+(\d+)/);
     const company = companyMatch ? companyMatch[1] : null;
 
@@ -1215,8 +1552,22 @@ const Router = () => {
       family: ["שם משפחה"],
       name: ["שם פרטי"],
     };
+    // Detect the header row dynamically: the first row (within the top 15) that
+    // carries the "מספר עובד" header cell.
+    let headerRowNum = null;
+    const scanTo = Math.min(sheet.rowCount, 15);
+    for (let r = 1; r <= scanTo && headerRowNum == null; r++) {
+      sheet.getRow(r).eachCell({ includeEmpty: false }, (cell) => {
+        if (_norm(_cellText(cell)) === "מספר עובד") headerRowNum = r;
+      });
+    }
+    if (headerRowNum == null) {
+      return {
+        error: 'header "מספר עובד" not found (Siklulit format)',
+      };
+    }
     const cols = {};
-    sheet.getRow(7).eachCell({ includeEmpty: false }, (cell, colNum) => {
+    sheet.getRow(headerRowNum).eachCell({ includeEmpty: false }, (cell, colNum) => {
       const t = _norm(_cellText(cell));
       for (const [key, labels] of Object.entries(HEADERS)) {
         if (cols[key]) continue;
@@ -1225,12 +1576,12 @@ const Router = () => {
     });
     if (!cols.keyName) {
       return {
-        error: 'header "מספר עובד" not found in row 7 (Siklulit format)',
+        error: 'header "מספר עובד" not found (Siklulit format)',
       };
     }
     let skipped = 0;
     const items = [];
-    for (let r = 8; r <= sheet.rowCount; r++) {
+    for (let r = headerRowNum + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
       const keyName = _norm(_cellText(row.getCell(cols.keyName)));
       if (!keyName) {
@@ -1256,7 +1607,7 @@ const Router = () => {
     }
     return {
       items,
-      scannedRows: sheet.rowCount - 7,
+      scannedRows: sheet.rowCount - headerRowNum,
       skipped,
       company,
     };

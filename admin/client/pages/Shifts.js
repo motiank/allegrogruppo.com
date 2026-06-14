@@ -1231,6 +1231,9 @@ const Shifts = () => {
             payroll_data: e.payroll_data || {},
             role_extras: e.role_extras || {},
             workdays: e.workdays,
+            // Total break hours → meals (שווי ארוחות) in the export. Computed
+            // the same way as the on-screen breaks column (0.5h per long day).
+            breaks: computeBreaks(e),
             in_advance: e.in_advance ?? null, // מפרעה
             // Source for the Shiklulit recordType=4 actual-attendance rows:
             // work_dates → actual work days, daily_hours → actual work hours.

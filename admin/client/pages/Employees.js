@@ -15,6 +15,7 @@ import {
 import useCurrentUser from "../hooks/useCurrentUser";
 import WageDialog from "../components/WageDialog";
 import EmployeeWageTable from "../components/EmployeeWageTable";
+import ShiftEmployeeLoader from "../components/ShiftEmployeeLoader";
 import { normalizeRoles } from "../../../shared/wage.js";
 
 const Employees = () => {
@@ -66,6 +67,9 @@ const Employees = () => {
   const [micpalResult, setMicpalResult] = useState(null);
   const [micpalError, setMicpalError] = useState(null);
   const micpalFileInputRef = useRef(null);
+  // Single "Employee" dropdown (Sync / Payroll loader / Shift loader).
+  const [empMenuOpen, setEmpMenuOpen] = useState(false);
+  const shiftLoaderRef = useRef(null);
   // Wage dialog target: { empIdx, roleIdx } when open, null otherwise.
   // roleIdx === undefined → editing the employee-level wage; otherwise the
   // per-role wage at that index. Both use the same WageDialog component.
@@ -77,6 +81,13 @@ const Employees = () => {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [menuOpenFor]);
+
+  useEffect(() => {
+    if (!empMenuOpen) return;
+    const close = () => setEmpMenuOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [empMenuOpen]);
 
   const selectedLabel = useMemo(
     () => findRestaurantLabel(selectedRestaurant),
@@ -787,6 +798,33 @@ const Employees = () => {
       cursor: "pointer",
       whiteSpace: "nowrap",
     },
+    empMenuWrap: { position: "relative", display: "inline-block" },
+    empMenu: {
+      position: "absolute",
+      top: "calc(100% + 4px)",
+      right: 0,
+      minWidth: "160px",
+      backgroundColor: theme.surface,
+      border: `1px solid ${theme.border}`,
+      borderRadius: "8px",
+      boxShadow: theme.shadow || "0 6px 18px rgba(0,0,0,0.18)",
+      padding: "4px",
+      zIndex: 50,
+      display: "flex",
+      flexDirection: "column",
+    },
+    empMenuItem: {
+      textAlign: "left",
+      padding: "9px 12px",
+      fontSize: "0.9rem",
+      fontWeight: 500,
+      border: "none",
+      borderRadius: "6px",
+      backgroundColor: "transparent",
+      color: theme.text,
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    },
     toggleButtonActive: {
       padding: "8px 14px",
       fontSize: "0.9rem",
@@ -1040,28 +1078,69 @@ const Employees = () => {
             ))}
           </select>
         </div>
-        <button
-          type="button"
-          title={
-            !selectedRestaurant
-              ? "Select a restaurant first"
-              : "Sync payroll-software index — pick an .xlsx file"
-          }
-          aria-label="Sync payroll-software index"
-          style={{
-            ...styles.iconButton,
-            opacity: micpalSyncing || !selectedRestaurant ? 0.6 : 1,
-            cursor: micpalSyncing
-              ? "wait"
-              : !selectedRestaurant
-                ? "not-allowed"
-                : "pointer",
-          }}
-          onClick={handleMicpalPick}
-          disabled={micpalSyncing || !selectedRestaurant}
+        <div
+          style={styles.empMenuWrap}
+          onClick={(e) => e.stopPropagation()}
         >
-          {micpalSyncing ? "…" : "↻"}
-        </button>
+          <button
+            type="button"
+            title={
+              !selectedRestaurant ? "Select a restaurant first" : "Employee actions"
+            }
+            style={{
+              ...styles.toggleButton,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              opacity: !selectedRestaurant ? 0.6 : 1,
+              cursor: !selectedRestaurant ? "not-allowed" : "pointer",
+            }}
+            onClick={() => setEmpMenuOpen((v) => !v)}
+            disabled={!selectedRestaurant}
+          >
+            <span>Employee</span>
+            <span style={{ fontSize: "0.8rem" }}>▾</span>
+          </button>
+          {empMenuOpen && (
+            <div style={styles.empMenu}>
+              <button
+                type="button"
+                style={styles.empMenuItem}
+                onClick={() => {
+                  setEmpMenuOpen(false);
+                  openMatchDialog();
+                }}
+              >
+                Sync
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...styles.empMenuItem,
+                  opacity: micpalSyncing ? 0.6 : 1,
+                  cursor: micpalSyncing ? "wait" : "pointer",
+                }}
+                onClick={() => {
+                  setEmpMenuOpen(false);
+                  handleMicpalPick();
+                }}
+                disabled={micpalSyncing}
+              >
+                {micpalSyncing ? "Payroll loader…" : "Payroll loader"}
+              </button>
+              <button
+                type="button"
+                style={styles.empMenuItem}
+                onClick={() => {
+                  setEmpMenuOpen(false);
+                  shiftLoaderRef.current?.openPicker();
+                }}
+              >
+                Shift loader
+              </button>
+            </div>
+          )}
+        </div>
         <input
           ref={micpalFileInputRef}
           type="file"
@@ -1099,6 +1178,11 @@ const Employees = () => {
           )}
         </div>
       )}
+
+      <ShiftEmployeeLoader
+        ref={shiftLoaderRef}
+        selectedRestaurant={selectedRestaurant}
+      />
 
       <div style={styles.body}>
         {!selectedRestaurant && (
@@ -1152,26 +1236,6 @@ const Employees = () => {
                   Duplicate employees ({counts.duplicate})
                 </option>
               </select>
-              <button
-                type="button"
-                title="Match employees ↔ micpal"
-                aria-label="Match with Micpal"
-                style={{
-                  ...styles.toggleButton,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  opacity: matchLoading ? 0.6 : 1,
-                  cursor: matchLoading ? "wait" : "pointer",
-                }}
-                onClick={openMatchDialog}
-                disabled={matchLoading}
-              >
-                <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>
-                  {matchLoading ? "…" : "↻"}
-                </span>
-                <span>micpal</span>
-              </button>
             </div>
             <div style={styles.summary}>
               {search.trim() || viewFilter !== "active" ? (

@@ -51,6 +51,7 @@ const hourlyEmp = {
   daily_hours: HOURLY_DAILY_HOURS, // → actualWorkHours (componentCode 5)
   travel: TRAVEL_PER_DAY,
   in_advance: 250, // מפרעה — no longer exported (advance removed)
+  breaks: 2.5, // → meals = 2.5 / 0.5 = 5 (שווי ארוחות, recordType 2 cc 21)
   payroll_data: {
     מלצר: { hours: [40, 5, 2] }, // default-rate role
     ראנר: { hours: [10, 1, 0] }, // also default rate → merges with מלצר
@@ -374,6 +375,15 @@ assert.equal(
 // gets a cc=35 row, regardless of any stored/manual in_advance value.
 assert.equal(findOne(hourlyShik, 35).length, 0, "no advance row (cc=35)");
 assert.equal(findOne(globalShik, 35).length, 0, "no advance for global emp");
+
+// שווי ארוחות → recordType 2, componentCode 21. rate = per-meal worth (15),
+// quantity = meals = breaks / 0.5 = 2.5 / 0.5 = 5.
+const mealsRow = findOne(hourlyShik, 21, 2);
+assert.equal(mealsRow.length, 1, "meals row (recordType 2, cc=21)");
+assert.equal(mealsRow[0].rate, 15, "meal worth 15");
+assert.equal(mealsRow[0].quantity, 5, "5 meals (2.5h / 0.5)");
+// No breaks → no meals row.
+assert.equal(findOne(globalShik, 21, 2).length, 0, "no meals row without breaks");
 
 // Global employee should produce: globalSalary (cc=1, rate=9000, qty=1) +
 // workDays.

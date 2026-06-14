@@ -31,6 +31,7 @@ export const SHIK_HEADERS = [
 
 export const SHIK_RECORD_TYPES = {
   SALARY: 1,
+  MEALS: 2,
   VOLUNTARY_DEDUCTION: 3,
   EMPLOYMENT_DATA: 4,
 };
@@ -44,6 +45,8 @@ export const SHIK_COMPONENTS = {
   travel: { recordType: 1, componentCode: 3 }, // נסיעות
   bonus: { recordType: 1, componentCode: 32 }, // בונוס
   globalSalary: { recordType: 1, componentCode: 1 }, // שכר גלובאלי
+  // שווי ארוחות — recordType 2. rate = per-meal worth, quantity = meal count.
+  meals: { recordType: 2, componentCode: 21 },
   // recordType 4 = employment data. These codes are NOT salary components —
   // they are fixed attendance codes from Tamal's Shiklulit import spec.
   paidWorkDays: { recordType: 4, componentCode: 4 }, // ימי עבודה משולמים
@@ -105,6 +108,8 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   const travel = toFiniteNumber(row.travel);
   const bonus = toFiniteNumber(row.bonus);
   const amount = toFiniteNumber(row.amount);
+  const meals = toFiniteNumber(row.meals);
+  const mealWorth = toFiniteNumber(row.mealWorth);
   // Prefer the raw count (always populated). Falls back to row.workdays so
   // direct callers that don't go through buildExportRow still work.
   const workdays = toFiniteNumber(
@@ -182,6 +187,9 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   }
   if (travel != null && travel > 0) emit("travel", travel, 1);
   if (bonus != null && bonus > 0) emit("bonus", bonus, 1);
+  // שווי ארוחות (recordType 2, cc 21): rate = per-meal worth, qty = meal count.
+  if (meals != null && meals > 0 && mealWorth != null && mealWorth > 0)
+    emit("meals", mealWorth, meals);
   // מפרעה (advance, component 35) is intentionally NOT emitted — the payroll
   // software reads code 35 as tips, so the advance must never appear in the file.
   // Employment-data rows (recordType 4). Emitted in spec order: paid days,

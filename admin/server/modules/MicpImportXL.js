@@ -76,6 +76,8 @@ class MicpImportXL {
       "תקן ימים",
       "תקן שעות",
       "מפרעה",
+      "ארוחות",
+      "שווי ארוחות",
     ];
     const r4 = ws.getRow(4);
     headers.forEach((h, i) => {
@@ -88,7 +90,9 @@ class MicpImportXL {
       };
     });
 
-    const numCols = [3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21];
+    const numCols = [
+      3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21, 22, 23,
+    ];
     for (const c of numCols) {
       ws.getColumn(c).numFmt = "0.00";
     }
@@ -128,6 +132,9 @@ class MicpImportXL {
       // מפרעה — column kept for layout, but always exported empty (the advance
       // is no longer emitted; it was being read as tips).
       row.getCell(21).value = "";
+      // ארוחות (meal count) + שווי ארוחות (per-meal worth). Blank when no meals.
+      row.getCell(22).value = emp.meals ? toNum(emp.meals) : "";
+      row.getCell(23).value = emp.meals ? toNum(emp.mealWorth) : "";
     }
 
     return wb.xlsx.writeBuffer();
