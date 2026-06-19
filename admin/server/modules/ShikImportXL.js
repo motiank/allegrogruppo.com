@@ -202,6 +202,48 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   return out;
 };
 
+// Write a flat list of Shiklulit rows ({workMonth, employeeNumber, recordType,
+// componentCode, rate, quantity}) to an xlsx Buffer. Shared by ShikImportXL
+// (which builds the rows from employees) and the tlush export (which already has
+// the rows).
+export async function writeShikRowsXlsx(allRows) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "allegro-payroll";
+  wb.created = new Date();
+  const ws = wb.addWorksheet("Shiklulit Import", {
+    views: [{ rightToLeft: true }],
+  });
+
+  SHIK_HEADERS.forEach((h, i) => (ws.getColumn(i + 1).width = 16));
+
+  const headerRow = ws.getRow(1);
+  SHIK_HEADERS.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: "center" };
+    cell.border = { bottom: { style: "thin" } };
+  });
+
+  // workMonth / employeeNumber / recordType / componentCode → integer.
+  // rate / quantity → 2-decimal.
+  [1, 2, 3, 4].forEach((c) => (ws.getColumn(c).numFmt = "0"));
+  [5, 6].forEach((c) => (ws.getColumn(c).numFmt = "0.00"));
+
+  for (let i = 0; i < allRows.length; i++) {
+    const r = allRows[i];
+    const row = ws.getRow(2 + i);
+    row.getCell(1).value = r.workMonth;
+    row.getCell(2).value = r.employeeNumber;
+    row.getCell(3).value = r.recordType;
+    row.getCell(4).value = r.componentCode;
+    row.getCell(5).value = r.rate;
+    row.getCell(6).value = r.quantity;
+  }
+
+  return wb.xlsx.writeBuffer();
+}
+
 class ShikImportXL {
   constructor({ year, month }) {
     this.year = year || "";
@@ -224,41 +266,7 @@ class ShikImportXL {
       for (const r of rows) allRows.push(r);
     }
 
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "allegro-payroll";
-    wb.created = new Date();
-    const ws = wb.addWorksheet("Shiklulit Import", {
-      views: [{ rightToLeft: true }],
-    });
-
-    SHIK_HEADERS.forEach((h, i) => (ws.getColumn(i + 1).width = 16));
-
-    const headerRow = ws.getRow(1);
-    SHIK_HEADERS.forEach((h, i) => {
-      const cell = headerRow.getCell(i + 1);
-      cell.value = h;
-      cell.font = { bold: true };
-      cell.alignment = { horizontal: "center" };
-      cell.border = { bottom: { style: "thin" } };
-    });
-
-    // workMonth / employeeNumber / recordType / componentCode → integer.
-    // rate / quantity → 2-decimal.
-    [1, 2, 3, 4].forEach((c) => (ws.getColumn(c).numFmt = "0"));
-    [5, 6].forEach((c) => (ws.getColumn(c).numFmt = "0.00"));
-
-    for (let i = 0; i < allRows.length; i++) {
-      const r = allRows[i];
-      const row = ws.getRow(2 + i);
-      row.getCell(1).value = r.workMonth;
-      row.getCell(2).value = r.employeeNumber;
-      row.getCell(3).value = r.recordType;
-      row.getCell(4).value = r.componentCode;
-      row.getCell(5).value = r.rate;
-      row.getCell(6).value = r.quantity;
-    }
-
-    return wb.xlsx.writeBuffer();
+    return writeShikRowsXlsx(allRows);
   }
 }
 

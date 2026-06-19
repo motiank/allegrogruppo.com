@@ -31,9 +31,8 @@ import {
 const STEPS = [
   { id: 1, label: "Select restaurant" },
   { id: 2, label: "Add shift files" },
-  { id: 3, label: "Employee data" },
-  { id: 4, label: "New employees" },
-  { id: 5, label: "Full payroll" },
+  { id: 3, label: "New employees" },
+  { id: 4, label: "Full payroll" },
 ];
 
 const formatBytes = (n) => {
@@ -48,6 +47,13 @@ const fmtNum = (n, decimals = 2) => {
   if (!Number.isFinite(v)) return "";
   return v.toFixed(decimals).replace(/\.?0+$/, "") || "0";
 };
+
+// Placeholder payroll-software number (the "דמה" dummy in payroll_soft_ix, used
+// for pool/placeholder identities with an all-zeros ID). Employees mapped to it
+// are hidden from the final table and never exported.
+const DUMMY_EMP_NUMBER = "9999";
+const isDummyEmpNumber = (n) =>
+  n != null && String(n).trim() === DUMMY_EMP_NUMBER;
 
 // National minimum hourly wage — used as a substitute when an employee's
 // configured hourly wage is the special marker -1.
@@ -856,7 +862,7 @@ const Shifts = () => {
 
   // Auto-run diff when entering Step 4 or when allEmployees changes (e.g. phones merged)
   useEffect(() => {
-    if (step === 4 && allEmployees.length > 0 && !saveResult) {
+    if (step === 3 && allEmployees.length > 0 && !saveResult) {
       buildDiff().catch((err) => console.error("auto-diff error:", err));
     }
   }, [step, allEmployees, saveResult, buildDiff]);
@@ -885,7 +891,7 @@ const Shifts = () => {
     }
   };
 
-  // ---------- Step 1: load an existing stored payroll, jump to step 3 ----------
+  // ---------- Step 1: load an existing stored payroll, jump to the final view ----------
   const loadExistingPayroll = async (mo) => {
     if (!selectedRestaurant || !mo || loadingExistingPayroll) return;
     setLoadingExistingPayroll(true);
@@ -911,7 +917,7 @@ const Shifts = () => {
       setPayrollResult(null);
       setPayrollError(null);
       await loadWages();
-      setStep(3);
+      setStep(4);
     } catch (err) {
       console.error("payroll-load error:", err);
       setLoadPayrollError(
@@ -1194,6 +1200,218 @@ const Shifts = () => {
     }
   };
 
+  // Final-table view: "data" (computed pay), "tlush" (converted payroll-soft
+  // components), "unexportable" (employees that can't be exported).
+  const [payrollView, setPayrollView] = useState("data");
+  // Tlush preview (computed in memory by the server, not saved):
+  // { payrollSoft, employees:[{name,ID_nmbr,employeeNumber,exportable,reasons,components}] }
+  const [tlushData, setTlushData] = useState(null);
+  const [tlushLoading, setTlushLoading] = useState(false);
+  const [tlushError, setTlushError] = useState(null);
+  const [refreshingFinal, setRefreshingFinal] = useState(false);
+
+  // Refresh the final view after editing salaries in another tab: reload the
+  // wages (→ fullPayrollRows recomputes) and invalidate the tlush preview.
+  const handleRefreshFinal = async () => {
+    if (refreshingFinal) return;
+    setRefreshingFinal(true);
+    try {
+      await loadWages();
+      setTlushData(null);
+    } finally {
+      setRefreshingFinal(false);
+    }
+  };
+
+  // Per-employee payload for the tlush-preview and save-export endpoints.
+  const buildPayrollEmployeesPayload = () =>
+    allEmployees.map((e) => ({
+      name: e.name,
+      ID_nmbr: e.ID_nmbr,
+      payroll_data: e.payroll_data || {},
+      role_extras: e.role_extras || {},
+      workdays: e.workdays ?? null,
+      global: e.global ?? null,
+      netGross: e.netGross ?? null,
+      in_advance: e.in_advance ?? null,
+      breaks: computeBreaks(e),
+      work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+      daily_breakdown:
+        e.daily_breakdown && typeof e.daily_breakdown === "object"
+          ? e.daily_breakdown
+          : {},
+      daily_hours:
+        e.daily_hours && typeof e.daily_hours === "object" ? e.daily_hours : {},
+    }));
+
+  // Human label for an unexportable reason code.
+  const reasonLabel = (code) =>
+    ({
+      no_number: "אין מס' עובד",
+      contractor: "קבלן",
+      no_wage: "אין שכר",
+      incomplete: "משמרות לא הושלמו",
+      build_error: "שגיאת בנייה",
+    })[code] || code;
+
+  // Compute the tlush (converted data) + unexportable classification in memory.
+  const fetchTlushPreview = useCallback(async () => {
+    if (!selectedRestaurant || !month || allEmployees.length === 0) return;
+    setTlushLoading(true);
+    setTlushError(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/tlush-preview",
+        {
+          rest: selectedRestaurant,
+          month,
+          employees: allEmployees.map((e) => ({
+            name: e.name,
+            ID_nmbr: e.ID_nmbr,
+            payroll_data: e.payroll_data || {},
+            role_extras: e.role_extras || {},
+            workdays: e.workdays ?? null,
+            global: e.global ?? null,
+            netGross: e.netGross ?? null,
+            in_advance: e.in_advance ?? null,
+            breaks: computeBreaks(e),
+            work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+            daily_hours:
+              e.daily_hours && typeof e.daily_hours === "object"
+                ? e.daily_hours
+                : {},
+          })),
+          incompleteNames: Array.from(flaggedNames),
+        },
+        { withCredentials: true },
+      );
+      setTlushData(res.data || null);
+    } catch (err) {
+      setTlushError(
+        err.response?.data?.error || err.message || "tlush preview failed",
+      );
+      setTlushData(null);
+    } finally {
+      setTlushLoading(false);
+    }
+  }, [selectedRestaurant, month, allEmployees, flaggedNames]);
+
+  // Invalidate the cached tlush whenever the underlying data changes.
+  useEffect(() => {
+    setTlushData(null);
+  }, [allEmployees]);
+
+  // Lazily fetch the tlush when the tlush/unexportable views are opened.
+  useEffect(() => {
+    if (
+      (payrollView === "tlush" || payrollView === "unexportable") &&
+      !tlushData &&
+      !tlushLoading &&
+      allEmployees.length > 0
+    ) {
+      fetchTlushPreview();
+    }
+  }, [payrollView, tlushData, tlushLoading, allEmployees, fetchTlushPreview]);
+
+  // Unified Save + Export: persists payroll_data + tlush and downloads the file
+  // (rendered from the saved tlush).
+  const handleSaveExport = async () => {
+    if (savingPayroll) return;
+    if (!month) {
+      setPayrollError("month not detected from upload — cannot save payroll");
+      return;
+    }
+    if (!allEmployees || allEmployees.length === 0) {
+      setPayrollError("no extracted employees to save payroll for");
+      return;
+    }
+    setSavingPayroll(true);
+    setPayrollError(null);
+    setDownloadError(null);
+    try {
+      if (freshExtract) {
+        try {
+          await axios.post(
+            "/admin/payroll/labor-cost",
+            { rest: selectedRestaurant, items: computeDailyLaborCost() },
+            { withCredentials: true },
+          );
+        } catch (laborErr) {
+          console.error("labor-cost error:", laborErr);
+        }
+      }
+      const res = await axios.post(
+        "/admin/payroll/save-export",
+        {
+          rest: selectedRestaurant,
+          restLabel: selectedLabel,
+          month,
+          employees: buildPayrollEmployeesPayload(),
+          incompleteNames: Array.from(flaggedNames),
+        },
+        { withCredentials: true },
+      );
+      setPayrollResult(res.data);
+      const { xlsxBase64, filename, unexportable } = res.data || {};
+      if (xlsxBase64) {
+        const binary = atob(xlsxBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++)
+          bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || `export_${month || "month"}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      // Surface the not-exported employees (with reasons) in the existing dialog.
+      if (Array.isArray(unexportable) && unexportable.length > 0) {
+        setSkippedContractors(null);
+        setMicpalMissing(
+          unexportable.map((u) => ({
+            name: u.name,
+            ID_nmbr: u.ID_nmbr,
+            reason: (u.reasons || []).map(reasonLabel).join(", "),
+          })),
+        );
+      }
+      // Refresh the in-memory tlush views to match what was just saved.
+      setTlushData(null);
+      // Labor-cost summary dialog (same as the old save).
+      try {
+        setLoadingLaborSummary(true);
+        setLaborSummaryError(null);
+        const sum = await axios.post(
+          "/admin/payroll/labor-cost-summary",
+          { rest: selectedRestaurant, month },
+          { withCredentials: true },
+        );
+        setLaborSummary(sum.data || null);
+      } catch (sumErr) {
+        setLaborSummaryError(
+          sumErr.response?.data?.error || sumErr.message || "summary failed",
+        );
+        setLaborSummary(null);
+      } finally {
+        setLoadingLaborSummary(false);
+        setShowLaborDialog(true);
+      }
+    } catch (err) {
+      console.error("save-export error:", err);
+      setPayrollError(
+        err.response?.data?.error || err.message || "Save & export failed",
+      );
+    } finally {
+      setSavingPayroll(false);
+    }
+  };
+
   // ---------- Step 4: XL download ----------
   // micNumbers: optional array of mic numbers (מס' עובד). When provided, only
   // employees whose empNumber is in the list are exported; otherwise everyone.
@@ -1288,8 +1506,7 @@ const Shifts = () => {
   const canAdvance = () => {
     if (step === 1) return !!selectedRestaurant;
     if (step === 2) return files.length > 0;
-    if (step === 3) return true; // Employee data — optional, can skip
-    if (step === 4) {
+    if (step === 3) {
       if (shiftIssues.length > 0 && !shiftIssuesAcknowledged) return false;
       if (employeesAllSaved) return true;
       if (diffSummary && diffSummary.inserts === 0 && diffSummary.updates === 0)
@@ -1306,14 +1523,9 @@ const Shifts = () => {
       const ok = await runExtract();
       if (ok) setStep(3);
     } else if (step === 3) {
-      if (empDataFiles.length > 0 && empDataResults.length === 0) {
-        await runEmpDataAttach();
-      }
-      setStep(4);
-    } else if (step === 4) {
       await handleSaveEmployees();
       await loadWages();
-      setStep(5);
+      setStep(4);
     }
   };
   const goBack = () => {
@@ -1327,13 +1539,12 @@ const Shifts = () => {
     }
     if (target === 2 && selectedRestaurant) setStep(2);
     if (target === 3 && allEmployees.length > 0) setStep(3);
-    if (target === 4 && allEmployees.length > 0) setStep(4);
     if (
-      target === 5 &&
+      target === 4 &&
       (employeesAllSaved || noNewEmployees) &&
       allEmployees.length > 0
     )
-      setStep(5);
+      setStep(4);
   };
 
   // ---------- Step 4: build payroll table rows + warnings ----------
@@ -1344,6 +1555,8 @@ const Shifts = () => {
 
     for (const emp of allEmployees) {
       const empData = lookupEmpData(wageMap, emp);
+      // Hide the "דמה" placeholder identities (number 9999) from every view.
+      if (isDummyEmpNumber(empData?.empNumber)) continue;
       const globalAmount =
         empData && empData.global != null && Number(empData.global) > 0
           ? Number(empData.global)
@@ -1508,35 +1721,40 @@ const Shifts = () => {
   // or any of the employee's roles. Whole employee blocks are kept/dropped
   // together; the grand-total row is hidden while a filter is active.
   const [payrollSearch, setPayrollSearch] = useState("");
-  // "Exportable only" — an employee is valid for export when it has a payroll
-  // employee number (מס' עובד); the export drops the rest as "missing".
-  const [exportableOnly, setExportableOnly] = useState(false);
+
+  // Names the server classified as not exportable (drives the unexportable view).
+  const unexportableNames = useMemo(() => {
+    const s = new Set();
+    for (const e of tlushData?.employees || [])
+      if (!e.exportable) s.add(String(e.name || "").trim());
+    return s;
+  }, [tlushData]);
+
   const displayedPayrollRows = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();
-    if (!q && !exportableOnly) return fullPayrollRows;
-    // Build per-employee haystack (name + מס' עובד + all roles) + export flag.
+    const restrictUnexp = payrollView === "unexportable";
+    if (!q && !restrictUnexp) return fullPayrollRows;
+    // Build per-employee haystack (name + מס' עובד + all roles).
     const byEmp = new Map();
     for (const r of fullPayrollRows) {
       if (r.isGrandTotal) continue;
       const key = r.name || "";
-      if (!byEmp.has(key)) byEmp.set(key, { hay: [key], empNumber: "" });
-      const e = byEmp.get(key);
-      if (r.empNumber != null && r.empNumber !== "") {
-        e.hay.push(String(r.empNumber));
-        e.empNumber = String(r.empNumber);
-      }
-      if (r.role) e.hay.push(String(r.role));
+      if (!byEmp.has(key)) byEmp.set(key, [key]);
+      const hay = byEmp.get(key);
+      if (r.empNumber != null && r.empNumber !== "")
+        hay.push(String(r.empNumber));
+      if (r.role) hay.push(String(r.role));
     }
     const matched = new Set();
-    for (const [key, e] of byEmp) {
-      const textOk = !q || e.hay.join(" ").toLowerCase().includes(q);
-      const exportOk = !exportableOnly || e.empNumber !== "";
-      if (textOk && exportOk) matched.add(key);
+    for (const [key, hay] of byEmp) {
+      const textOk = !q || hay.join(" ").toLowerCase().includes(q);
+      const unexpOk = !restrictUnexp || unexportableNames.has(key.trim());
+      if (textOk && unexpOk) matched.add(key);
     }
     return fullPayrollRows.filter(
       (r) => !r.isGrandTotal && matched.has(r.name || ""),
     );
-  }, [fullPayrollRows, payrollSearch, exportableOnly]);
+  }, [fullPayrollRows, payrollSearch, payrollView, unexportableNames]);
 
   // RTL payroll table: when step 4 opens, scroll the wrapper to the inline-start
   // (right edge) so the sticky שם + תפקיד (role) columns are visible instead of
@@ -1613,7 +1831,7 @@ const Shifts = () => {
       width: "100%",
       // Final step shows the wide payroll table — let it grow up to 90% of the
       // screen width; earlier steps stay at the comfortable reading width.
-      maxWidth: step === 5 ? "90vw" : "1400px",
+      maxWidth: step === 4 ? "90vw" : "1400px",
       flex: 1,
       display: "flex",
       flexDirection: "column",
@@ -2315,6 +2533,79 @@ const Shifts = () => {
     </div>
   );
 
+  // Tlush view: per exportable employee, one line per component
+  // (code · label · quantity · wage). Driven by the in-memory tlush preview.
+  const renderTlushView = () => {
+    if (tlushLoading && !tlushData) {
+      return (
+        <div style={{ padding: "16px", color: theme.textSecondary }}>
+          טוען תלוש…
+        </div>
+      );
+    }
+    if (tlushError) {
+      return (
+        <div style={{ padding: "16px", color: theme.error || "#e53935" }}>
+          {tlushError}
+        </div>
+      );
+    }
+    const q = payrollSearch.trim().toLowerCase();
+    const emps = (tlushData?.employees || [])
+      .filter((e) => e.exportable && (e.components || []).length > 0)
+      .filter(
+        (e) =>
+          !q ||
+          `${e.name} ${e.employeeNumber ?? ""}`.toLowerCase().includes(q),
+      );
+    if (!emps.length) {
+      return (
+        <div style={{ padding: "16px", color: theme.textSecondary }}>
+          אין נתוני תלוש להצגה.
+        </div>
+      );
+    }
+    return (
+      <div style={{ ...styles.tableWrapStep4, marginTop: "12px" }}>
+        <table style={styles.tableStep4}>
+          <thead>
+            <tr>
+              <th style={{ ...styles.th, ...styles.stickyNameTh }}>שם</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>קוד</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>רכיב</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>כמות</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>תעריף</th>
+            </tr>
+          </thead>
+          <tbody>
+            {emps.flatMap((e) => {
+              const comps = e.components || [];
+              return comps.map((c, ci) => {
+                const isFirst = ci === 0;
+                const isLast = ci === comps.length - 1;
+                const cell = isLast ? styles.tdEmpBoundary : styles.td;
+                const nameCell = { ...cell, ...styles.stickyNameCell };
+                return (
+                  <tr key={`${e.name}::${ci}`}>
+                    <td style={nameCell}>{isFirst ? e.name : ""}</td>
+                    <td style={cell}>
+                      {isFirst ? (e.employeeNumber ?? "") : ""}
+                    </td>
+                    <td style={cell}>{c.code}</td>
+                    <td style={cell}>{c.label}</td>
+                    <td style={cell}>{fmtNum(c.quantity)}</td>
+                    <td style={cell}>{fmtNum(c.wage)}</td>
+                  </tr>
+                );
+              });
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const renderStep4 = () => (
     <div style={styles.card}>
       <div style={styles.summary}>
@@ -2394,26 +2685,51 @@ const Shifts = () => {
             direction: "rtl",
           }}
         />
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "0.9rem",
-            color: theme.text,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-          title="הצג רק עובדים בעלי מס' עובד (ניתנים לייצוא)"
+        <select
+          value={payrollView}
+          onChange={(ev) => setPayrollView(ev.target.value)}
+          style={{ ...styles.select, width: "auto", cursor: "pointer" }}
+          title="תצוגה"
         >
-          <input
-            type="checkbox"
-            checked={exportableOnly}
-            onChange={(ev) => setExportableOnly(ev.target.checked)}
-          />
-          ניתן לייצוא בלבד
-        </label>
-        {(payrollSearch.trim() || exportableOnly) && (
+          <option value="data">תצוגת נתונים</option>
+          <option value="tlush">תצוגת תלוש</option>
+          <option value="unexportable">לא ניתנים לייצוא</option>
+        </select>
+        <button
+          type="button"
+          onClick={handleRefreshFinal}
+          disabled={refreshingFinal}
+          title="רענון שכר מהמסד (לאחר עדכון שכר עובד)"
+          aria-label="רענן"
+          style={{
+            ...styles.secondaryButton,
+            width: "36px",
+            height: "36px",
+            padding: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "18px",
+            lineHeight: 1,
+            cursor: refreshingFinal ? "wait" : "pointer",
+            opacity: refreshingFinal ? 0.6 : 1,
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              animation: refreshingFinal ? "spin 0.8s linear infinite" : "none",
+            }}
+          >
+            ↻
+          </span>
+        </button>
+        {tlushLoading && (
+          <span style={{ fontSize: "0.85rem", color: theme.textSecondary }}>
+            טוען…
+          </span>
+        )}
+        {(payrollSearch.trim() || payrollView === "unexportable") && (
           <span style={{ fontSize: "0.85rem", color: theme.textSecondary }}>
             {
               new Set(
@@ -2435,6 +2751,9 @@ const Shifts = () => {
         )}
       </div>
 
+      {payrollView === "tlush" ? (
+        renderTlushView()
+      ) : (
       <div
         ref={payrollWrapRef}
         style={{ ...styles.tableWrapStep4, marginTop: "12px" }}
@@ -2524,6 +2843,7 @@ const Shifts = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       <div
         style={{
@@ -2542,8 +2862,9 @@ const Shifts = () => {
           }}
           onClick={() => setShowExportDialog(true)}
           disabled={downloadingXlsx || allEmployees.length === 0}
+          title="ייצוא נבחרים בלבד (ללא שמירה)"
         >
-          {downloadingXlsx ? "Building…" : "XL download"}
+          {downloadingXlsx ? "Building…" : "ייצוא נבחרים"}
         </button>
         <button
           type="button"
@@ -2552,11 +2873,11 @@ const Shifts = () => {
             opacity: savingPayroll ? 0.7 : 1,
             cursor: savingPayroll ? "wait" : "pointer",
           }}
-          onClick={handleSavePayroll}
+          onClick={handleSaveExport}
           disabled={savingPayroll || !month}
           title={!month ? "month not detected" : ""}
         >
-          {savingPayroll ? "Saving…" : "Save payroll"}
+          {savingPayroll ? "שומר ומייצא…" : "שמירה וייצוא"}
         </button>
       </div>
 
@@ -2754,9 +3075,8 @@ const Shifts = () => {
   const stepRenderers = {
     1: renderStep1,
     2: renderStep2,
-    3: renderStepEmployeeData,
-    4: renderStep3,
-    5: renderStep4,
+    3: renderStep3,
+    4: renderStep4,
   };
 
   const renderLaborDialog = () => {
@@ -3194,6 +3514,7 @@ const Shifts = () => {
                     <tr>
                       <th style={th}>שם</th>
                       <th style={th}>ת"ז</th>
+                      {rows.some((m) => m.reason) && <th style={th}>סיבה</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -3201,6 +3522,9 @@ const Shifts = () => {
                       <tr key={i}>
                         <td style={td}>{m.name || "—"}</td>
                         <td style={td}>{m.ID_nmbr || "—"}</td>
+                        {rows.some((x) => x.reason) && (
+                          <td style={td}>{m.reason || "—"}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -3217,8 +3541,8 @@ const Shifts = () => {
                   )}
                 {hasMissing &&
                   section(
-                    "חסר מספר עובד",
-                    "אין מספר עובד (מס עובד) — דולגו בייצוא.",
+                    "לא ניתנים לייצוא",
+                    "עובדים שלא נכללו בקובץ הייצוא — ראו סיבה.",
                     micpalMissing,
                   )}
               </>
@@ -3281,7 +3605,7 @@ const Shifts = () => {
           >
             ← Back
           </button>
-          {step < 5 && (
+          {step < 4 && (
             <button
               type="button"
               style={{

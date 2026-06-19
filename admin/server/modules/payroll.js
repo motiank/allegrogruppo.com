@@ -3,7 +3,8 @@ import multer from "multer";
 import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import MicpImportXL from "./MicpImportXL.js";
-import ShikImportXL from "./ShikImportXL.js";
+import ShikImportXL, { writeShikRowsXlsx } from "./ShikImportXL.js";
+import { buildTlush, tlushToShikRows, tlushToMicRow } from "./tlush.js";
 import {
   normalizeRoleWage,
   normalizeRoles,
@@ -16,6 +17,12 @@ const require = createRequire(import.meta.url);
 // Flat worth (NIS) of a single served meal — one meal per break-day. Exported
 // as שווי ארוחות (Micpal column / Shiklulit recordType 2 cc 21 rate).
 const MEAL_WORTH = 15;
+
+// Placeholder payroll-software number (the "דמה" dummy in payroll_soft_ix, used
+// for pool identities with an all-zeros ID). Employees mapped to it are never
+// exported and never shown.
+const DUMMY_EMP_NUMBER = "9999";
+const isDummyKeyName = (k) => k != null && String(k).trim() === DUMMY_EMP_NUMBER;
 
 // Normalize a money value to a DECIMAL-safe string (avoid JS Number float
 // drift on the way to MySQL DECIMAL columns). Returns null when not a number.
@@ -571,6 +578,103 @@ async function resolveEmployeeId(rest, emp) {
     if (rows && rows[0]) return rows[0].employee_id;
   }
   return null;
+}
+
+// Load the per-employee export context for a restaurant+month: DB employee
+// records (with per-role wages + contractor flag), the payroll-soft number map,
+// standard days/hours, and the branch's payroll software. Shared by the export
+// and tlush routes.
+async function loadExportCtx(rest, month) {
+  const [empRows] = await executeSql(
+    "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage, roles, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+    { rest },
+  );
+  const empByName = new Map();
+  for (const e of empRows || []) {
+    if (!e.name) continue;
+    let roles = [];
+    if (e.roles) {
+      try {
+        roles = typeof e.roles === "string" ? JSON.parse(e.roles) : e.roles;
+      } catch {
+        roles = [];
+      }
+    }
+    const rolesByName = {};
+    for (const r of normalizeRoles(roles)) {
+      if (r && r.role) rolesByName[String(r.role).trim()] = r;
+    }
+    e.rolesByName = rolesByName;
+    empByName.set(String(e.name).trim(), e);
+  }
+  const [micpalRows] = await executeSql(
+    "SELECT keyName, ID_nmbr FROM payroll_soft_ix WHERE ID_nmbr IS NOT NULL",
+    {},
+  );
+  const micpalByIdNmbr = new Map();
+  for (const m of micpalRows || []) {
+    if (m.ID_nmbr) micpalByIdNmbr.set(String(m.ID_nmbr).trim(), m.keyName);
+  }
+  const ctx = {
+    empByName,
+    micpalByIdNmbr,
+    stdDays: workingDaysFor(month),
+    stdHours: workingHoursFor(month),
+    minHourlyWage: Number(process.env.MIN_HOURLY_WAGE) || 35.4,
+  };
+  const payrollSoft = payrollSoftForBranch(rest) || "mic";
+  return { ctx, payrollSoft };
+}
+
+const isFiniteNum = (v) => v != null && v !== "" && Number.isFinite(Number(v));
+
+// Classify one employee for export and (when exportable) build its tlush.
+// Unexportable reasons: contractor / no_number / no_wage / incomplete.
+function classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet) {
+  const row = buildExportRow(emp, ctx);
+  // "דמה" placeholder identities (number 9999) are dropped entirely — not
+  // exported, not shown, not reported as unexportable.
+  if (isDummyKeyName(row.keyName)) {
+    return {
+      emp,
+      row,
+      name: row.name,
+      ID_nmbr: row.ID_nmbr,
+      employeeNumber: row.keyName || null,
+      dummy: true,
+      exportable: false,
+      reasons: ["dummy"],
+      tlush: null,
+    };
+  }
+  const reasons = [];
+  if (row.contractor) reasons.push("contractor");
+  if (!row.keyName) reasons.push("no_number");
+  const hasAnyRate =
+    row.isGlobal ||
+    isFiniteNum(row.hourlyWage) ||
+    (row.roleBreakdown || []).some((rb) => isFiniteNum(rb.rate));
+  if (!hasAnyRate) reasons.push("no_wage");
+  if (incompleteSet && incompleteSet.has(String(emp.name || "").trim()))
+    reasons.push("incomplete");
+  let tlush = null;
+  if (reasons.length === 0) {
+    try {
+      tlush = buildTlush(row, payrollSoft, { workMonth });
+    } catch {
+      reasons.push("build_error");
+    }
+  }
+  return {
+    emp,
+    row,
+    name: row.name,
+    ID_nmbr: row.ID_nmbr,
+    employeeNumber: row.keyName || null,
+    exportable: reasons.length === 0,
+    reasons,
+    tlush,
+  };
 }
 
 const Router = () => {
@@ -1824,7 +1928,7 @@ const Router = () => {
         return res.status(400).json({ error: "month must be YYYY-MM" });
 
       const [rows] = await executeSql(
-        `SELECT p.employee_id, p.payroll_data,
+        `SELECT p.employee_id, p.payroll_data, p.tlush,
                 e.ID_nmbr, e.name
            FROM payroll p
            JOIN employees e ON e.employee_id = p.employee_id
@@ -1841,6 +1945,14 @@ const Router = () => {
             raw = {};
           }
         }
+        let tlush = r.tlush;
+        if (typeof tlush === "string") {
+          try {
+            tlush = JSON.parse(tlush);
+          } catch {
+            tlush = null;
+          }
+        }
         const hasWrapper =
           raw && typeof raw === "object" && "payroll_data" in raw;
         const pd = hasWrapper ? raw.payroll_data || {} : raw || {};
@@ -1848,6 +1960,7 @@ const Router = () => {
           ID_nmbr: r.ID_nmbr,
           name: r.name,
           payroll_data: pd,
+          tlush: tlush || null,
           role_extras: hasWrapper ? raw.role_extras || {} : {},
           workdays: hasWrapper ? (raw.workdays ?? null) : null,
           global: hasWrapper ? (raw.global ?? null) : null,
@@ -1951,6 +2064,170 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/payroll-data error:", err);
       res.status(500).json({ error: err.message || "save failed" });
+    }
+  });
+
+  // Compute the tlush (converted payroll-soft data) per employee + the
+  // unexportable classification, WITHOUT writing anything. Drives the in-memory
+  // tlush / unexportable views in the final table.
+  router.post("/tlush-preview", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      const list = Array.isArray(req.body?.employees) ? req.body.employees : [];
+      const incompleteSet = new Set(
+        (Array.isArray(req.body?.incompleteNames)
+          ? req.body.incompleteNames
+          : []
+        ).map((n) => String(n || "").trim()),
+      );
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+
+      const { ctx, payrollSoft } = await loadExportCtx(rest, month);
+      const workMonth = Number(month.split("-")[1]);
+      const employees = list
+        .map((emp) =>
+          classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet),
+        )
+        .filter((c) => !c.dummy)
+        .map((c) => ({
+          name: c.name,
+          ID_nmbr: c.ID_nmbr,
+          employeeNumber: c.employeeNumber,
+          exportable: c.exportable,
+          reasons: c.reasons,
+          components: c.tlush ? c.tlush.components : [],
+        }));
+      res.json({ payrollSoft, employees });
+    } catch (err) {
+      console.error("payroll/tlush-preview error:", err);
+      res.status(500).json({ error: err.message || "tlush preview failed" });
+    }
+  });
+
+  // Unified Save + Export: persist payroll_data (+ the computed tlush for
+  // exportable employees) and render the xlsx FROM the stored tlush (the tlush
+  // is the source of truth for the export file).
+  router.post("/save-export", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      const list = Array.isArray(req.body?.employees) ? req.body.employees : [];
+      const incompleteSet = new Set(
+        (Array.isArray(req.body?.incompleteNames)
+          ? req.body.incompleteNames
+          : []
+        ).map((n) => String(n || "").trim()),
+      );
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+      if (list.length === 0)
+        return res.status(400).json({ error: "No employees in request body" });
+
+      const { ctx, payrollSoft } = await loadExportCtx(rest, month);
+      const [y, m] = month.split("-");
+      const monthInt = m ? String(Number(m)) : "";
+      const workMonth = Number(monthInt);
+
+      const classified = list
+        .map((emp) =>
+          classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet),
+        )
+        // Drop "דמה" placeholders entirely (not saved, exported, or reported).
+        .filter((c) => !c.dummy);
+
+      // Persist payroll_data (+ tlush for exportable) per employee.
+      let saved = 0;
+      const errors = [];
+      const unresolved = [];
+      for (const c of classified) {
+        const employee_id = await resolveEmployeeId(rest, c.emp);
+        if (!employee_id) {
+          unresolved.push({ name: c.emp.name, ID_nmbr: c.emp.ID_nmbr });
+          continue;
+        }
+        const wrapped = {
+          payroll_data: c.emp.payroll_data || {},
+          role_extras: c.emp.role_extras || {},
+          workdays: c.emp.workdays ?? null,
+          global: c.emp.global ?? null,
+          netGross: c.emp.netGross ?? null,
+          in_advance: c.emp.in_advance ?? null,
+          work_dates: Array.isArray(c.emp.work_dates) ? c.emp.work_dates : [],
+          daily_breakdown:
+            c.emp.daily_breakdown && typeof c.emp.daily_breakdown === "object"
+              ? c.emp.daily_breakdown
+              : {},
+          daily_hours:
+            c.emp.daily_hours && typeof c.emp.daily_hours === "object"
+              ? c.emp.daily_hours
+              : {},
+        };
+        const payrollJson = JSON.stringify(wrapped);
+        const tlushJson = c.tlush ? JSON.stringify(c.tlush) : null;
+        try {
+          await executeSql(
+            `INSERT INTO payroll (rest, month, employee_id, payroll_data, tlush)
+             VALUES (:rest, :month, :employee_id, CAST(:payroll AS JSON), CAST(:tlush AS JSON))
+             ON DUPLICATE KEY UPDATE
+               payroll_data = CAST(:payroll AS JSON),
+               tlush = CAST(:tlush AS JSON)`,
+            { rest, month, employee_id, payroll: payrollJson, tlush: tlushJson },
+          );
+          saved += 1;
+        } catch (e) {
+          errors.push({ name: c.emp.name, issue: e.message || "save failed" });
+        }
+      }
+
+      // Render xlsx FROM the stored tlush (exportable employees only).
+      const exportableTlushes = classified
+        .filter((c) => c.exportable && c.tlush)
+        .map((c) => c.tlush);
+      const company =
+        micCompanyForBranch(rest) || String(req.body?.company || "").trim();
+      const restLabel = String(req.body?.restLabel || rest);
+      const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
+      let buf;
+      let filename;
+      if (payrollSoft === "shik") {
+        const allRows = [];
+        for (const t of exportableTlushes) {
+          for (const r of tlushToShikRows(t, workMonth)) allRows.push(r);
+        }
+        buf = await writeShikRowsXlsx(allRows);
+        filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
+      } else {
+        const xl = new MicpImportXL({ company, year: y || "", month: monthInt });
+        buf = await xl.generate(exportableTlushes.map(tlushToMicRow));
+        filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+      }
+
+      const unexportable = classified
+        .filter((c) => !c.exportable)
+        .map((c) => ({
+          name: c.name,
+          ID_nmbr: c.ID_nmbr,
+          reasons: c.reasons,
+        }));
+
+      res.json({
+        saved,
+        attempted: list.length,
+        unresolved,
+        errors,
+        payrollSoft,
+        filename,
+        xlsxBase64: Buffer.from(buf).toString("base64"),
+        exported: exportableTlushes.length,
+        unexportable,
+      });
+    } catch (err) {
+      console.error("payroll/save-export error:", err);
+      res.status(500).json({ error: err.message || "save+export failed" });
     }
   });
 
@@ -2409,6 +2686,8 @@ const Router = () => {
       const missing = [];
       const skippedContractors = [];
       for (const row of employees) {
+        // "דמה" placeholders (number 9999) are dropped entirely.
+        if (isDummyKeyName(row.keyName)) continue;
         if (row.contractor) {
           skippedContractors.push({
             name: row.name || "",

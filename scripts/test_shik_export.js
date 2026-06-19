@@ -14,6 +14,11 @@ import ShikImportXL, {
   buildShikRowsForEmployee,
   SHIK_HEADERS,
 } from "../admin/server/modules/ShikImportXL.js";
+import {
+  buildTlush,
+  tlushToShikRows,
+  tlushToMicRow,
+} from "../admin/server/modules/tlush.js";
 
 const HOURLY_RATE = 40;
 const TRAVEL_PER_DAY = 12;
@@ -471,6 +476,23 @@ assert.deepEqual(SHIK_HEADERS, [
   "תעריף",
   "כמות",
 ]);
+
+// ─── Tlush round-trip ───────────────────────────────────────────────────────
+// The tlush is the source of truth for the export: rebuilding the export rows
+// from the tlush must reproduce the direct buildShikRowsForEmployee output
+// exactly (Shiklulit), and tlushToMicRow must reproduce the Micpal wide row.
+const tShik = buildTlush(hourlyRow, "shik", { workMonth });
+assert.deepEqual(
+  tlushToShikRows(tShik, workMonth),
+  buildShikRowsForEmployee(workMonth, hourlyRow),
+  "tlush → shik rows round-trip",
+);
+const tMic = buildTlush(hourlyRow, "mic", { workMonth });
+const micRow = tlushToMicRow(tMic);
+for (const k of ["keyName", "hourlyWage", "hours100", "hours125", "hours150"]) {
+  assert.equal(micRow[k], hourlyRow[k], `tlush mic row preserves ${k}`);
+}
+console.log("✓ tlush round-trip assertions passed");
 
 const xl = new ShikImportXL({ year: "2026", month: String(workMonth) });
 const buf = await xl.generate([hourlyRow, globalRow]);
