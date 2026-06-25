@@ -860,13 +860,6 @@ const Shifts = () => {
     return [...inserts, ...updates];
   }, [selectedRestaurant, newEmployees, allEmployees]);
 
-  // Auto-run diff when entering Step 4 or when allEmployees changes (e.g. phones merged)
-  useEffect(() => {
-    if (step === 3 && allEmployees.length > 0 && !saveResult) {
-      buildDiff().catch((err) => console.error("auto-diff error:", err));
-    }
-  }, [step, allEmployees, saveResult, buildDiff]);
-
   const handleSaveEmployees = async () => {
     if (saving) return;
     setSaving(true);
@@ -1507,11 +1500,10 @@ const Shifts = () => {
     if (step === 1) return !!selectedRestaurant;
     if (step === 2) return files.length > 0;
     if (step === 3) {
+      // Step 3 is display-only (no employee commit). Just require that any
+      // incomplete-shift issues were acknowledged.
       if (shiftIssues.length > 0 && !shiftIssuesAcknowledged) return false;
-      if (employeesAllSaved) return true;
-      if (diffSummary && diffSummary.inserts === 0 && diffSummary.updates === 0)
-        return true;
-      return false;
+      return true;
     }
     return false;
   };
@@ -1523,7 +1515,8 @@ const Shifts = () => {
       const ok = await runExtract();
       if (ok) setStep(3);
     } else if (step === 3) {
-      await handleSaveEmployees();
+      // No DB sync — employees are managed on the Employee page. Just load the
+      // DB wages so the final table can resolve them.
       await loadWages();
       setStep(4);
     }
@@ -1539,12 +1532,7 @@ const Shifts = () => {
     }
     if (target === 2 && selectedRestaurant) setStep(2);
     if (target === 3 && allEmployees.length > 0) setStep(3);
-    if (
-      target === 4 &&
-      (employeesAllSaved || noNewEmployees) &&
-      allEmployees.length > 0
-    )
-      setStep(4);
+    if (target === 4 && allEmployees.length > 0) setStep(4);
   };
 
   // ---------- Step 4: build payroll table rows + warnings ----------
@@ -2391,48 +2379,12 @@ const Shifts = () => {
         Restaurant:{" "}
         <strong style={{ color: theme.text }}>{selectedLabel}</strong>
         {" · "}
-        {diffSummary ? (
-          <span>
-            <strong style={{ color: theme.text }}>{diffSummary.inserts}</strong>{" "}
-            new ·{" "}
-            <strong style={{ color: theme.text }}>{diffSummary.updates}</strong>{" "}
-            to update
-            {diffSummary.roleUpdates > 0 ? (
-              <>
-                {" "}
-                (
-                <strong style={{ color: theme.text }}>
-                  {diffSummary.roleUpdates}
-                </strong>{" "}
-                role{diffSummary.roleUpdates === 1 ? "" : "s"})
-              </>
-            ) : null}{" "}
-            ·{" "}
-            <strong style={{ color: theme.text }}>
-              {diffSummary.existing}
-            </strong>{" "}
-            unchanged
-          </span>
-        ) : noNewEmployees ? (
-          <span>
-            {allEmployees.length > 0 ? (
-              <>
-                <strong style={{ color: theme.text }}>
-                  {allEmployees.length}
-                </strong>{" "}
-                employee{allEmployees.length === 1 ? "" : "s"} — click Update to
-                compare with DB
-              </>
-            ) : (
-              "No employees."
-            )}
-          </span>
-        ) : (
-          <>
-            <strong style={{ color: theme.text }}>{newEmployees.length}</strong>{" "}
-            new employee{newEmployees.length === 1 ? "" : "s"} to add
-          </>
-        )}
+        <strong style={{ color: theme.text }}>{newEmployees.length}</strong> new
+        {" · "}
+        <strong style={{ color: theme.text }}>
+          {Math.max(0, allEmployees.length - newEmployees.length)}
+        </strong>{" "}
+        existing
         {exceptions.length > 0 && ` · ${exceptions.length} exception(s)`}
         {month && ` · month ${month}`}
         {shiftIssuesAcknowledged && shiftIssues.length > 0 && (
@@ -2446,88 +2398,47 @@ const Shifts = () => {
         )}
       </div>
 
-      {newEmployees.length > 0 && (
-        <div style={{ marginTop: "12px" }}>
-          <EmployeeWageTable
-            rows={newEmployees.map((emp, empIdx) => ({ emp, empIdx }))}
-            onEditEmpWage={(empIdx) => setWageDialog({ empIdx })}
-            onEditRoleWage={(empIdx, roleIdx) =>
-              setWageDialog({ empIdx, roleIdx })
-            }
-            onUpdateTravel={updateTravel}
-            onUpdateMaxTravel={updateMaxTravel}
-            onToggleContractor={toggleContractor}
-            actions={{
-              keyOf: (emp) => emp,
-              menuOpenFor,
-              setMenuOpenFor,
-              removingId: null,
-              onRemove: removeNewEmployee,
-              onDuplicate: null,
+      {newEmployees.length > 0 ? (
+        <>
+          <div
+            style={{
+              marginTop: "12px",
+              fontSize: "0.9rem",
+              color: theme.textSecondary,
             }}
-          />
-        </div>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginTop: "12px",
-        }}
-      >
-        <button
-          type="button"
-          style={{
-            ...styles.primaryButton,
-            opacity: saving ? 0.7 : 1,
-            cursor: saving ? "wait" : "pointer",
-          }}
-          onClick={handleSaveEmployees}
-          disabled={
-            saving ||
-            employeesAllSaved ||
-            (diffSummary &&
-              diffSummary.inserts === 0 &&
-              diffSummary.updates === 0)
-          }
-        >
-          {saving
-            ? "Saving…"
-            : employeesAllSaved
-              ? "Saved"
-              : diffSummary &&
-                  diffSummary.inserts === 0 &&
-                  diffSummary.updates === 0
-                ? "Nothing to update"
-                : "Update"}
-        </button>
-      </div>
-
-      {saveError && (
-        <div style={{ ...styles.errorBox, marginTop: "12px" }}>
-          <strong>Error:</strong> {saveError}
-        </div>
-      )}
-      {saveResult && (
-        <div style={{ ...styles.successBox, marginTop: "12px" }}>
-          Inserted <strong>{saveResult.inserted || 0}</strong>
-          {saveResult.updated ? (
-            <>
-              , updated <strong>{saveResult.updated}</strong>
-            </>
-          ) : null}{" "}
-          of {saveResult.attempted} employee
-          {saveResult.attempted === 1 ? "" : "s"}
-          {saveResult.errors && saveResult.errors.length > 0 && (
-            <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
-              {saveResult.errors.map((e, i) => (
-                <li key={i}>
-                  {e.name || "(no name)"}: {e.issue}
-                </li>
-              ))}
-            </ul>
-          )}
+          >
+            עובדים אלו אינם בטבלת העובדים — הוסיפו אותם בעמוד העובדים כדי להגדיר
+            שכר. (העובדים הקיימים יקבלו שכר מהמסד אוטומטית.)
+          </div>
+          <div style={{ ...styles.tableWrap, marginTop: "8px" }}>
+            <table style={{ ...styles.table, ...styles.ltrTable }}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>name</th>
+                  <th style={styles.th}>ID_nmbr</th>
+                  <th style={styles.th}>roles</th>
+                </tr>
+              </thead>
+              <tbody>
+                {newEmployees.map((emp, i) => (
+                  <tr key={i}>
+                    <td style={styles.td}>{emp.name || "—"}</td>
+                    <td style={styles.td}>{emp.ID_nmbr || "—"}</td>
+                    <td style={styles.td}>
+                      {(emp.roles || [])
+                        .map((r) => (typeof r === "string" ? r : r && r.role))
+                        .filter(Boolean)
+                        .join(", ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div style={{ marginTop: "12px", color: theme.textSecondary }}>
+          כל עובדי המשמרות קיימים בטבלת העובדים.
         </div>
       )}
     </div>
