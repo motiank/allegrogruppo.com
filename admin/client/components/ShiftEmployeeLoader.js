@@ -73,9 +73,9 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
   }));
 
   const handleFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     setOpen(true);
     setStatus("processing");
     setError(null);
@@ -84,7 +84,7 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
     try {
       const fd = new FormData();
       fd.append("rest", selectedRestaurant);
-      fd.append("file", file, file.name);
+      for (const file of files) fd.append("file", file, file.name);
       const res = await axios.post(
         "/admin/payroll/shift-employees/preview",
         fd,
@@ -157,6 +157,7 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         style={{ display: "none" }}
         onChange={handleFile}
@@ -198,7 +199,11 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
                     <Chip theme={theme} tone="upd" label="עדכון שם" n={counts.updates} />
                     <Chip theme={theme} tone="same" label="ללא שינוי" n={counts.unchanged} />
                     <Chip theme={theme} tone="conf" label="התנגשויות" n={counts.conflicts} />
-                    <span style={s.fileName}>{preview.file}</span>
+                    <span style={s.fileName} title={preview.file}>
+                      {preview.fileCount > 1
+                        ? `${preview.fileCount} קבצים`
+                        : preview.file}
+                    </span>
                   </div>
 
                   {conflicts.length > 0 ? (

@@ -547,6 +547,42 @@ const categorizeRoster = (incomingRows, existingRows) => {
   return { news, updates, unchanged, conflicts };
 };
 
+// Merge parsed roster rows from several files into one deduped set, using the
+// same 3-key (clock_id / phone / username) union logic: a row that shares any
+// key with an earlier one merges into it (fills missing fields; later non-empty
+// values win). Lets the loader accept multiple files as one combined roster.
+const mergeIncomingRoster = (rowsLists) => {
+  const merged = [];
+  const byClock = new Map();
+  const byPhone = new Map();
+  const byUser = new Map();
+  const link = (row) => {
+    if (row.clock_id) byClock.set(String(row.clock_id).trim(), row);
+    if (row.phone) byPhone.set(String(row.phone).trim(), row);
+    if (row.username) byUser.set(normUser(row.username), row);
+  };
+  for (const rows of rowsLists) {
+    for (const inc of rows) {
+      const hit =
+        (inc.clock_id && byClock.get(String(inc.clock_id).trim())) ||
+        (inc.phone && byPhone.get(String(inc.phone).trim())) ||
+        (inc.username && byUser.get(normUser(inc.username))) ||
+        null;
+      if (hit) {
+        for (const f of Object.keys(inc)) {
+          if (inc[f] != null && inc[f] !== "") hit[f] = inc[f];
+        }
+        link(hit);
+      } else {
+        const row = { ...inc };
+        merged.push(row);
+        link(row);
+      }
+    }
+  }
+  return merged;
+};
+
 async function fetchExistingKeys(rest) {
   if (!rest) return new Set();
   const [rows] = await executeSql(
@@ -1130,7 +1166,7 @@ const Router = () => {
   // ── Standalone shift-employee roster loader ──────────────────────────────
   // Company-keyed roster in `shift_employees`, loaded from the Tabit
   // "רשימת עובדים" export and independent of the payroll `employees` table.
-  const parseRosterUpload = upload.single("file");
+  const parseRosterUpload = upload.array("file");
 
   const fetchRoster = async (company) => {
     const [rows] = await executeSql(
@@ -1159,21 +1195,32 @@ const Router = () => {
             .status(400)
             .json({ error: "could not resolve company for restaurant" });
         }
-        const f = req.file;
-        if (!f || !f.buffer) {
+        const files = (req.files || []).filter((f) => f && f.buffer);
+        if (files.length === 0) {
           return res.status(400).json({ error: "no file uploaded" });
         }
-        if (!/\.xlsx$/i.test(f.originalname || "")) {
-          return res.status(400).json({ error: "expected an .xlsx file" });
+        const bad = files.find((f) => !/\.xlsx$/i.test(f.originalname || ""));
+        if (bad) {
+          return res.status(400).json({ error: "expected .xlsx files" });
         }
-        const { headerRow, rows } = await parseEmployeeRosterXlsx(f.buffer);
+        // Parse every file, then merge the rows into one combined roster so a
+        // person appearing in multiple files is categorized once.
+        const rowsLists = [];
+        let headerRow = null;
+        for (const f of files) {
+          const parsed = await parseEmployeeRosterXlsx(f.buffer);
+          if (headerRow == null) headerRow = parsed.headerRow;
+          rowsLists.push(parsed.rows);
+        }
+        const rows = mergeIncomingRoster(rowsLists);
         const existing = await fetchRoster(company);
         const { news, updates, unchanged, conflicts } = categorizeRoster(
           rows,
           existing,
         );
         res.json({
-          file: f.originalname,
+          file: files.map((f) => f.originalname).join(", "),
+          fileCount: files.length,
           company,
           headerRow,
           counts: {
