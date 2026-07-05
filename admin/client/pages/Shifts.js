@@ -5,6 +5,8 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
+import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import {
   BarChart,
@@ -47,6 +49,115 @@ const fmtNum = (n, decimals = 2) => {
   if (!Number.isFinite(v)) return "";
   return v.toFixed(decimals).replace(/\.?0+$/, "") || "0";
 };
+
+// Format a 'YYYY-MM-DD' key as DD/MM for the compact notes tooltip. Falls back
+// to the raw string (or "" ) when the date is missing/unrecognized.
+const fmtNoteDate = (d) => {
+  if (!d) return "";
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}` : String(d);
+};
+
+// Genuine free-text note vs. leaked header label / bare number / date. Keeps
+// the notes icon off employees that have no real הערות.
+const isRealNote = (raw) => {
+  const t = String(raw || "").trim();
+  if (!t) return false;
+  if (t === "הערות" || t === "הערה") return false;
+  if (/^-?[\d.,:%/\s]+$/.test(t)) return false;
+  return true;
+};
+
+// Left-aligned note indicator shown inside the employee-name cell. Only rendered
+// when the employee has one or more dated הערות. Hovering reveals a small
+// position-fixed tooltip (fixed so the scroll container doesn't clip it) that
+// lists every note as "DD/MM — text".
+// Compact "100%: x · 125%: y · 150%: z" line for a note's date. Only nonzero
+// buckets are shown; returns "" when the day carries no split hours.
+const fmtHoursSplit = (n) => {
+  const parts = [];
+  if (Number(n.h100)) parts.push(`100%: ${fmtNum(n.h100)}`);
+  if (Number(n.h125)) parts.push(`125%: ${fmtNum(n.h125)}`);
+  if (Number(n.h150)) parts.push(`150%: ${fmtNum(n.h150)}`);
+  return parts.join(" · ");
+};
+
+function NotesBadge({ notes }) {
+  const [pos, setPos] = useState(null); // {x, y} or null when hidden
+  // Only real, non-empty notes count — no notes ⇒ no icon at all.
+  const valid = Array.isArray(notes)
+    ? notes.filter((n) => n && String(n.note || "").trim())
+    : [];
+  if (valid.length === 0) return null;
+  const show = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setPos({ x: r.left, y: r.bottom });
+  };
+  return (
+    <span
+      onMouseEnter={show}
+      onMouseLeave={() => setPos(null)}
+      style={{
+        cursor: "default",
+        fontSize: "0.95rem",
+        lineHeight: 1,
+        userSelect: "none",
+      }}
+      aria-label={`${valid.length} הערות`}
+    >
+      📝
+      {pos &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: pos.x,
+              top: pos.y + 4,
+              zIndex: 10000,
+              direction: "rtl",
+              textAlign: "right",
+              maxWidth: "340px",
+              background: "#333",
+              color: "#fff",
+              padding: "8px 10px",
+              borderRadius: "6px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+              fontSize: "0.8rem",
+              lineHeight: 1.4,
+              fontWeight: 400,
+              whiteSpace: "normal",
+              pointerEvents: "none",
+            }}
+          >
+            {valid.map((n, i) => {
+              const split = fmtHoursSplit(n);
+              return (
+                <div
+                  key={i}
+                  style={{ marginBottom: i < valid.length - 1 ? "4px" : 0 }}
+                >
+                  <div>
+                    {n.date ? (
+                      <span style={{ opacity: 0.7, marginLeft: "6px" }}>
+                        {fmtNoteDate(n.date)}
+                      </span>
+                    ) : null}
+                    {n.note}
+                  </div>
+                  {split ? (
+                    <div style={{ opacity: 0.7, fontSize: "0.72rem" }}>
+                      {split}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </span>
+  );
+}
 
 // Placeholder payroll-software number (the "דמה" dummy in payroll_soft_ix, used
 // for pool/placeholder identities with an all-zeros ID). Employees mapped to it
@@ -582,6 +693,7 @@ const Shifts = () => {
     setFreshExtract(false);
     setNewEmployees([]);
     setAllEmployees([]);
+    setRoleSyncNote(null);
     setMonth("");
     setExceptions([]);
     setSaveResult(null);
@@ -747,6 +859,8 @@ const Shifts = () => {
   };
 
   const [diffSummary, setDiffSummary] = useState(null);
+  // Feedback when new roles were auto-added to existing employees on step 3→4.
+  const [roleSyncNote, setRoleSyncNote] = useState(null);
 
   const buildDiff = useCallback(async () => {
     if (!selectedRestaurant) return [];
@@ -860,6 +974,67 @@ const Shifts = () => {
     return [...inserts, ...updates];
   }, [selectedRestaurant, newEmployees, allEmployees]);
 
+  // Persist ONLY new roles that EXISTING employees picked up in this month's
+  // shift files. Never inserts brand-new employees (those stay managed on the
+  // Employee page) and never rewrites stored name/phone/wages — roles only.
+  // Returns { added, employees } for user feedback.
+  const syncExistingEmployeeRoles = async () => {
+    if (!selectedRestaurant) return { added: 0, employees: 0 };
+    const dbRes = await axios.post(
+      "/admin/payroll/wages",
+      { rest: selectedRestaurant, scope: "all" },
+      { withCredentials: true },
+    );
+    const dbByName = new Map();
+    const dbByBase = new Map();
+    for (const e of dbRes.data?.employees || []) {
+      dbByName.set((e.name || "").trim(), e);
+      const base = baseName(e.name);
+      if (base) {
+        if (dbByBase.has(base)) dbByBase.set(base, null); // ambiguous → disable
+        else dbByBase.set(base, e);
+      }
+    }
+
+    const updates = [];
+    let added = 0;
+    const seen = new Set();
+    for (const emp of [...newEmployees, ...allEmployees]) {
+      const name = (emp.name || "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      let db = dbByName.get(name);
+      if (!db) {
+        const base = baseName(name);
+        if (base) db = dbByBase.get(base) || undefined;
+      }
+      // Only existing employees get roles merged — never insert a new one.
+      if (!db) continue;
+      const {
+        roles: mergedRoles,
+        added: addedRoles,
+        changed,
+      } = mergeRoles(db.roles, roleNamesOf(emp.roles));
+      if (!changed) continue;
+      added += addedRoles.length;
+      updates.push({
+        rest: selectedRestaurant,
+        // The DB row's own name so the server resolves the right row even when
+        // we matched via the base-name fallback. Only the roles column is sent.
+        name: db.name || name,
+        roles: mergedRoles,
+      });
+    }
+
+    if (updates.length === 0) return { added: 0, employees: 0 };
+    await axios.post(
+      "/admin/payroll/employees",
+      { employees: updates },
+      { withCredentials: true },
+    );
+    return { added, employees: updates.length };
+  };
+
   const handleSaveEmployees = async () => {
     if (saving) return;
     setSaving(true);
@@ -884,6 +1059,60 @@ const Shifts = () => {
     }
   };
 
+  // Save ONLY the new employees (those not in the DB) with their roles. Existing
+  // employees are never touched here — their new roles are merged separately on
+  // advancing to step 4 (syncExistingEmployeeRoles), per the roles-only policy.
+  // Wages are left empty; they're set afterwards on the Employee page / wage table.
+  const saveNewEmployees = async () => {
+    if (saving || !selectedRestaurant) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const payload = newEmployees
+        .map((emp) => ({
+          rest: selectedRestaurant,
+          name: (emp.name || "").trim(),
+          ID_nmbr: emp.ID_nmbr || null,
+          phone: emp.phone || null,
+          roles: emp.roles || [],
+          new_wage_type: emp.new_wage_type,
+          wage: emp.wage,
+          travel: emp.travel,
+          maxTravel: emp.maxTravel,
+          contractor: !!emp.contractor,
+          t101: false,
+        }))
+        .filter((e) => e.name);
+      if (payload.length === 0) {
+        setSaveResult({ inserted: 0, updated: 0, attempted: 0, errors: [] });
+        return;
+      }
+      const res = await axios.post(
+        "/admin/payroll/employees",
+        { employees: payload },
+        { withCredentials: true },
+      );
+      setSaveResult(res.data);
+      // Move successfully-saved employees out of the "new" list — keep only the
+      // ones that errored (or were never attempted because they had no name).
+      const failed = new Set(
+        (res.data?.errors || []).map((e) => String(e.name || "").trim()),
+      );
+      setNewEmployees((prev) =>
+        prev.filter((e) => {
+          const nm = String(e.name || "").trim();
+          if (!nm) return true; // never attempted → keep
+          return failed.has(nm); // keep only if the save failed
+        }),
+      );
+    } catch (err) {
+      console.error("save new employees error:", err);
+      setSaveError(err.response?.data?.error || err.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ---------- Step 1: load an existing stored payroll, jump to the final view ----------
   const loadExistingPayroll = async (mo) => {
     if (!selectedRestaurant || !mo || loadingExistingPayroll) return;
@@ -900,6 +1129,7 @@ const Shifts = () => {
       setNewEmployees([]);
       setAllEmployees(list);
       setFreshExtract(false);
+      setRoleSyncNote(null);
       setMonth(res.data?.month || mo);
       setExceptions([]);
       setShiftIssues([]);
@@ -929,6 +1159,47 @@ const Shifts = () => {
     }
     loadExistingPayroll(val);
   };
+
+  // ---------- Deep-linking: sync restaurant + month with the URL ----------
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deeplinkDone = useRef(false);
+  const pendingMonthRef = useRef(null);
+
+  // Hydrate the selection from ?rest=<id>&month=<YYYY-MM> once, when the
+  // allowed-restaurant list is known. A valid month is stashed and applied by
+  // the effect below (which waits until the restaurant state is set).
+  useEffect(() => {
+    if (deeplinkDone.current) return;
+    if (!flatAvailable || flatAvailable.length === 0) return;
+    deeplinkDone.current = true;
+    const urlRest = searchParams.get("rest");
+    if (!urlRest || !flatAvailable.some((r) => r.value === urlRest)) return;
+    const urlMonth = searchParams.get("month");
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth)) {
+      pendingMonthRef.current = urlMonth;
+    }
+    if (selectedRestaurant !== urlRest) setSelectedRestaurant(urlRest);
+  }, [flatAvailable, searchParams, selectedRestaurant]);
+
+  // Once the URL's restaurant is applied, auto-load the requested payroll month.
+  useEffect(() => {
+    const mo = pendingMonthRef.current;
+    if (!mo || !selectedRestaurant) return;
+    pendingMonthRef.current = null;
+    setSelectedPayroll(mo);
+    loadExistingPayroll(mo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRestaurant]);
+
+  // Reflect the current restaurant + month back into the URL (replace, so we
+  // don't spam browser history) for shareable/bookmarkable deep links.
+  useEffect(() => {
+    if (!deeplinkDone.current) return;
+    const next = {};
+    if (selectedRestaurant) next.rest = selectedRestaurant;
+    if (month) next.month = month;
+    setSearchParams(next, { replace: true });
+  }, [selectedRestaurant, month, setSearchParams]);
 
   // ---------- Step 3 → 4: load wages from DB ----------
   const loadWages = async () => {
@@ -1155,6 +1426,7 @@ const Shifts = () => {
             e.daily_hours && typeof e.daily_hours === "object"
               ? e.daily_hours
               : {},
+          notes: Array.isArray(e.notes) ? e.notes : [],
         })),
       };
       const res = await axios.post("/admin/payroll/payroll-data", payload, {
@@ -1235,6 +1507,7 @@ const Shifts = () => {
           : {},
       daily_hours:
         e.daily_hours && typeof e.daily_hours === "object" ? e.daily_hours : {},
+      notes: Array.isArray(e.notes) ? e.notes : [],
     }));
 
   // Human label for an unexportable reason code.
@@ -1515,8 +1788,20 @@ const Shifts = () => {
       const ok = await runExtract();
       if (ok) setStep(3);
     } else if (step === 3) {
-      // No DB sync — employees are managed on the Employee page. Just load the
-      // DB wages so the final table can resolve them.
+      // Persist NEW roles that existing employees picked up in this month's
+      // shift files, so the reloaded wages surface them (with null wage) in
+      // step 4. No inserts — brand-new employees stay managed on the Employee
+      // page. Non-fatal: a failure here must never block advancing.
+      setRoleSyncNote(null);
+      try {
+        const summary = await syncExistingEmployeeRoles();
+        if (summary && summary.added > 0) {
+          setRoleSyncNote(`נוספו ${summary.added} תפקידים חדשים לעובדים קיימים`);
+        }
+      } catch (err) {
+        console.error("role sync error:", err);
+      }
+      // Must run AFTER the sync so the rebuilt wageMap includes the new roles.
       await loadWages();
       setStep(4);
     }
@@ -1569,6 +1854,27 @@ const Shifts = () => {
       const breaksByRole = computeBreaksByRole(emp);
       // Payroll-software employee number (מס עובד) for the new table column.
       const empNumber = empData?.empNumber ?? null;
+
+      // הערות surfaced next to the name, each enriched with that date's hours
+      // split (100/125/150) summed from the per-day breakdown.
+      const empDaily =
+        emp.daily_breakdown && typeof emp.daily_breakdown === "object"
+          ? emp.daily_breakdown
+          : {};
+      const empNotes = (Array.isArray(emp.notes) ? emp.notes : [])
+        .filter((n) => n && isRealNote(String(n.note || "")))
+        .map((n) => {
+          const entries = Array.isArray(empDaily[n.date]) ? empDaily[n.date] : [];
+          let h100 = 0,
+            h125 = 0,
+            h150 = 0;
+          for (const e of entries) {
+            h100 += Number(e.h100) || 0;
+            h125 += Number(e.h125) || 0;
+            h150 += Number(e.h150) || 0;
+          }
+          return { ...n, h100, h125, h150 };
+        });
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
@@ -1635,6 +1941,7 @@ const Shifts = () => {
           isTotal: false,
           empty: true,
           name: emp.name,
+          notes: empNotes,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -1654,6 +1961,7 @@ const Shifts = () => {
           last: i === roleRows.length - 1 && roleRows.length === 1,
           isTotal: false,
           name: emp.name,
+          notes: i === 0 ? empNotes : null,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -2407,8 +2715,9 @@ const Shifts = () => {
               color: theme.textSecondary,
             }}
           >
-            עובדים אלו אינם בטבלת העובדים — הוסיפו אותם בעמוד העובדים כדי להגדיר
-            שכר. (העובדים הקיימים יקבלו שכר מהמסד אוטומטית.)
+            עובדים אלו אינם בטבלת העובדים. ניתן לשמור אותם כאן עם התפקידים;
+            הגדרת השכר תתבצע לאחר מכן בעמוד העובדים או בטבלת השכר. (העובדים
+            הקיימים יקבלו שכר מהמסד אוטומטית.)
           </div>
           <div style={{ ...styles.tableWrap, marginTop: "8px" }}>
             <table style={{ ...styles.table, ...styles.ltrTable }}>
@@ -2435,10 +2744,49 @@ const Shifts = () => {
               </tbody>
             </table>
           </div>
+          <div
+            style={{
+              marginTop: "12px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                ...styles.primaryButton,
+                opacity: saving ? 0.7 : 1,
+                cursor: saving ? "wait" : "pointer",
+              }}
+              onClick={saveNewEmployees}
+              disabled={saving}
+            >
+              {saving ? "שומר…" : "שמירת העובדים החדשים"}
+            </button>
+          </div>
         </>
       ) : (
         <div style={{ marginTop: "12px", color: theme.textSecondary }}>
           כל עובדי המשמרות קיימים בטבלת העובדים.
+        </div>
+      )}
+
+      {/* Save feedback lives outside the list block so it persists after saved
+          employees are removed from the "new" list. */}
+      {saveResult && (
+        <div style={{ ...styles.successBox, marginTop: "12px" }}>
+          נשמרו {saveResult.inserted || 0} עובדים חדשים
+          {saveResult.updated ? ` · עודכנו ${saveResult.updated} קיימים` : ""}
+          {saveResult.errors && saveResult.errors.length > 0
+            ? ` · ${saveResult.errors.length} שגיאות`
+            : ""}
+        </div>
+      )}
+      {saveError && (
+        <div style={{ ...styles.errorBox, marginTop: "8px" }}>
+          <strong>Error:</strong> {saveError}
         </div>
       )}
     </div>
@@ -2531,6 +2879,18 @@ const Shifts = () => {
         employee{allEmployees.length === 1 ? "" : "s"}
         {loadingWages && " · loading wages…"}
       </div>
+
+      {roleSyncNote && (
+        <div
+          style={{
+            ...styles.successBox,
+            marginTop: "12px",
+            padding: "8px 12px",
+          }}
+        >
+          {roleSyncNote} — יש להגדיר להם שכר
+        </div>
+      )}
 
       {payrollWarnings && payrollWarnings.length > 0 && (
         <div
@@ -2723,7 +3083,23 @@ const Shifts = () => {
               }
               return (
                 <tr key={r.empKey + i}>
-                  <td style={nameCell}>{r.first ? r.name : ""}</td>
+                  <td style={nameCell}>
+                    {r.first ? (
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "6px",
+                        }}
+                      >
+                        <span>{r.name}</span>
+                        <NotesBadge notes={r.notes} />
+                      </span>
+                    ) : (
+                      ""
+                    )}
+                  </td>
                   <td style={cell}>{r.first ? (r.empNumber ?? "") : ""}</td>
                   <td style={cell}>{r.role || ""}</td>
                   <td style={cell}>
@@ -2815,6 +3191,18 @@ const Shifts = () => {
                   <li key={i}>
                     {u.name || "(no name)"}
                     {u.ID_nmbr ? ` · ID ${u.ID_nmbr}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {payrollResult.errors && payrollResult.errors.length > 0 && (
+            <div style={{ marginTop: "8px", color: theme.error || "#c0392b" }}>
+              <strong>Save errors ({payrollResult.errors.length}):</strong>
+              <ul style={{ margin: "4px 0 0", paddingLeft: "20px" }}>
+                {payrollResult.errors.map((e, i) => (
+                  <li key={i}>
+                    {e.name || "(no name)"}: {e.issue}
                   </li>
                 ))}
               </ul>

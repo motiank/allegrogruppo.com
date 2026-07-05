@@ -95,6 +95,12 @@ const HEADER_SYNONYMS = {
   hag: ["שעות חג", "חגים", "חג"],
   rate: ["מחיר לשעה", "תעריף לשעה", "שכר לשעה", "תעריף"],
   netGross: ["נטו/ברוטו", "נטו / ברוטו", "סוג שכר", "ברוטו/נטו"],
+  // Specific tip columns must precede the generic `tip` below: every one of
+  // these headers contains the substring "טיפ", so whichever field is checked
+  // first claims the column. tipCash folds into the tip total; tipCreditTlush
+  // folds into the השלמה (completion) total (see extractFromSummaryRow).
+  tipCash: ["טיפ מזומן"],
+  tipCreditTlush: ["טיפ מהאשראי לתשלום בתלוש", "מהאשראי לתשלום בתלוש"],
   tip: ["טיפ", "טיפים", "תשר"],
   completion: ["השלמה", "תוספת", "בונוס"],
   travel: ["נסיעות", "דמי נסיעה", "הוצאות נסיעה", "נסיעה"],
@@ -681,6 +687,18 @@ function collectDailyBreakdown(worksheet, headerInfo, summaryRowNumbers) {
         ? getCellNumber(row.getCell(cols.completion))
         : null,
     };
+    // Fold the specific tip columns in: טיפ מזומן → tip, טיפ מהאשראי לתשלום
+    // בתלוש → השלמה (completion), matching the summary-row aggregation.
+    if (cols.tipCash)
+      rowData.tip = sumNullable(
+        rowData.tip,
+        getCellNumber(row.getCell(cols.tipCash)),
+      );
+    if (cols.tipCreditTlush)
+      rowData.completion = sumNullable(
+        rowData.completion,
+        getCellNumber(row.getCell(cols.tipCreditTlush)),
+      );
     const { value: h150 } = normalize150(rowData, headerInfo);
 
     let role = null;
@@ -782,6 +800,67 @@ function collectDailyHours(worksheet, headerInfo, summaryRowNumbers) {
   return out;
 }
 
+// True when a cell's text is really free-text note content — not a leaked
+// header label, a bare number (hours/amount), or a date. Prevents the icon
+// from lighting up on every employee due to non-note cells.
+function looksLikeNoteText(t) {
+  if (!t) return false;
+  if (t === "הערות" || t === "הערה") return false; // header label leaked in
+  if (/^-?[\d.,:%/\s]+$/.test(t)) return false; // pure number / time / percent
+  if (getCellDateKey({ value: t })) return false; // a date, not a note
+  return true;
+}
+
+// Walk the data rows and collect the free-text הערות column paired with the
+// row's date. Returns [{ date: 'YYYY-MM-DD', note: string }, ...] for every
+// DATED data row that carries genuine note text. Summary rows and any row
+// without a real date are skipped, so employees with no notes get an empty
+// array (and therefore no icon).
+function collectDailyNotes(worksheet, headerInfo, summaryRowNumbers) {
+  const out = [];
+  if (!headerInfo) return out;
+  const headerRow = headerInfo.row;
+  // Locate the notes column. Only trust the detected column when its own
+  // header text actually reads הערות/הערה — otherwise the value under it is
+  // some other field and would produce a note on every row.
+  let notesCol = null;
+  const detected = (headerInfo.columns || {}).notes || null;
+  if (detected != null) {
+    const ht = normalize(getCellText(worksheet.getRow(headerRow).getCell(detected)));
+    if (ht === "הערות" || ht === "הערה") notesCol = detected;
+  }
+  if (notesCol == null) {
+    worksheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+      if (notesCol != null) return;
+      const t = normalize(getCellText(cell));
+      if (t === "הערות" || t === "הערה") notesCol = col;
+    });
+  }
+  if (notesCol == null) return out;
+  // Date column (same detection style as collectDailyHours).
+  let dateCol = null;
+  worksheet.getRow(headerRow).eachCell({ includeEmpty: false }, (cell, col) => {
+    const t = normalize(getCellText(cell));
+    if (t === "תאריך" || t.includes("תאריך")) {
+      if (dateCol == null) dateCol = col;
+    }
+  });
+  if (dateCol == null) dateCol = (headerInfo.columns || {}).date || 2;
+
+  const last = worksheet.rowCount || 0;
+  for (let r = headerRow + 1; r <= last; r++) {
+    if (summaryRowNumbers && summaryRowNumbers.has(r)) continue;
+    const row = worksheet.getRow(r);
+    // A real note belongs to a real shift row — require a parseable date.
+    const date = getCellDateKey(row.getCell(dateCol));
+    if (!date) continue;
+    const note = normalize(getCellText(row.getCell(notesCol)));
+    if (!looksLikeNoteText(note)) continue;
+    out.push({ date, note });
+  }
+  return out;
+}
+
 // Collect YYYY-MM-DD strings for every data row that has at least one
 // complete shift block (both כניסה and יציאה filled in). Used for
 // per-day labor cost allocation. Returns Set<string>.
@@ -865,8 +944,18 @@ function extractFromSummaryRow(worksheet, summary, headerInfo) {
       out.shabbatHag = getCellNumber(row.getCell(cols.shabbatHag));
     if (cols.rate) out.rate = getCellNumber(row.getCell(cols.rate));
     if (cols.tip) out.tip = getCellNumber(row.getCell(cols.tip));
+    // טיפ מזומן — cash tip, added on top of the regular tip.
+    if (cols.tipCash)
+      out.tip = sumNullable(out.tip, getCellNumber(row.getCell(cols.tipCash)));
     if (cols.completion)
       out.completion = getCellNumber(row.getCell(cols.completion));
+    // טיפ מהאשראי לתשלום בתלוש — credit-card tip paid via the payslip, added
+    // on top of the regular השלמה (completion).
+    if (cols.tipCreditTlush)
+      out.completion = sumNullable(
+        out.completion,
+        getCellNumber(row.getCell(cols.tipCreditTlush)),
+      );
     if (cols.travel) out.travel = getCellNumber(row.getCell(cols.travel));
     if (cols.workdays) out.workdays = getCellNumber(row.getCell(cols.workdays));
     if (cols.notes) out.notes = normalize(getCellText(row.getCell(cols.notes)));
@@ -1085,6 +1174,9 @@ function getOrCreateEmployee(employees, name) {
       // monthly cost proportionally to each day's hours when the data
       // rows don't carry hours100/125/150 cells.
       dailyHours: new Map(),
+      // Free-text הערות pulled from the dated data rows, as
+      // [{ date: 'YYYY-MM-DD', note }]. Surfaced next to the employee name.
+      dailyNotes: [],
     });
   }
   return employees.get(name);
@@ -1408,6 +1500,8 @@ async function processWorkbookSheets(
       for (const [d, hrs] of Object.entries(dailyHrs)) {
         emp.dailyHours.set(d, (emp.dailyHours.get(d) || 0) + hrs);
       }
+      const dailyNotes = collectDailyNotes(sheet, headerInfo, summaryRowNumbers);
+      for (const n of dailyNotes) emp.dailyNotes.push(n);
 
       // National ID (ת.ז. / תעודת זהות) — distinct from employee number.
       let extractedIdNum = findInlineLabelValueInHeader(
@@ -1940,6 +2034,18 @@ async function extractEmployees(items, configMap = {}) {
       work_dates: Array.from(emp.workDates).sort(),
       daily_breakdown: Object.fromEntries(emp.dailyBreakdown),
       daily_hours: Object.fromEntries(emp.dailyHours),
+      // Dedup (date+note) and sort chronologically for a stable tooltip list.
+      notes: (() => {
+        const seen = new Set();
+        return (emp.dailyNotes || [])
+          .filter((n) => {
+            const k = `${n.date} ${n.note}`;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          })
+          .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      })(),
     };
   });
   list.sort((a, b) => a.name.localeCompare(b.name, "he"));

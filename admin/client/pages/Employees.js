@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from "react";
 import axios from "axios";
+import { useSearchParams } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import {
   RESTAURANT_GROUPS,
@@ -45,6 +46,31 @@ const Employees = () => {
       setSelectedRestaurant(flatAvailable[0].value);
     }
   }, [allowedRestaurants, flatAvailable, selectedRestaurant]);
+
+  // Deep-linking: hydrate the restaurant from ?rest=<id> once the allowed list
+  // is known, then keep the URL in sync as the selection changes.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deeplinkDone = useRef(false);
+  useEffect(() => {
+    if (deeplinkDone.current) return;
+    if (!flatAvailable || flatAvailable.length === 0) return;
+    deeplinkDone.current = true;
+    const urlRest = searchParams.get("rest");
+    if (
+      urlRest &&
+      flatAvailable.some((r) => r.value === urlRest) &&
+      selectedRestaurant !== urlRest
+    ) {
+      setSelectedRestaurant(urlRest);
+    }
+  }, [flatAvailable, searchParams, selectedRestaurant]);
+  useEffect(() => {
+    if (!deeplinkDone.current) return;
+    const next = {};
+    if (selectedRestaurant) next.rest = selectedRestaurant;
+    setSearchParams(next, { replace: true });
+  }, [selectedRestaurant, setSearchParams]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [employees, setEmployees] = useState([]);

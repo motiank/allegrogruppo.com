@@ -779,6 +779,7 @@ const Router = () => {
             e.daily_hours && typeof e.daily_hours === "object"
               ? e.daily_hours
               : {},
+          notes: Array.isArray(e.notes) ? e.notes : [],
         }));
 
         res.json({
@@ -2025,6 +2026,8 @@ const Router = () => {
             hasWrapper && raw.daily_hours && typeof raw.daily_hours === "object"
               ? raw.daily_hours
               : {},
+          notes:
+            hasWrapper && Array.isArray(raw.notes) ? raw.notes : [],
         };
       });
 
@@ -2075,6 +2078,7 @@ const Router = () => {
             emp.daily_hours && typeof emp.daily_hours === "object"
               ? emp.daily_hours
               : {},
+          notes: Array.isArray(emp.notes) ? emp.notes : [],
         };
         const payrollJson = JSON.stringify(wrapped);
         try {
@@ -2212,6 +2216,7 @@ const Router = () => {
             c.emp.daily_hours && typeof c.emp.daily_hours === "object"
               ? c.emp.daily_hours
               : {},
+          notes: Array.isArray(c.emp.notes) ? c.emp.notes : [],
         };
         const payrollJson = JSON.stringify(wrapped);
         const tlushJson = c.tlush ? JSON.stringify(c.tlush) : null;
@@ -2263,6 +2268,11 @@ const Router = () => {
 
       res.json({
         saved,
+        // Aliases + context so the shared "Saved payroll for X of Y" success
+        // box (built for /payroll-data) renders correctly for save-export too.
+        inserted: saved,
+        rest,
+        month,
         attempted: list.length,
         unresolved,
         errors,
