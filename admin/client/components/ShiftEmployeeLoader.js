@@ -50,6 +50,9 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
   const [preview, setPreview] = useState(null);
   const [resolutions, setResolutions] = useState([]);
   const [commitResult, setCommitResult] = useState(null);
+  // The loaded file(s), retained so Save can also push their phone numbers into
+  // the employees table (via /employees/attach-phones).
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   const close = () => {
     setOpen(false);
@@ -58,6 +61,7 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
     setResolutions([]);
     setError(null);
     setCommitResult(null);
+    setPendingFiles([]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -76,6 +80,7 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     if (files.length === 0) return;
+    setPendingFiles(files);
     setOpen(true);
     setStatus("processing");
     setError(null);
@@ -136,7 +141,35 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
         buildPayload(),
         { withCredentials: true },
       );
-      setCommitResult(res.data);
+      // Also mirror phone numbers into the employees table so the Sync dialog's
+      // phone / WhatsApp link is populated. Reuses /employees/attach-phones,
+      // which processes the WHOLE file (not just the roster delta) and matches
+      // by ID then name. Non-fatal: the roster is already saved either way.
+      let phonesUpdated = 0;
+      let phonesUnmatched = 0;
+      const phoneErrors = [];
+      for (const file of pendingFiles) {
+        try {
+          const fd = new FormData();
+          fd.append("rest", selectedRestaurant);
+          fd.append("file", file, file.name);
+          const pr = await axios.post(
+            "/admin/payroll/employees/attach-phones",
+            fd,
+            {
+              withCredentials: true,
+              headers: { "Content-Type": "multipart/form-data" },
+            },
+          );
+          phonesUpdated += pr.data?.updated || 0;
+          phonesUnmatched += pr.data?.unmatched || 0;
+        } catch (pe) {
+          phoneErrors.push(
+            pe.response?.data?.error || pe.message || "phone attach failed",
+          );
+        }
+      }
+      setCommitResult({ ...res.data, phonesUpdated, phonesUnmatched, phoneErrors });
       setStatus("done");
     } catch (err) {
       setError(err.response?.data?.error || err.message || "commit failed");
@@ -189,6 +222,17 @@ const ShiftEmployeeLoader = forwardRef(({ selectedRestaurant }, ref) => {
                   {commitResult.errors && commitResult.errors.length > 0
                     ? ` · ${commitResult.errors.length} שגיאות`
                     : ""}
+                  <div style={{ marginTop: "4px" }}>
+                    טלפונים עודכנו בעובדים:{" "}
+                    <strong>{commitResult.phonesUpdated || 0}</strong>
+                    {commitResult.phonesUnmatched
+                      ? ` · ${commitResult.phonesUnmatched} ללא התאמה`
+                      : ""}
+                    {commitResult.phoneErrors &&
+                    commitResult.phoneErrors.length > 0
+                      ? ` · ${commitResult.phoneErrors.length} שגיאות`
+                      : ""}
+                  </div>
                 </div>
               )}
 

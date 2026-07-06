@@ -242,6 +242,7 @@ const globalShik = buildShikRowsForEmployee(workMonth, globalRow);
 const netShik = buildShikRowsForEmployee(workMonth, netRow);
 const netLowShik = buildShikRowsForEmployee(workMonth, netLowRow);
 const minShik = buildShikRowsForEmployee(workMonth, minRow);
+const minLevelShik = buildShikRowsForEmployee(workMonth, minLevelRow);
 
 console.log("hourly emp →", hourlyShik);
 console.log("global emp →", globalShik);
@@ -375,11 +376,22 @@ assert.equal(
   "no bonus row for hourly_gross",
 );
 
-// מפרעה (advance, componentCode 35) is no longer exported — the payroll
-// software reads code 35 as tips, so the advance must never appear. No employee
-// gets a cc=35 row, regardless of any stored/manual in_advance value.
+// Legacy advance (componentCode 35) is still never emitted — the payroll
+// software reads code 35 as tips. The prepayment uses recordType 3 / cc 21.
 assert.equal(findOne(hourlyShik, 35).length, 0, "no advance row (cc=35)");
 assert.equal(findOne(globalShik, 35).length, 0, "no advance for global emp");
+
+// מפרעה מטיפים → recordType 3, componentCode 21, rate = in_advance, qty = 1.
+const prepayRow = findOne(hourlyShik, 21, 3);
+assert.equal(prepayRow.length, 1, "prepayment row (recordType 3, cc=21)");
+assert.equal(prepayRow[0].rate, 250, "prepayment rate = in_advance (250)");
+assert.equal(prepayRow[0].quantity, 1, "prepayment quantity = 1");
+// Every employee gets a prepayment row — default rate 0 AND quantity 0 when
+// there's no in_advance.
+const gPrepay = findOne(globalShik, 21, 3);
+assert.equal(gPrepay.length, 1, "prepayment row present for global emp");
+assert.equal(gPrepay[0].rate, 0, "prepayment rate defaults to 0");
+assert.equal(gPrepay[0].quantity, 0, "prepayment quantity 0 when default");
 
 // שווי ארוחות → recordType 2, componentCode 21. rate = per-meal worth (15),
 // quantity = meals = breaks / 0.5 = 2.5 / 0.5 = 5.
@@ -421,14 +433,21 @@ assert.equal(netLowRow.hourlyWage, 40, "hourly_net at wage rate");
 assert.equal(findOne(netLowShik, 1)[0].rate, 40, "baseHourly at wage rate");
 assert.equal(findOne(netLowShik, 32).length, 0, "no net bonus row");
 
-// hourly_min: the advance is no longer computed or exported, even though the
-// fixture carries a manual in_advance (9999). No cc=35 row, and the export row
-// no longer exposes an inAdvance field.
-assert.equal(minRow.inAdvance, undefined, "no inAdvance field on export row");
+// hourly_min: the manual in_advance (9999) is exposed on the export row and
+// emitted as a prepayment (recordType 3, cc 21) — never as the legacy cc=35.
+assert.equal(minRow.inAdvance, 9999, "inAdvance exposed on export row");
 assert.equal(findOne(minShik, 35).length, 0, "no advance row (cc=35) for hourly_min");
+const minPrepay = findOne(minShik, 21, 3);
+assert.equal(minPrepay.length, 1, "hourly_min prepayment row (recordType 3, cc=21)");
+assert.equal(minPrepay[0].rate, 9999, "hourly_min prepayment rate = 9999");
 
-// Employee-level min-wage employee: same — no advance computed or exported.
-assert.equal(minLevelRow.inAdvance, undefined, "no inAdvance field (employee-level min)");
+// Employee-level min-wage employee: no in_advance → coerced to 0, but still a
+// prepayment row with rate 0.
+assert.equal(minLevelRow.inAdvance, 0, "inAdvance coerced to 0 when absent");
+const minLevelPrepay = findOne(minLevelShik, 21, 3);
+assert.equal(minLevelPrepay.length, 1, "prepayment row present (rate 0)");
+assert.equal(minLevelPrepay[0].rate, 0, "prepayment rate 0 when absent");
+assert.equal(minLevelPrepay[0].quantity, 0, "prepayment quantity 0 when absent");
 
 // Every workMonth / employeeNumber must be a finite integer.
 for (const r of [

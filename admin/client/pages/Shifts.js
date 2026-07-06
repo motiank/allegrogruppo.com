@@ -1488,6 +1488,66 @@ const Shifts = () => {
     }
   };
 
+  // מפרעה — coerce the editable advance field to a number (empty → 0).
+  const coerceAdvance = (v) => (v === "" || v == null ? 0 : Number(v) || 0);
+
+  // Update the editable מפרעה (advance) for an employee so it flows into the
+  // payroll payloads. Matched by name (the key used throughout this flow).
+  const setInAdvance = (name, val) => {
+    setAllEmployees((prev) =>
+      prev.map((e) => (e.name === name ? { ...e, in_advance: val } : e)),
+    );
+  };
+
+  const [updatingPayroll, setUpdatingPayroll] = useState(false);
+  const [updateResult, setUpdateResult] = useState(null);
+
+  // "עדכון" — persist current edits (incl. מפרעה, empty → 0) to the payroll
+  // table without exporting. Uses /payroll-data, leaving any saved tlush intact.
+  const handleUpdatePayroll = async () => {
+    if (updatingPayroll || !month || allEmployees.length === 0) return;
+    setUpdatingPayroll(true);
+    setUpdateResult(null);
+    try {
+      const employees = allEmployees.map((e) => ({
+        name: e.name,
+        ID_nmbr: e.ID_nmbr,
+        payroll_data: e.payroll_data || {},
+        role_extras: e.role_extras || {},
+        workdays: e.workdays ?? null,
+        global: e.global ?? null,
+        netGross: e.netGross ?? null,
+        in_advance: coerceAdvance(e.in_advance),
+        work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+        daily_breakdown:
+          e.daily_breakdown && typeof e.daily_breakdown === "object"
+            ? e.daily_breakdown
+            : {},
+        daily_hours:
+          e.daily_hours && typeof e.daily_hours === "object"
+            ? e.daily_hours
+            : {},
+        notes: Array.isArray(e.notes) ? e.notes : [],
+      }));
+      const res = await axios.post(
+        "/admin/payroll/payroll-data",
+        { rest: selectedRestaurant, month, employees },
+        { withCredentials: true },
+      );
+      // Reflect the empty→0 normalization back into the table.
+      setAllEmployees((prev) =>
+        prev.map((e) => ({ ...e, in_advance: coerceAdvance(e.in_advance) })),
+      );
+      setUpdateResult(res.data);
+    } catch (err) {
+      setUpdateResult({
+        error: err.response?.data?.error || err.message || "update failed",
+      });
+    } finally {
+      setUpdatingPayroll(false);
+    }
+  };
+
   // Per-employee payload for the tlush-preview and save-export endpoints.
   const buildPayrollEmployeesPayload = () =>
     allEmployees.map((e) => ({
@@ -1498,7 +1558,7 @@ const Shifts = () => {
       workdays: e.workdays ?? null,
       global: e.global ?? null,
       netGross: e.netGross ?? null,
-      in_advance: e.in_advance ?? null,
+      in_advance: coerceAdvance(e.in_advance),
       breaks: computeBreaks(e),
       work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
       daily_breakdown:
@@ -1830,6 +1890,8 @@ const Shifts = () => {
       const empData = lookupEmpData(wageMap, emp);
       // Hide the "דמה" placeholder identities (number 9999) from every view.
       if (isDummyEmpNumber(empData?.empNumber)) continue;
+      // קבלן (contractor) employees are not shown in the full payroll.
+      if (empData?.contractor) continue;
       const globalAmount =
         empData && empData.global != null && Number(empData.global) > 0
           ? Number(empData.global)
@@ -1942,6 +2004,7 @@ const Shifts = () => {
           empty: true,
           name: emp.name,
           notes: empNotes,
+          in_advance: emp.in_advance,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -1962,6 +2025,7 @@ const Shifts = () => {
           isTotal: false,
           name: emp.name,
           notes: i === 0 ? empNotes : null,
+          in_advance: i === 0 ? emp.in_advance : null,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -3045,6 +3109,7 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>טיפ</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נסיעות</th>
+              <th style={{ ...styles.th, ...styles.stickyTh }}>מפרעה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>עובד גלובאלי</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>סה"כ</th>
             </tr>
@@ -3074,7 +3139,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={14}>
+                    <td style={nameCell} colSpan={15}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -3122,6 +3187,28 @@ const Shifts = () => {
                       ? fmtNum(r.travel)
                       : fmtNum(r.travel)}
                   </td>
+                  <td style={cell}>
+                    {r.first && !r.isTotal ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={r.in_advance ?? ""}
+                        onChange={(e) => setInAdvance(r.name, e.target.value)}
+                        style={{
+                          width: "64px",
+                          textAlign: "center",
+                          padding: "2px 4px",
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: "4px",
+                          backgroundColor: theme.surface,
+                          color: theme.text,
+                        }}
+                        title="מפרעה מטיפים"
+                      />
+                    ) : (
+                      ""
+                    )}
+                  </td>
                   <td style={cell}>{r.first && r.global ? "כן" : ""}</td>
                   <td style={cell}>{r.total == null ? "" : fmtNum(r.total)}</td>
                 </tr>
@@ -3136,9 +3223,34 @@ const Shifts = () => {
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
+          gap: "8px",
           marginTop: "12px",
         }}
       >
+        {updateResult &&
+          (updateResult.error ? (
+            <span style={{ color: theme.error || "#e53935", fontSize: "0.9rem" }}>
+              {updateResult.error}
+            </span>
+          ) : (
+            <span style={{ color: theme.text, fontSize: "0.9rem" }}>
+              נשמר · עודכנו {updateResult.inserted ?? 0} רשומות
+            </span>
+          ))}
+        <button
+          type="button"
+          style={{
+            ...styles.secondaryButton,
+            opacity: updatingPayroll ? 0.7 : 1,
+            cursor: updatingPayroll ? "wait" : "pointer",
+          }}
+          onClick={handleUpdatePayroll}
+          disabled={updatingPayroll || !month || allEmployees.length === 0}
+          title="שמירת שינויים (כולל מפרעה) ללא ייצוא"
+        >
+          {updatingPayroll ? "מעדכן…" : "עדכון"}
+        </button>
         <button
           type="button"
           style={{
@@ -3203,6 +3315,24 @@ const Shifts = () => {
                 {payrollResult.errors.map((e, i) => (
                   <li key={i}>
                     {e.name || "(no name)"}: {e.issue}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {payrollResult.alerts && payrollResult.alerts.length > 0 && (
+            <div style={{ marginTop: "8px", color: "#b26a00" }}>
+              <strong>
+                ⚠️ התנגשות תעריפים — אותו רכיב עם תעריף שונה (
+                {payrollResult.alerts.length}):
+              </strong>
+              <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
+                {payrollResult.alerts.map((a, i) => (
+                  <li key={i}>
+                    {a.name || "(ללא שם)"}
+                    {a.employeeNumber ? ` · מס' ${a.employeeNumber}` : ""} — סוג
+                    רשומה {a.recordType}, קוד רכיב {a.componentCode}, תעריפים:{" "}
+                    {(a.rates || []).join(", ")}
                   </li>
                 ))}
               </ul>

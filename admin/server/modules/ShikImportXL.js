@@ -47,6 +47,8 @@ export const SHIK_COMPONENTS = {
   globalSalary: { recordType: 1, componentCode: 1 }, // שכר גלובאלי
   // שווי ארוחות — recordType 2. rate = per-meal worth, quantity = meal count.
   meals: { recordType: 2, componentCode: 21 },
+  // מפרעה מטיפים (prepayment) — recordType 3. rate = advance amount, quantity = 1.
+  prepayment: { recordType: 3, componentCode: 21 },
   // recordType 4 = employment data. These codes are NOT salary components —
   // they are fixed attendance codes from Tamal's Shiklulit import spec.
   paidWorkDays: { recordType: 4, componentCode: 4 }, // ימי עבודה משולמים
@@ -68,6 +70,52 @@ const otRate = (compKey, wage) => {
   if (wage == null) return wage;
   const m = OT_MULTIPLIER[compKey] || 1;
   return Math.round(wage * m * 100) / 100;
+};
+
+// Merge Shiklulit rows for ONE employee that share (recordType, componentCode,
+// rate) by summing their quantity. First-appearance order is preserved. Rows
+// with the same recordType+componentCode but a DIFFERENT rate stay separate
+// (surfaced via detectShikRateConflicts).
+export const mergeShikRows = (rows) => {
+  const byKey = new Map();
+  const order = [];
+  for (const r of rows) {
+    const key = `${r.recordType}|${r.componentCode}|${r.rate}`;
+    const hit = byKey.get(key);
+    if (hit) {
+      // Round to 2 decimals so summed fractional hours don't drift.
+      hit.quantity = Math.round((hit.quantity + r.quantity) * 100) / 100;
+    } else {
+      const copy = { ...r };
+      byKey.set(key, copy);
+      order.push(key);
+    }
+  }
+  return order.map((k) => byKey.get(k));
+};
+
+// Find (recordType, componentCode) groups that carry more than one distinct
+// rate for the same employee — these can't collapse into one Shiklulit line and
+// are reported to the user. Returns [{ recordType, componentCode, rates }].
+export const detectShikRateConflicts = (rows) => {
+  const groups = new Map(); // "rt|cc" -> Set(rate)
+  for (const r of rows) {
+    const g = `${r.recordType}|${r.componentCode}`;
+    if (!groups.has(g)) groups.set(g, new Set());
+    groups.get(g).add(r.rate);
+  }
+  const out = [];
+  for (const [g, rates] of groups) {
+    if (rates.size > 1) {
+      const [recordType, componentCode] = g.split("|").map(Number);
+      out.push({
+        recordType,
+        componentCode,
+        rates: [...rates].sort((a, b) => a - b),
+      });
+    }
+  }
+  return out;
 };
 
 // Build the Siklulit rows for a single employee given the shared per-employee
@@ -190,8 +238,24 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   // שווי ארוחות (recordType 2, cc 21): rate = per-meal worth, qty = meal count.
   if (meals != null && meals > 0 && mealWorth != null && mealWorth > 0)
     emit("meals", mealWorth, meals);
-  // מפרעה (advance, component 35) is intentionally NOT emitted — the payroll
-  // software reads code 35 as tips, so the advance must never appear in the file.
+  // מפרעה מטיפים (recordType 3, cc 21): rate = advance amount. Always emitted
+  // for every employee — a real advance is qty 1, and the 0 default is qty 0.
+  // Pushed directly (not via emit) since emit drops rows where rate AND qty are 0.
+  {
+    const inAdvance = toFiniteNumber(row.inAdvance) || 0;
+    const { recordType, componentCode } = SHIK_COMPONENTS.prepayment;
+    out.push({
+      workMonth,
+      employeeNumber,
+      recordType,
+      componentCode,
+      rate: inAdvance,
+      quantity: inAdvance > 0 ? 1 : 0,
+    });
+  }
+  // NOTE: the legacy advance (component 35) is still NOT emitted — the payroll
+  // software reads code 35 as tips. The prepayment above uses the distinct
+  // recordType 3 / code 21 slot instead.
   // Employment-data rows (recordType 4). Emitted in spec order: paid days,
   // actual days, actual hours. Zero quantities are dropped (emit's zero-row
   // skip), matching the existing paid-work-days behavior.
@@ -199,7 +263,9 @@ export const buildShikRowsForEmployee = (workMonth, row) => {
   if (actualWorkDays > 0) emit("actualWorkDays", 0, actualWorkDays);
   if (actualWorkHours > 0) emit("actualWorkHours", 0, actualWorkHours);
 
-  return out;
+  // Collapse identical (recordType, componentCode, rate) rows into one line by
+  // summing quantity. Different-rate duplicates are left for the caller to flag.
+  return mergeShikRows(out);
 };
 
 // Write a flat list of Shiklulit rows ({workMonth, employeeNumber, recordType,

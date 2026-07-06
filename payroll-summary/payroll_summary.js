@@ -97,10 +97,17 @@ const HEADER_SYNONYMS = {
   netGross: ["נטו/ברוטו", "נטו / ברוטו", "סוג שכר", "ברוטו/נטו"],
   // Specific tip columns must precede the generic `tip` below: every one of
   // these headers contains the substring "טיפ", so whichever field is checked
-  // first claims the column. tipCash folds into the tip total; tipCreditTlush
-  // folds into the השלמה (completion) total (see extractFromSummaryRow).
+  // first claims the column. tipCash is an alternative source for the tip total
+  // (טיפ OR טיפ מזומן, never summed); tipCreditTlush (credit-card tip) is added
+  // to the השלמה (completion) total. See extractFromSummaryRow.
   tipCash: ["טיפ מזומן"],
-  tipCreditTlush: ["טיפ מהאשראי לתשלום בתלוש", "מהאשראי לתשלום בתלוש"],
+  tipCreditTlush: [
+    "טיפ מהאשראי לתשלום בתלוש",
+    "מהאשראי לתשלום בתלוש",
+    "טיפ אשראי",
+    "טיפ מאשראי",
+    "טיפ מהאשראי",
+  ],
   tip: ["טיפ", "טיפים", "תשר"],
   completion: ["השלמה", "תוספת", "בונוס"],
   travel: ["נסיעות", "דמי נסיעה", "הוצאות נסיעה", "נסיעה"],
@@ -687,13 +694,10 @@ function collectDailyBreakdown(worksheet, headerInfo, summaryRowNumbers) {
         ? getCellNumber(row.getCell(cols.completion))
         : null,
     };
-    // Fold the specific tip columns in: טיפ מזומן → tip, טיפ מהאשראי לתשלום
-    // בתלוש → השלמה (completion), matching the summary-row aggregation.
-    if (cols.tipCash)
-      rowData.tip = sumNullable(
-        rowData.tip,
-        getCellNumber(row.getCell(cols.tipCash)),
-      );
+    // tip = טיפ, or טיפ מזומן when the plain טיפ cell is empty (never summed);
+    // credit-card tip → השלמה (completion). Matches the summary-row aggregation.
+    if (rowData.tip == null && cols.tipCash)
+      rowData.tip = getCellNumber(row.getCell(cols.tipCash));
     if (cols.tipCreditTlush)
       rowData.completion = sumNullable(
         rowData.completion,
@@ -943,14 +947,15 @@ function extractFromSummaryRow(worksheet, summary, headerInfo) {
     if (cols.shabbatHag)
       out.shabbatHag = getCellNumber(row.getCell(cols.shabbatHag));
     if (cols.rate) out.rate = getCellNumber(row.getCell(cols.rate));
+    // tip = טיפ, or טיפ מזומן when the plain טיפ cell is empty. They are the
+    // same cash tip in different export formats — take one, never sum them.
     if (cols.tip) out.tip = getCellNumber(row.getCell(cols.tip));
-    // טיפ מזומן — cash tip, added on top of the regular tip.
-    if (cols.tipCash)
-      out.tip = sumNullable(out.tip, getCellNumber(row.getCell(cols.tipCash)));
+    if (out.tip == null && cols.tipCash)
+      out.tip = getCellNumber(row.getCell(cols.tipCash));
     if (cols.completion)
       out.completion = getCellNumber(row.getCell(cols.completion));
-    // טיפ מהאשראי לתשלום בתלוש — credit-card tip paid via the payslip, added
-    // on top of the regular השלמה (completion).
+    // Credit-card tip (טיפ אשראי / טיפ מהאשראי לתשלום בתלוש) — added on top of
+    // the regular השלמה (completion).
     if (cols.tipCreditTlush)
       out.completion = sumNullable(
         out.completion,

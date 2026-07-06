@@ -3,7 +3,11 @@ import multer from "multer";
 import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import MicpImportXL from "./MicpImportXL.js";
-import ShikImportXL, { writeShikRowsXlsx } from "./ShikImportXL.js";
+import ShikImportXL, {
+  writeShikRowsXlsx,
+  mergeShikRows,
+  detectShikRateConflicts,
+} from "./ShikImportXL.js";
 import { buildTlush, tlushToShikRows, tlushToMicRow } from "./tlush.js";
 import {
   normalizeRoleWage,
@@ -247,9 +251,10 @@ export const buildExportRow = (emp, ctx) => {
     }
   }
 
-  // מפרעה (advance) is no longer exported (it was being read as tips in the
-  // Shiklulit import) — neither the computed hourly_min advance nor the stored
-  // manual value is emitted to either export file.
+  // מפרעה מטיפים (prepayment from tips): the manually-entered advance, exported
+  // to Shiklulit as recordType 3 / componentCode 21 (see buildShikRowsForEmployee).
+  // Empty → 0. The old auto-computed hourly_min advance is not used.
+  const inAdvance = Number(emp.in_advance) || 0;
 
   // שווי ארוחות (meal worth): one meal is served per break-day, and each
   // break-day contributes exactly 0.5h of break — so meals = breaks / 0.5. Each
@@ -299,6 +304,8 @@ export const buildExportRow = (emp, ctx) => {
     // ארוחות / שווי ארוחות columns.
     meals,
     mealWorth: MEAL_WORTH,
+    // מפרעה מטיפים — Shiklulit recordType 3 / componentCode 21, rate = amount.
+    inAdvance,
     standardDays: stdDays ?? "",
     standardHours: stdHours ?? "",
   };
@@ -2245,10 +2252,26 @@ const Router = () => {
       const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
       let buf;
       let filename;
+      // Rate-conflict alerts: same recordType+componentCode with differing rates
+      // for one employee (can't merge into a single Shiklulit line).
+      const alerts = [];
       if (payrollSoft === "shik") {
         const allRows = [];
         for (const t of exportableTlushes) {
-          for (const r of tlushToShikRows(t, workMonth)) allRows.push(r);
+          // Merge identical (recordType, componentCode, rate) rows by summing
+          // quantity; flag differing-rate duplicates for the same employee.
+          const rows = mergeShikRows(tlushToShikRows(t, workMonth));
+          for (const r of rows) allRows.push(r);
+          for (const c of detectShikRateConflicts(rows)) {
+            alerts.push({
+              employeeNumber: t.employeeNumber ?? null,
+              name: t.name || "",
+              ID_nmbr: t.ID_nmbr || "",
+              recordType: c.recordType,
+              componentCode: c.componentCode,
+              rates: c.rates,
+            });
+          }
         }
         buf = await writeShikRowsXlsx(allRows);
         filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
@@ -2281,6 +2304,7 @@ const Router = () => {
         xlsxBase64: Buffer.from(buf).toString("base64"),
         exported: exportableTlushes.length,
         unexportable,
+        alerts,
       });
     } catch (err) {
       console.error("payroll/save-export error:", err);
