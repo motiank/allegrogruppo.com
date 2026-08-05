@@ -129,9 +129,8 @@ class MicpImportXL {
       row.getCell(18).value = toNum(emp.bonus);
       row.getCell(19).value = toNum(emp.standardDays);
       row.getCell(20).value = toNum(emp.standardHours);
-      // מפרעה — column kept for layout, but always exported empty (the advance
-      // is no longer emitted; it was being read as tips).
-      row.getCell(21).value = "";
+      // מפרעה (prepayment/advance). Blank when there is no advance.
+      row.getCell(21).value = emp.inAdvance ? toNum(emp.inAdvance) : "";
       // ארוחות (meal count) + שווי ארוחות (per-meal worth). Blank when no meals.
       row.getCell(22).value = emp.meals ? toNum(emp.meals) : "";
       row.getCell(23).value = emp.meals ? toNum(emp.mealWorth) : "";

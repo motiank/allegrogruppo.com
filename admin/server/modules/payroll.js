@@ -121,21 +121,6 @@ export const buildExportRow = (emp, ctx) => {
   const MIN_HOURLY_WAGE = Number(ctx.minHourlyWage) || 35.4;
 
   const payroll = emp.payroll_data || {};
-  // Tips and completion (השלמה) are intentionally NOT exported in either
-  // format, so they are not accumulated here.
-  let h100 = 0,
-    h125 = 0,
-    h150 = 0,
-    shabbat = 0,
-    holiday = 0;
-  for (const [, payload] of Object.entries(payroll)) {
-    const hours = (payload && payload.hours) || [];
-    h100 += Number(hours[0] || 0);
-    h125 += Number(hours[1] || 0);
-    h150 += Number(hours[2] || 0);
-    shabbat += Number(hours[3] || 0);
-    holiday += Number(hours[4] || 0);
-  }
   const name = (emp.name || "").trim();
   const dbEmp = empByName.get(name) || {};
   const idNmbr = dbEmp.ID_nmbr
@@ -144,30 +129,107 @@ export const buildExportRow = (emp, ctx) => {
       ? String(emp.ID_nmbr).trim()
       : "";
   const newWageType = dbEmp.new_wage_type || null;
+  const rolesByName = dbEmp.rolesByName || {};
+  // "Hourly · Net" (not minimum-wage-net) roles don't get 125%/150% overtime
+  // broken out — all their hours count as regular hours. Role-level type
+  // wins; falls back to the employee-level compound type. Mirrors
+  // isHourlyNetWage in admin/client/pages/Shifts.js — keep both in sync.
+  const isHourlyNetRole = (role) =>
+    ((rolesByName[role] && rolesByName[role].new_wage_type) || newWageType) ===
+    "hourly_net";
+
+  // Tips and completion (השלמה) are intentionally NOT exported in either
+  // format, so they are not accumulated here.
+  let h100 = 0,
+    h125 = 0,
+    h150 = 0,
+    shabbat = 0,
+    holiday = 0;
+  for (const [role, payload] of Object.entries(payroll)) {
+    const hours = (payload && payload.hours) || [];
+    let rh100 = Number(hours[0] || 0);
+    let rh125 = Number(hours[1] || 0);
+    let rh150 = Number(hours[2] || 0);
+    if (isHourlyNetRole(role)) {
+      rh100 = rh100 + rh125 + rh150;
+      rh125 = 0;
+      rh150 = 0;
+    }
+    h100 += rh100;
+    h125 += rh125;
+    h150 += rh150;
+    shabbat += Number(hours[3] || 0);
+    holiday += Number(hours[4] || 0);
+  }
   const rawWageVal = dbEmp.wage != null ? Number(dbEmp.wage) : null;
   // -1 is the "minimum wage" sentinel — resolve it to the national minimum.
   const wageVal = rawWageVal === -1 ? MIN_HOURLY_WAGE : rawWageVal;
+
+  // Micpal's row has room for exactly ONE rate, but a role's own wage type
+  // should still win over the employee-level default (matches per-role
+  // resolution in roleBreakdown/Shiklulit and resolveHourlyWage in
+  // Shifts.js). Unambiguous only when a single role carries all the hours —
+  // with 2+ differently-rated roles this still falls back to the employee
+  // default; genuinely mixed-rate employees are a known limitation, not
+  // solved here.
+  let effectiveWageType = newWageType;
+  let effectiveWageVal = wageVal;
+  const rolesWithHours = Object.entries(payroll).filter(([, payload]) => {
+    const hrs = (payload && payload.hours) || [];
+    return hrs.some((h) => Number(h) > 0);
+  });
+  if (rolesWithHours.length === 1) {
+    const roleEntry = rolesByName[rolesWithHours[0][0]];
+    if (roleEntry && roleEntry.new_wage_type) {
+      effectiveWageType = roleEntry.new_wage_type;
+      const rv = roleEntry.wage != null ? Number(roleEntry.wage) : null;
+      effectiveWageVal = rv === -1 ? MIN_HOURLY_WAGE : rv;
+    }
+  }
 
   let hourlyWage = null;
   // hourly_* (gross AND net) is paid at the wage rate. net-ness is conveyed
   // only by the net flag (below) — there is NO reduced rate. hourly_min_* is
   // paid at the national minimum, with the gap topped up via a bonus.
-  if (newWageType && newWageType.startsWith("hourly_min_")) {
+  if (effectiveWageType && effectiveWageType.startsWith("hourly_min_")) {
     hourlyWage = MIN_HOURLY_WAGE;
-  } else if (newWageType && newWageType.startsWith("hourly_")) {
-    hourlyWage = wageVal;
+  } else if (effectiveWageType && effectiveWageType.startsWith("hourly_")) {
+    hourlyWage = effectiveWageVal;
   }
+  // Bonus (top-up above national minimum) — computed ONLY from hours worked
+  // in roles whose own wage type is hourly_min_* (role-level type, falling
+  // back to the employee-level type when the role has none of its own).
+  // Each such role's own configured wage (falling back to the employee-level
+  // wage when the role has none) sets its top-up rate, so hours worked in a
+  // differently-paid role never factor into the bonus.
   let bonus = "";
-  if (
-    newWageType &&
-    newWageType.startsWith("hourly_min_") &&
-    wageVal != null &&
-    wageVal > 0
-  ) {
-    const hoursFactor = h100 + h125 * 1.25 + h150 * 1.5;
-    bonus = (wageVal - MIN_HOURLY_WAGE) * hoursFactor;
+  {
+    let bonusTotal = 0;
+    let any = false;
+    for (const [role, payload] of Object.entries(payroll)) {
+      const roleEntry = rolesByName[role];
+      const roleType = (roleEntry && roleEntry.new_wage_type) || newWageType;
+      if (!roleType || !roleType.startsWith("hourly_min_")) continue;
+      const roleWageRaw =
+        roleEntry && roleEntry.wage != null ? Number(roleEntry.wage) : null;
+      const roleWage =
+        roleWageRaw === -1
+          ? MIN_HOURLY_WAGE
+          : roleWageRaw != null
+            ? roleWageRaw
+            : wageVal;
+      if (roleWage == null || roleWage <= 0) continue;
+      const hrs = (payload && payload.hours) || [];
+      const rh100 = Number(hrs[0] || 0);
+      const rh125 = Number(hrs[1] || 0);
+      const rh150 = Number(hrs[2] || 0);
+      const hoursFactor = rh100 + rh125 * 1.25 + rh150 * 1.5;
+      bonusTotal += (roleWage - MIN_HOURLY_WAGE) * hoursFactor;
+      any = true;
+    }
+    if (any) bonus = bonusTotal;
   }
-  const netFlag = newWageType && newWageType.endsWith("_net") ? "נ" : "";
+  const netFlag = effectiveWageType && effectiveWageType.endsWith("_net") ? "נ" : "";
   const isGlobal = !!newWageType && newWageType.startsWith("global_");
   const amount = isGlobal && wageVal != null ? wageVal : "";
 
@@ -230,12 +292,16 @@ export const buildExportRow = (emp, ctx) => {
   // 33 (role "מתלמד"). The Micpal exporter ignores this field.
   const roleBreakdown = [];
   if (!isGlobal) {
-    const rolesByName = dbEmp.rolesByName || {};
     for (const [role, payload] of Object.entries(payroll)) {
       const hrs = (payload && payload.hours) || [];
-      const rh100 = Number(hrs[0] || 0);
-      const rh125 = Number(hrs[1] || 0);
-      const rh150 = Number(hrs[2] || 0);
+      let rh100 = Number(hrs[0] || 0);
+      let rh125 = Number(hrs[1] || 0);
+      let rh150 = Number(hrs[2] || 0);
+      if (isHourlyNetRole(role)) {
+        rh100 = rh100 + rh125 + rh150;
+        rh125 = 0;
+        rh150 = 0;
+      }
       if (rh100 === 0 && rh125 === 0 && rh150 === 0) continue;
       let rate = effectiveHourlyRate(rolesByName[role], {
         minHourlyWage: MIN_HOURLY_WAGE,
@@ -284,9 +350,9 @@ export const buildExportRow = (emp, ctx) => {
     actualWorkDays,
     actualWorkHours,
     hours100: isGlobal ? "" : h100 || "",
-    wage125: !isGlobal && hourlyWage != null ? hourlyWage * 1.25 : "",
+    wage125: !isGlobal && hourlyWage != null && h125 ? hourlyWage * 1.25 : "",
     hours125: isGlobal ? "" : h125 || "",
-    wage150: !isGlobal && hourlyWage != null ? hourlyWage * 1.5 : "",
+    wage150: !isGlobal && hourlyWage != null && h150 ? hourlyWage * 1.5 : "",
     hours150: isGlobal ? "" : h150 || "",
     hoursSum: isGlobal ? "" : h100 + h125 + h150 || "",
     shabbat: isGlobal ? "" : shabbat || "",

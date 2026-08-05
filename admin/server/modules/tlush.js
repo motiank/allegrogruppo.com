@@ -65,6 +65,7 @@ const MIC_ROW_FIELDS = [
   "bonus",
   "standardDays",
   "standardHours",
+  "inAdvance",
   "meals",
   "mealWorth",
 ];

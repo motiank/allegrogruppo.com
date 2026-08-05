@@ -316,7 +316,9 @@ const mergeRoles = (dbRoles, shiftRoleNames) => {
 // Wage resolution per spec:
 //   1. role-level compound wage from employees.roles JSON — its new_wage_type
 //      drives the rate (hourly_min → minimum, hourly_net → reduced rate, …)
-//   2. fallback: employees.hourly_wage (legacy column, -1 → minimum)
+//   2. fallback: employee-level compound wage (new_wage_type/wage) — set once
+//      for the whole employee when no per-role wage was configured
+//   3. fallback: employees.hourly_wage (legacy column, -1 → minimum)
 const resolveHourlyWage = (empData, role) => {
   const roleEntry = empData?.roles?.[role];
   if (roleEntry) {
@@ -325,10 +327,36 @@ const resolveHourlyWage = (empData, role) => {
     });
     if (rate != null) return rate;
   }
+  if (empData?.new_wage_type) {
+    const rate = effectiveHourlyRate(
+      { new_wage_type: empData.new_wage_type, wage: empData.wage },
+      { minHourlyWage: MIN_HOURLY_WAGE },
+    );
+    if (rate != null) return rate;
+  }
   const wage = empData?.hourly_wage;
   if (wage == null) return null;
   if (Number(wage) === -1) return MIN_HOURLY_WAGE;
   return Number(wage);
+};
+
+// Mirrors resolveHourlyWage's fallback chain (role-level compound type, then
+// the employee-level compound type, then the legacy hourly_wage -1 sentinel)
+// to flag "national minimum" pay.
+const isHourlyMinWage = (empData, role) => {
+  const roleEntry = empData?.roles?.[role];
+  const t = (roleEntry && roleEntry.new_wage_type) || empData?.new_wage_type;
+  if (t) return t.startsWith("hourly_min_");
+  return Number(empData?.hourly_wage) === -1;
+};
+
+// "Hourly · Net" (not minimum-wage-net) — these roles don't get 125%/150%
+// overtime hours broken out; all their hours count as regular (100%) hours.
+// Same role-level-then-employee-level fallback as isHourlyMinWage.
+const isHourlyNetWage = (empData, role) => {
+  const roleEntry = empData?.roles?.[role];
+  const t = (roleEntry && roleEntry.new_wage_type) || empData?.new_wage_type;
+  return t === "hourly_net";
 };
 
 // Hebrew label for wage_type ENUM
@@ -1940,9 +1968,16 @@ const Shifts = () => {
 
       const roleEntries = Object.entries(emp.payroll_data || {});
 
-      const roleRows = roleEntries.map(([role, payload]) => {
+      const roleRowsUnsorted = roleEntries.map(([role, payload]) => {
         const hours = (payload && payload.hours) || [];
-        const [h100 = 0, h125 = 0, h150 = 0] = hours;
+        let [h100 = 0, h125 = 0, h150 = 0] = hours;
+        // hourly · net roles don't break out 125%/150% overtime — all their
+        // hours count as regular hours.
+        if (isHourlyNetWage(empData, role)) {
+          h100 = (Number(h100) || 0) + (Number(h125) || 0) + (Number(h150) || 0);
+          h125 = 0;
+          h150 = 0;
+        }
         const tip = Number((payload && payload.tip) || 0);
         // Negative completion (השלמה) is clamped to 0 — matches the export.
         const completion = Math.max(
@@ -1950,8 +1985,8 @@ const Shifts = () => {
           Number((payload && payload.completion) || 0),
         );
         const wage = resolveHourlyWage(empData, role);
+        const isHourlyMin = isHourlyMinWage(empData, role);
         const extras = (emp.role_extras && emp.role_extras[role]) || {};
-        const hasTipOrCompletion = tip !== 0 || completion !== 0;
 
         let total = null;
         let warn = null;
@@ -1960,9 +1995,6 @@ const Shifts = () => {
           // Global salary handled at the employee level — leave per-role
           // total empty; final salary is set on the first role row below.
           total = null;
-        } else if (hasTipOrCompletion) {
-          // tip + completion REPLACE the hourly calc — they ARE the wage.
-          total = tip + completion;
         } else if (wage == null) {
           total = null;
           warn = `${emp.name || "(no name)"} / ${role}: missing hourly wage and not global`;
@@ -1981,6 +2013,7 @@ const Shifts = () => {
           h125,
           h150,
           wage,
+          isHourlyMin,
           tip,
           completion,
           manualCompletion: extras.manualCompletion || 0,
@@ -1989,6 +2022,13 @@ const Shifts = () => {
           warn,
         };
       });
+
+      // Within this employee's own block, hourly-min lines come first,
+      // followed by the regular-rate lines. Stable sort: ties (same type)
+      // keep their original payroll_data order.
+      const roleRows = [...roleRowsUnsorted].sort((a, b) =>
+        a.isHourlyMin === b.isHourlyMin ? 0 : a.isHourlyMin ? -1 : 1,
+      );
 
       if (globalAmount != null && roleRows.length > 0) {
         // Place the global salary on the first role row only.
@@ -2011,6 +2051,7 @@ const Shifts = () => {
           wage_type: wageType,
           travel: empTravel,
           breaks: empBreaks,
+          isHourlyMin: false,
           total: globalAmount,
         });
         if (globalAmount != null) grandTotal += globalAmount;
@@ -2019,7 +2060,7 @@ const Shifts = () => {
 
       roleRows.forEach((r, i) => {
         rows.push({
-          empKey: emp.name + "::" + i,
+          empKey: emp.name + "::" + r.role,
           first: i === 0,
           last: i === roleRows.length - 1 && roleRows.length === 1,
           isTotal: false,
@@ -2081,6 +2122,9 @@ const Shifts = () => {
   // or any of the employee's roles. Whole employee blocks are kept/dropped
   // together; the grand-total row is hidden while a filter is active.
   const [payrollSearch, setPayrollSearch] = useState("");
+  // "" = original (extraction) order; "name" / "empNumber" sort employee
+  // blocks by that key.
+  const [payrollSort, setPayrollSort] = useState("");
 
   // Names the server classified as not exportable (drives the unexportable view).
   const unexportableNames = useMemo(() => {
@@ -2093,28 +2137,62 @@ const Shifts = () => {
   const displayedPayrollRows = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();
     const restrictUnexp = payrollView === "unexportable";
-    if (!q && !restrictUnexp) return fullPayrollRows;
-    // Build per-employee haystack (name + מס' עובד + all roles).
-    const byEmp = new Map();
-    for (const r of fullPayrollRows) {
-      if (r.isGrandTotal) continue;
-      const key = r.name || "";
-      if (!byEmp.has(key)) byEmp.set(key, [key]);
-      const hay = byEmp.get(key);
-      if (r.empNumber != null && r.empNumber !== "")
-        hay.push(String(r.empNumber));
-      if (r.role) hay.push(String(r.role));
+    let rows = fullPayrollRows;
+    if (q || restrictUnexp) {
+      // Build per-employee haystack (name + מס' עובד + all roles).
+      const byEmp = new Map();
+      for (const r of fullPayrollRows) {
+        if (r.isGrandTotal) continue;
+        const key = r.name || "";
+        if (!byEmp.has(key)) byEmp.set(key, [key]);
+        const hay = byEmp.get(key);
+        if (r.empNumber != null && r.empNumber !== "")
+          hay.push(String(r.empNumber));
+        if (r.role) hay.push(String(r.role));
+      }
+      const matched = new Set();
+      for (const [key, hay] of byEmp) {
+        const textOk = !q || hay.join(" ").toLowerCase().includes(q);
+        const unexpOk = !restrictUnexp || unexportableNames.has(key.trim());
+        if (textOk && unexpOk) matched.add(key);
+      }
+      rows = fullPayrollRows.filter(
+        (r) => !r.isGrandTotal && matched.has(r.name || ""),
+      );
     }
-    const matched = new Set();
-    for (const [key, hay] of byEmp) {
-      const textOk = !q || hay.join(" ").toLowerCase().includes(q);
-      const unexpOk = !restrictUnexp || unexportableNames.has(key.trim());
-      if (textOk && unexpOk) matched.add(key);
+
+    if (!payrollSort) return rows;
+
+    // Re-group the (already filtered) rows into contiguous per-employee
+    // blocks and sort the blocks by the chosen key.
+    const blocks = [];
+    let current = null;
+    let grandTotalRow = null;
+    for (const r of rows) {
+      if (r.isGrandTotal) {
+        grandTotalRow = r;
+        current = null;
+        continue;
+      }
+      if (current && current.name === r.name) {
+        current.rows.push(r);
+      } else {
+        current = { name: r.name, empNumber: r.empNumber, rows: [r] };
+        blocks.push(current);
+      }
     }
-    return fullPayrollRows.filter(
-      (r) => !r.isGrandTotal && matched.has(r.name || ""),
-    );
-  }, [fullPayrollRows, payrollSearch, payrollView, unexportableNames]);
+
+    const numOrInf = (v) => (v == null || v === "" ? Infinity : Number(v));
+    const cmp =
+      payrollSort === "empNumber"
+        ? (a, b) => numOrInf(a.empNumber) - numOrInf(b.empNumber)
+        : (a, b) =>
+            String(a.name || "").localeCompare(String(b.name || ""), "he");
+
+    const sorted = [...blocks].sort(cmp).flatMap((b) => b.rows);
+    if (grandTotalRow) sorted.push(grandTotalRow);
+    return sorted;
+  }, [fullPayrollRows, payrollSearch, payrollView, unexportableNames, payrollSort]);
 
   // RTL payroll table: when step 4 opens, scroll the wrapper to the inline-start
   // (right edge) so the sticky שם + תפקיד (role) columns are visible instead of
@@ -2376,7 +2454,6 @@ const Shifts = () => {
       zIndex: 3,
       backgroundColor: theme.surfaceSecondary || theme.surface,
       borderBottom: `1px solid ${theme.border}`,
-      borderLeft: `1px solid ${theme.border}`,
       minWidth: "180px",
     },
     stickyNameCell: {
@@ -2384,8 +2461,28 @@ const Shifts = () => {
       right: 0,
       zIndex: 1,
       backgroundColor: theme.surface,
-      borderLeft: `1px solid ${theme.border}`,
       minWidth: "180px",
+    },
+    // Employee-number column pins right after the name column (180px, its
+    // width) so both stay fixed together during horizontal scroll; the
+    // divider border moves here since it's now the edge of the fixed area.
+    stickyNumberTh: {
+      position: "sticky",
+      top: 0,
+      right: "180px",
+      zIndex: 3,
+      backgroundColor: theme.surfaceSecondary || theme.surface,
+      borderBottom: `1px solid ${theme.border}`,
+      borderLeft: `1px solid ${theme.border}`,
+      minWidth: "90px",
+    },
+    stickyNumberCell: {
+      position: "sticky",
+      right: "180px",
+      zIndex: 1,
+      backgroundColor: theme.surface,
+      borderLeft: `1px solid ${theme.border}`,
+      minWidth: "90px",
     },
     table: {
       width: "100%",
@@ -2881,6 +2978,14 @@ const Shifts = () => {
           !q ||
           `${e.name} ${e.employeeNumber ?? ""}`.toLowerCase().includes(q),
       );
+    if (payrollSort === "empNumber") {
+      const numOrInf = (v) => (v == null || v === "" ? Infinity : Number(v));
+      emps.sort((a, b) => numOrInf(a.employeeNumber) - numOrInf(b.employeeNumber));
+    } else if (payrollSort === "name") {
+      emps.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "he"),
+      );
+    }
     if (!emps.length) {
       return (
         <div style={{ padding: "16px", color: theme.textSecondary }}>
@@ -3030,6 +3135,16 @@ const Shifts = () => {
           <option value="tlush">תצוגת תלוש</option>
           <option value="unexportable">לא ניתנים לייצוא</option>
         </select>
+        <select
+          value={payrollSort}
+          onChange={(ev) => setPayrollSort(ev.target.value)}
+          style={{ ...styles.select, width: "auto", cursor: "pointer" }}
+          title="מיון"
+        >
+          <option value="">ללא מיון</option>
+          <option value="name">מיון לפי שם</option>
+          <option value="empNumber">מיון לפי מס' עובד</option>
+        </select>
         <button
           type="button"
           onClick={handleRefreshFinal}
@@ -3097,7 +3212,7 @@ const Shifts = () => {
           <thead>
             <tr>
               <th style={{ ...styles.th, ...styles.stickyNameTh }}>שם</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
+              <th style={{ ...styles.th, ...styles.stickyNumberTh }}>מס' עובד</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>תפקיד</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>שכר שעתי</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>ימי עבודה</th>
@@ -3136,6 +3251,19 @@ const Shifts = () => {
                 backgroundColor:
                   cell.backgroundColor || styles.stickyNameCell.backgroundColor,
               };
+              const numberCell = {
+                ...cell,
+                ...styles.stickyNumberCell,
+                backgroundColor:
+                  cell.backgroundColor || styles.stickyNumberCell.backgroundColor,
+              };
+              // Total column: red for national-minimum rows, green otherwise.
+              const totalCell = r.isGrandTotal
+                ? cell
+                : {
+                    ...cell,
+                    color: r.isHourlyMin ? "#c62828" : "#2e7d32",
+                  };
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
@@ -3165,7 +3293,7 @@ const Shifts = () => {
                       ""
                     )}
                   </td>
-                  <td style={cell}>{r.first ? (r.empNumber ?? "") : ""}</td>
+                  <td style={numberCell}>{r.first ? (r.empNumber ?? "") : ""}</td>
                   <td style={cell}>{r.role || ""}</td>
                   <td style={cell}>
                     {r.isTotal ? "" : r.wage != null ? fmtNum(r.wage) : ""}
@@ -3210,7 +3338,7 @@ const Shifts = () => {
                     )}
                   </td>
                   <td style={cell}>{r.first && r.global ? "כן" : ""}</td>
-                  <td style={cell}>{r.total == null ? "" : fmtNum(r.total)}</td>
+                  <td style={totalCell}>{r.total == null ? "" : fmtNum(r.total)}</td>
                 </tr>
               );
             })}
