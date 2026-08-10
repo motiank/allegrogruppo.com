@@ -130,13 +130,6 @@ export const buildExportRow = (emp, ctx) => {
       : "";
   const newWageType = dbEmp.new_wage_type || null;
   const rolesByName = dbEmp.rolesByName || {};
-  // "Hourly · Net" (not minimum-wage-net) roles don't get 125%/150% overtime
-  // broken out — all their hours count as regular hours. Role-level type
-  // wins; falls back to the employee-level compound type. Mirrors
-  // isHourlyNetWage in admin/client/pages/Shifts.js — keep both in sync.
-  const isHourlyNetRole = (role) =>
-    ((rolesByName[role] && rolesByName[role].new_wage_type) || newWageType) ===
-    "hourly_net";
 
   // Tips and completion (השלמה) are intentionally NOT exported in either
   // format, so they are not accumulated here.
@@ -145,19 +138,11 @@ export const buildExportRow = (emp, ctx) => {
     h150 = 0,
     shabbat = 0,
     holiday = 0;
-  for (const [role, payload] of Object.entries(payroll)) {
+  for (const [, payload] of Object.entries(payroll)) {
     const hours = (payload && payload.hours) || [];
-    let rh100 = Number(hours[0] || 0);
-    let rh125 = Number(hours[1] || 0);
-    let rh150 = Number(hours[2] || 0);
-    if (isHourlyNetRole(role)) {
-      rh100 = rh100 + rh125 + rh150;
-      rh125 = 0;
-      rh150 = 0;
-    }
-    h100 += rh100;
-    h125 += rh125;
-    h150 += rh150;
+    h100 += Number(hours[0] || 0);
+    h125 += Number(hours[1] || 0);
+    h150 += Number(hours[2] || 0);
     shabbat += Number(hours[3] || 0);
     holiday += Number(hours[4] || 0);
   }
@@ -294,14 +279,9 @@ export const buildExportRow = (emp, ctx) => {
   if (!isGlobal) {
     for (const [role, payload] of Object.entries(payroll)) {
       const hrs = (payload && payload.hours) || [];
-      let rh100 = Number(hrs[0] || 0);
-      let rh125 = Number(hrs[1] || 0);
-      let rh150 = Number(hrs[2] || 0);
-      if (isHourlyNetRole(role)) {
-        rh100 = rh100 + rh125 + rh150;
-        rh125 = 0;
-        rh150 = 0;
-      }
+      const rh100 = Number(hrs[0] || 0);
+      const rh125 = Number(hrs[1] || 0);
+      const rh150 = Number(hrs[2] || 0);
       if (rh100 === 0 && rh125 === 0 && rh150 === 0) continue;
       let rate = effectiveHourlyRate(rolesByName[role], {
         minHourlyWage: MIN_HOURLY_WAGE,
@@ -358,6 +338,11 @@ export const buildExportRow = (emp, ctx) => {
     shabbat: isGlobal ? "" : shabbat || "",
     holiday: isGlobal ? "" : holiday || "",
     net: netFlag,
+    // The row's resolved wage type (role override or employee default) — lets
+    // downstream tlush component classification distinguish "true" net types
+    // (hourly_net, global_net) from hourly_min_net, which `net`/netFlag alone
+    // can't (it's just "does the type end in _net").
+    netKind: effectiveWageType || null,
     travel: travelAmount,
     // השלמה (completion) is intentionally excluded from the export — always
     // blank. The Micpal exporter keeps the column but emits no value; tips are
@@ -2880,6 +2865,114 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/export-micpal error:", err);
       res.status(500).json({ error: err.message || "micpal export failed" });
+    }
+  });
+
+  // Raw תלוש-view export: dumps exactly the employee/component rows the
+  // client is currently showing (already filtered/sorted client-side) into
+  // a plain xlsx — name/מס' עובד shown once per employee, a computed
+  // התשלום (quantity × rate) column, and סה"כ נטו / סה"כ ברוטו subtotal
+  // rows per employee (each only when that employee has a matching
+  // component), mirroring the on-screen תלוש view.
+  router.post("/export-tlush-xlsx", async (req, res) => {
+    try {
+      const employees = Array.isArray(req.body?.employees)
+        ? req.body.employees
+        : [];
+      if (employees.length === 0) {
+        return res.status(400).json({ error: "No employees to export" });
+      }
+      const month = String(req.body?.month || "").trim();
+      const restLabel = String(req.body?.restaurant || "").trim();
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("תלוש");
+      ws.views = [{ rightToLeft: true }];
+      ws.columns = [
+        { header: "שם", key: "name", width: 22 },
+        { header: "מס' עובד", key: "employeeNumber", width: 12 },
+        { header: "קוד", key: "code", width: 10 },
+        { header: "רכיב", key: "label", width: 20 },
+        { header: "כמות", key: "quantity", width: 12, style: { numFmt: "0.00" } },
+        { header: "תעריף", key: "wage", width: 12, style: { numFmt: "0.00" } },
+        { header: "התשלום", key: "payment", width: 14, style: { numFmt: "0.00" } },
+      ];
+      ws.getRow(1).font = { bold: true };
+
+      // Highlight נטו lines — both individual components and the total rows
+      // (bold) — with orange text, matching the on-screen תלוש view.
+      const NET_LINE_FONT = { color: { argb: "FFF57C00" } };
+      const NET_FONT = { bold: true, color: { argb: "FFF57C00" } };
+      const markNetRow = (row) => {
+        row.font = NET_FONT;
+      };
+
+      let grandNetTotal = 0;
+      let grandGrossTotal = 0;
+      for (const e of employees) {
+        const comps = Array.isArray(e.components) ? e.components : [];
+        if (comps.length === 0) continue;
+        let netTotal = 0;
+        let grossTotal = 0;
+        comps.forEach((c, ci) => {
+          const quantity = Number(c.quantity) || 0;
+          const wage = Number(c.wage) || 0;
+          const payment = quantity * wage;
+          if (c.netGross === "net") netTotal += payment;
+          else grossTotal += payment;
+          const row = ws.addRow({
+            // Name/employee number only on the first row of this employee's
+            // block — blank on the rest, matching the on-screen table.
+            name: ci === 0 ? e.name || "" : "",
+            employeeNumber: ci === 0 ? (e.employeeNumber ?? "") : "",
+            code: c.code ?? "",
+            label: c.label || "",
+            quantity,
+            wage,
+            payment,
+          });
+          if (c.netGross === "net") row.font = NET_LINE_FONT;
+        });
+        const hasNet = comps.some((c) => c.netGross === "net");
+        const hasGross = comps.some((c) => c.netGross === "gross");
+        if (hasNet) {
+          markNetRow(ws.addRow({ label: 'סה"כ נטו', payment: netTotal }));
+        }
+        if (hasGross) {
+          ws.addRow({ label: 'סה"כ ברוטו', payment: grossTotal }).font = {
+            bold: true,
+          };
+        }
+        grandNetTotal += netTotal;
+        grandGrossTotal += grossTotal;
+      }
+
+      // Grand totals across all employees, at the very bottom of the sheet.
+      const hasAnyNet = employees.some((e) =>
+        (e.components || []).some((c) => c.netGross === "net"),
+      );
+      const hasAnyGross = employees.some((e) =>
+        (e.components || []).some((c) => c.netGross === "gross"),
+      );
+      if (hasAnyNet) {
+        markNetRow(
+          ws.addRow({ label: 'סה"כ נטו כללי', payment: grandNetTotal }),
+        );
+      }
+      if (hasAnyGross) {
+        ws.addRow({
+          label: 'סה"כ ברוטו כללי',
+          payment: grandGrossTotal,
+        }).font = { bold: true };
+      }
+
+      const buf = await wb.xlsx.writeBuffer();
+      const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
+      const filename = `tlush_${safeRest || "export"}_${month || "month"}.xlsx`;
+      res.json({ filename, xlsxBase64: Buffer.from(buf).toString("base64") });
+    } catch (err) {
+      console.error("payroll/export-tlush-xlsx error:", err);
+      res.status(500).json({ error: err.message || "tlush export failed" });
     }
   });
 

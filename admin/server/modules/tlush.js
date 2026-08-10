@@ -42,6 +42,19 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// נטו/ברוטו classification per component: the wage-rate components (base
+// salary/role-rate variants, overtime, shabbat, holiday) are נטו only when
+// the row's resolved wage type is exactly hourly_net or global_net —
+// hourly_min_net does NOT count as נטו here (it's still shown as ברוטו).
+// Everything else (travel, bonus, meals, prepayment, attendance) is always
+// ברוטו. Codes are shared between the Micpal and Shiklulit component sets
+// (1 base/global, 31 other role rate, 33 trainee, 38/39 overtime,
+// "shabbat"/"holiday").
+const WAGE_RATE_COMPONENT_CODES = new Set([1, 31, 33, 38, 39, "shabbat", "holiday"]);
+const NET_WAGE_KINDS = new Set(["hourly_net", "global_net"]);
+const componentNetGross = (code, isNet) =>
+  WAGE_RATE_COMPONENT_CODES.has(code) ? (isNet ? "net" : "gross") : "gross";
+
 // The subset of buildExportRow fields the Micpal exporter consumes (kept on the
 // tlush so the export can be regenerated verbatim).
 const MIC_ROW_FIELDS = [
@@ -80,17 +93,30 @@ const pickMicRow = (row) => {
 // quantity,wage} line. Mirrors the exporter's "blank cells are skipped" rule.
 const decomposeMicComponents = (row) => {
   const comps = [];
+  const isNet = NET_WAGE_KINDS.has(row.netKind);
   // Hour-based line: quantity = hours, wage = rate. Skipped when no hours.
   const addHours = (code, label, hours, rate) => {
     const q = num(hours);
     if (q == null || q === 0) return;
-    comps.push({ code, label, quantity: q, wage: num(rate) ?? 0 });
+    comps.push({
+      code,
+      label,
+      quantity: q,
+      wage: num(rate) ?? 0,
+      netGross: componentNetGross(code, isNet),
+    });
   };
   // Amount line: quantity = count, wage = amount. Skipped when no amount.
   const addAmount = (code, label, quantity, amount) => {
     const w = num(amount);
     if (w == null || w === 0) return;
-    comps.push({ code, label, quantity: num(quantity) ?? 1, wage: w });
+    comps.push({
+      code,
+      label,
+      quantity: num(quantity) ?? 1,
+      wage: w,
+      netGross: componentNetGross(code, isNet),
+    });
   };
   if (row.isGlobal) {
     addAmount(1, "שכר גלובאלי", 1, row.amount);
@@ -122,12 +148,14 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
       ...row,
       employeeNumber,
     });
+    const isNet = NET_WAGE_KINDS.has(row.netKind);
     const components = rows.map((r) => ({
       recordType: r.recordType,
       code: r.componentCode,
       label: shikLabel(r.recordType, r.componentCode),
       quantity: r.quantity,
       wage: r.rate,
+      netGross: componentNetGross(r.componentCode, isNet),
     }));
     return { ...base, components };
   }

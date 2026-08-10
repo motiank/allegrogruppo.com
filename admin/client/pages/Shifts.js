@@ -350,15 +350,6 @@ const isHourlyMinWage = (empData, role) => {
   return Number(empData?.hourly_wage) === -1;
 };
 
-// "Hourly · Net" (not minimum-wage-net) — these roles don't get 125%/150%
-// overtime hours broken out; all their hours count as regular (100%) hours.
-// Same role-level-then-employee-level fallback as isHourlyMinWage.
-const isHourlyNetWage = (empData, role) => {
-  const roleEntry = empData?.roles?.[role];
-  const t = (roleEntry && roleEntry.new_wage_type) || empData?.new_wage_type;
-  return t === "hourly_net";
-};
-
 // Hebrew label for wage_type ENUM
 const wageTypeLabel = (t) =>
   t === "gross" ? "ברוטו" : t === "net" ? "נטו" : "";
@@ -642,6 +633,7 @@ const Shifts = () => {
   const [payrollError, setPayrollError] = useState(null);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  const [exportingTlushXlsx, setExportingTlushXlsx] = useState(false);
   // Export chooser dialog: "all" vs a comma-separated list of mic numbers.
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportEmpNumbers, setExportEmpNumbers] = useState("");
@@ -1608,9 +1600,34 @@ const Shifts = () => {
       build_error: "שגיאת בנייה",
     })[code] || code;
 
+  // Unique by employee number (מס' עובד): two different shift-extracted names
+  // can resolve to the same DB employee (e.g. a name-spelling variant sharing
+  // one ID_nmbr). When that happens, keep only the LAST-occurring entry in
+  // allEmployees for that employee number — the earlier one is dropped from
+  // the display. Employees with no resolvable empNumber are never deduped.
+  const dedupedEmployees = useMemo(() => {
+    const indexByEmpNumber = new Map();
+    const result = [];
+    for (const emp of allEmployees) {
+      const empNumber = lookupEmpData(wageMap, emp)?.empNumber;
+      if (empNumber == null) {
+        result.push(emp);
+        continue;
+      }
+      const key = String(empNumber);
+      if (indexByEmpNumber.has(key)) {
+        result[indexByEmpNumber.get(key)] = emp;
+      } else {
+        indexByEmpNumber.set(key, result.length);
+        result.push(emp);
+      }
+    }
+    return result;
+  }, [allEmployees, wageMap]);
+
   // Compute the tlush (converted data) + unexportable classification in memory.
   const fetchTlushPreview = useCallback(async () => {
-    if (!selectedRestaurant || !month || allEmployees.length === 0) return;
+    if (!selectedRestaurant || !month || dedupedEmployees.length === 0) return;
     setTlushLoading(true);
     setTlushError(null);
     try {
@@ -1619,7 +1636,7 @@ const Shifts = () => {
         {
           rest: selectedRestaurant,
           month,
-          employees: allEmployees.map((e) => ({
+          employees: dedupedEmployees.map((e) => ({
             name: e.name,
             ID_nmbr: e.ID_nmbr,
             payroll_data: e.payroll_data || {},
@@ -1648,7 +1665,7 @@ const Shifts = () => {
     } finally {
       setTlushLoading(false);
     }
-  }, [selectedRestaurant, month, allEmployees, flaggedNames]);
+  }, [selectedRestaurant, month, dedupedEmployees, flaggedNames]);
 
   // Invalidate the cached tlush whenever the underlying data changes.
   useEffect(() => {
@@ -1914,7 +1931,7 @@ const Shifts = () => {
     const warnings = [];
     let grandTotal = 0;
 
-    for (const emp of allEmployees) {
+    for (const emp of dedupedEmployees) {
       const empData = lookupEmpData(wageMap, emp);
       // Hide the "דמה" placeholder identities (number 9999) from every view.
       if (isDummyEmpNumber(empData?.empNumber)) continue;
@@ -1970,14 +1987,7 @@ const Shifts = () => {
 
       const roleRowsUnsorted = roleEntries.map(([role, payload]) => {
         const hours = (payload && payload.hours) || [];
-        let [h100 = 0, h125 = 0, h150 = 0] = hours;
-        // hourly · net roles don't break out 125%/150% overtime — all their
-        // hours count as regular hours.
-        if (isHourlyNetWage(empData, role)) {
-          h100 = (Number(h100) || 0) + (Number(h125) || 0) + (Number(h150) || 0);
-          h125 = 0;
-          h150 = 0;
-        }
+        const [h100 = 0, h125 = 0, h150 = 0] = hours;
         const tip = Number((payload && payload.tip) || 0);
         // Negative completion (השלמה) is clamped to 0 — matches the export.
         const completion = Math.max(
@@ -2116,7 +2126,7 @@ const Shifts = () => {
     });
 
     return { rows, warnings };
-  }, [allEmployees, wageMap]);
+  }, [dedupedEmployees, wageMap]);
 
   // Final-table filter: matches by employee name, employee number (מס' עובד),
   // or any of the employee's roles. Whole employee blocks are kept/dropped
@@ -2993,44 +3003,229 @@ const Shifts = () => {
         </div>
       );
     }
+
+    const payment = (c) => (Number(c.quantity) || 0) * (Number(c.wage) || 0);
+    const allComps = emps.flatMap((e) => e.components || []);
+    const hasAnyNet = allComps.some((c) => c.netGross === "net");
+    const hasAnyGross = allComps.some((c) => c.netGross === "gross");
+    const grandNetTotal = allComps
+      .filter((c) => c.netGross === "net")
+      .reduce((s, c) => s + payment(c), 0);
+    const grandGrossTotal = allComps
+      .filter((c) => c.netGross === "gross")
+      .reduce((s, c) => s + payment(c), 0);
+
+    const handleExportTlushXlsx = async () => {
+      if (exportingTlushXlsx) return;
+      const employees = emps
+        .filter((e) => (e.components || []).length > 0)
+        .map((e) => ({
+          name: e.name,
+          employeeNumber: e.employeeNumber ?? "",
+          components: (e.components || []).map((c) => ({
+            code: c.code,
+            label: c.label,
+            quantity: c.quantity,
+            wage: c.wage,
+            netGross: c.netGross,
+          })),
+        }));
+      if (employees.length === 0) return;
+      setExportingTlushXlsx(true);
+      setDownloadError(null);
+      try {
+        const res = await axios.post(
+          "/admin/payroll/export-tlush-xlsx",
+          { employees, restaurant: selectedLabel, month },
+          { withCredentials: true },
+        );
+        const { xlsxBase64, filename } = res.data || {};
+        if (xlsxBase64) {
+          const binary = atob(xlsxBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++)
+            bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename || `tlush_${month || "month"}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+      } catch (err) {
+        console.error("export-tlush-xlsx error:", err);
+        setDownloadError(err.message || "download failed");
+      } finally {
+        setExportingTlushXlsx(false);
+      }
+    };
+
     return (
-      <div style={{ ...styles.tableWrapStep4, marginTop: "12px" }}>
-        <table style={styles.tableStep4}>
-          <thead>
-            <tr>
-              <th style={{ ...styles.th, ...styles.stickyNameTh }}>שם</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>קוד</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>רכיב</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>כמות</th>
-              <th style={{ ...styles.th, ...styles.stickyTh }}>תעריף</th>
-            </tr>
-          </thead>
-          <tbody>
-            {emps.flatMap((e) => {
-              const comps = e.components || [];
-              return comps.map((c, ci) => {
-                const isFirst = ci === 0;
-                const isLast = ci === comps.length - 1;
-                const cell = isLast ? styles.tdEmpBoundary : styles.td;
-                const nameCell = { ...cell, ...styles.stickyNameCell };
-                return (
-                  <tr key={`${e.name}::${ci}`}>
-                    <td style={nameCell}>{isFirst ? e.name : ""}</td>
-                    <td style={cell}>
-                      {isFirst ? (e.employeeNumber ?? "") : ""}
-                    </td>
-                    <td style={cell}>{c.code}</td>
-                    <td style={cell}>{c.label}</td>
-                    <td style={cell}>{fmtNum(c.quantity)}</td>
-                    <td style={cell}>{fmtNum(c.wage)}</td>
-                  </tr>
-                );
-              });
-            })}
-          </tbody>
-        </table>
-      </div>
+      <>
+        <div style={{ ...styles.tableWrapStep4, marginTop: "12px" }}>
+          <table style={styles.tableStep4}>
+            <thead>
+              <tr>
+                <th style={{ ...styles.th, ...styles.stickyNameTh }}>שם</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>קוד</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>רכיב</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>כמות</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>תעריף</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>תשלום</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emps.flatMap((e) => {
+                const comps = e.components || [];
+                const hasNet = comps.some((c) => c.netGross === "net");
+                const hasGross = comps.some((c) => c.netGross === "gross");
+                const netTotal = comps
+                  .filter((c) => c.netGross === "net")
+                  .reduce((s, c) => s + payment(c), 0);
+                const grossTotal = comps
+                  .filter((c) => c.netGross === "gross")
+                  .reduce((s, c) => s + payment(c), 0);
+                const hasSummary = hasNet || hasGross;
+
+                const compRows = comps.map((c, ci) => {
+                  const isFirst = ci === 0;
+                  const isLast = !hasSummary && ci === comps.length - 1;
+                  const baseCell = isLast ? styles.tdEmpBoundary : styles.td;
+                  const cell =
+                    c.netGross === "net"
+                      ? { ...baseCell, color: "#f57c00" }
+                      : baseCell;
+                  const nameCell = { ...cell, ...styles.stickyNameCell };
+                  return (
+                    <tr key={`${e.name}::${ci}`}>
+                      <td style={nameCell}>{isFirst ? e.name : ""}</td>
+                      <td style={cell}>
+                        {isFirst ? (e.employeeNumber ?? "") : ""}
+                      </td>
+                      <td style={cell}>{c.code}</td>
+                      <td style={cell}>{c.label}</td>
+                      <td style={cell}>{fmtNum(c.quantity)}</td>
+                      <td style={cell}>{fmtNum(c.wage)}</td>
+                      <td style={cell}>{fmtNum(payment(c))}</td>
+                    </tr>
+                  );
+                });
+
+                const summaryRows = [];
+                if (hasNet) {
+                  const cell = { ...styles.tdTotal, color: "#f57c00" };
+                  const nameCell = { ...cell, ...styles.stickyNameCell, color: cell.color };
+                  summaryRows.push(
+                    <tr key={`${e.name}::total-net`}>
+                      <td style={nameCell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}>סה"כ נטו</td>
+                      <td style={cell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}>{fmtNum(netTotal)}</td>
+                    </tr>,
+                  );
+                }
+                if (hasGross) {
+                  const cell = styles.tdTotal;
+                  const nameCell = { ...cell, ...styles.stickyNameCell };
+                  summaryRows.push(
+                    <tr key={`${e.name}::total-gross`}>
+                      <td style={nameCell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}>סה"כ ברוטו</td>
+                      <td style={cell}></td>
+                      <td style={cell}></td>
+                      <td style={cell}>{fmtNum(grossTotal)}</td>
+                    </tr>,
+                  );
+                }
+
+                return [...compRows, ...summaryRows];
+              })}
+              {hasAnyNet && (
+                <tr>
+                  <td
+                    style={{
+                      ...styles.tdTotal,
+                      ...styles.stickyNameCell,
+                      color: "#f57c00",
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                    }}
+                    colSpan={6}
+                  >
+                    סה"כ נטו כללי
+                  </td>
+                  <td
+                    style={{
+                      ...styles.tdTotal,
+                      color: "#f57c00",
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    {fmtNum(grandNetTotal)}
+                  </td>
+                </tr>
+              )}
+              {hasAnyGross && (
+                <tr>
+                  <td
+                    style={{
+                      ...styles.tdTotal,
+                      ...styles.stickyNameCell,
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                    }}
+                    colSpan={6}
+                  >
+                    סה"כ ברוטו כללי
+                  </td>
+                  <td
+                    style={{
+                      ...styles.tdTotal,
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    {fmtNum(grandGrossTotal)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "12px",
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              ...styles.secondaryButton,
+              opacity: exportingTlushXlsx ? 0.7 : 1,
+              cursor: exportingTlushXlsx ? "wait" : "pointer",
+            }}
+            onClick={handleExportTlushXlsx}
+            disabled={exportingTlushXlsx}
+            title="ייצוא תצוגת התלוש לאקסל"
+          >
+            {exportingTlushXlsx ? "מייצא…" : "ייצוא לאקסל"}
+          </button>
+        </div>
+      </>
     );
   };
 
