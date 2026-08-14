@@ -3022,6 +3022,7 @@ const Shifts = () => {
         .map((e) => ({
           name: e.name,
           employeeNumber: e.employeeNumber ?? "",
+          mixedRates: !!e.mixedRates,
           components: (e.components || []).map((c) => ({
             code: c.code,
             label: c.label,
@@ -3075,8 +3076,8 @@ const Shifts = () => {
                 <th style={{ ...styles.th, ...styles.stickyTh }}>מס' עובד</th>
                 <th style={{ ...styles.th, ...styles.stickyTh }}>קוד</th>
                 <th style={{ ...styles.th, ...styles.stickyTh }}>רכיב</th>
-                <th style={{ ...styles.th, ...styles.stickyTh }}>כמות</th>
                 <th style={{ ...styles.th, ...styles.stickyTh }}>תעריף</th>
+                <th style={{ ...styles.th, ...styles.stickyTh }}>כמות</th>
                 <th style={{ ...styles.th, ...styles.stickyTh }}>תשלום</th>
               </tr>
             </thead>
@@ -3104,14 +3105,36 @@ const Shifts = () => {
                   const nameCell = { ...cell, ...styles.stickyNameCell };
                   return (
                     <tr key={`${e.name}::${ci}`}>
-                      <td style={nameCell}>{isFirst ? e.name : ""}</td>
+                      <td style={nameCell}>
+                        {isFirst ? (
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <span>{e.name}</span>
+                            {e.mixedRates && (
+                              <span
+                                title="עובד זה עבד ביותר משכר שעתי אחד. הפירוט כאן מציג לפי תעריף, אך קובץ ה-Micpal בפועל ממזג הכל לתעריף אחד."
+                                style={{ color: "#e65100", cursor: "help" }}
+                              >
+                                ⚠
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          ""
+                        )}
+                      </td>
                       <td style={cell}>
                         {isFirst ? (e.employeeNumber ?? "") : ""}
                       </td>
                       <td style={cell}>{c.code}</td>
                       <td style={cell}>{c.label}</td>
-                      <td style={cell}>{fmtNum(c.quantity)}</td>
                       <td style={cell}>{fmtNum(c.wage)}</td>
+                      <td style={cell}>{fmtNum(c.quantity)}</td>
                       <td style={cell}>{fmtNum(payment(c))}</td>
                     </tr>
                   );

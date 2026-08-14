@@ -2208,6 +2208,9 @@ const Router = () => {
           exportable: c.exportable,
           reasons: c.reasons,
           components: c.tlush ? c.tlush.components : [],
+          // Multiple hourly rates were split for display, but Micpal's real
+          // export merges them back into one rate — see tlush.js.
+          mixedRates: !!(c.tlush && c.tlush.mixedRates),
         }));
       res.json({ payrollSoft, employees });
     } catch (err) {
@@ -2893,8 +2896,8 @@ const Router = () => {
         { header: "מס' עובד", key: "employeeNumber", width: 12 },
         { header: "קוד", key: "code", width: 10 },
         { header: "רכיב", key: "label", width: 20 },
-        { header: "כמות", key: "quantity", width: 12, style: { numFmt: "0.00" } },
         { header: "תעריף", key: "wage", width: 12, style: { numFmt: "0.00" } },
+        { header: "כמות", key: "quantity", width: 12, style: { numFmt: "0.00" } },
         { header: "התשלום", key: "payment", width: 14, style: { numFmt: "0.00" } },
       ];
       ws.getRow(1).font = { bold: true };
@@ -2922,8 +2925,13 @@ const Router = () => {
           else grossTotal += payment;
           const row = ws.addRow({
             // Name/employee number only on the first row of this employee's
-            // block — blank on the rest, matching the on-screen table.
-            name: ci === 0 ? e.name || "" : "",
+            // block — blank on the rest, matching the on-screen table. A ⚠
+            // suffix flags employees whose real Micpal export merges these
+            // rate groups back into one rate.
+            name:
+              ci === 0
+                ? (e.name || "") + (e.mixedRates ? " ⚠ (תעריפים מעורבים)" : "")
+                : "",
             employeeNumber: ci === 0 ? (e.employeeNumber ?? "") : "",
             code: c.code ?? "",
             label: c.label || "",
