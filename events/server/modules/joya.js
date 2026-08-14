@@ -3,6 +3,7 @@ import { renderJoyaPage } from "../render/joya.js";
 import { renderBranchPage, renderBranchesIndex } from "../render/branch.js";
 import { BRANCH_BY_SLUG } from "../data/branches.js";
 import { baseUrlFor, escapeHtml } from "../render/html.js";
+import { gaSnippet } from "../render/analytics.js";
 
 // Minimal RTL "coming soon" page for links we reference now but build later
 // (per-branch pages, full menu, privacy policy). Reuses /css/joya.css.
@@ -13,6 +14,7 @@ const comingSoon = (title) => `<!DOCTYPE html>
 <meta name="robots" content="noindex" />
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@700;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/joya.css" />
+${gaSnippet()}
 </head><body>
 <section class="section" style="text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1rem">
   <img src="/images/joya/logo-dark.png" alt="Joya" style="height:64px" />
