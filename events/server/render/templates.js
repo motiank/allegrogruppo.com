@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html.js";
+import { gaSnippet } from "./analytics.js";
 
 // ---------------------------------------------------------------------------
 // Server-side templates for the events landing-page service.
@@ -48,6 +49,7 @@ const layout = ({ title, lang = "he", head = "", body }) => {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="/css/events.css" />
+  ${gaSnippet()}
   ${head}
 </head>
 <body>

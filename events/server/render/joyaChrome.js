@@ -1,4 +1,5 @@
 import { escapeHtml } from "./html.js";
+import { gaSnippet } from "./analytics.js";
 
 // Shared chrome (document shell + header + footer) for Joya-branded pages,
 // so /joya and the /joya/branches/* pages look identical and stay in sync.
@@ -78,6 +79,7 @@ export const joyaDoc = ({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/joya.css" />
+  ${gaSnippet()}
 </head>
 <body>
 ${body}
