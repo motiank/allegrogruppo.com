@@ -23,6 +23,7 @@ const { default: eventsPageRouter, apiRouter: eventsApiRouter } = await import(
   "./modules/events.js"
 );
 const { default: joyaRouter } = await import("./modules/joya.js");
+const { renderRoot } = await import("./render/templates.js");
 
 const app = express();
 const PORT = process.env.EVENTS_PORT || 3023;
@@ -55,6 +56,13 @@ app.use(express.static(join(__dirname, "../public")));
 
 // JSON API.
 app.use("/api/events", eventsApiRouter());
+
+// Root landing page (registered before the /:restaurant catch-all so "/"
+// doesn't fall through to it — Express wouldn't match it there anyway, but
+// this keeps the site branded instead of a bare 404).
+app.get("/", (req, res) => {
+  res.set("Content-Type", "text/html; charset=utf-8").send(renderRoot());
+});
 
 // Curated landing pages (registered before the /:restaurant catch-all so the
 // slug isn't treated as a restaurant).

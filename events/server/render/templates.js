@@ -186,6 +186,16 @@ export const renderEventList = ({ events, restaurant, baseUrl }) => {
   return layout({ title, head, body });
 };
 
+// Root / index page — minimal branded placeholder (events.allegrogruppo.com/).
+export const renderRoot = () => {
+  const body = `
+  <main class="root-page">
+    <h1>Allegro Gruppo</h1>
+    <p>Events</p>
+  </main>`;
+  return layout({ title: "Allegro Gruppo — Events", body });
+};
+
 // Generic 404 page.
 export const renderNotFound = ({ message = "Event not found" } = {}) => {
   const body = `
