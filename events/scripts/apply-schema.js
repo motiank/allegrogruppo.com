@@ -21,7 +21,7 @@ dotenv.config({ path: path.join(__dirname, "../..", envFileName) });
 
 const run = async () => {
   const schemaDir = path.join(__dirname, "../schema");
-  const files = ["events.sql"];
+  const files = ["events.sql", "leads.sql"];
   if (process.argv.includes("--seed")) files.push("seed.sql");
 
   const caPath = process.env.DB_SSL_CA

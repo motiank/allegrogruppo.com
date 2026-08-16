@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { gaSnippet } from "./analytics.js";
+import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
 
 // ---------------------------------------------------------------------------
 // Server-side templates for the events landing-page service.
@@ -45,14 +45,15 @@ const layout = ({ title, lang = "he", head = "", body }) => {
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(lang)}" dir="${dir}">
 <head>
+  ${gtmHeadSnippet()}
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="/css/events.css" />
-  ${gaSnippet()}
   ${head}
 </head>
 <body>
+  ${gtmBodySnippet()}
   ${body}
   <footer class="site-footer">
     <p>&copy; ${new Date().getFullYear()} Allegro Gruppo</p>

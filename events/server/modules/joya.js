@@ -3,19 +3,21 @@ import { renderJoyaPage } from "../render/joya.js";
 import { renderBranchPage, renderBranchesIndex } from "../render/branch.js";
 import { BRANCH_BY_SLUG } from "../data/branches.js";
 import { baseUrlFor, escapeHtml } from "../render/html.js";
-import { gaSnippet } from "../render/analytics.js";
+import { gtmHeadSnippet, gtmBodySnippet } from "../render/analytics.js";
+import { executeSql } from "../sources/dbpool.js";
 
 // Minimal RTL "coming soon" page for links we reference now but build later
 // (per-branch pages, full menu, privacy policy). Reuses /css/joya.css.
 const comingSoon = (title) => `<!DOCTYPE html>
 <html lang="he" dir="rtl"><head>
+${gtmHeadSnippet()}
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)} | Joya</title>
 <meta name="robots" content="noindex" />
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@700;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/joya.css" />
-${gaSnippet()}
 </head><body>
+${gtmBodySnippet()}
 <section class="section" style="text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1rem">
   <img src="/images/joya/logo-dark.png" alt="Joya" style="height:64px" />
   <p class="section-eyebrow">בקרוב</p>
@@ -38,38 +40,48 @@ ${gaSnippet()}
 export default () => {
   const router = express.Router();
 
-  // Landing page.
+  // Landing page. `lead=sent`/`lead=error` (set by the /inquiry redirect
+  // below) drives an inline success/error banner near the lead form.
   router.get("/", (req, res) => {
-    const html = renderJoyaPage({ baseUrl: baseUrlFor(req) });
+    const leadStatus = ["sent", "error"].includes(req.query.lead)
+      ? req.query.lead
+      : null;
+    const html = renderJoyaPage({ baseUrl: baseUrlFor(req), leadStatus });
     res.set("Content-Type", "text/html; charset=utf-8").send(html);
   });
 
-  // Lead-form submission (placeholder — admin backend will own this later).
-  router.post("/inquiry", (req, res) => {
+  // Lead-form submission. This is a plain HTML form POST (no JS), so on
+  // both success and failure we redirect back to /joya#lead with a query
+  // flag rather than returning JSON — see renderJoyaPage's leadStatus banner.
+  router.post("/inquiry", async (req, res) => {
     const { name, phone, email, guests, event_date, branch, message, consent } =
       req.body || {};
 
     // Minimal validation: name + phone are required.
     if (!name || !phone) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "missing_required", fields: ["name", "phone"] });
+      return res.redirect(303, "/joya?lead=error#lead");
     }
 
-    // TODO(admin): persist to a `joya_event_leads` table and notify the
-    // events manager (email / WhatsApp). For now just log the lead.
-    console.log("[events][joya] new event inquiry:", {
-      name,
-      phone,
-      email,
-      guests,
-      event_date,
-      branch,
-      message,
-      consent: consent === "1" || consent === true,
-    });
-
-    res.json({ ok: true, message: "תודה! נחזור אליכם בהקדם." });
+    try {
+      await executeSql(
+        `INSERT INTO joya_event_leads
+           (name, phone, email, guests, event_date, branch, message)
+         VALUES (:name, :phone, :email, :guests, :event_date, :branch, :message)`,
+        {
+          name,
+          phone,
+          email: email || null,
+          guests: guests ? Number(guests) : null,
+          event_date: event_date || null,
+          branch: branch || null,
+          message: message || null,
+        },
+      );
+      res.redirect(303, "/joya?lead=sent#lead");
+    } catch (e) {
+      console.error("[events][joya] inquiry insert failed:", e);
+      res.redirect(303, "/joya?lead=error#lead");
+    }
   });
 
   // Branches index + per-branch landing pages.

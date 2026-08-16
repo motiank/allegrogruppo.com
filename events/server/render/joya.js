@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { gaSnippet } from "./analytics.js";
+import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
 import { BRANCHES } from "../data/branches.js";
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ const GALLERY = Array.from({ length: 12 }, (_, i) => `/images/joya/g-${String(i 
 const icon = (name) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
-export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
+export const renderJoyaPage = ({ baseUrl = "", leadStatus = null } = {}) => {
   const url = `${baseUrl}/joya`;
   const ogImage = `${baseUrl}/images/joya/hero-1.jpg`;
 
@@ -126,6 +126,7 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+  ${gtmHeadSnippet()}
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>אירועים בג׳ויה | Joya Cucina Italiana</title>
@@ -141,9 +142,9 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Frank+Ruhl+Libre:wght@500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/joya.css" />
-  ${gaSnippet()}
 </head>
 <body>
+  ${gtmBodySnippet()}
   <!-- Header -->
   <header class="site-header" id="top">
     <div class="container header-inner">
@@ -280,6 +281,13 @@ export const renderJoyaPage = ({ baseUrl = "" } = {}) => {
       </div>
 
       <form class="lead-form" method="post" action="/joya/inquiry" novalidate>
+        ${
+          leadStatus === "sent"
+            ? `<p class="lead-banner lead-banner--ok">תודה! קיבלנו את הפנייה ונחזור אליכם בהקדם.</p>`
+            : leadStatus === "error"
+              ? `<p class="lead-banner lead-banner--error">נא למלא שם וטלפון ולנסות שוב.</p>`
+              : ""
+        }
         <div class="field">
           <label for="name">שם מלא</label>
           <input id="name" name="name" type="text" autocomplete="name" required />

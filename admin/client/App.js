@@ -13,6 +13,7 @@ import OrderHistory from "./pages/OrderHistory";
 import Analytics from "./pages/analytics/index.js";
 import Performance from "./pages/Performance";
 import Affiliates from "./pages/Affiliates";
+import JoyaLeads from "./pages/JoyaLeads";
 import Coupons from "./pages/Coupons";
 import Shifts from "./pages/Shifts";
 import Employees from "./pages/Employees";
@@ -194,6 +195,18 @@ const App = () => {
               <RestrictByRole allow={[]}>
                 <Layout>
                   <Affiliates />
+                </Layout>
+              </RestrictByRole>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/joya-leads"
+          element={
+            <ProtectedRoute>
+              <RestrictByRole allow={[]}>
+                <Layout>
+                  <JoyaLeads />
                 </Layout>
               </RestrictByRole>
             </ProtectedRoute>
