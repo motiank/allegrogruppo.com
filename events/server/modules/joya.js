@@ -31,11 +31,33 @@ ${gtmBodySnippet()}
 // Joya — a curated, hand-designed events landing page at /joya.
 //
 // Unlike /:restaurant/:slug (DB-driven event pages), this is a bespoke page.
-// The lead form posts to /joya/inquiry. The real submission handling
-// (persist to DB + notify the events manager) will be wired through the admin
-// backend later — for now we acknowledge the submission so the form works
-// end-to-end without losing the lead.
+// The lead form posts to /joya/inquiry, which persists to joya_event_leads
+// and (when enabled) forwards the lead to a Make.com webhook scenario.
 // ---------------------------------------------------------------------------
+
+// Make.com (Integromat) webhook for new leads — set EVENTS_LEADS_WEBHOOK_URL
+// in .env, and EVENTS_LEADS_WEBHOOK_ENABLED=true to actually fire it (off by
+// default so a configured-but-untested URL can't misfire in other envs).
+const LEADS_WEBHOOK_URL = process.env.EVENTS_LEADS_WEBHOOK_URL || "";
+const LEADS_WEBHOOK_ENABLED = process.env.EVENTS_LEADS_WEBHOOK_ENABLED === "true";
+
+// Best-effort, fire-and-forget — never let a webhook failure affect the
+// visitor's submission (the DB row is already the source of truth).
+const postLeadWebhook = async (lead) => {
+  if (!LEADS_WEBHOOK_ENABLED || !LEADS_WEBHOOK_URL) return;
+  try {
+    const res = await fetch(LEADS_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lead),
+    });
+    if (!res.ok) {
+      console.error(`[events][joya] leads webhook responded ${res.status}`);
+    }
+  } catch (e) {
+    console.error("[events][joya] leads webhook failed:", e);
+  }
+};
 
 export default () => {
   const router = express.Router();
@@ -62,21 +84,28 @@ export default () => {
       return res.redirect(303, "/joya?lead=error#lead");
     }
 
+    const leadFields = {
+      name,
+      phone,
+      email: email || null,
+      guests: guests ? Number(guests) : null,
+      event_date: event_date || null,
+      branch: branch || null,
+      message: message || null,
+    };
+
     try {
-      await executeSql(
+      const [result] = await executeSql(
         `INSERT INTO joya_event_leads
            (name, phone, email, guests, event_date, branch, message)
          VALUES (:name, :phone, :email, :guests, :event_date, :branch, :message)`,
-        {
-          name,
-          phone,
-          email: email || null,
-          guests: guests ? Number(guests) : null,
-          event_date: event_date || null,
-          branch: branch || null,
-          message: message || null,
-        },
+        leadFields,
       );
+      postLeadWebhook({
+        id: result.insertId,
+        ...leadFields,
+        created_at: new Date().toISOString(),
+      });
       res.redirect(303, "/joya?lead=sent#lead");
     } catch (e) {
       console.error("[events][joya] inquiry insert failed:", e);
