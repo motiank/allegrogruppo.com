@@ -27,10 +27,13 @@ export const joyaHeader = ({ home = false } = {}) => {
         ${a("gallery", "גלריה")}
         ${a("lead", "צרו קשר")}
       </nav>
-      <a class="phone-cta" href="tel:${PHONE_TEL}">
-        <span class="phone-label">${escapeHtml(CONTACT_NAME)}</span>
-        <span class="phone-num">${escapeHtml(PHONE_DISPLAY)}</span>
-      </a>
+      <div class="header-actions">
+        <a class="contact-cta" href="${home ? "" : "/joya"}#lead">צרו קשר</a>
+        <a class="phone-cta" href="tel:${PHONE_TEL}">
+          <span class="phone-label">${escapeHtml(CONTACT_NAME)}</span>
+          <span class="phone-num">${escapeHtml(PHONE_DISPLAY)}</span>
+        </a>
+      </div>
     </div>
   </header>`;
 };

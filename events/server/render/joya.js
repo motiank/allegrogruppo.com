@@ -159,10 +159,13 @@ export const renderJoyaPage = ({ baseUrl = "", leadStatus = null } = {}) => {
         <a href="#testimonials">המלצות</a>
         <a href="#lead">צרו קשר</a>
       </nav>
-      <a class="phone-cta" href="tel:${PHONE_TEL}">
-        <span class="phone-label">${escapeHtml(CONTACT_NAME)}</span>
-        <span class="phone-num">${escapeHtml(PHONE_DISPLAY)}</span>
-      </a>
+      <div class="header-actions">
+        <a class="contact-cta" href="#lead">צרו קשר</a>
+        <a class="phone-cta" href="tel:${PHONE_TEL}">
+          <span class="phone-label">${escapeHtml(CONTACT_NAME)}</span>
+          <span class="phone-num">${escapeHtml(PHONE_DISPLAY)}</span>
+        </a>
+      </div>
     </div>
   </header>
 

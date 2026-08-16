@@ -184,6 +184,27 @@ h3 {
   transform: scaleX(1);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Standalone "צרו קשר" CTA — only shown once .main-nav collapses (≤920px),
+   so the header always keeps a way to call AND a way to jump to the lead
+   form, even when the full nav links are hidden. */
+.contact-cta {
+  display: none;
+  align-items: center;
+  padding: 0.5rem 1.1rem;
+  border-radius: 12px;
+  background: var(--red);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .phone-cta {
   display: flex;
   flex-direction: column;
@@ -193,6 +214,7 @@ h3 {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--white);
+  white-space: nowrap;
 }
 
 .phone-label {
@@ -704,6 +726,9 @@ h3 {
   .main-nav {
     display: none;
   }
+  .contact-cta {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 560px) {
@@ -727,8 +752,30 @@ h3 {
     grid-column: span 1;
     grid-row: span 1;
   }
+  /* Keep the phone button + צרו קשר CTA visible (the sticky header keeps
+     them on screen while scrolling) — just tighten them up for narrow
+     screens instead of hiding them. */
+  .header-inner {
+    height: 64px;
+    gap: 0.75rem;
+  }
+  .brand img {
+    height: 32px;
+  }
   .phone-cta {
+    padding: 0.3rem 0.6rem;
+    border-radius: 10px;
+  }
+  .phone-label {
     display: none;
+  }
+  .phone-num {
+    font-size: 0.85rem;
+  }
+  .contact-cta {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.82rem;
+    border-radius: 10px;
   }
   .footer-inner {
     flex-direction: column;
