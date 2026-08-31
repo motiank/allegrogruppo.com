@@ -546,11 +546,15 @@ const Shifts = () => {
       }
 
       // Match by clock id (מזהה שעון) first — exact and name-independent — then
-      // fall back to the special-char-stripped name.
+      // fall back to the special-char-stripped base name. baseName() strips the
+      // leading "*" / trailing " - <role>" suffix the shift export bakes into
+      // new employees' names (see buildDiff below); without it, names with a
+      // role suffix never match the plain "first family" keys built from the
+      // phone roster file, so new employees end up with no phone.
       const phoneFor = (emp) => {
         const clock = emp && emp.clockId != null ? String(emp.clockId).trim() : "";
         if (clock && phoneByClockId.has(clock)) return phoneByClockId.get(clock);
-        const key = stripForMatch(emp && emp.name);
+        const key = stripForMatch(baseName(emp && emp.name));
         return (key && phoneByName.get(key)) || null;
       };
 
