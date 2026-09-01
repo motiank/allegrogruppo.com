@@ -751,8 +751,14 @@ function classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet) {
   if (!hasAnyRate) reasons.push("no_wage");
   if (incompleteSet && incompleteSet.has(String(emp.name || "").trim()))
     reasons.push("incomplete");
+  // The tlush (pay breakdown) is still buildable without a micpal number —
+  // only the actual Micpal/Shiklulit import needs one. Build it whenever no
+  // OTHER blocking reason applies, so a "no_number" employee still has
+  // components to show/export (e.g. on the tlush export's second sheet),
+  // while `exportable` below still requires reasons to be fully empty and so
+  // stays false for them, keeping the real payroll-software export gated.
   let tlush = null;
-  if (reasons.length === 0) {
+  if (reasons.filter((r) => r !== "no_number").length === 0) {
     try {
       tlush = buildTlush(row, payrollSoft, { workMonth });
     } catch {
@@ -2877,6 +2883,95 @@ const Router = () => {
   // התשלום (quantity × rate) column, and סה"כ נטו / סה"כ ברוטו subtotal
   // rows per employee (each only when that employee has a matching
   // component), mirroring the on-screen תלוש view.
+  // Fill one worksheet with the same per-component layout the on-screen
+  // תלוש view uses. Shared by both the "has micpal number" and "no micpal
+  // number" pages below.
+  const fillTlushSheet = (ws, employees) => {
+    ws.views = [{ rightToLeft: true }];
+    ws.columns = [
+      { header: "שם", key: "name", width: 22 },
+      { header: "מס' עובד", key: "employeeNumber", width: 12 },
+      { header: "קוד", key: "code", width: 10 },
+      { header: "רכיב", key: "label", width: 20 },
+      { header: "תעריף", key: "wage", width: 12, style: { numFmt: "0.00" } },
+      { header: "כמות", key: "quantity", width: 12, style: { numFmt: "0.00" } },
+      { header: "התשלום", key: "payment", width: 14, style: { numFmt: "0.00" } },
+    ];
+    ws.getRow(1).font = { bold: true };
+
+    // Highlight נטו lines — both individual components and the total rows
+    // (bold) — with orange text, matching the on-screen תלוש view.
+    const NET_LINE_FONT = { color: { argb: "FFF57C00" } };
+    const NET_FONT = { bold: true, color: { argb: "FFF57C00" } };
+    const markNetRow = (row) => {
+      row.font = NET_FONT;
+    };
+
+    let grandNetTotal = 0;
+    let grandGrossTotal = 0;
+    for (const e of employees) {
+      const comps = Array.isArray(e.components) ? e.components : [];
+      if (comps.length === 0) continue;
+      let netTotal = 0;
+      let grossTotal = 0;
+      comps.forEach((c, ci) => {
+        const quantity = Number(c.quantity) || 0;
+        const wage = Number(c.wage) || 0;
+        const payment = quantity * wage;
+        if (c.netGross === "net") netTotal += payment;
+        else grossTotal += payment;
+        const row = ws.addRow({
+          // Name/employee number only on the first row of this employee's
+          // block — blank on the rest, matching the on-screen table. A ⚠
+          // suffix flags employees whose real Micpal export merges these
+          // rate groups back into one rate.
+          name:
+            ci === 0
+              ? (e.name || "") + (e.mixedRates ? " ⚠ (תעריפים מעורבים)" : "")
+              : "",
+          employeeNumber: ci === 0 ? (e.employeeNumber ?? "") : "",
+          code: c.code ?? "",
+          label: c.label || "",
+          quantity,
+          wage,
+          payment,
+        });
+        if (c.netGross === "net") row.font = NET_LINE_FONT;
+      });
+      const hasNet = comps.some((c) => c.netGross === "net");
+      const hasGross = comps.some((c) => c.netGross === "gross");
+      if (hasNet) {
+        markNetRow(ws.addRow({ label: 'סה"כ נטו', payment: netTotal }));
+      }
+      if (hasGross) {
+        ws.addRow({ label: 'סה"כ ברוטו', payment: grossTotal }).font = {
+          bold: true,
+        };
+      }
+      grandNetTotal += netTotal;
+      grandGrossTotal += grossTotal;
+    }
+
+    // Grand totals across all employees, at the very bottom of the sheet.
+    const hasAnyNet = employees.some((e) =>
+      (e.components || []).some((c) => c.netGross === "net"),
+    );
+    const hasAnyGross = employees.some((e) =>
+      (e.components || []).some((c) => c.netGross === "gross"),
+    );
+    if (hasAnyNet) {
+      markNetRow(
+        ws.addRow({ label: 'סה"כ נטו כללי', payment: grandNetTotal }),
+      );
+    }
+    if (hasAnyGross) {
+      ws.addRow({
+        label: 'סה"כ ברוטו כללי',
+        payment: grandGrossTotal,
+      }).font = { bold: true };
+    }
+  };
+
   router.post("/export-tlush-xlsx", async (req, res) => {
     try {
       const employees = Array.isArray(req.body?.employees)
@@ -2888,91 +2983,20 @@ const Router = () => {
       const month = String(req.body?.month || "").trim();
       const restLabel = String(req.body?.restaurant || "").trim();
 
+      // Two pages: employees with a micpal number (ready for the real
+      // Micpal/Shiklulit import) and employees without one (still need a
+      // number assigned before they can be imported, but their pay is
+      // computed here so the office can process them manually).
+      const withNumber = employees.filter(
+        (e) => e.employeeNumber != null && String(e.employeeNumber).trim() !== "",
+      );
+      const withoutNumber = employees.filter(
+        (e) => e.employeeNumber == null || String(e.employeeNumber).trim() === "",
+      );
+
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet("תלוש");
-      ws.views = [{ rightToLeft: true }];
-      ws.columns = [
-        { header: "שם", key: "name", width: 22 },
-        { header: "מס' עובד", key: "employeeNumber", width: 12 },
-        { header: "קוד", key: "code", width: 10 },
-        { header: "רכיב", key: "label", width: 20 },
-        { header: "תעריף", key: "wage", width: 12, style: { numFmt: "0.00" } },
-        { header: "כמות", key: "quantity", width: 12, style: { numFmt: "0.00" } },
-        { header: "התשלום", key: "payment", width: 14, style: { numFmt: "0.00" } },
-      ];
-      ws.getRow(1).font = { bold: true };
-
-      // Highlight נטו lines — both individual components and the total rows
-      // (bold) — with orange text, matching the on-screen תלוש view.
-      const NET_LINE_FONT = { color: { argb: "FFF57C00" } };
-      const NET_FONT = { bold: true, color: { argb: "FFF57C00" } };
-      const markNetRow = (row) => {
-        row.font = NET_FONT;
-      };
-
-      let grandNetTotal = 0;
-      let grandGrossTotal = 0;
-      for (const e of employees) {
-        const comps = Array.isArray(e.components) ? e.components : [];
-        if (comps.length === 0) continue;
-        let netTotal = 0;
-        let grossTotal = 0;
-        comps.forEach((c, ci) => {
-          const quantity = Number(c.quantity) || 0;
-          const wage = Number(c.wage) || 0;
-          const payment = quantity * wage;
-          if (c.netGross === "net") netTotal += payment;
-          else grossTotal += payment;
-          const row = ws.addRow({
-            // Name/employee number only on the first row of this employee's
-            // block — blank on the rest, matching the on-screen table. A ⚠
-            // suffix flags employees whose real Micpal export merges these
-            // rate groups back into one rate.
-            name:
-              ci === 0
-                ? (e.name || "") + (e.mixedRates ? " ⚠ (תעריפים מעורבים)" : "")
-                : "",
-            employeeNumber: ci === 0 ? (e.employeeNumber ?? "") : "",
-            code: c.code ?? "",
-            label: c.label || "",
-            quantity,
-            wage,
-            payment,
-          });
-          if (c.netGross === "net") row.font = NET_LINE_FONT;
-        });
-        const hasNet = comps.some((c) => c.netGross === "net");
-        const hasGross = comps.some((c) => c.netGross === "gross");
-        if (hasNet) {
-          markNetRow(ws.addRow({ label: 'סה"כ נטו', payment: netTotal }));
-        }
-        if (hasGross) {
-          ws.addRow({ label: 'סה"כ ברוטו', payment: grossTotal }).font = {
-            bold: true,
-          };
-        }
-        grandNetTotal += netTotal;
-        grandGrossTotal += grossTotal;
-      }
-
-      // Grand totals across all employees, at the very bottom of the sheet.
-      const hasAnyNet = employees.some((e) =>
-        (e.components || []).some((c) => c.netGross === "net"),
-      );
-      const hasAnyGross = employees.some((e) =>
-        (e.components || []).some((c) => c.netGross === "gross"),
-      );
-      if (hasAnyNet) {
-        markNetRow(
-          ws.addRow({ label: 'סה"כ נטו כללי', payment: grandNetTotal }),
-        );
-      }
-      if (hasAnyGross) {
-        ws.addRow({
-          label: 'סה"כ ברוטו כללי',
-          payment: grandGrossTotal,
-        }).font = { bold: true };
-      }
+      fillTlushSheet(wb.addWorksheet("עם מספר מיקפל"), withNumber);
+      fillTlushSheet(wb.addWorksheet("ללא מספר מיקפל"), withoutNumber);
 
       const buf = await wb.xlsx.writeBuffer();
       const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");

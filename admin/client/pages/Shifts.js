@@ -3021,8 +3021,17 @@ const Shifts = () => {
 
     const handleExportTlushXlsx = async () => {
       if (exportingTlushXlsx) return;
-      const employees = emps
+      // Unlike the on-screen table (`emps`, exportable-only i.e. has a micpal
+      // number), the export also includes employees whose only blocker is a
+      // missing micpal number — their pay is still computed server-side, and
+      // the export puts them on a second sheet so the office can process them
+      // manually. Same search-query filter as the on-screen table.
+      const employees = (tlushData?.employees || [])
         .filter((e) => (e.components || []).length > 0)
+        .filter(
+          (e) =>
+            !q || `${e.name} ${e.employeeNumber ?? ""}`.toLowerCase().includes(q),
+        )
         .map((e) => ({
           name: e.name,
           employeeNumber: e.employeeNumber ?? "",
