@@ -965,9 +965,16 @@ function extractFromSummaryRow(worksheet, summary, headerInfo) {
     if (cols.workdays) out.workdays = getCellNumber(row.getCell(cols.workdays));
     if (cols.notes) out.notes = normalize(getCellText(row.getCell(cols.notes)));
   }
-  // Last-resort fallback: if we couldn't infer a 100% column, take the first
-  // plausible numeric cell on the summary row.
-  if (out.hours100 == null) {
+  // Last-resort fallback: if we couldn't even LOCATE a 100% column on this
+  // sheet, take the first plausible numeric cell on the summary row. Gated on
+  // the column mapping itself (not just this row's value being null) — a row
+  // for a role that genuinely worked zero 100% hours (e.g. a weekend-only
+  // role with only 150% hours) correctly has a blank 100% cell, and must NOT
+  // fall through to this scan, or it grabs that row's 150%-hours cell instead
+  // and duplicates it into hours100 (see the "התלמדות מוקדן" bug: a 150%-only
+  // role ended up with hours100 === hours150).
+  const hasHours100Col = !!(headerInfo && headerInfo.columns.hours100);
+  if (out.hours100 == null && !hasHours100Col) {
     let firstNum = null;
     row.eachCell({ includeEmpty: false }, (cell, col) => {
       if (firstNum != null) return;
@@ -1122,6 +1129,35 @@ function bucketsApproxEqual(a, b, tol = 0.5) {
     if (Math.abs((a[k] || 0) - (b[k] || 0)) > tol) return false;
   }
   return true;
+}
+
+// Cap the TOTAL of one hour-band (idx: 0=100%, 2=150%) across every role in
+// payroll_data at `cap`, trimming the excess from the largest bucket(s)
+// first so a single bloated role absorbs the correction rather than
+// spreading it thin across every role the employee worked. Mutates
+// payroll_data in place. Returns { total, cap } (the PRE-trim total) when a
+// cap was applied, or null when the total was already within range.
+function capRoleHoursTotal(payroll_data, idx, cap) {
+  const roles = Object.keys(payroll_data);
+  const total = roles.reduce(
+    (s, r) => s + (Number(payroll_data[r].hours[idx]) || 0),
+    0,
+  );
+  if (total <= cap) return null;
+  let excess = total - cap;
+  const sorted = [...roles].sort(
+    (a, b) =>
+      (Number(payroll_data[b].hours[idx]) || 0) -
+      (Number(payroll_data[a].hours[idx]) || 0),
+  );
+  for (const role of sorted) {
+    if (excess <= 0) break;
+    const hrs = payroll_data[role].hours;
+    const take = Math.min(hrs[idx] || 0, excess);
+    hrs[idx] = (hrs[idx] || 0) - take;
+    excess -= take;
+  }
+  return { total, cap };
 }
 
 function sumRolesData(rolesData) {
@@ -1889,11 +1925,20 @@ async function main() {
   }
 }
 
-async function extractEmployees(items, configMap = {}) {
+async function extractEmployees(items, configMap = {}, opts = {}) {
+  // Hourly-min (tip-based) roles are excluded from the break-deduction rule
+  // below: their hours never count toward a day's 7h threshold and are never
+  // charged a break. Wage type isn't known to this module on its own (it's a
+  // DB-side employee/role setting) — callers with DB access (payroll.js's
+  // /extract route) pass a resolver in; the CLI tool (main(), no DB) gets the
+  // pre-existing behavior via the no-op default.
+  const isHourlyMinRole =
+    typeof opts.isHourlyMinRole === "function" ? opts.isHourlyMinRole : () => false;
   const employees = new Map();
   const rawRows = [];
   const exceptions = [];
   const shiftIssues = [];
+  const hourCapWarnings = [];
   const monthCounts = new Map();
   for (const item of items) {
     const filename = item.filename || item.name || "uploaded.xlsx";
@@ -1959,12 +2004,21 @@ async function extractEmployees(items, configMap = {}) {
     // to the role with the MOST hours that day, taken from that role's 100%
     // hours first and overflowing into its 150%. `breaks` is the per-employee
     // total deducted.
+    //
+    // Hourly-min (tip-based) roles are excluded from this rule entirely:
+    // their hours don't count toward a day's 7h threshold (so a day that's
+    // only long because of an hourly-min shift never triggers a break), they
+    // are never picked as the role a break is charged to, and they are never
+    // used to absorb overflow — any break amount that non-hourly-min roles
+    // can't fully absorb is simply dropped rather than touching hourly-min
+    // hours.
     let breaks = 0;
     const breakByRole = new Map(); // role -> break hours to deduct
     for (const entries of emp.dailyBreakdown.values()) {
       let dayTotal = 0;
       const dayRoleHours = new Map();
       for (const e of entries) {
+        if (e.role && isHourlyMinRole(emp.name, e.role)) continue;
         const h =
           (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
         dayTotal += h;
@@ -1986,7 +2040,9 @@ async function extractEmployees(items, configMap = {}) {
     }
     // Deduct each role's accrued break from its own hours (100% then 150%).
     // Anything a role can't absorb (or whose name isn't a payroll bucket)
-    // overflows to the remaining roles so the full break is always removed.
+    // overflows to the remaining non-hourly-min roles so the full break is
+    // removed where possible; any amount that still can't be placed is
+    // dropped rather than touching an hourly-min role's hours.
     let overflow = 0;
     for (const [role, amount] of breakByRole) {
       let remaining = amount;
@@ -2003,7 +2059,9 @@ async function extractEmployees(items, configMap = {}) {
       overflow += remaining;
     }
     if (overflow > 0) {
-      const roleKeys = Object.keys(payroll_data);
+      const roleKeys = Object.keys(payroll_data).filter(
+        (role) => !isHourlyMinRole(emp.name, role),
+      );
       for (const role of roleKeys) {
         if (overflow <= 0) break;
         const hrs = payroll_data[role].hours;
@@ -2018,6 +2076,34 @@ async function extractEmployees(items, configMap = {}) {
         hrs[2] = (hrs[2] || 0) - take;
         overflow -= take;
       }
+    }
+    // --- Hour caps (sanity check against unrealistic monthly totals) ---
+    // An employee's TOTAL 100% hours (summed across every role, after the
+    // break deduction above) is capped at 182/month; total 150% hours at
+    // 45/month. These are meant to catch data/extraction errors (e.g. the
+    // "התלמדות מוקדן" bug where a 150%-only role's hours got duplicated into
+    // its own 100% bucket) rather than to encode a real payroll rule, so
+    // exceeding them clamps the total AND records a warning rather than
+    // silently accepting an implausible number.
+    const cap100 = capRoleHoursTotal(payroll_data, 0, 182);
+    if (cap100) {
+      hourCapWarnings.push({
+        name: emp.name,
+        field: "hours100",
+        label: "100%",
+        from: cap100.total,
+        to: cap100.cap,
+      });
+    }
+    const cap150 = capRoleHoursTotal(payroll_data, 2, 45);
+    if (cap150) {
+      hourCapWarnings.push({
+        name: emp.name,
+        field: "hours150",
+        label: "150%",
+        from: cap150.total,
+        to: cap150.cap,
+      });
     }
     let workdays = 0;
     for (const w of emp.workdaysPerSheet.values()) {
@@ -2054,7 +2140,7 @@ async function extractEmployees(items, configMap = {}) {
     };
   });
   list.sort((a, b) => a.name.localeCompare(b.name, "he"));
-  return { employees: list, exceptions, month, shiftIssues };
+  return { employees: list, exceptions, month, shiftIssues, hourCapWarnings };
 }
 
 module.exports = { extractEmployees, main };

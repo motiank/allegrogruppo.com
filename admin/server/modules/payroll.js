@@ -678,7 +678,11 @@ async function resolveEmployeeId(rest, emp) {
 // records (with per-role wages + contractor flag), the payroll-soft number map,
 // standard days/hours, and the branch's payroll software. Shared by the export
 // and tlush routes.
-async function loadExportCtx(rest, month) {
+// Load this restaurant's active employees keyed by (trimmed) name, each
+// annotated with `rolesByName` (compound-wage role entries keyed by role
+// name). Shared by loadExportCtx (export/tlush) and /extract (break-rule
+// wage-type lookups) so both see the same wage config.
+async function loadEmpByName(rest) {
   const [empRows] = await executeSql(
     "SELECT name, ID_nmbr, travel, maxTravel, hourly_wage, wage_type, new_wage_type, wage, roles, contractor FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
     { rest },
@@ -701,6 +705,24 @@ async function loadExportCtx(rest, month) {
     e.rolesByName = rolesByName;
     empByName.set(String(e.name).trim(), e);
   }
+  return empByName;
+}
+
+// Resolve whether a given (employee name, role) pair is currently configured
+// as an hourly-min wage type (role-level type, falling back to the
+// employee-level type) — tip-based shifts that the break rule excludes.
+// Unknown employees/roles (e.g. not yet saved to the DB) resolve to false,
+// same as every other wage-type-dependent rule in this file.
+const isHourlyMinRoleFor = (empByName) => (name, role) => {
+  const dbEmp = empByName.get(String(name || "").trim());
+  if (!dbEmp) return false;
+  const roleEntry = dbEmp.rolesByName && dbEmp.rolesByName[String(role || "").trim()];
+  const roleType = (roleEntry && roleEntry.new_wage_type) || dbEmp.new_wage_type;
+  return !!roleType && roleType.startsWith("hourly_min_");
+};
+
+async function loadExportCtx(rest, month) {
+  const empByName = await loadEmpByName(rest);
   const [micpalRows] = await executeSql(
     "SELECT keyName, ID_nmbr FROM payroll_soft_ix WHERE ID_nmbr IS NOT NULL",
     {},
@@ -803,8 +825,14 @@ const Router = () => {
             .json({ error: "No .xlsx files found in upload" });
         }
 
-        const { employees, exceptions, month, shiftIssues } =
-          await extractEmployees(items);
+        // Hourly-min (tip-based) roles are excluded from the break-deduction
+        // rule (see extractEmployees) — only known for employees already
+        // saved with a wage type configured; a brand-new employee gets the
+        // deduction normally until saved and re-extracted.
+        const empByName = rest ? await loadEmpByName(rest) : new Map();
+        const isHourlyMinRole = isHourlyMinRoleFor(empByName);
+        const { employees, exceptions, month, shiftIssues, hourCapWarnings } =
+          await extractEmployees(items, {}, { isHourlyMinRole });
 
         const existingKeys = await fetchExistingKeys(rest);
         const newOnly = employees.filter((e) => {
@@ -852,6 +880,7 @@ const Router = () => {
           month,
           exceptions,
           shiftIssues: shiftIssues || [],
+          hourCapWarnings: hourCapWarnings || [],
           processed: items.length,
           totalExtracted: employees.length,
           alreadyExisting: employees.length - newOnly.length,
@@ -2217,6 +2246,9 @@ const Router = () => {
           // Multiple hourly rates were split for display, but Micpal's real
           // export merges them back into one rate — see tlush.js.
           mixedRates: !!(c.tlush && c.tlush.mixedRates),
+          // Rate groups beyond the 2 supported slots — excluded from pay
+          // here, reported so the office can handle them manually.
+          excludedRateGroups: (c.tlush && c.tlush.excludedRateGroups) || [],
         }));
       res.json({ payrollSoft, employees });
     } catch (err) {
@@ -2914,6 +2946,10 @@ const Router = () => {
       if (comps.length === 0) continue;
       let netTotal = 0;
       let grossTotal = 0;
+      const excludedHours = (e.excludedRateGroups || []).reduce(
+        (s, g) => s + (Number(g.hours) || 0),
+        0,
+      );
       comps.forEach((c, ci) => {
         const quantity = Number(c.quantity) || 0;
         const wage = Number(c.wage) || 0;
@@ -2924,10 +2960,16 @@ const Router = () => {
           // Name/employee number only on the first row of this employee's
           // block — blank on the rest, matching the on-screen table. A ⚠
           // suffix flags employees whose real Micpal export merges these
-          // rate groups back into one rate.
+          // rate groups back into one rate; a second ⚠ flags hours excluded
+          // entirely (more than the 2 rate slots this תלוש supports) that
+          // still need to be paid manually.
           name:
             ci === 0
-              ? (e.name || "") + (e.mixedRates ? " ⚠ (תעריפים מעורבים)" : "")
+              ? (e.name || "") +
+                (e.mixedRates ? " ⚠ (תעריפים מעורבים)" : "") +
+                (excludedHours > 0
+                  ? ` ⚠ (${excludedHours.toFixed(2)}ש לא כלולות)`
+                  : "")
               : "",
           employeeNumber: ci === 0 ? (e.employeeNumber ?? "") : "",
           code: c.code ?? "",

@@ -123,12 +123,21 @@ const decomposeMicComponents = (row) => {
   // already sums every role into that one rate. Here, for the on-screen
   // breakdown only, split by each role's OWN rate (row.roleBreakdown, already
   // computed for the Shiklulit exporter): the group matching the row's own
-  // default rate keeps the existing "שכר יסוד שעתי" labels/codes; every other
-  // distinct rate becomes an "extra" group ("שכר נוסף שעתי" / "שעות נ. X%",
-  // code 31 like Shiklulit's "other rate" convention). mixedRates flags when
-  // this happened, so the caller can warn that the real Micpal file won't
-  // reflect the split (it still exports the merged single-rate totals).
+  // default rate keeps the existing "שכר יסוד שעתי" labels/codes; the single
+  // OTHER distinct rate with the most hours becomes the "extra" group ("שכר
+  // נוסף שעתי" / "שעות נ. X%", code 31 like Shiklulit's "other rate"
+  // convention). mixedRates flags when this happened, so the caller can warn
+  // that the real Micpal file won't reflect the split (it still exports the
+  // merged single-rate totals).
+  //
+  // Only 2 rate "slots" exist per employee in this payroll's reporting
+  // (base + one other) — if there are 2+ OTHER distinct rates beyond the
+  // default, only the largest-by-hours one gets a slot; the rest are excluded
+  // from pay here entirely and returned as `excludedRateGroups` so the caller
+  // can report them (e.g. for manual payment) instead of silently emitting
+  // unlimited extra-rate lines the real payroll software has no room for.
   let mixedRates = false;
+  let excludedRateGroups = [];
   if (row.isGlobal) {
     addAmount(1, "שכר גלובאלי", 1, row.amount);
   } else {
@@ -148,18 +157,27 @@ const decomposeMicComponents = (row) => {
       const defaultKey = row.hourlyWage == null ? "null" : String(row.hourlyWage);
       const primary = byRate.get(defaultKey) || null;
       byRate.delete(defaultKey);
-      const extras = [...byRate.values()];
-      mixedRates = extras.length > 0;
+      const allOthers = [...byRate.values()].sort(
+        (a, b) => b.h100 + b.h125 + b.h150 - (a.h100 + a.h125 + a.h150),
+      );
+      const keptExtra = allOthers[0] || null;
+      excludedRateGroups = allOthers.slice(1).map((g) => ({
+        rate: g.rate,
+        h100: g.h100,
+        h125: g.h125,
+        h150: g.h150,
+        hours: g.h100 + g.h125 + g.h150,
+      }));
+      mixedRates = !!keptExtra;
 
       addHours(1, "שכר יסוד שעתי", primary?.h100, row.hourlyWage);
       addHours(38, "שעות 125%", primary?.h125, row.hourlyWage != null ? row.hourlyWage * 1.25 : null);
       addHours(39, "שעות 150%", primary?.h150, row.hourlyWage != null ? row.hourlyWage * 1.5 : null);
-      extras.forEach((g, i) => {
-        const suffix = i === 0 ? "" : ` ${i + 1}`;
-        addHours(31, `שכר נוסף שעתי${suffix}`, g.h100, g.rate);
-        addHours(38, `שעות נ. 125%${suffix}`, g.h125, g.rate != null ? g.rate * 1.25 : null);
-        addHours(39, `שעות נ. 150%${suffix}`, g.h150, g.rate != null ? g.rate * 1.5 : null);
-      });
+      if (keptExtra) {
+        addHours(31, "שכר נוסף שעתי", keptExtra.h100, keptExtra.rate);
+        addHours(38, "שעות נ. 125%", keptExtra.h125, keptExtra.rate != null ? keptExtra.rate * 1.25 : null);
+        addHours(39, "שעות נ. 150%", keptExtra.h150, keptExtra.rate != null ? keptExtra.rate * 1.5 : null);
+      }
     } else {
       // No per-role breakdown available — fall back to the merged totals.
       addHours(1, "שכר יסוד שעתי", row.hours100, row.hourlyWage);
@@ -172,7 +190,7 @@ const decomposeMicComponents = (row) => {
   addAmount(3, "נסיעות", 1, row.travel);
   addAmount(32, "בונוס", 1, row.bonus);
   if (num(row.meals)) addAmount(21, "ארוחות", row.meals, row.mealWorth);
-  return { comps, mixedRates };
+  return { comps, mixedRates, excludedRateGroups };
 };
 
 // Build the tlush for one employee. `row` is a buildExportRow() result.
@@ -203,7 +221,7 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
   }
 
   // Micpal
-  const { comps, mixedRates } = decomposeMicComponents(row);
+  const { comps, mixedRates, excludedRateGroups } = decomposeMicComponents(row);
   return {
     ...base,
     components: comps,
@@ -211,6 +229,10 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
     // the real Micpal xlsx (micRow, below) has no second-rate column and
     // still exports everything merged into one rate.
     mixedRates,
+    // Rate groups beyond the 2 supported slots (base + one other) — excluded
+    // from `comps` entirely (not paid through this tlush), reported here so
+    // the caller can flag them for manual handling.
+    excludedRateGroups,
     micRow: pickMicRow(row),
   };
 }

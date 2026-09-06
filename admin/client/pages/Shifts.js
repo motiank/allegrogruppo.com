@@ -171,17 +171,22 @@ const isDummyEmpNumber = (n) =>
 const MIN_HOURLY_WAGE = Number(import.meta.env.VITE_MIN_HOURLY_WAGE) || 35.4;
 
 // Total break hours for an employee: 0.5h for each day whose total paid hours
-// (h100+h125+h150) exceed 7. Prefers the server-computed `emp.breaks`; falls
-// back to recomputing from the persisted daily_breakdown (e.g. payroll loaded
-// from DB). Mirrors the deduction in payroll_summary.js extractEmployees().
-const computeBreaks = (emp) => {
-  if (emp && typeof emp.breaks === "number") return emp.breaks;
+// (h100+h125+h150) exceed 7, EXCLUDING hours worked in an hourly-min
+// (tip-based) role — those never count toward the 7h threshold and are never
+// charged a break (see isHourlyMinWage). `isHourlyMin(role)` is omitted when
+// the caller has no empData (e.g. no wage config resolvable yet), which
+// preserves the old no-exclusion behavior for those cases. Always recomputed
+// client-side from daily_breakdown — the server's `breaks` field is not sent
+// to the client. Mirrors the deduction in payroll_summary.js
+// extractEmployees().
+const computeBreaks = (emp, isHourlyMin) => {
   const bd = emp && emp.daily_breakdown;
   if (!bd || typeof bd !== "object") return 0;
   let total = 0;
   for (const entries of Object.values(bd)) {
     let dayTotal = 0;
     for (const e of entries || []) {
+      if (e.role && isHourlyMin && isHourlyMin(e.role)) continue;
       dayTotal +=
         (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
     }
@@ -192,9 +197,10 @@ const computeBreaks = (emp) => {
 
 // Per-role break hours for an employee: same 0.5h/day rule, but attributed to
 // the role with the most hours that day (the employee works one role per day,
-// so this is exact). Returns a Map<role, hours>. Mirrors the breakByRole
-// attribution in payroll_summary.js extractEmployees().
-const computeBreaksByRole = (emp) => {
+// so this is exact). Hourly-min roles are excluded from the day total and can
+// never be picked as the charged role. Returns a Map<role, hours>. Mirrors
+// the breakByRole attribution in payroll_summary.js extractEmployees().
+const computeBreaksByRole = (emp, isHourlyMin) => {
   const map = new Map();
   const bd = emp && emp.daily_breakdown;
   if (!bd || typeof bd !== "object") return map;
@@ -202,6 +208,7 @@ const computeBreaksByRole = (emp) => {
     let dayTotal = 0;
     const dayRoleHours = new Map();
     for (const e of entries || []) {
+      if (e.role && isHourlyMin && isHourlyMin(e.role)) continue;
       const h =
         (Number(e.h100) || 0) + (Number(e.h125) || 0) + (Number(e.h150) || 0);
       dayTotal += h;
@@ -652,6 +659,11 @@ const Shifts = () => {
   const [shiftIssues, setShiftIssues] = useState([]);
   const [shiftIssuesAcknowledged, setShiftIssuesAcknowledged] = useState(false);
 
+  // Sanity-check caps on monthly hour totals (182 @ 100%, 45 @ 150%) — server
+  // auto-trims the excess and reports it here. Informational only, doesn't
+  // block anything (unlike shiftIssues above).
+  const [hourCapWarnings, setHourCapWarnings] = useState([]);
+
   const selectedLabel = useMemo(() => {
     for (const group of RESTAURANT_GROUPS) {
       const m = group.items.find((i) => i.value === selectedRestaurant);
@@ -729,6 +741,7 @@ const Shifts = () => {
     setPayrollError(null);
     setShiftIssues([]);
     setShiftIssuesAcknowledged(false);
+    setHourCapWarnings([]);
   };
 
   // ---------- Step 2 file handling ----------
@@ -799,6 +812,7 @@ const Shifts = () => {
       setMonth(res.data.month || "");
       setExceptions(res.data.exceptions || []);
       setShiftIssues(res.data.shiftIssues || []);
+      setHourCapWarnings(res.data.hourCapWarnings || []);
       setShiftIssuesAcknowledged(false);
       setSaveResult(null);
       setSaveError(null);
@@ -1574,25 +1588,30 @@ const Shifts = () => {
 
   // Per-employee payload for the tlush-preview and save-export endpoints.
   const buildPayrollEmployeesPayload = () =>
-    allEmployees.map((e) => ({
-      name: e.name,
-      ID_nmbr: e.ID_nmbr,
-      payroll_data: e.payroll_data || {},
-      role_extras: e.role_extras || {},
-      workdays: e.workdays ?? null,
-      global: e.global ?? null,
-      netGross: e.netGross ?? null,
-      in_advance: coerceAdvance(e.in_advance),
-      breaks: computeBreaks(e),
-      work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
-      daily_breakdown:
-        e.daily_breakdown && typeof e.daily_breakdown === "object"
-          ? e.daily_breakdown
-          : {},
-      daily_hours:
-        e.daily_hours && typeof e.daily_hours === "object" ? e.daily_hours : {},
-      notes: Array.isArray(e.notes) ? e.notes : [],
-    }));
+    allEmployees.map((e) => {
+      const empData = lookupEmpData(wageMap, e);
+      return {
+        name: e.name,
+        ID_nmbr: e.ID_nmbr,
+        payroll_data: e.payroll_data || {},
+        role_extras: e.role_extras || {},
+        workdays: e.workdays ?? null,
+        global: e.global ?? null,
+        netGross: e.netGross ?? null,
+        in_advance: coerceAdvance(e.in_advance),
+        breaks: computeBreaks(e, (role) => isHourlyMinWage(empData, role)),
+        work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+        daily_breakdown:
+          e.daily_breakdown && typeof e.daily_breakdown === "object"
+            ? e.daily_breakdown
+            : {},
+        daily_hours:
+          e.daily_hours && typeof e.daily_hours === "object"
+            ? e.daily_hours
+            : {},
+        notes: Array.isArray(e.notes) ? e.notes : [],
+      };
+    });
 
   // Human label for an unexportable reason code.
   const reasonLabel = (code) =>
@@ -1640,22 +1659,25 @@ const Shifts = () => {
         {
           rest: selectedRestaurant,
           month,
-          employees: dedupedEmployees.map((e) => ({
-            name: e.name,
-            ID_nmbr: e.ID_nmbr,
-            payroll_data: e.payroll_data || {},
-            role_extras: e.role_extras || {},
-            workdays: e.workdays ?? null,
-            global: e.global ?? null,
-            netGross: e.netGross ?? null,
-            in_advance: e.in_advance ?? null,
-            breaks: computeBreaks(e),
-            work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
-            daily_hours:
-              e.daily_hours && typeof e.daily_hours === "object"
-                ? e.daily_hours
-                : {},
-          })),
+          employees: dedupedEmployees.map((e) => {
+            const empData = lookupEmpData(wageMap, e);
+            return {
+              name: e.name,
+              ID_nmbr: e.ID_nmbr,
+              payroll_data: e.payroll_data || {},
+              role_extras: e.role_extras || {},
+              workdays: e.workdays ?? null,
+              global: e.global ?? null,
+              netGross: e.netGross ?? null,
+              in_advance: e.in_advance ?? null,
+              breaks: computeBreaks(e, (role) => isHourlyMinWage(empData, role)),
+              work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+              daily_hours:
+                e.daily_hours && typeof e.daily_hours === "object"
+                  ? e.daily_hours
+                  : {},
+            };
+          }),
           incompleteNames: Array.from(flaggedNames),
         },
         { withCredentials: true },
@@ -1669,7 +1691,7 @@ const Shifts = () => {
     } finally {
       setTlushLoading(false);
     }
-  }, [selectedRestaurant, month, dedupedEmployees, flaggedNames]);
+  }, [selectedRestaurant, month, dedupedEmployees, flaggedNames, wageMap]);
 
   // Invalidate the cached tlush whenever the underlying data changes.
   useEffect(() => {
@@ -1825,8 +1847,9 @@ const Shifts = () => {
             role_extras: e.role_extras || {},
             workdays: e.workdays,
             // Total break hours → meals (שווי ארוחות) in the export. Computed
-            // the same way as the on-screen breaks column (0.5h per long day).
-            breaks: computeBreaks(e),
+            // the same way as the on-screen breaks column (0.5h per long day,
+            // excluding hourly-min/tip-based roles).
+            breaks: computeBreaks(e, (role) => isHourlyMinWage(empData, role)),
             in_advance: e.in_advance ?? null, // מפרעה
             // Source for the Shiklulit recordType=4 actual-attendance rows:
             // work_dates → actual work days, daily_hours → actual work hours.
@@ -1961,8 +1984,9 @@ const Shifts = () => {
       } else if (dailyTravel != null) {
         empTravel = dailyTravel * wd;
       }
-      const empBreaks = computeBreaks(emp);
-      const breaksByRole = computeBreaksByRole(emp);
+      const isHourlyMin = (role) => isHourlyMinWage(empData, role);
+      const empBreaks = computeBreaks(emp, isHourlyMin);
+      const breaksByRole = computeBreaksByRole(emp, isHourlyMin);
       // Payroll-software employee number (מס עובד) for the new table column.
       const empNumber = empData?.empNumber ?? null;
 
@@ -2858,6 +2882,54 @@ const Shifts = () => {
         </div>
       )}
 
+      {hourCapWarnings.length > 0 && (
+        <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
+          <div style={{ fontWeight: 600, marginBottom: "6px" }}>
+            ⚠️ {hourCapWarnings.length} monthly hour total
+            {hourCapWarnings.length === 1 ? "" : "s"} exceeded a sanity cap and
+            was auto-trimmed
+          </div>
+          <div
+            style={{
+              maxHeight: "200px",
+              overflowY: "auto",
+              border: `1px solid ${theme.border}`,
+              borderRadius: "4px",
+              backgroundColor: theme.surface,
+              color: theme.text,
+              marginTop: "6px",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "0.85rem",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th style={styles.th}>employee</th>
+                  <th style={styles.th}>band</th>
+                  <th style={styles.th}>from</th>
+                  <th style={styles.th}>capped to</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hourCapWarnings.map((w, idx) => (
+                  <tr key={idx}>
+                    <td style={styles.td}>{w.name || "—"}</td>
+                    <td style={styles.td}>{w.label}</td>
+                    <td style={styles.td}>{fmtNum(w.from)}</td>
+                    <td style={styles.td}>{fmtNum(w.to)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div style={styles.summary}>
         Restaurant:{" "}
         <strong style={{ color: theme.text }}>{selectedLabel}</strong>
@@ -3008,6 +3080,14 @@ const Shifts = () => {
       );
     }
 
+    // Employees with rate groups excluded from pay because they have more
+    // than the 2 rate slots this payroll's תלוש supports (base + one other).
+    // Computed from the full (unfiltered/unsorted) employee list so the
+    // warning stays visible regardless of the on-screen search/sort.
+    const excludedRateWarnings = (tlushData?.employees || []).filter(
+      (e) => (e.excludedRateGroups || []).length > 0,
+    );
+
     const payment = (c) => (Number(c.quantity) || 0) * (Number(c.wage) || 0);
     const allComps = emps.flatMap((e) => e.components || []);
     const hasAnyNet = allComps.some((c) => c.netGross === "net");
@@ -3036,6 +3116,7 @@ const Shifts = () => {
           name: e.name,
           employeeNumber: e.employeeNumber ?? "",
           mixedRates: !!e.mixedRates,
+          excludedRateGroups: e.excludedRateGroups || [],
           components: (e.components || []).map((c) => ({
             code: c.code,
             label: c.label,
@@ -3081,6 +3162,53 @@ const Shifts = () => {
 
     return (
       <>
+        {excludedRateWarnings.length > 0 && (
+          <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
+            <div style={{ fontWeight: 600, marginBottom: "6px" }}>
+              ⚠️ {excludedRateWarnings.length} employee
+              {excludedRateWarnings.length === 1 ? "" : "s"} with more than 2
+              rate types — extra hours excluded from תלוש, pay manually
+            </div>
+            <div
+              style={{
+                maxHeight: "200px",
+                overflowY: "auto",
+                border: `1px solid ${theme.border}`,
+                borderRadius: "4px",
+                backgroundColor: theme.surface,
+                color: theme.text,
+                marginTop: "6px",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "0.85rem",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th style={styles.th}>employee</th>
+                    <th style={styles.th}>excluded rate</th>
+                    <th style={styles.th}>hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {excludedRateWarnings.flatMap((e) =>
+                    (e.excludedRateGroups || []).map((g, gi) => (
+                      <tr key={`${e.name}::${gi}`}>
+                        <td style={styles.td}>{gi === 0 ? e.name : ""}</td>
+                        <td style={styles.td}>{fmtNum(g.rate)}</td>
+                        <td style={styles.td}>{fmtNum(g.hours)}</td>
+                      </tr>
+                    )),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         <div style={{ ...styles.tableWrapStep4, marginTop: "12px" }}>
           <table style={styles.tableStep4}>
             <thead>
@@ -3136,6 +3264,20 @@ const Shifts = () => {
                                 ⚠
                               </span>
                             )}
+                            {e.excludedRateGroups &&
+                              e.excludedRateGroups.length > 0 && (
+                                <span
+                                  title={`עובד זה עבד ביותר משני תעריפים. השעות הבאות אינן כלולות בתלוש ויש לשלמן בנפרד: ${e.excludedRateGroups
+                                    .map(
+                                      (g) =>
+                                        `${fmtNum(g.hours)}h @ ₪${fmtNum(g.rate)}`,
+                                    )
+                                    .join(", ")}`}
+                                  style={{ color: "#c62828", cursor: "help" }}
+                                >
+                                  ⚠
+                                </span>
+                              )}
                           </span>
                         ) : (
                           ""
