@@ -1131,33 +1131,16 @@ function bucketsApproxEqual(a, b, tol = 0.5) {
   return true;
 }
 
-// Cap the TOTAL of one hour-band (idx: 0=100%, 2=150%) across every role in
-// payroll_data at `cap`, trimming the excess from the largest bucket(s)
-// first so a single bloated role absorbs the correction rather than
-// spreading it thin across every role the employee worked. Mutates
-// payroll_data in place. Returns { total, cap } (the PRE-trim total) when a
-// cap was applied, or null when the total was already within range.
-function capRoleHoursTotal(payroll_data, idx, cap) {
-  const roles = Object.keys(payroll_data);
-  const total = roles.reduce(
+// Check the TOTAL of one hour-band (idx: 0=100%, 2=150%) across every role
+// in payroll_data against `cap`. Warning only — payroll_data is NOT modified
+// (a real long month must still be paid in full). Returns { total, cap } when
+// the total exceeds the cap, or null when it's within range.
+function checkRoleHoursTotal(payroll_data, idx, cap) {
+  const total = Object.keys(payroll_data).reduce(
     (s, r) => s + (Number(payroll_data[r].hours[idx]) || 0),
     0,
   );
-  if (total <= cap) return null;
-  let excess = total - cap;
-  const sorted = [...roles].sort(
-    (a, b) =>
-      (Number(payroll_data[b].hours[idx]) || 0) -
-      (Number(payroll_data[a].hours[idx]) || 0),
-  );
-  for (const role of sorted) {
-    if (excess <= 0) break;
-    const hrs = payroll_data[role].hours;
-    const take = Math.min(hrs[idx] || 0, excess);
-    hrs[idx] = (hrs[idx] || 0) - take;
-    excess -= take;
-  }
-  return { total, cap };
+  return total > cap ? { total, cap } : null;
 }
 
 function sumRolesData(rolesData) {
@@ -2079,13 +2062,13 @@ async function extractEmployees(items, configMap = {}, opts = {}) {
     }
     // --- Hour caps (sanity check against unrealistic monthly totals) ---
     // An employee's TOTAL 100% hours (summed across every role, after the
-    // break deduction above) is capped at 182/month; total 150% hours at
-    // 45/month. These are meant to catch data/extraction errors (e.g. the
+    // break deduction above) is checked against 182/month; total 150% hours
+    // against 45/month. These are meant to catch data/extraction errors (e.g. the
     // "התלמדות מוקדן" bug where a 150%-only role's hours got duplicated into
     // its own 100% bucket) rather than to encode a real payroll rule, so
-    // exceeding them clamps the total AND records a warning rather than
-    // silently accepting an implausible number.
-    const cap100 = capRoleHoursTotal(payroll_data, 0, 182);
+    // exceeding them only records a warning for the office to verify — the
+    // hours are left as-is, since a genuinely long month must be paid in full.
+    const cap100 = checkRoleHoursTotal(payroll_data, 0, 182);
     if (cap100) {
       hourCapWarnings.push({
         name: emp.name,
@@ -2095,7 +2078,7 @@ async function extractEmployees(items, configMap = {}, opts = {}) {
         to: cap100.cap,
       });
     }
-    const cap150 = capRoleHoursTotal(payroll_data, 2, 45);
+    const cap150 = checkRoleHoursTotal(payroll_data, 2, 45);
     if (cap150) {
       hourCapWarnings.push({
         name: emp.name,

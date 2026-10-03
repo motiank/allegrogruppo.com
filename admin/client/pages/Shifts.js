@@ -660,7 +660,8 @@ const Shifts = () => {
   const [shiftIssuesAcknowledged, setShiftIssuesAcknowledged] = useState(false);
 
   // Sanity-check caps on monthly hour totals (182 @ 100%, 45 @ 150%) — server
-  // auto-trims the excess and reports it here. Informational only, doesn't
+  // reports totals above them here for the office to verify; hours are NOT
+  // trimmed. Informational only, doesn't
   // block anything (unlike shiftIssues above).
   const [hourCapWarnings, setHourCapWarnings] = useState([]);
 
@@ -2886,8 +2887,8 @@ const Shifts = () => {
         <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
           <div style={{ fontWeight: 600, marginBottom: "6px" }}>
             ⚠️ {hourCapWarnings.length} monthly hour total
-            {hourCapWarnings.length === 1 ? "" : "s"} exceeded a sanity cap and
-            was auto-trimmed
+            {hourCapWarnings.length === 1 ? "" : "s"} exceeded a sanity cap — please
+            verify (hours were not changed)
           </div>
           <div
             style={{
@@ -2911,8 +2912,8 @@ const Shifts = () => {
                 <tr>
                   <th style={styles.th}>employee</th>
                   <th style={styles.th}>band</th>
-                  <th style={styles.th}>from</th>
-                  <th style={styles.th}>capped to</th>
+                  <th style={styles.th}>total</th>
+                  <th style={styles.th}>cap</th>
                 </tr>
               </thead>
               <tbody>
