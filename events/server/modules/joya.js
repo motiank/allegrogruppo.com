@@ -5,6 +5,11 @@ import { BRANCH_BY_SLUG } from "../data/branches.js";
 import { baseUrlFor, escapeHtml } from "../render/html.js";
 import { gtmHeadSnippet, gtmBodySnippet } from "../render/analytics.js";
 import { executeSql } from "../sources/dbpool.js";
+import {
+  TRACKING_PARAMS,
+  deviceFromUserAgent,
+  postLeadToLeadim,
+} from "../sources/leadim.js";
 
 // Minimal RTL "coming soon" page for links we reference now but build later
 // (per-branch pages, full menu, privacy policy). Reuses /css/joya.css.
@@ -32,8 +37,23 @@ ${gtmBodySnippet()}
 //
 // Unlike /:restaurant/:slug (DB-driven event pages), this is a bespoke page.
 // The lead form posts to /joya/inquiry, which persists to joya_event_leads
-// and (when enabled) forwards the lead to a Make.com webhook scenario.
+// and (when enabled) forwards the lead to a Make.com webhook scenario and to
+// lead.im (see sources/leadim.js).
 // ---------------------------------------------------------------------------
+
+// UTM/gclid values from a query string — preserved across the /inquiry
+// redirect so a retry after a validation error keeps its attribution.
+const pickTracking = (query = {}) =>
+  Object.fromEntries(
+    TRACKING_PARAMS.filter((k) => typeof query[k] === "string" && query[k]).map(
+      (k) => [k, query[k]],
+    ),
+  );
+
+const backToForm = (res, status, tracking) => {
+  const qs = new URLSearchParams({ ...tracking, lead: status });
+  res.redirect(303, `/joya?${qs}#lead`);
+};
 
 // Make.com (Integromat) webhook for new leads — set EVENTS_LEADS_WEBHOOK_URL
 // in .env, and EVENTS_LEADS_WEBHOOK_ENABLED=true to actually fire it (off by
@@ -68,7 +88,22 @@ export default () => {
     const leadStatus = ["sent", "error"].includes(req.query.lead)
       ? req.query.lead
       : null;
-    const html = renderJoyaPage({ baseUrl: baseUrlFor(req), leadStatus });
+    const baseUrl = baseUrlFor(req);
+
+    // Full landing URL (minus our own `lead` flag) + external referrer, for
+    // lead.im's lm_source / ref fields.
+    const pageUrl = new URL(req.originalUrl, baseUrl);
+    pageUrl.searchParams.delete("lead");
+    const referer = req.get("referer") || "";
+    const externalRef =
+      referer && new URL(referer, baseUrl).host !== pageUrl.host ? referer : "";
+
+    const tracking = {
+      ...pickTracking(req.query),
+      page_url: pageUrl.toString(),
+      ref: externalRef,
+    };
+    const html = renderJoyaPage({ baseUrl, leadStatus, tracking });
     res.set("Content-Type", "text/html; charset=utf-8").send(html);
   });
 
@@ -78,10 +113,11 @@ export default () => {
   router.post("/inquiry", async (req, res) => {
     const { name, phone, email, guests, event_date, branch, message, consent } =
       req.body || {};
+    const tracking = pickTracking(req.body);
 
     // Minimal validation: name + phone are required.
     if (!name || !phone) {
-      return res.redirect(303, "/joya?lead=error#lead");
+      return backToForm(res, "error", tracking);
     }
 
     const leadFields = {
@@ -106,10 +142,34 @@ export default () => {
         ...leadFields,
         created_at: new Date().toISOString(),
       });
-      res.redirect(303, "/joya?lead=sent#lead");
+
+      // lead.im has no dedicated guests/date fields — fold them into fld_msg.
+      const branchName = BRANCH_BY_SLUG[branch]?.name || branch || "";
+      const details = [
+        leadFields.guests && `מספר אורחים: ${leadFields.guests}`,
+        leadFields.event_date && `תאריך האירוע: ${leadFields.event_date}`,
+        branchName && `סניף: ${branchName}`,
+        message && `פרטי האירוע: ${message}`,
+      ].filter(Boolean);
+      postLeadToLeadim({
+        subject: "אירועים בג׳ויה",
+        name,
+        phone,
+        email,
+        choice: branchName,
+        message: details.join("\n"),
+        pageTitle: "אירועים בג׳ויה | Joya Cucina Italiana",
+        pageUrl: req.body.page_url || `${baseUrlFor(req)}/joya`,
+        branch: branchName,
+        device: deviceFromUserAgent(req.get("user-agent")),
+        ref: req.body.ref || "",
+        tracking,
+      });
+
+      backToForm(res, "sent", tracking);
     } catch (e) {
       console.error("[events][joya] inquiry insert failed:", e);
-      res.redirect(303, "/joya?lead=error#lead");
+      backToForm(res, "error", tracking);
     }
   });
 

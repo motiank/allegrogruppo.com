@@ -15,8 +15,8 @@ import { BRANCHES } from "../data/branches.js";
 // External / future assets ---------------------------------------------------
 const EVENTS_MENU_PDF =
   "https://joya.co.il/wp-content/uploads/2024/01/%D7%AA%D7%A4%D7%A8%D7%99%D7%98%D7%99-%D7%90%D7%99%D7%A8%D7%95%D7%A2%D7%99%D7%9D-%D7%92%D7%95%D7%99%D7%94-1.pdf";
-const PHONE_DISPLAY = "073-7592993";
-const PHONE_TEL = "+972737592993";
+const PHONE_DISPLAY = "055-4566993";
+const PHONE_TEL = "+972554566993";
 const CONTACT_NAME = "מעיין";
 const FACEBOOK = "https://www.facebook.com/NOUVAJOYA";
 const INSTAGRAM = "https://www.instagram.com/joyarest/";
@@ -70,7 +70,11 @@ const GALLERY = Array.from({ length: 12 }, (_, i) => `/images/joya/g-${String(i 
 const icon = (name) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
-export const renderJoyaPage = ({ baseUrl = "", leadStatus = null } = {}) => {
+export const renderJoyaPage = ({
+  baseUrl = "",
+  leadStatus = null,
+  tracking = {},
+} = {}) => {
   const url = `${baseUrl}/joya`;
   const ogImage = `${baseUrl}/images/joya/hero-1.jpg`;
 
@@ -88,6 +92,16 @@ export const renderJoyaPage = ({ baseUrl = "", leadStatus = null } = {}) => {
     (b) =>
       `<option value="${escapeHtml(b.slug)}">${escapeHtml(shortName(b))}${b.kosher ? " (כשר)" : ""}</option>`,
   ).join("");
+
+  // Landing-page attribution (UTMs, gclid, referrer, full URL) captured on
+  // GET /joya and carried through the plain-HTML form POST for lead.im.
+  const trackingInputs = Object.entries(tracking)
+    .filter(([, v]) => v)
+    .map(
+      ([k, v]) =>
+        `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}" />`,
+    )
+    .join("");
 
   const eventTypeCards = EVENT_TYPES.map(
     (e) => `
@@ -284,6 +298,7 @@ export const renderJoyaPage = ({ baseUrl = "", leadStatus = null } = {}) => {
       </div>
 
       <form class="lead-form" method="post" action="/joya/inquiry" novalidate>
+        ${trackingInputs}
         ${
           leadStatus === "sent"
             ? `<p class="lead-banner lead-banner--ok">תודה! קיבלנו את הפנייה ונחזור אליכם בהקדם.</p>`

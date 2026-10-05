@@ -4,8 +4,8 @@ import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
 // Shared chrome (document shell + header + footer) for Joya-branded pages,
 // so /joya and the /joya/branches/* pages look identical and stay in sync.
 
-export const PHONE_TEL = "+972737592993";
-export const PHONE_DISPLAY = "073-7592993";
+export const PHONE_TEL = "+972554566993";
+export const PHONE_DISPLAY = "055-4566993";
 export const CONTACT_NAME = "מעיין";
 export const FACEBOOK = "https://www.facebook.com/NOUVAJOYA";
 export const INSTAGRAM = "https://www.instagram.com/joyarest/";
