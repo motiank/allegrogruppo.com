@@ -350,13 +350,37 @@ const Employees = () => {
     setMicpalSyncing(true);
     setMicpalResult(null);
     setMicpalError(null);
-    try {
+    const send = (force) => {
       const fd = new FormData();
       fd.append("file", file, file.name);
       fd.append("rest", selectedRestaurant);
-      const res = await axios.post("/admin/payroll/micpal/sync", fd, {
+      if (force) fd.append("force", "1");
+      return axios.post("/admin/payroll/micpal/sync", fd, {
         withCredentials: true,
       });
+    };
+    try {
+      let res;
+      try {
+        res = await send(false);
+      } catch (err) {
+        // Server refuses a file that would hand many existing employee
+        // numbers to different people (likely an old / wrong export) until
+        // the user explicitly confirms.
+        const d = err.response?.data;
+        if (err.response?.status !== 409 || !d?.needsConfirm) throw err;
+        const samples = (d.samples || [])
+          .map((s) => `#${s.keyName}: ${s.from} → ${s.to}`)
+          .join("\n");
+        const ok = window.confirm(
+          `⚠️ ${d.error}\n\n${samples}\n\nלהמשיך ולדרוס בכל זאת?`,
+        );
+        if (!ok) {
+          setMicpalError(`Upload cancelled — ${d.error}`);
+          return;
+        }
+        res = await send(true);
+      }
       setMicpalResult(res.data);
     } catch (err) {
       setMicpalError(err.response?.data?.error || err.message || "Sync failed");

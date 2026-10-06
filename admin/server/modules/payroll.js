@@ -1907,6 +1907,46 @@ const Router = () => {
         // mic_company configured for this restaurant in shared/restaurants.json.
         const company = parsedCompany || micCompanyForBranch(rest) || null;
 
+        // Guard against uploading the wrong file (an old export or another
+        // company's): the upsert below collides on (company, keyName), so it
+        // silently hands every existing employee number to whoever the file
+        // lists under it. When many existing numbers would move to a
+        // different ID_nmbr, stop and make the user confirm (force=1). A
+        // handful of changes (e.g. "0" -> passport) is normal and passes.
+        const force = String(req.body?.force || "") === "1";
+        if (!force && company && items.length > 0) {
+          const [existing] = await executeSql(
+            "SELECT keyName, name, family, ID_nmbr FROM payroll_soft_ix WHERE company = :company",
+            { company },
+          );
+          const byKey = new Map(
+            (existing || []).map((r) => [String(r.keyName), r]),
+          );
+          let overlap = 0;
+          const reassigned = [];
+          for (const it of items) {
+            const old = byKey.get(String(it[0]));
+            if (!old) continue;
+            overlap += 1;
+            if (old.ID_nmbr && it[4] && String(old.ID_nmbr) !== String(it[4])) {
+              reassigned.push({
+                keyName: it[0],
+                from: `${old.name || ""} ${old.family || ""}`.trim(),
+                to: `${it[2] || ""} ${it[3] || ""}`.trim(),
+              });
+            }
+          }
+          if (reassigned.length > Math.max(10, overlap * 0.05)) {
+            return res.status(409).json({
+              needsConfirm: true,
+              error: `${reassigned.length} of ${overlap} existing employee numbers would be reassigned to a different person — is this the right (current) file?`,
+              reassignedCount: reassigned.length,
+              overlapCount: overlap,
+              samples: reassigned.slice(0, 5),
+            });
+          }
+        }
+
         // One INSERT per ~2000 rows — handful of statements at most, stays
         // safely under MySQL's max_allowed_packet (default 64MB).
         let upserted = 0;
