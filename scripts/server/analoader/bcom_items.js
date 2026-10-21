@@ -5,7 +5,7 @@
 //
 // Backfill (CLI), e.g. from the project root:
 //   node scripts/server/analoader/bcom_items.js --from 01/01/2026 --to 19/10/2026
-// Dates are DD/MM/YYYY like the loader.
+// Dates are DD/MM/YYYY like the loader. --pause (ms, default 2000) waits between calls.
 import moment from "moment";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -83,14 +83,17 @@ if (isMain) {
   const from = moment(String(argv.from || ""), "DD/MM/YYYY", true);
   const to = argv.to ? moment(String(argv.to), "DD/MM/YYYY", true) : moment().subtract(1, "days");
   if (!from.isValid() || !to.isValid() || from.isAfter(to)) {
-    console.log("usage: node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY]");
+    console.log("usage: node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]");
     process.exit(1);
   }
+  // Pause between Beecomm calls: long unpaused backfills get the API blocked (403 from CloudFront).
+  const pauseMs = Number(argv.pause ?? 2000);
   let total = 0;
   for (let day = from.clone(); !day.isAfter(to); day.add(1, "days")) {
     const d = day.format("DD/MM/YYYY");
     const saved = await saveItems(await bcomGetItemsByDay({ startDate: d, endDate: d }));
     total += saved;
+    await new Promise((r) => setTimeout(r, pauseMs));
     console.log(`${d}: ${saved} dish rows saved`);
   }
   console.log(`done: ${total} dish rows`);

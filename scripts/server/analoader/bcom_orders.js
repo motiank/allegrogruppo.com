@@ -6,7 +6,7 @@
 //
 // Backfill (CLI), e.g. from the project root:
 //   node scripts/server/analoader/bcom_orders.js --from 01/01/2026 --to 19/10/2026
-// Dates are DD/MM/YYYY like the loader. Long ranges are loaded one week at a time.
+// Dates are DD/MM/YYYY like the loader. --pause (ms, default 2000) waits between calls. Long ranges are loaded one week at a time.
 import moment from "moment";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -106,15 +106,18 @@ if (isMain) {
   const from = moment(String(argv.from || ""), "DD/MM/YYYY", true);
   const to = argv.to ? moment(String(argv.to), "DD/MM/YYYY", true) : moment().subtract(1, "days");
   if (!from.isValid() || !to.isValid() || from.isAfter(to)) {
-    console.log("usage: node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY]");
+    console.log("usage: node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]");
     process.exit(1);
   }
+  // Pause between Beecomm calls: long unpaused backfills get the API blocked (403 from CloudFront).
+  const pauseMs = Number(argv.pause ?? 2000);
   let total = 0;
   for (let start = from.clone(); !start.isAfter(to); start.add(7, "days")) {
     const end = moment.min(start.clone().add(6, "days"), to);
     const dates = { startDate: start.format("DD/MM/YYYY"), endDate: end.format("DD/MM/YYYY") };
     const saved = await saveOrders(await bcomGetOrders(dates));
     total += saved;
+    await new Promise((r) => setTimeout(r, pauseMs));
     console.log(`${dates.startDate} - ${dates.endDate}: ${saved} orders saved`);
   }
   console.log(`done: ${total} orders`);
