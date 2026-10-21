@@ -17,6 +17,7 @@ import JoyaLeads from "./pages/JoyaLeads";
 import Coupons from "./pages/Coupons";
 import Shifts from "./pages/Shifts";
 import Employees from "./pages/Employees";
+import Upload from "./pages/Upload";
 import axios from "axios";
 import useCurrentUser, { clearCachedUser } from "./hooks/useCurrentUser";
 
@@ -251,6 +252,18 @@ const App = () => {
         <Route
           path="/shifts"
           element={<Navigate to="/shift-tabit/create-payroll" replace />}
+        />
+        <Route
+          path="/upload"
+          element={
+            <ProtectedRoute>
+              <RestrictByRole allow={["restMngr"]}>
+                <Layout>
+                  <Upload />
+                </Layout>
+              </RestrictByRole>
+            </ProtectedRoute>
+          }
         />
         <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
         <Route path="/admin.html" element={<RootRoute />} />

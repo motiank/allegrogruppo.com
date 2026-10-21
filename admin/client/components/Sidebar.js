@@ -24,6 +24,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const allMenuItems = [
     { path: "/dashboard", label: "Dashboard" },
+    { path: "/upload", label: "Upload files" },
     { path: "/orders", label: "Orders History" },
     {
       path: "/analytics",
@@ -54,7 +55,9 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const menuItems =
     role === "restMngr"
-      ? allMenuItems.filter((item) => item.path === "/shift-tabit")
+      ? allMenuItems.filter(
+          (item) => item.path === "/shift-tabit" || item.path === "/upload",
+        )
       : allMenuItems;
 
   const handleNavigation = (path) => {

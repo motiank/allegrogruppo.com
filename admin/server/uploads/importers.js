@@ -1,0 +1,102 @@
+// Importers for the kinds the "Upload files" page writes itself (handler "server").
+// Each one runs in a single transaction and returns counts for the result screen.
+import { getDbPool } from "../sources/dbpool.js";
+import { loadWorkbook } from "./workbook.js";
+import { parseTabitDetailed, parseBankHapoalim } from "./parsers.js";
+
+const CHUNK = 500;
+
+const inTransaction = async (fn) => {
+  const pool = await getDbPool();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const out = await fn(conn);
+    await conn.commit();
+    return out;
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+};
+
+const bulk = async (conn, sql, rows) => {
+  let affected = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const [res] = await conn.query(sql, [rows.slice(i, i + CHUNK)]);
+    affected += res.affectedRows || 0;
+  }
+  return affected;
+};
+
+// Tabit detailed report → tabit_shifts. Replaces the month's rows of every employee in the file
+// (other employees of the same branch/month stay, so two partial reports can be uploaded).
+export const importTabitDetailed = async (buffer, { rest, uploadId }) => {
+  const parsed = parseTabitDetailed(await loadWorkbook(buffer));
+  if (!parsed.month) throw new Error("the month of the report was not found");
+  const month = parsed.month;
+  return inTransaction(async (conn) => {
+    let replaced = 0;
+    const rows = [];
+    for (const e of parsed.employees) {
+      const [del] = await conn.execute("DELETE FROM tabit_shifts WHERE rest = :rest AND month = :month AND employee_name = :name", {
+        rest,
+        month,
+        name: e.name,
+      });
+      replaced += del.affectedRows || 0;
+      for (const s of e.shifts) {
+        rows.push([rest, month, e.name, e.clockId, s.work_date, s.block_no, s.role, s.clock_in, s.clock_out, s.note, uploadId]);
+      }
+    }
+    const inserted = await bulk(
+      conn,
+      "INSERT INTO tabit_shifts (rest, month, employee_name, clock_id, work_date, block_no, role, clock_in, clock_out, note, upload_id) VALUES ?",
+      rows,
+    );
+    const noClockOut = rows.filter((r) => r[7] && !r[8]).length;
+    return {
+      month,
+      employees: parsed.employees.length,
+      shifts: inserted,
+      replacedOldRows: replaced,
+      shiftsWithoutClockOut: noClockOut,
+      skippedSheets: parsed.skipped,
+    };
+  });
+};
+
+// Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped.
+export const importBankHapoalim = async (buffer, { uploadId }) => {
+  const wb = await loadWorkbook(buffer);
+  const parsed = parseBankHapoalim(wb.worksheets.find((w) => w.rowCount > 0));
+  if (parsed.error) throw new Error(parsed.error);
+  if (!parsed.account) throw new Error("account number not found");
+  const rows = parsed.rows.map((r) => [
+    "hapoalim",
+    r.account,
+    r.tx_date,
+    r.action_code,
+    r.action,
+    r.details ? r.details.slice(0, 500) : null,
+    r.reference,
+    r.bundle,
+    r.debit,
+    r.credit,
+    r.balance,
+    r.note,
+    r.row_key,
+    uploadId,
+  ]);
+  return inTransaction(async (conn) => {
+    const inserted = await bulk(
+      conn,
+      `INSERT IGNORE INTO bank_transactions (bank, account, tx_date, action_code, action, details, reference, bundle, debit, credit,
+         balance, note, row_key, upload_id) VALUES ?`,
+      rows,
+    );
+    return { account: parsed.account, from: parsed.from, to: parsed.to, rows: rows.length, newRows: inserted, alreadyStored: rows.length - inserted };
+  });
+};

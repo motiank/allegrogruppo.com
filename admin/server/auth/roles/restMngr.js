@@ -1,6 +1,7 @@
 import express from "express";
 
 import { Router as payroll } from "../../modules/payroll.js";
+import { Router as files } from "../../modules/files.js";
 import users from "../../sources/users.js";
 
 const lookupAllowed = (req) =>
@@ -63,6 +64,8 @@ const api = function () {
   });
 
   rest.use("/payroll", restrictRestaurant, payroll());
+  // Upload files: own branches only (checked inside, after the files are read); no bank files.
+  rest.use("/files", files({ restricted: true }));
   return rest;
 };
 

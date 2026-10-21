@@ -9,6 +9,7 @@ import { Router as affiliates } from "../../modules/affiliates.js";
 import { Router as coupons } from "../../modules/coupons.js";
 import { Router as payroll } from "../../modules/payroll.js";
 import { Router as joyaLeads } from "../../modules/joyaLeads.js";
+import { Router as files } from "../../modules/files.js";
 
 const api = function () {
   var admin = express.Router();
@@ -30,6 +31,7 @@ const api = function () {
   admin.use("/coupons", coupons());
   admin.use("/payroll", payroll());
   admin.use("/joya-leads", joyaLeads());
+  admin.use("/files", files());
   return admin;
 };
 
