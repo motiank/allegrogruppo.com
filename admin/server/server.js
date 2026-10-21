@@ -28,6 +28,7 @@ const cookieSessionStorage = authModule.cookieSessionStorage;
 const managementModule = await import("./auth/management.js");
 const managementRouter = managementModule.default;
 const { Router: orderSystemRouter } = await import("./modules/orderSystem.js");
+const { Router: localApiRouter } = await import("./modules/localApi.js");
 
 const app = express();
 const PORT = process.env.ADMIN_PORT || 3021;
@@ -71,6 +72,9 @@ app.get("/config", (req, res) => {
   res.json({ darkMode });
 });
 
+// Read-only data API (shifts, payroll, beecomm) - no login, loopback connections only
+app.use("/local-api/v1", localApiRouter());
+
 // Protected admin routes - require authentication
 app.use("/admin", gateKeeper, managementRouter);
 
@@ -92,6 +96,7 @@ app.get("*", (req, res, next) => {
     req.path.startsWith("/auth") ||
     req.path.startsWith("/admin") ||
     req.path.startsWith("/health") ||
+    req.path.startsWith("/local-api") ||
     req.path.startsWith("/config")
   ) {
     return next();

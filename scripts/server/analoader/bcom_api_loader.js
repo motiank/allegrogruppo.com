@@ -1,6 +1,9 @@
 // index.js
 import axios from 'axios';
 import moment from 'moment';
+import zlib from 'zlib';
+
+const BCOM_CUBE_URL = 'https://20cs5hma71.execute-api.eu-west-1.amazonaws.com/prod/api';
 
 const bcom_rest_map = {
   '64251a17042cbcc5928813fd': [
@@ -35,65 +38,281 @@ const zReports_payload = {
   // token: '',
 };
 
+const getOrderHeaders_payload = {
+  action: 'getOrderHeaders',
+  filter: {
+    searchTerm: null,
+    orderNumber: null,
+    orderTypes: [],
+    clientName: null,
+    waiterName: null,
+    tableNumber: null,
+    dishes: [],
+    zNumber: null,
+    cardNumber: null,
+    orderTotal: null,
+    orderSources: [],
+    dishesFilterType: 'OR',
+    serviceType: 'service',
+    serviceFrom: null,
+    serviceTo: null,
+    serviceFromOperator: '$gte',
+    serviceToOperator: '$lte',
+    discountType: 'discount',
+    discountFrom: null,
+    discountTo: null,
+    discountFromOperator: '$gte',
+    discountToOperator: '$lte',
+    profitUnits: [],
+    drawers: [],
+    memberCardExists: false,
+    refundExists: false,
+    cashRefundExists: false,
+    upsaleExists: false,
+    itemFullDiscountExists: false,
+    canceledItemExists: false,
+    externalsOnly: false,
+    clientPhoneNumber: null,
+    withCash: false,
+    paymentTypes: [],
+    optimaGuestName: null,
+    optimaRoomNumber: null,
+    optimaGuestFolio: null,
+  },
+};
+
+const exceptionsReport_payload = {
+  action: 'createExceptionsReport',
+  filter: {
+    searchTerm: null,
+    secondSearchTerm: null,
+    thirdSearchTerm: null,
+    strArray: [],
+  },
+};
+
+const itemsReport_payload = {
+  action: 'getAnalyticsItemsReport',
+  filter: {
+    startTs: null,
+    endTs: null,
+    searchTerm: null,
+    splitHours: false,
+    splitBranches: true,
+    splitDays: false,
+    includeExternalIdentity: false,
+    globalTimeSettings: false,
+    catalog: { level0Id: null, level1Id: null, level2Id: null, level3Id: null },
+  },
+};
+
+// Restaurants (bcom restaurantId -> branches) to query, optionally narrowed to the given branch ids.
+function restaurantsFor(branchIds) {
+  const entries = Object.entries(bcom_rest_map);
+  if (!branchIds || branchIds.length === 0) return entries;
+  return entries
+    .map(([rest_id, branches]) => [rest_id, branches.filter((b) => branchIds.includes(b.id))])
+    .filter(([, branches]) => branches.length > 0);
+}
+
+// Access tokens live 1h; reuse one until 5 minutes before it expires.
+let cachedToken = null;
+
+// Exchange the backoffice (Firebase) refresh token for a short-lived access token.
+// The refresh token is taken from the backoffice.beecommcloud.com securetoken request.
+async function getBcomAccessToken() {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token;
+  const { BCOM_BO_API_KEY, BCOM_BO_REFRESH_TOKEN } = process.env;
+  if (!BCOM_BO_API_KEY || !BCOM_BO_REFRESH_TOKEN) {
+    throw new Error('BCOM_BO_API_KEY and BCOM_BO_REFRESH_TOKEN must be set in .env');
+  }
+  const { data } = await axios.post(
+    `https://securetoken.googleapis.com/v1/token?key=${BCOM_BO_API_KEY}`,
+    new URLSearchParams({ grant_type: 'refresh_token', refresh_token: BCOM_BO_REFRESH_TOKEN }),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+  );
+  cachedToken = { token: data.access_token, expiresAt: Date.now() + (Number(data.expires_in) - 300) * 1000 };
+  return data.access_token;
+}
+
+async function postCube(path, payload, accessToken) {
+  const { data } = await axios.post(
+    `${BCOM_CUBE_URL}/${path}`,
+    { ...payload, token: `Bearer ${accessToken}` },
+    { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+// orders/cube returns its rows as base64-encoded gzipped JSON
+function decodeBase64Gzip(encoded) {
+  return JSON.parse(zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
+}
+
 async function bcomApiLoad(dates, dal_push) {
   try {
-    // 1. Exchange the refresh token for a new access token
-    const refreshToken =
-    'AMf-vBzfiKAcnkspCSgpCdpd0hoWh7mDko224h920cOf8enIgpYmEOI7_i7bA50AajaVEpPGgNr6Xa--A8COUJstEpawluU48jSCTDfYlm4eqtHwxstpaGafo50ZE8Sjqtj4vxCHhdGNceShKHIuR_izO6zlB9AfoCiExS_XW9S1vppXU1KFXbBXIwC0XAx85AallkHj8BMwUfw3vlSEf5K3OLS1Q9Ed6Q';
-      // 'AMf-vBw559ceQiZB1iLxqJbzI8ctQYYzqpUj9pnRsb9YIN336LOGOpZNcwLXb4Nt8BWy92p36hO-eIlMU4cfmoMuMUgc-N4be6C-bOewySA1H2qXCV2aK7wPSZ9q-nmLnvT88lpxxKxBoi4gs9DQFE-5-u2zpI1nMdBS82X9U6ms7YsEPiV5AqaO96fBtDWfgMiTPahUsVJx3kwDY0RRZsvkAYaL8TJiyQ'; // e.g. "AE...Zxy"
-    const apiKey = 'AIzaSyCWThH_TX19GrAxoH7zBLE6OzSx2n1Erps'; // e.g. "AIzaSyCWThH_..."
+    const accessToken = await getBcomAccessToken();
 
-    const tokenUrl = `https://securetoken.googleapis.com/v1/token?key=${apiKey}`;
-
-    // Make the POST request to exchange the refresh token
-    // Google expects x-www-form-urlencoded data
-    const tokenResponse = await axios.post(
-      tokenUrl,
-      new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+    for (const rest_id in bcom_rest_map) {
+      const payload = {
+        ...zReports_payload,
+        restaurantId: rest_id,
+        filter: {
+          ...zReports_payload.filter,
+          branches: bcom_rest_map[rest_id].map((branch) => branch.id),
+          startDate: dates.startDate,
+          endDate: dates.endDate,
         },
-      },
-    );
-
-    // console.log(`token response : ${JSON.stringify(tokenResponse.data, null, "\t")}`);
-    // Extract the access token
-    const accessToken = tokenResponse.data.access_token;
-    // console.log(`Access Token: ${accessToken}`);
-
-    // 2. Use the access token to call your Amazon API
-    // const amazonEndpoint = "https://20cs5hma71.execute-api.eu-west-1.amazonaws.com/prod/api/orders/cube";
-    const amazonEndpoint = 'https://20cs5hma71.execute-api.eu-west-1.amazonaws.com/prod/api/zReports/cube';
-    let payload = zReports_payload;
-
-    https: for (var rest_id in bcom_rest_map) {
-      payload.restaurantId = rest_id;
-
-      payload.filter.branches = bcom_rest_map[rest_id].map((branch) => branch.id);
-      payload.filter.startDate = dates.startDate;
-      payload.filter.endDate = dates.endDate;
-
-      payload.token = `Bearer ${accessToken}`;
-      const amazonResponse = await axios.post(amazonEndpoint, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      // let orders = decodeBase64Gzip(amazonResponse.data.rows);
-      // console.log(`Amazon API Response:${rest_id} ${orders.length} orders`);
-      // console.log(`Amazon API Response: ${JSON.stringify(amazonResponse.data.rows, null, '\t')}`);
-      console.log(`Amazon API Response:${rest_id} ${amazonResponse.data.rows.length} days`);
-      dal_push('api', amazonResponse.data.rows);
+      };
+      const data = await postCube('zReports/cube', payload, accessToken);
+      console.log(`Amazon API Response:${rest_id} ${data.rows.length} days`);
+      dal_push('api', data.rows);
     }
   } catch (error) {
     console.error('Error:', error.response?.data || error.message);
   }
+}
+
+// Daily Z-report rows for the date range (includes a branchId "900" total row per restaurant).
+// options.branchIds limits the query to those branches (default: all).
+async function bcomGetZReports(dates, { branchIds } = {}) {
+  const accessToken = await getBcomAccessToken();
+  const rows = [];
+
+  for (const [rest_id, branches] of restaurantsFor(branchIds)) {
+    const payload = {
+      ...zReports_payload,
+      restaurantId: rest_id,
+      filter: {
+        ...zReports_payload.filter,
+        branches: branches.map((branch) => branch.id),
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+      },
+    };
+    const data = await postCube('zReports/cube', payload, accessToken);
+    for (const row of data.rows || []) rows.push({ ...row, restaurantId: rest_id });
+  }
+  return rows;
+}
+
+// Fetch all order headers for every restaurant/branch in bcom_rest_map.
+// dates: { startDate: 'DD/MM/YYYY', endDate: 'DD/MM/YYYY' }
+// Each returned order is tagged with restaurantId and branchName.
+// options.branchIds limits the query to those branches (default: all).
+async function bcomGetOrders(dates, { branchIds } = {}) {
+  const accessToken = await getBcomAccessToken();
+  const orders = [];
+
+  for (const [rest_id, branches] of restaurantsFor(branchIds)) {
+    const payload = {
+      ...getOrderHeaders_payload,
+      restaurantId: rest_id,
+      filter: {
+        ...getOrderHeaders_payload.filter,
+        branches: branches.map((branch) => branch.id),
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+      },
+    };
+    const data = await postCube('orders/cube', payload, accessToken);
+    const rows = typeof data.orders === 'string' ? decodeBase64Gzip(data.orders) : data.orders || [];
+    const branchNames = Object.fromEntries(branches.map((b) => [b.id, b.branchName]));
+    for (const order of rows) {
+      orders.push({ ...order, restaurantId: rest_id, branchName: branchNames[order.branchId] });
+    }
+    console.log(`bcom orders:${rest_id} ${rows.length} orders`);
+  }
+  return orders;
+}
+
+// Fetch the exceptions report (discounts, refunds, cancellations...) for every
+// restaurant/branch in bcom_rest_map. dates: { startDate: 'DD/MM/YYYY', endDate: 'DD/MM/YYYY' }
+// Each returned row is tagged with restaurantId (branchName already comes from the API).
+// options.branchIds limits the query to those branches (default: all).
+async function bcomGetExceptions(dates, { branchIds } = {}) {
+  const accessToken = await getBcomAccessToken();
+  const exceptions = [];
+
+  for (const [rest_id, branches] of restaurantsFor(branchIds)) {
+    const payload = {
+      ...exceptionsReport_payload,
+      restaurantId: rest_id,
+      filter: {
+        ...exceptionsReport_payload.filter,
+        branches: branches.map((branch) => branch.id),
+        startDate: dates.startDate,
+        endDate: dates.endDate,
+      },
+    };
+    const data = await postCube('zReports/cube', payload, accessToken);
+    const rows = data.rows || [];
+    for (const row of rows) exceptions.push({ ...row, restaurantId: rest_id });
+    console.log(`bcom exceptions:${rest_id} ${rows.length} rows`);
+  }
+  return exceptions;
+}
+
+// Orders for the date range, each enriched with its exceptions (empty array when none).
+// orderNumber is only unique per branch, so orders and exceptions are matched by branchId + orderNumber.
+async function bcomGetOrdersWithExceptions(dates, options = {}) {
+  const [orders, exceptions] = await Promise.all([bcomGetOrders(dates, options), bcomGetExceptions(dates, options)]);
+
+  const exceptionsByOrder = new Map();
+  for (const exception of exceptions) {
+    const key = `${exception.branchId}:${exception.orderNumber}`;
+    if (!exceptionsByOrder.has(key)) exceptionsByOrder.set(key, []);
+    exceptionsByOrder.get(key).push(exception);
+  }
+
+  return orders.map((order) => ({
+    ...order,
+    exceptions: exceptionsByOrder.get(`${order.branchId}:${order.orderNumber}`) || [],
+  }));
+}
+
+// Dish sales (quantity, sales, cancels, discounts, menu category) summed over the business days
+// of the range, per branch. options.splitHours adds an "hour" per row (one row per dish per hour).
+// The report has no per-order lines and no per-date split (splitDays only gives the weekday);
+// use bcomGetItemsByDay for one row set per business day.
+async function bcomGetItems(dates, { branchIds, splitHours = false } = {}) {
+  const accessToken = await getBcomAccessToken();
+  const restaurants = restaurantsFor(branchIds);
+  const results = await Promise.all(
+    restaurants.map(async ([rest_id, branches]) => {
+      const payload = {
+        ...itemsReport_payload,
+        restaurantId: rest_id,
+        filter: {
+          ...itemsReport_payload.filter,
+          branches: branches.map((branch) => branch.id),
+          startDate: dates.startDate,
+          endDate: dates.endDate,
+          splitHours,
+        },
+      };
+      const data = await postCube('zReports/cube', payload, accessToken);
+      const branchNames = Object.fromEntries(branches.map((b) => [b.id, b.branchName]));
+      return (data.rows || []).map(({ _id, dayOfWeek, ...row }) => ({
+        ...row,
+        restaurantId: rest_id,
+        branchName: branchNames[row.branchId],
+      }));
+    }),
+  );
+  return results.flat();
+}
+
+// bcomGetItems one business day at a time; each row gets businessDate (YYYY-MM-DD).
+async function bcomGetItemsByDay(dates, options = {}) {
+  const rows = [];
+  const end = moment(dates.endDate, 'DD/MM/YYYY');
+  for (let day = moment(dates.startDate, 'DD/MM/YYYY'); !day.isAfter(end); day.add(1, 'days')) {
+    const d = day.format('DD/MM/YYYY');
+    const businessDate = day.format('YYYY-MM-DD');
+    for (const row of await bcomGetItems({ startDate: d, endDate: d }, options)) rows.push({ ...row, businessDate });
+  }
+  return rows;
 }
 
 function getRecord(row) {
@@ -111,4 +330,5 @@ function getRecord(row) {
 
 // callAmazonApi();
 export default bcomApiLoad;
-export { getRecord };
+export { getRecord, getBcomAccessToken, bcomGetOrders, bcomGetExceptions, bcomGetOrdersWithExceptions, bcomGetZReports,
+  bcomGetItems, bcomGetItemsByDay };

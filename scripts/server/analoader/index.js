@@ -4,12 +4,15 @@ dotenv.config({ path: "../.env" });
 
 import moment from "moment";
 import minimist from "minimist";
-import bcomApiLoad, { getRecord } from "./bcom_api_loader.js";
+import bcomApiLoad, { getRecord, bcomGetOrders, bcomGetItemsByDay } from "./bcom_api_loader.js";
 import gglSheetLoader from "./ggl_sheet_loader.js";
 import dal from "./dal.js";
 import astrateg from "./astrateg.js";
 import ontopo from "./ontopo.js";
 import { executeSql } from "../../../admin/server/sources/dbpool.js";
+import { saveZDetails } from "./bcom_z_details.js";
+import { saveOrders } from "./bcom_orders.js";
+import { saveItems } from "./bcom_items.js";
 
 const src_path = "/home/moti/dataSrc/algro";
 
@@ -97,7 +100,12 @@ class App {
     }
 
     try {
+      // The same API rows also go, in full, to bcom_z_reports (Z details: payments, VAT, refunds...).
+      const zSaves = [];
       const dalPush = async (src, rows) => {
+        zSaves.push(
+          saveZDetails(rows).catch((e) => console.log(`bcom_z_reports save failed: ${e.message}`)),
+        );
         const table_name = "bcom_cash"; // this.argv.t;
         // console.log(file, table_name, rows.length);
         return new Promise((resolve, reject) => {
@@ -115,6 +123,21 @@ class App {
         });
       };
       await bcomApiLoad(dates, dalPush);
+      await Promise.all(zSaves);
+      // Order headers of the same range → bcom_orders (after the Zs, which give each order its business day).
+      try {
+        const saved = await saveOrders(await bcomGetOrders(dates));
+        console.log(`bcom_orders: ${saved} orders saved`);
+      } catch (e) {
+        console.log(`bcom_orders save failed: ${e.message}`);
+      }
+      // Dish sales per business day → bcom_items_daily.
+      try {
+        const saved = await saveItems(await bcomGetItemsByDay(dates));
+        console.log(`bcom_items_daily: ${saved} dish rows saved`);
+      } catch (e) {
+        console.log(`bcom_items_daily save failed: ${e.message}`);
+      }
       // await gglSheetLoader(ontopo, dates);
       // await gglSheetLoader(astrateg, dates);
       await this.flush();
