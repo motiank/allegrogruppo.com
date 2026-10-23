@@ -22,11 +22,12 @@ curl -s http://localhost:3021/local-api/v1/branches | jq
 5. [Employees](#employees)
 6. [Shifts](#shifts)
 7. [Payroll (salaries)](#payroll-salaries)
-8. [Beecomm (sales)](#beecomm-sales)
-9. [Data sources](#data-sources)
-10. [Errors](#errors)
-11. [Configuration and limits](#configuration-and-limits)
-12. [Examples](#examples)
+8. [Daily labor cost](#daily-labor-cost)
+9. [Beecomm (sales)](#beecomm-sales)
+10. [Data sources](#data-sources)
+11. [Errors](#errors)
+12. [Configuration and limits](#configuration-and-limits)
+13. [Examples](#examples)
 
 ---
 
@@ -105,8 +106,6 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 
 `GET /local-api/v1/` returns this list as JSON.
 
-| Endpoint | Purpose | Source |
-|---|---|---|
 `[&branch=]` = optional, comma-separated list.
 
 | Endpoint | Purpose | Source |
@@ -122,7 +121,9 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /shifts/by-shift?from=&to=[&branch=][&split=][&minHours=]` | People and clock hours per branch/date/shift/role | `tabit_shifts` ¹ |
 | `GET /payroll/months?branch=` | Months that have saved payroll | `payroll` |
 | `GET /payroll?month=\|updatedSince=[&branch=][&employeeId=]` | Saved payroll + payslip components (tlush) | `payroll` |
-| `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. labor cost | `bcom_cash` |
+| `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. the stored labor cost | `bcom_cash` |
+| `GET /labor/daily?from=&to=[&branch=]` | Per branch per day: revenue, hours, payslip gross, labor % | `payroll` + `employees` + `bcom_cash` |
+| `GET /labor/daily/employees?from=&to=[&branch=][&employeeId=]` | The same per employee per day | `payroll` + `employees` |
 | `GET /beecomm/daily?from=&to=[&branch=]` | Daily sales totals (stored) | `bcom_cash` |
 | `GET /beecomm/z-reports?from=&to=[&branch=]` | Daily Z reports (live) | Beecomm API |
 | `GET /beecomm/z-reports/stored?from=&to=[&branch=]` | Daily Z reports (stored) | `bcom_z_reports` ¹ |
@@ -133,7 +134,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /beecomm/items?from=&to=[&branch=][&hours=1\|&byDay=1]` | Dish sales: quantity, sales, cancels, discounts, category (live) | Beecomm API |
 | `GET /beecomm/items/stored?from=&to=[&branch=][&group=day\|dish]` | Dish sales per business day, or per dish over the range (stored) | `bcom_items_daily` ¹ |
 
-¹ The table must be created first (see [Data sources](#data-sources)). Until then the endpoint answers `503 not_loaded`.
+¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
 ---
 
@@ -157,16 +158,14 @@ What is loaded for each branch, and up to when. Use it to tell **"no data"** apa
   "name": "רעננה",
   "beecomm": {
     "daily":    { "lastDate": "2026-10-07", "days": 544 },
-    "zReports": { "lastDate": "2026-10-07", "lastLoadAt": "2026-10-08T03:00:12.000Z", "rows": 400 },
-    "orders":   { "firstDate": "2026-01-01", "lastDate": "2026-10-07", "lastLoadAt": "2026-10-08T03:00:40.000Z", "rows": 61000 },
-    "items":    { "firstDate": "2026-01-01", "lastDate": "2026-10-07", "lastLoadAt": "2026-10-08T03:01:30.000Z", "rows": 28000 }
+    "zReports": { "lastDate": "2026-10-20", "lastLoadAt": "2026-10-21T09:23:06.000Z", "rows": 290 },
+    "orders":   { "firstDate": "2026-01-01", "lastDate": "2026-10-20", "lastLoadAt": "2026-10-21T09:36:28.000Z", "rows": 28772 },
+    "items":    { "firstDate": "2026-01-01", "lastDate": "2026-10-20", "lastLoadAt": "2026-10-21T09:49:20.000Z", "rows": 32459 }
   },
-  "tabitShifts": [
-    { "month": "2026-09", "shifts": 812, "employees": 64, "missingClockOut": 3, "lastUploadAt": "2026-10-02T09:12:00.000Z" }
-  ],
-  "uploads": [ { "kind": "TABIT_DETAILED", "files": 4, "lastUploadAt": "2026-10-02T09:12:00.000Z" } ],
+  "tabitShifts": [],
+  "uploads": [],
   "payrollMonths": [ { "month": "2026-09", "employees": 61, "withTlush": 57, "updatedAt": "2026-10-08T10:18:13.000Z" } ],
-  "employees": { "active": 113, "total": 113, "lastUpdatedAt": "2026-10-19T08:00:00.000Z" }
+  "employees": { "active": 113, "total": 113, "lastUpdatedAt": "2026-10-06T19:19:54.000Z" }
 }
 ```
 
@@ -461,6 +460,70 @@ Daily revenue (Beecomm) against labor cost (entered on the payroll screen), the 
 
 `meta.totals` = `{ revenue, laborCost, laborPct }` for the month. `laborCost` is `null` on days without an entry. `laborPct` is `laborCost / revenue × 100`.
 
+This is the **stored** figure only, and it has gaps (see below). For the restaurant's daily gross use `/labor/daily`.
+
+---
+
+## Daily labor cost
+
+The restaurant's daily labor cost, computed from what the admin manages: the saved payroll month (hours per employee per day per role, from the Tabit upload) and the employees' wages. Each day carries three figures, so they can be compared:
+
+| Figure | What it is |
+|---|---|
+| `gross` | **Payslip gross.** The employee's saved tlush for the month (wage lines + travel + bonus), spread over the days they worked in proportion to weighted hours (100% + 125% × 1.25 + 150% × 1.5). For an employee-month without a tlush (`source: "estimate"`), hours × current wage instead. This is the number to use as "total daily gross". |
+| `adminCost` | The admin Shifts page's own daily formula: per role entry, tip + completion when there is any, otherwise weighted hours × wage. Monthly-salary employees: salary ÷ days worked. |
+| `storedCost` | `bcom_cash.labor_cost`: the `adminCost` the Shifts page saved when the month was extracted. A snapshot; `null` on days it never saved. |
+
+Wages are resolved like the Shifts page: the role's wage type, then the employee's, then the legacy `hourly_wage` (−1 = minimum). Minimum wage is `MIN_HOURLY_WAGE` (env, default 35.4), returned in `meta.minHourlyWage`. Wages are the **current** ones in `employees`, so `wageCost`/`adminCost` for an old month change if a wage was edited since; the tlush-based `gross` doesn't.
+
+### `GET /labor/daily?from=&to=[&branch=]`
+
+One row per branch per day (days with revenue or payroll). Up to 800 days.
+
+```json
+{
+  "branch": "5ff419934676f0fddabaef3a",
+  "date": "2026-09-01",
+  "revenue": 15145.14,
+  "hours": { "h100": 120.47, "h125": 0, "h150": 3, "total": 123.47 },
+  "gross": { "total": 8426.76, "wages": 8044.12, "travel": 128.97, "bonus": 253.67, "netWages": 126.02, "meals": 66.57 },
+  "wageCost": 8056.96,
+  "tip": 640, "completion": -4.33,
+  "adminCost": 8205.6,
+  "storedCost": 8205.6,
+  "laborPct": { "gross": 55.64, "adminCost": 54.18, "storedCost": 54.18 },
+  "coverage": { "employees": 20, "estimated": 2, "globalSalary": 2, "unpricedHours": 14.78 }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `revenue` | Beecomm daily total (`bcom_cash.total`, before discounts). `null` when not loaded. |
+| `gross.total` | `wages + travel + bonus`, all gross. |
+| `gross.netWages` | Wage lines paid **net** (net-wage employees). Not in `total`: their gross is higher and only the payroll software computes it. |
+| `gross.meals` | Meal benefit value (שווי ארוחות). Not in `total`. |
+| `wageCost` | Weighted hours × current wage (monthly salary ÷ days for salaried staff). |
+| `tip`, `completion` | From the payroll month, for tip-based roles. |
+| `laborPct` | Cost ÷ revenue × 100 for each figure. `null` for a day with no payroll rows. |
+| `coverage.employees` | Employees with hours that day. |
+| `coverage.estimated` | Of them, how many have no tlush, so `gross` is hours × wage. |
+| `coverage.globalSalary` | Of them, how many are on a monthly salary. |
+| `coverage.unpricedHours` | Hours of roles with no wage set. They add nothing to `wageCost`/`adminCost` (and to `gross` when estimated). |
+
+`meta.totals` sums the days **that have payroll rows** (so branches whose payroll isn't in the admin don't dilute the %): `{ revenue, gross, adminCost, storedCost, days, daysWithoutRevenue, laborPct }`.
+
+### `GET /labor/daily/employees?from=&to=[&branch=][&employeeId=]`
+
+The rows behind each day: one per employee per worked day, with `month`, `employeeId`, `name`, `globalSalary`, `hours`, `gross` (plus `gross.source`: `tlush` or `estimate`), `wageCost`, `tip`, `completion`, `adminCost`, `unpricedHours` and `payrollUpdatedAt`.
+
+### What the numbers showed (October 2026)
+
+- **Raanana, June–September:** payslip gross is 28–31% of revenue.
+- **The port matches the admin:** where the stored cost exists, `adminCost` equals it (e.g. 1 Sep: ₪8,205.60 both).
+- **Stored cost has gaps:** `bcom_cash.labor_cost` for Raanana is missing from 18 July and from 16 September to month end, so the stored % for those months (12–17%) is wrong.
+- **Missing wages:** Rosh Pina's June has 2,539 of 2,677 hours on roles with no wage, so its cost is near zero. Raanana's September has 432 such hours (`gross` is still right where a tlush exists).
+- **The admin formula vs. payslip:** for tip-based roles `adminCost` counts tips + completion, which can be well above the payslip gross for that day (e.g. ₪523 vs ₪463 for one waiter on 5 Sep). Over a month they differed by up to 18% (Raanana, September: ₪240k vs ₪203k).
+
 ---
 
 ## Beecomm (sales)
@@ -601,6 +664,7 @@ The same order headers, saved by the daily loader (`bcom_orders`). `from`/`to` f
 }
 ```
 
+- **Revenue from orders:** sum `netTotal − serviceAmount` over orders with `status = 2` (closed). That matches the Z's `brutoIncome` (Raanana, September 2026: ₪662,287 vs ₪662,518). `total` and `netTotal` include the service charge (tips), which the Z excludes, and `status = 1` are cancelled orders (their count equals the Z's `cancelledOrders`).
 - `discountRate` / `serviceRate` are usually fractions (`0.12` = 12%). A few orders (about 1 in 1,500) hold a fixed ₪ amount there instead, equal to the `…Amount` field, so use `discountAmount` / `serviceAmount` for money and treat a rate above 1 as "fixed amount".
 
 History before the table existed is loaded with the backfill script (see [Data sources](#data-sources)).
@@ -724,15 +788,32 @@ The same report, saved per business day by the 06:00 loader (`bcom_items_daily`)
 | Uploads log | DB `file_uploads`, written by the Upload files page | Live |
 | Beecomm Z / orders / exceptions / dish sales (live) | Beecomm backoffice API (`20cs5hma71…amazonaws.com/prod/api`) | Live |
 
-### Tables that must be created first
+### Tables and history
 
-| Table | Create with | Then load history with |
+All tables exist on the production DB (created 21 Oct 2026). Beecomm history was backfilled from **1 Jan 2026**; from then on the 06:00 loader adds each day.
+
+| Table | Created by | Backfill / reload a range |
 |---|---|---|
-| `tabit_shifts`, `file_uploads`, `bcom_z_reports` | `scripts/utils/create_file_upload_tables.sql` | Z: `node scripts/server/analoader/bcom_z_details.js --from DD/MM/YYYY [--to DD/MM/YYYY]`. Raw shifts: upload Tabit reports on the Upload files page. |
-| `bcom_orders` | `scripts/utils/create_bcom_orders_table.sql` | `node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY]` (one week per Beecomm call). Run it **after** the Z backfill for the same dates, so orders get their Z's business day. |
-| `bcom_items_daily` | `scripts/utils/create_bcom_items_table.sql` | `node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY]` (one Beecomm call per day per restaurant, so a year takes a while). Independent of the Z backfill. |
+| `tabit_shifts`, `file_uploads`, `bank_transactions`, `bcom_z_reports` | `scripts/utils/create_file_upload_tables.sql` | Z: `node scripts/server/analoader/bcom_z_details.js --from DD/MM/YYYY [--to DD/MM/YYYY]`. Raw shifts: upload Tabit detailed reports on the Upload files page (nothing uploaded yet). |
+| `bcom_orders` | `scripts/utils/create_bcom_orders_table.sql` | `node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one week per call). Run it **after** the Z load for the same dates, so orders get their Z's business day. |
+| `bcom_items_daily` | `scripts/utils/create_bcom_items_table.sql` | `node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one call per day per Beecomm restaurant). Independent of the Z load. |
 
-Until a table exists, its endpoints answer `503 not_loaded` and `/status` lists it in `meta.sources`.
+- Reloading is safe: Z and orders are upserted, and a reloaded dish-sales day replaces that day.
+- **Don't run backfills in parallel or without `--pause`** (default 2 s). Thousands of fast calls got the Beecomm API blocked with `403 Forbidden` (CloudFront) for about 20 minutes on 21 Oct 2026. The block hits every caller from the same IP, including the backoffice in a browser.
+- On a DB where a table is missing, its endpoints answer `503 not_loaded` and `/status` lists it in `meta.sources`.
+
+### Data coverage (21 Oct 2026)
+
+| Data | Branches | Range | Notes |
+|---|---|---|---|
+| Beecomm daily totals (`bcom_cash`) | all | to 7 Oct 2026 | **The 06:00 loader has failed since 8 Oct** (old token in production). Deploying the `BCOM_BO_*` `.env` lines fixes it; it catches up from the last day. |
+| Z reports | all with Beecomm sales in 2026 | 1 Jan – 20 Oct 2026 | 2,437 reports |
+| Orders | same | 1 Jan – 20 Oct 2026 | 208,994 orders, all linked to their Z |
+| Dish sales | same | 1 Jan – 20 Oct 2026 | 226,375 rows; daily sums match the Z within 1% |
+| Payroll | רעננה (to Sep 2026); ג'ויה, רמת החיל, ראש פינה (to Jun 2026) | per month | Other branches' payroll isn't managed in the admin. Payslips (tlush) from Jun 2026. |
+| Raw Tabit shifts | none | — | No Tabit file uploaded since the table was created. |
+
+Branches whose Beecomm data stops: ג'ויה and לה בראצ׳ה (28 Jul 2026), פיאמונטה (15 Jul), תל אביב (26 Feb), פסקרה and הרצליה (2025). Closed, or not visible to the backoffice user.
 
 ---
 
@@ -764,9 +845,11 @@ Until a table exists, its endpoints answer `503 not_loaded` and `/status` lists 
 | `MAX_STORED_DAYS` | `localApi.js` | 800-day cap on stored ranges (`/shifts/raw`, `/beecomm/*/stored`). |
 | `MAX_ITEMS_DAYS_BY_DAY` | `localApi.js` | 31-day cap on `/beecomm/items?byDay=1`. |
 | `MAX_BY_SHIFT_DAYS` | `localApi.js` | 400-day cap on `/shifts/by-shift`. |
+| `MIN_HOURLY_WAGE` | env | Minimum hourly wage for `/labor/*` (default 35.4), same as the payroll export. |
 
 - Live Beecomm calls make one request per Beecomm restaurant in range. Allow a few seconds for all branches over a month.
-- No pagination: each response is complete. The largest is `/beecomm/orders` for all branches: about 13k orders for the first 19 days of October 2026. Narrow it with `branch` where you can.
+- No pagination: each response is complete. The largest are a month of `/beecomm/orders/stored` or `/beecomm/items/stored` for all branches (about 19k and 20k rows, ~1 s). Narrow with `branch` where you can.
+- Slowest calls: `/beecomm/exceptions/summary` for all branches (~4.5 s for 20 days) and `/beecomm/items?byDay=1` (~2.5 s per branch-week).
 
 ---
 
@@ -797,6 +880,14 @@ curl -s "$API/status" | jq '.data[] | {name, beecomm: .beecomm.daily.lastDate, p
 
 # Labor cost % for September
 curl -s "$API/payroll/labor-cost?branch=$R&month=2026-09" | jq '.meta.totals'
+
+# Daily gross and labor % for September, and the month totals
+curl -s "$API/labor/daily?branch=$R&from=2026-09-01&to=2026-09-30" \
+  | jq '.data[] | {date, revenue, gross: .gross.total, pct: .laborPct.gross}, .meta.totals'
+
+# Who made 5 Sep expensive
+curl -s "$API/labor/daily/employees?branch=$R&from=2026-09-05" \
+  | jq '.data | sort_by(-.gross.total) | .[:10] | .[] | {name, hours: .hours.total, gross: .gross.total, adminCost}'
 
 # Orders with exceptions on 1 Oct, only those that had any
 curl -s "$API/beecomm/orders?branch=$R&from=2026-10-01&exceptions=1" \
