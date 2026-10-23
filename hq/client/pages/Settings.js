@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api } from '../api.js';
-import { Page, Card, Row, Btn, Badge, Field, Input, Select, Modal, Tabs, Loading, Empty, ErrorBox, useLoad, useAction, Term } from '../ui.js';
+import { Page, Card, Row, Btn, Badge, Input, Select, Tabs, Loading, Empty, ErrorBox, useLoad, useAction, Term } from '../ui.js';
 import { useJoya, companyOf, companiesOf } from '../context.js';
 import { useT } from '../i18n/index.js';
 
@@ -12,7 +12,6 @@ const useStyles = createUseStyles((theme) => ({
   coHead: { fontSize: '0.85rem', color: theme.textSecondary, margin: '0.9rem 0.2rem 0.3rem', fontWeight: 600 },
   code: { display: 'block', direction: 'ltr', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', background: theme.background, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '0.4rem 0.5rem', margin: '0.3rem 0 0.7rem', overflowX: 'auto', whiteSpace: 'nowrap' },
   sub: { fontSize: '0.76rem', color: theme.textSecondary, marginTop: '0.15rem' },
-  check: { display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.86rem', padding: '0.2rem 0', cursor: 'pointer' },
   num: { borderTop: `1px solid ${theme.border}`, padding: '0.45rem 0' },
   numHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' },
   numInput: { width: '6.5rem', flexShrink: 0 },
@@ -27,30 +26,13 @@ const ORDER = {
 };
 const ENV = { ALLEGRO: 'ALLEGRO_API_URL', INSTAGRAM: 'JOYA_INSTAGRAM_TOKEN', GOOGLE: 'JOYA_GOOGLE_CREDENTIALS' };
 
-function Check({ checked, onChange, children, c }) {
-  return (
-    <label className={c.check}>
-      <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>{children}</span>
-    </label>
-  );
-}
-
 // ---------------------------------------------------------------- users
 
+// Read-only: the users and their rights are the Allegro admin users (users.json), managed in the admin.
 function Users({ c }) {
   const { t } = useT();
   const j = useJoya();
   const r = useLoad(() => api('/users'), []);
-  const [edit, setEdit] = useState(null);
-  const [remove, setRemove] = useState(null);
-  const act = useAction();
-  const save = () =>
-    act.run(async () => {
-      const out = await api('/users', { method: 'POST', body: { username: edit.username.trim(), role: edit.role, locationIds: edit.role === 'CHAIN_ADMIN' ? [] : edit.locationIds, payroll: edit.payroll } });
-      r.setData(out);
-      setEdit(null);
-    });
   return (
     <>
       <Card>
@@ -69,105 +51,12 @@ function Users({ c }) {
             <Term>{u.allegroRole || '—'}</Term>
             {!u.allegroActive ? <> · {t('joya.set.inactiveAllegro')}</> : null}
           </Row>
-          <Row label={t('joya.set.accessFrom')}>{u.override ? t('joya.set.overridden') : t('joya.set.fromAllegro')}</Row>
           <Row label={t('joya.set.locations')}>
-            {!u.role ? (
-              '—'
-            ) : u.role === 'CHAIN_ADMIN' ? (
-              t('joya.set.allLocations')
-            ) : (
-              <bdi dir="auto">{u.locationIds.map((id) => j.locName(id)).join(', ') || '—'}</bdi>
-            )}
+            {!u.role ? '—' : u.role === 'CHAIN_ADMIN' ? t('joya.set.allLocations') : <bdi dir="auto">{u.locationIds.map((id) => j.locName(id)).join(', ') || '—'}</bdi>}
           </Row>
           <Row label={t('joya.set.payroll')}>{u.payroll ? t('joya.set.yes') : t('joya.set.no')}</Row>
-          {u.allegroActive ? (
-            <div className={c.actions}>
-              <Btn small onClick={() => setEdit({ ...u, role: u.role || 'LOCATION_MANAGER', isNew: false })}>
-                {t('joya.edit')}
-              </Btn>
-              {u.override && u.username !== j.me?.username ? (
-                <Btn small kind="danger" onClick={() => setRemove(u)}>
-                  {t('joya.set.removeUser')}
-                </Btn>
-              ) : null}
-            </div>
-          ) : null}
         </Card>
       ))}
-      {edit && (
-        <Modal
-          title={edit.isNew ? t('joya.set.addUser') : t('joya.set.editUser')}
-          onClose={() => setEdit(null)}
-          footer={
-            <>
-              <Btn onClick={() => setEdit(null)}>{t('joya.cancel')}</Btn>
-              <Btn kind="primary" disabled={act.busy || !edit.username.trim()} onClick={save}>
-                {t('joya.save')}
-              </Btn>
-            </>
-          }
-        >
-          <Field label={t('joya.set.username')}>
-            <Input dir="ltr" value={edit.username} disabled={!edit.isNew} onChange={(e) => setEdit({ ...edit, username: e.target.value })} />
-          </Field>
-          <Field label={t('joya.set.role')}>
-            <Select value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value })}>
-              {['LOCATION_MANAGER', 'CHAIN_ADMIN'].map((r) => (
-                <option key={r} value={r}>
-                  {t(`joya.role.${r}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          {edit.role === 'LOCATION_MANAGER' ? (
-            <Field label={t('joya.set.locations')}>
-              {j.locations.map((l) => (
-                <Check
-                  key={l.id}
-                  c={c}
-                  checked={edit.locationIds.includes(l.id)}
-                  onChange={(on) => setEdit({ ...edit, locationIds: on ? [...edit.locationIds, l.id] : edit.locationIds.filter((x) => x !== l.id) })}
-                >
-                  <bdi dir="auto">{l.name}</bdi>
-                </Check>
-              ))}
-            </Field>
-          ) : null}
-          <Field hint={t('joya.set.payrollHelp')}>
-            <Check c={c} checked={edit.payroll} onChange={(on) => setEdit({ ...edit, payroll: on })}>
-              {t('joya.set.payroll')}
-            </Check>
-          </Field>
-          <ErrorBox error={act.error} />
-        </Modal>
-      )}
-      {remove && (
-        <Modal
-          title={t('joya.set.removeTitle', { user: remove.username })}
-          onClose={() => setRemove(null)}
-          footer={
-            <>
-              <Btn onClick={() => setRemove(null)}>{t('joya.cancel')}</Btn>
-              <Btn
-                kind="danger"
-                disabled={act.busy}
-                onClick={() =>
-                  act.run(async () => {
-                    const out = await api(`/users/${encodeURIComponent(remove.username)}`, { method: 'DELETE' });
-                    r.setData(out);
-                    setRemove(null);
-                  })
-                }
-              >
-                {t('joya.set.removeUser')}
-              </Btn>
-            </>
-          }
-        >
-          <p style={{ margin: 0, fontSize: '0.86rem' }}>{t('joya.set.removeText')}</p>
-          <ErrorBox error={act.error} />
-        </Modal>
-      )}
     </>
   );
 }

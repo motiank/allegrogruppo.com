@@ -10,8 +10,9 @@ Rules for this folder:
 - **Never develop or test against the production DB.** The repo-root `.env` points at the production `allegro`
   DB; `hq/.env.local` must point `DB_*` at a local MySQL. The smoke test and the eval-context script refuse
   any other host.
-- **Logins are the Allegro admin users** (repo-root `users.json`). Joya only reads that file, never writes it,
-  and checks passwords with the admin's `userApi.getUserKey`. Never copy the hashing code here.
+- **Users and their rights live only in the admin's JSON file** (repo-root `users.json`; owner 2026-10-24: users in
+  JSON files, not the DB). Joya only reads it, never writes it, keeps no users table or file of its own, and checks
+  passwords with the admin's `userApi.getUserKey`. Never copy the hashing code here.
 - **No source data is stored here.** Sales, dish sales, employees, clock times and payroll come from the admin
   Local Data API through `src/services/source.js` only (never a new `joya_*` copy). Joya's tables hold only
   Joya's own records, linked to Allegro ids. A missing API is asked from the admin (`../local_api_readme.md`).

@@ -7,10 +7,9 @@
  *     JOYA_HQ_PORT=4360 node server.js                                                   (terminal 2)
  *   ALLEGRO_USERS_FILE=/tmp/joya-smoke-users.json node scripts/joya-smoke.mjs http://localhost:4360
  *
- * Writes its own Allegro users file (never the real users.json) with three test users, and signs
- * login cookies for them with JOYA_SESSION_SECRET: a chain admin with payroll access and a location
- * manager without it (both joya_user_access rows, removed after), and an Allegro restMngr with no row
- * (access from the Allegro role and branches).
+ * Writes its own Allegro users file (never the real users.json, removed after) with two test users and
+ * signs login cookies for them with JOYA_SESSION_SECRET: an Allegro admin (chain admin) and an Allegro
+ * restMngr of the demo Haifa branch (manager of that location only). Access comes from users.json only.
  * Plays the AI runner itself (fixed "model" output), so no Claude call is made.
  */
 import '../lib/env.js';
@@ -36,14 +35,12 @@ const sql = async (s, p = {}) => (await executeSql(s, p))[0];
 const sign = (sub) => `joya_session=${signSession(sub, '15m')}`;
 const ADMIN = 'joya-smoke-admin';
 const MGR = 'joya-smoke-mgr';
-const RM = 'joya-smoke-rm'; // Allegro restMngr of the demo Haifa branch, no joya_user_access row
 const PASSWORD = 'smoke-pass-1';
 const testUser = (email, role, extra = {}) => ({ user_id: email, id: email, email, authKey: userApi.getUserKey(email, PASSWORD), role, status: 'active', ...extra });
-writeFileSync(USERS_FILE, JSON.stringify([testUser(ADMIN, 'admin'), testUser(MGR, 'restMngr', { restaurants: [] }), testUser(RM, 'restMngr', { restaurants: ['demo-hfa'] })]));
+writeFileSync(USERS_FILE, JSON.stringify([testUser(ADMIN, 'admin'), testUser(MGR, 'restMngr', { restaurants: ['demo-hfa'] })]));
 const cookies = {
   admin: sign(ADMIN),
   mgr: sign(MGR),
-  rm: sign(RM),
   // a cookie with the right secret but another audience (e.g. a trading-app token) must not pass
   foreign: `joya_session=${jwt.sign({ sub: ADMIN }, process.env.JOYA_SESSION_SECRET, { expiresIn: '15m' })}`,
 };
@@ -100,7 +97,6 @@ async function cleanup() {
   await sql(`DELETE FROM joya_audit_log WHERE username IN (:a, :m)`, p);
 }
 await cleanup();
-await sql(`REPLACE INTO joya_user_access (username, role, location_ids, payroll_access, updated_by) VALUES (:a, 'CHAIN_ADMIN', '[]', 1, 'smoke'), (:m, 'LOCATION_MANAGER', :l, 0, 'smoke')`, { a: ADMIN, m: MGR, l: JSON.stringify([hfa]) });
 
 try {
   console.log('permissions');
@@ -124,14 +120,10 @@ try {
   check(r.status === 401, 'a wrong password is refused', r.status);
   r = await call(null, 'POST', '/api/login', { username: MGR.toUpperCase(), password: PASSWORD });
   check(r.status === 200 && r.data.username === MGR, 'an Allegro user logs in with the admin password (e-mail in any case)', r.status);
-  r = await call('rm', 'GET', '/api/joya/me');
-  check(r.status === 200 && !r.data.isAdmin && r.data.locations.length === 1 && r.data.locations[0].id === hfa && r.data.payroll === true, 'an Allegro restMngr with no row manages their own branches', r.data);
-  r = await call('mgr', 'GET', `/api/joya/payroll/lines?locationId=${hfa}&period=${today.slice(0, 7)}`);
-  check(r.status === 403, 'no payroll lines without payroll access');
-  r = await call('mgr', 'GET', `/api/joya/labor/summary?locationIds=${hfa}`);
-  check(r.status === 200 && r.data.locations[0].estimate === undefined && r.data.payrollVisible === false, 'labor summary shows hours but no money without payroll access');
-  r = await call('mgr', 'GET', `/api/joya/employees?locationIds=${hfa}`);
-  check(r.status === 200 && r.data.employees.every((e) => e.hourlyWage === undefined), 'wages are hidden without payroll access');
+  r = await call('mgr', 'GET', '/api/joya/users');
+  check(r.status === 403, 'only the chain admin sees the user list', r.status);
+  r = await call('admin', 'POST', '/api/joya/users', { username: MGR, role: 'CHAIN_ADMIN' });
+  check(r.status === 404, 'users cannot be changed in Joya (only in the Allegro admin)', r.status);
   r = await call('mgr', 'PUT', '/api/joya/settings/staffing', { value: { historyWeeks: 2 } });
   check(r.status === 403, 'only the chain admin changes settings');
 
@@ -304,8 +296,6 @@ try {
   check(r.status === 200 && r.data.pending.length >= 2 && r.data.sales.locations.length >= 2, 'chain overview');
 } finally {
   await cleanup();
-  await sql(`DELETE FROM joya_user_access WHERE username IN (:a, :m)`, { a: ADMIN, m: MGR });
-  await sql(`DELETE FROM joya_ai_requests WHERE username=:u`, { u: RM });
   rmSync(USERS_FILE, { force: true });
   await getDbPool().end();
 }

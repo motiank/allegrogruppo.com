@@ -34,15 +34,7 @@ CREATE TABLE IF NOT EXISTS joya_locations (
   UNIQUE KEY uq_branch (allegro_branch_id)
 );
 
--- Who may see what. A login (trade-hub config/users.json) with no row here has no Joya access.
-CREATE TABLE IF NOT EXISTS joya_user_access (
-  username VARCHAR(255) NOT NULL PRIMARY KEY,
-  role ENUM('CHAIN_ADMIN','LOCATION_MANAGER') NOT NULL,
-  location_ids JSON NULL,                         -- LOCATION_MANAGER: [1,3]; CHAIN_ADMIN: ignored (all)
-  payroll_access TINYINT(1) NOT NULL DEFAULT 0,   -- wages, payroll lines, labor cost in money
-  updated_by VARCHAR(255) NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- Users and their rights are NOT stored here: they are the Allegro admin users (repo-root users.json).
 
 CREATE TABLE IF NOT EXISTS joya_audit_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

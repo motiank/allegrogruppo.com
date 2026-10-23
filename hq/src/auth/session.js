@@ -2,8 +2,7 @@
  * Logins of Joya HQ are the Allegro admin users (repo-root users.json, managed in the admin).
  * The password is checked with the admin's own method (admin/server/auth userApi.getUserKey), so a
  * change there applies here too. Only users with status "active" may log in. The username is the
- * e-mail. Which locations a user may see: src/access.js (from the Allegro role and branches, or a
- * joya_user_access row).
+ * e-mail. Which locations a user may see: src/access.js (from the Allegro role and branches only).
  *
  * Session: a JWT in the httpOnly cookie `joya_session`, signed with JOYA_SESSION_SECRET and
  * audience 'joya-hq' — Joya's own cookie, separate from the admin's `user` cookie.

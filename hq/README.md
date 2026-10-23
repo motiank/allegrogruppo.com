@@ -48,8 +48,7 @@ The chat needs the AI runner running, and all data needs the Allegro admin runni
 | AI runner | `runner/` (`npm run runner`) — `claude -p` on the Claude subscription, no API key |
 | Tests | `npm test` (logic) · end to end on the local mirror: `node scripts/fake-allegro.mjs 4399`, then `ALLEGRO_API_URL=http://localhost:4399/local-api/v1 JOYA_HQ_PORT=4360 node server.js`, then `node scripts/joya-smoke.mjs http://localhost:4360`, both with `ALLEGRO_USERS_FILE=<a test file>` (the smoke test writes its own users there) · `npm run test:runner` · planner eval (real model): `npm run eval`; its contexts: `node scripts/joya-eval-context.mjs` (local DB + fake API) |
 | Demo | `scripts/fake-allegro.mjs` serves made-up source data of two demo branches (`demo-tlv`, `demo-hfa`) in the API's shapes; `node scripts/joya-seed-demo.mjs` (`--remove`) writes Joya's own demo records for them (menu, rules, past lists…), every row `is_demo = 1`. Both use `scripts/demo-defs.mjs`; dates are relative to the day they run |
-| Logins | the Allegro admin users (added and changed in the admin) |
-| Access override | Settings → Users, or `node scripts/joya-access.mjs <e-mail> CHAIN_ADMIN|LOCATION_MANAGER [--locations A,B] [--payroll]` |
+| Logins and rights | only the Allegro admin users (`users.json`, added and changed in the admin); Settings → Users only shows them |
 
 ## What is kept apart
 
@@ -98,8 +97,8 @@ refused with "comes from the Allegro API".
   callers pass.
 - Joya access comes from the Allegro role: `admin` → `CHAIN_ADMIN` (all locations, settings, chain-wide and
   mandatory rules, users), `restMngr` → `LOCATION_MANAGER` of the user's `restaurants` (Allegro branch ids, `*` =
-  all); both with payroll access (wages, payroll lines, labor cost in money). Any other role: no access. A
-  `joya_user_access` row (Settings → Users) overrides this for one user. Every route checks the location it touches; lists are filtered to the user's locations; the AI
+  all); both with payroll access (wages, payroll lines, labor cost in money). Any other role: no access. Users
+  and rights are kept **only** in that JSON file (owner, 2026-10-24) — no Joya table or file of users. Every route checks the location it touches; lists are filtered to the user's locations; the AI
   calculations run with the asking user's access.
 - The top bar picks company → restaurant. Each location's company is the Allegro branch's `company` (from
   `/branches`, not stored). The company list shows only when the user's locations span more than one company; an
@@ -209,5 +208,5 @@ Not done yet — ask the owner before each step that touches the server.
    `node runner/index.js`, working directory `hq/`. The runner needs a logged-in `claude` CLI for its user.
 5. DNS `hq.allegrogruppo.com` → the server, and a site in the web server in front of the admin: TLS, proxy to
    127.0.0.1:4300. Never proxy `/local-api` (the admin's data API stays private).
-6. Users need nothing: the admin users log in with their admin e-mail and password.
+6. Users need nothing: the admin users log in with their admin e-mail and password; rights follow their admin role.
 Do not seed demo records on production; they only make sense with the fake API.

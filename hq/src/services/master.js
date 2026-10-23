@@ -4,7 +4,7 @@
 import { q, one, err, audit, parseJson, inList, clearSettingsCache, hms, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import { assertLocation, accessFor } from '../access.js';
-import { loadUsers, allegroUser } from '../auth/session.js';
+import { loadUsers } from '../auth/session.js';
 import { normTime } from '../lib/staffingRules.js';
 import * as source from './source.js';
 
@@ -41,47 +41,16 @@ export async function upsertLocation(access, { id, active = true }) {
 
 // ---------------------------------------------------------------- users
 
-/**
- * Every Allegro admin user with their Joya access: from the Allegro role, or from a joya_user_access
- * row set here (override). Users not active in Allegro are listed without access.
- */
+/** Every Allegro admin user with their Joya access (from the Allegro role; read-only here — users are managed in the admin). */
 export async function listUsers() {
-  const rows = new Map((await q(`SELECT * FROM joya_user_access`)).map((r) => [r.username.toLowerCase(), r]));
   const linked = await q(`SELECT id, allegro_branch_id FROM joya_locations WHERE allegro_branch_id IS NOT NULL`);
-  const users = loadUsers().filter((u) => u.email);
-  return users
+  return loadUsers()
+    .filter((u) => u.email)
     .map((u) => {
-      const user = { username: u.email, role: u.role, restaurants: Array.isArray(u.restaurants) ? u.restaurants : [] };
-      const row = rows.get(u.email.toLowerCase()) || null;
-      const a = u.status === 'active' ? accessFor(user, row, linked) : null;
-      return { username: u.email, allegroRole: u.role, allegroActive: u.status === 'active', role: a?.role ?? null, locationIds: a && !a.isAdmin ? a.locationIds : [], payroll: !!a?.payroll, override: !!row, updatedBy: row?.updated_by ?? null };
+      const a = u.status === 'active' ? accessFor({ username: u.email, role: u.role, restaurants: Array.isArray(u.restaurants) ? u.restaurants : [] }, linked) : null;
+      return { username: u.email, allegroRole: u.role, allegroActive: u.status === 'active', role: a?.role ?? null, locationIds: a && !a.isAdmin ? a.locationIds : [], payroll: !!a?.payroll };
     })
     .sort((a, b) => (a.role || 'Z').localeCompare(b.role || 'Z') || a.username.localeCompare(b.username));
-}
-
-/** Sets this user's Joya access here (an override of the Allegro role). The user must exist in Allegro. */
-export async function setUser(access, { username, role, locationIds = [], payroll = false }) {
-  if (!username) throw err('BAD_REQUEST', 'username is required');
-  const u = allegroUser(username);
-  if (!u) throw err('BAD_REQUEST', 'no active Allegro admin user with this e-mail — add the user in the Allegro admin first');
-  username = u.username;
-  if (!['CHAIN_ADMIN', 'LOCATION_MANAGER'].includes(role)) throw err('BAD_REQUEST', 'role must be CHAIN_ADMIN or LOCATION_MANAGER');
-  if (username === access.username && role !== 'CHAIN_ADMIN') throw err('BAD_REQUEST', 'you cannot remove your own admin role');
-  const ids = (locationIds || []).map(Number).filter(Number.isFinite);
-  await q(
-    `INSERT INTO joya_user_access (username, role, location_ids, payroll_access, updated_by)
-     VALUES (:u, :r, :l, :p, :by)
-     ON DUPLICATE KEY UPDATE role=VALUES(role), location_ids=VALUES(location_ids), payroll_access=VALUES(payroll_access), updated_by=VALUES(updated_by)`,
-    { u: username, r: role, l: JSON.stringify(ids), p: payroll ? 1 : 0, by: access.username },
-  );
-  await audit(access.username, 'USER_ACCESS_SET', 'user', null, null, { username, role, locationIds: ids, payroll });
-}
-
-/** Removes the override: the user's access follows their Allegro role again. */
-export async function removeUser(access, username) {
-  if (username === access.username) throw err('BAD_REQUEST', 'you cannot remove yourself');
-  await q(`DELETE FROM joya_user_access WHERE username=:u`, { u: username });
-  await audit(access.username, 'USER_ACCESS_REMOVED', 'user', null, null, { username });
 }
 
 // ---------------------------------------------------------------- settings

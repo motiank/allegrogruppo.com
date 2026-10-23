@@ -4,29 +4,24 @@
 //   role admin        → CHAIN_ADMIN: every location, settings, rules, users; payroll
 //   role restMngr     → LOCATION_MANAGER of the user's `restaurants` (Allegro branch ids, "*" = all); payroll
 //   any other role    → no access
-// A joya_user_access row (Settings → Users) overrides that for one user:
-//   CHAIN_ADMIN / LOCATION_MANAGER (location_ids) and payroll_access (wages, payroll lines, labor cost in
-//   money, payroll checks). A user who is not active in Allegro gets 403 even with a row.
+// Users and their rights live only in the admin's users.json (owner, 2026-10-24): no Joya table or file
+// of users. payroll = wages, payroll lines, labor cost in money, payroll checks.
 //
 // Every route checks the location it touches with canLocation(); lists are filtered
 // with scopeLocations(). The AI calculations run with the asking user's access too.
 import { getSessionUser, allegroUser } from './auth/session.js';
-import { one, q, parseJson } from './db.js';
+import { q } from './db.js';
 import { syncLocations } from './services/source.js';
 
 /**
- * The Joya access of an Allegro user (allegroUser shape), with or without a joya_user_access row;
- * linked = the location link rows [{ id, allegro_branch_id }]. null = no Joya access.
+ * The Joya access of an Allegro user (allegroUser shape); linked = the location link rows
+ * [{ id, allegro_branch_id }]. null = no Joya access.
  */
-export function accessFor(user, row, linked) {
+export function accessFor(user, linked) {
   let role;
   let ids;
   let payroll;
-  if (row) {
-    role = row.role;
-    ids = (parseJson(row.location_ids) || []).map(Number).filter(Number.isFinite);
-    payroll = !!row.payroll_access;
-  } else if (user.role === 'admin') {
+  if (user.role === 'admin') {
     role = 'CHAIN_ADMIN';
     ids = [];
     payroll = true;
@@ -38,7 +33,7 @@ export function accessFor(user, row, linked) {
   } else return null;
   const isAdmin = role === 'CHAIN_ADMIN';
   const known = linked.map((l) => l.id);
-  return { username: user.username, role, isAdmin, locationIds: isAdmin ? known : ids.filter((id) => known.includes(id)), payroll, fromAllegroRole: !row };
+  return { username: user.username, role, isAdmin, locationIds: isAdmin ? known : ids.filter((id) => known.includes(id)), payroll };
 }
 
 export async function loadAccess(username) {
@@ -48,8 +43,7 @@ export async function loadAccess(username) {
   // locations are the Allegro branches (link rows made on first sight; refreshed at most every 5 min)
   await syncLocations();
   const linked = await q(`SELECT id, allegro_branch_id FROM joya_locations WHERE allegro_branch_id IS NOT NULL`);
-  const row = await one(`SELECT * FROM joya_user_access WHERE username = :u`, { u: user.username });
-  return accessFor(user, row, linked);
+  return accessFor(user, linked);
 }
 
 export function canLocation(access, locationId) {

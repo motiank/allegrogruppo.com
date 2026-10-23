@@ -131,7 +131,7 @@ async function create() {
 
   console.log(`demo records created: ${made.join(', ')}`);
   console.log('The source data comes from the fake Allegro API:  node scripts/fake-allegro.mjs  (+ ALLEGRO_API_URL=http://localhost:4399/local-api/v1)');
-  console.log('Give a user access:  node scripts/joya-access.mjs <username> CHAIN_ADMIN --payroll');
+  console.log('Users: the Allegro admin users (users.json); an admin sees the demo locations too.');
 }
 
 try {

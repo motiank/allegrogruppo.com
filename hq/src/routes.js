@@ -88,8 +88,6 @@ r.get(
 r.get('/joya/locations', h(async (req) => ({ locations: await master.listLocations(req.joya) })));
 r.post('/joya/locations', requireAdmin, h(async (req) => ({ location: await master.upsertLocation(req.joya, req.body || {}) })));
 r.get('/joya/users', requireAdmin, h(async () => ({ users: await master.listUsers() })));
-r.post('/joya/users', requireAdmin, h(async (req) => (await master.setUser(req.joya, req.body || {}), { users: await master.listUsers() })));
-r.delete('/joya/users/:username', requireAdmin, h(async (req) => (await master.removeUser(req.joya, req.params.username), { users: await master.listUsers() })));
 r.get('/joya/settings', h(async () => ({ settings: await master.listSettings() })));
 r.put('/joya/settings/:name', requireAdmin, h(async (req) => (await master.saveSetting(req.joya, req.params.name, req.body?.value), { settings: await master.listSettings() })));
 r.get('/joya/roles', h(async () => ({ roles: await master.listRoles() })));
