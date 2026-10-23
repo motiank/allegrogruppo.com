@@ -1,0 +1,213 @@
+# Joya HQ
+
+The AI headquarters of the **Allegro group restaurants** (built 2026-10-12 in the tradewit repo, moved here to the
+Allegro repo on 2026-10-24). It analyses restaurant data, makes recommendations (ordering lists, weekly staffing),
+lets managers edit and approve them, and learns from what they approved and what really happened. Address:
+**https://hq.allegrogruppo.com** (planned; the admin is https://admin.allegrogruppo.com).
+
+**A separate service in this repo**, like `admin/`, `order_sys/` and `events/`: own Express server (`server.js`,
+port 4300), own phone app, own `package.json`, own systemd unit. It shares with the admin:
+- **the users** — the Allegro admin users (`users.json` at the repo root, managed in the admin). The password is
+  checked with the admin's own method (`admin/server/auth` `userApi.getUserKey`); Joya keeps its own session cookie.
+- **the data** — read on demand from the admin **Local Data API** (`../local_api_readme.md`), never copied:
+  `src/services/source.js` (client `lib/allegro.js`, answers kept in memory for 5 minutes). The API answers on
+  its own machine only, which is why Joya runs on the same server as the admin.
+- **the database server** — Joya's own records (decisions, edits, rules, notes, tasks, chat) are tables
+  `joya_*` (`sql/add-joya.sql`) in `DB_NAME` (the `allegro` DB; `JOYA_DB_NAME` overrides it).
+
+The AI runner is `runner/` (it talks to this service over HTTP).
+
+## Run
+
+```bash
+cd hq
+npm install
+npm run build              # client/ → prod/ (the phone app)
+npm start                  # :4300 (JOYA_HQ_PORT), host 127.0.0.1 (JOYA_HQ_HOST)
+npm run runner             # the AI runner (answers the chat); needs Joya HQ running
+npm run dev                # nodemon; with `npm run dev:client` (Vite :5175, proxies /api to :4300)
+```
+
+Env (`lib/env.js`, later files win): the repo-root `.env` (the DB of every Allegro service — **production**),
+then `hq/.env` (Joya's secrets on the server), then `hq/.env.local` (development: a LOCAL MySQL — never develop
+against the production DB). Example: `env.joya-hq.example`. Needs `JOYA_SESSION_SECRET` (the server refuses to
+start without it) and, in production, `JOYA_API_KEY` (the runner's key) and `NODE_ENV=production` (secure cookie).
+The chat needs the AI runner running, and all data needs the Allegro admin running (port 3021).
+
+| Part | Where |
+|---|---|
+| Server | `server.js` — `/health`, `/api/session|login|logout`, `/api/joya/*`, the built app from `prod/` |
+| Env, log, DB pool | `lib/env.js`, `lib/log.js` (pino), `lib/dbpool.js` |
+| Logins, runner key | `src/auth/session.js`, `src/auth/machineKey.js`, `src/sessionRoutes.js` |
+| API routes | `src/routes.js` |
+| Permissions | `src/access.js` |
+| Logic (pure, unit-tested) | `src/lib/` — `recommend.js`, `staffingRules.js`, `demand.js`, `fields.js`, `csv.js` |
+| Source data (Allegro API) | `lib/allegro.js` (HTTP + 5-min memory cache), `src/services/source.js` (the only reader of source data) |
+| Services (DB) | `src/services/` — replenishment, staffing, demand, analytics, payroll, quality, work (tasks, inquiries, overview), imports, master, ai |
+| Phone app | `client/` — `index.js`, `App.js` (login or app), `Login.js`, `JoyaApp.js` (shell + routes), `pages/*`, `AskBox.js`, `i18n/` (provider `index.js` + dictionaries) |
+| AI runner | `runner/` (`npm run runner`) — `claude -p` on the Claude subscription, no API key |
+| Tests | `npm test` (logic) · end to end on the local mirror: `node scripts/fake-allegro.mjs 4399`, then `ALLEGRO_API_URL=http://localhost:4399/local-api/v1 JOYA_HQ_PORT=4360 node server.js`, then `node scripts/joya-smoke.mjs http://localhost:4360`, both with `ALLEGRO_USERS_FILE=<a test file>` (the smoke test writes its own users there) · `npm run test:runner` · planner eval (real model): `npm run eval`; its contexts: `node scripts/joya-eval-context.mjs` (local DB + fake API) |
+| Demo | `scripts/fake-allegro.mjs` serves made-up source data of two demo branches (`demo-tlv`, `demo-hfa`) in the API's shapes; `node scripts/joya-seed-demo.mjs` (`--remove`) writes Joya's own demo records for them (menu, rules, past lists…), every row `is_demo = 1`. Both use `scripts/demo-defs.mjs`; dates are relative to the day they run |
+| Logins | the Allegro admin users (added and changed in the admin) |
+| Access override | Settings → Users, or `node scripts/joya-access.mjs <e-mail> CHAIN_ADMIN|LOCATION_MANAGER [--locations A,B] [--payroll]` |
+
+## What is kept apart
+
+1. **Source data** — in Allegro, never copied here: Beecomm orders (`/beecomm/orders/stored`, a check = a closed
+   order, amount = `netTotal − serviceAmount`), dish sales (`/beecomm/items/stored`), employees (`/employees`), Tabit
+   clock rows (`/shifts/raw`), the saved payroll month (`/payroll`, `/shifts/summary`) and its daily payslip gross
+   (`/labor/daily`). Entered here: the menu (`joya_menu_items`, by Beecomm dish id — from the API later, postponed),
+   recipes, shortages.
+2. **Recommendations** — `joya_order_recommendation_lines`, `joya_staffing_proposal_lines`. Never edited.
+3. **Manager edits** — `joya_order_edits`, `joya_staffing_edits` (who, when, before/after, `UI` or `CHAT`),
+   `joya_attendance_corrections` (by Allegro raw shift id, with the raw times copied in; the raw row is never changed).
+4. **Approved decisions** — `joya_order_lists.final_json`, `joya_staffing_plans.final_json`, frozen at approval.
+5. **Execution / outcome** — `joya_order_lists.ordered_json` + `ordered_by/at` (marked as really ordered, separate
+   from approved); actual demand and worked hours, computed from the source data ("planned vs actual").
+
+Ids: a location is a link row `joya_locations.allegro_branch_id` (made on first sight of a branch, active when it had
+Beecomm orders in the last 60 days; only `active` is set here); an employee id is Allegro's `employeeId`; an
+attendance id is Allegro's raw shift id. `joya_role_aliases` maps Allegro role names ('מלצר', 'פס חם'…) to Joya role
+codes (Settings → Role names; unmapped names are listed on the data page). National ids and phones from Allegro are
+never kept or shown.
+
+`joya_audit_log` records every action with the user. `is_demo = 1` marks demonstration rows; the app shows a banner.
+
+## Integrations — what is real
+
+**Allegro admin Local Data API** — live and read-only, for everything above. `ALLEGRO_API_URL` (default
+`http://localhost:3021/local-api/v1`); the API answers **only on its own machine** (loopback, no proxy headers,
+`Host: localhost`), so joya-hq must run next to the Allegro admin or reach it through an SSH tunnel. When it cannot be
+reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) — nothing is shown from a copy.
+`/status` tells "not loaded yet" apart from "missing" (missing sales days are counted only up to Allegro's last
+loaded day). Settings → Connections checks the API; Settings → Locations → "Read Allegro again now" clears the cache.
+
+Instagram and Google inquiries/reviews are **entered by hand**. The staffing plan is exported as a **CSV for Tabit**.
+Nothing is sent to a supplier, Tabit, Instagram or Google.
+
+Import (CSV or typed, column mapping saved per source and kind) is left only for what Allegro does not have:
+`MENU`, `RECIPES`, `ORDER_HISTORY` (`services/imports.js` `IMPORTABLE`). The other kinds in `lib/fields.js` are
+refused with "comes from the Allegro API".
+
+## Permissions
+
+- Login = an Allegro admin user (e-mail + the admin password, status `active`). The session is a JWT in the
+  httpOnly cookie `joya_session` (7 days), signed with `JOYA_SESSION_SECRET` and audience `joya-hq`, so a token
+  of another app never passes. A user made inactive in the admin loses Joya access at the next request.
+- The AI runner calls `/api/joya/ai/runner/*` with `X-Joya-Key` = `JOYA_API_KEY`; with no key set, only loopback
+  callers pass.
+- Joya access comes from the Allegro role: `admin` → `CHAIN_ADMIN` (all locations, settings, chain-wide and
+  mandatory rules, users), `restMngr` → `LOCATION_MANAGER` of the user's `restaurants` (Allegro branch ids, `*` =
+  all); both with payroll access (wages, payroll lines, labor cost in money). Any other role: no access. A
+  `joya_user_access` row (Settings → Users) overrides this for one user. Every route checks the location it touches; lists are filtered to the user's locations; the AI
+  calculations run with the asking user's access.
+- The top bar picks company → restaurant. Each location's company is the Allegro branch's `company` (from
+  `/branches`, not stored). The company list shows only when the user's locations span more than one company; an
+  admin may pick "all companies" or "all locations of this company", and a page then covers those locations.
+
+## Replenishment — how the recommendation learns
+
+Not perpetual inventory: the system never knows current stock and never says it does.
+
+**Learning examples** are the location's *final* order lists (newest `historyLists`, default 8): `ORDERED` and
+imported history weigh 1, approved-but-not-marked-ordered weigh `approvedOnlyWeight` (0.5), and newer lists weigh
+more (half-life `halfLifeLists` = 4 lists). A final list includes the manager's changes and added items, so every
+edit becomes part of the next recommendation — no model retraining. Learning is **per location**.
+
+Per item, `lib/recommend.js` keeps plain numbers (stored in `joya_item_patterns` after every approve / order,
+shown on "What the system learned"): times ordered, median days between orders, weighted median quantity, the
+**sales ratio** (quantity ordered ÷ units sold of the dishes linked to the item since the previous order — only
+when every day of that window has POS data), and how often the manager removed it when suggested.
+
+Quantity, first that applies: `SALES_RATIO` (≥ 3 ratios: ratio × linked dish units sold since the last order) →
+`HISTORY_MEDIAN` (≥ 2 past quantities) → `RECIPE_ESTIMATE` (only when every linked dish has a recipe quantity in a
+convertible unit; always LOW confidence, labelled an estimate) → `NONE` (quantity left empty for the manager).
+Due: a shortage reported since the last order, or days since the last order ≥ `dueFraction` (0.8) × median
+interval. A shortage raises the quantity by `shortageBumpPct` (15 %). An item removed in ≥ 75 % of the lists that
+suggested it moves to "check". Sections: `SUGGESTED`, `CHECK` (decision or quantity for the manager), `NOT_DUE`.
+Every line stores its basis (reasons, calculation, examples with weights) and the page shows it.
+
+What it does **not** assume: a final list is how this manager orders, not proof of consumption; no shortage report
+does not mean the order was right (no quantity is ever lowered for that); ingredients without recipe quantities
+link dishes to items but never produce a "consumption" number. With too little history the list is partial and the
+manager completes it; approval is refused while a kept line has no quantity.
+
+All numbers above are in `joya_settings.replenishment` (Settings page).
+
+## Staffing — rules, demand units, proposal
+
+Demand units (`lib/demand.js`), from Bikum checks. An **order = one POS check**, counted when it is *opened*:
+`DINERS_PER_SHIFT`, `DINERS_PEAK_HOUR` (busiest clock hour of the shift), `CONCURRENT_DINERS_PEAK` (most diners
+seated at once, sampled every 15 min, needs check close times), `ORDERS_PER_SHIFT`, `ORDERS_PEAK_HOUR`. More than
+20 % of checks without a diner count → diner units are unknown, not 0.
+
+Forecast: median of the same weekday and shift over the previous `historyWeeks` (8); days without POS data are
+left out and listed. Rules (`lib/staffingRules.js`): `FIXED`, `MIN`, `MAX`, `RATIO`, `STEPS`, `PEAK_EXTRA` (extra
+people for a window when peak demand passes a threshold), each with a demand unit, scope (location / shift / days),
+optional role start/end times and a `mandatory` flag. The most specific rule of each type wins; RATIO and STEPS →
+the larger. Unknown demand → the minimum only, never "0 staff". Roles no rule covers use the **baseline** (existing
+staffing examples). The output is roles, headcounts and hours — no names.
+
+**Learning from edits** never changes a rule: when the approved plans differ from the proposals in the same slot in
+the same direction in ≥ 3 of the last 4 plans, the proposal applies the median change and says so ("you added 1
+in 3 of the last 4 weeks; rule result 2"), never below the mandatory minimum. Manager edits below a mandatory
+minimum are refused (422 `MANDATORY_MIN`); chain-wide and mandatory rules are changed only by the chain admin.
+
+### Learned staffing (no plan, no rules) — `src/lib/shiftModel.js`, `services/shiftModel.js`
+
+The chat's "how many employees per shift next week" (`staffing_forecast_week`) and "what does an average
+shift look like" (`shift_profile`) need no plan and no stored rule. From the last `profileWeeks` (13) weeks:
+- **Profile:** per weekday × shift, the average diners (sit-down checks, order type 1) and deliveries (every
+  other check). Morning = checks opened before `shiftSplit` (17:00), evening = from it (after midnight = the
+  evening of the business date).
+- **Ratios:** per Allegro role name and shift, diners ÷ people, from the shifts that have both sales and staff
+  (Allegro `/shifts/by-shift`, computed by the Allegro admin from the Tabit clock times). Kitchen roles
+  (`kitchenRoles`, or a role mapped to `cook`) count 1 delivery as `deliveryAsDiners` (1) diners.
+- **Forecast:** people = average load ÷ ratio, rounded to the nearest; a role that worked in ≥ `minPresence`
+  (50 %) of those weekday shifts gets at least 1. The result lists the usual headcount next to it.
+Settings (`joya_settings` 'staffing', all optional): `profileWeeks`, `shiftSplit`, `deliveryAsDiners`,
+`minPresence`, `minHoursInShift`, `kitchenRoles`. Without `/shifts/by-shift` (older Allegro) or with no clock
+times, the answer gives the expected diners only and says why.
+
+## Asking in words
+
+`POST /api/joya/ai/ask` → the runner plans calculations from `services/ai.js` `CALCS` (sales, labor, demand,
+plans, lists, quality, payroll issues…), **joya-hq** runs them with the user's access, the runner writes the answer
+from the results, and numbers in the answer not found in the results are listed (`meta.unverifiedNumbers`, shown as
+a warning). A change request becomes a validated proposal (same checks as the UI) that is saved only on **Apply**,
+logged `via = 'CHAT'`. "Recalculate with …" is a what-if: the stored rules do not change.
+
+The main menu (since 2026-10-23) has three areas, each one a chat: **מלאי ורכש** (`/stock`), **כח אדם** (`/people`),
+**ביצועים** (`/performance`) — `client/pages/Area.js`. A question asked there is a request with context `AREA` and
+context id 1 / 2 / 3 (`ai.js` `AREAS`; `sql/joya-areas.sql` once on an existing DB), so each area keeps its own
+history. While the user types, the chat box suggests questions of that area (strings `joya.area.<area>.sN`) and
+the user's own past questions. The detailed pages keep their routes but are not in the menu; Settings is at the
+bottom of the menu for a chain admin.
+
+## Other functions
+
+Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
+(ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
+Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **known** gross
+(Allegro `/labor/daily`: the payslip gross of saved payroll months, spread over the days worked; % of the sales of
+the same days — Allegro has no employer cost) and an **estimate** (clocked hours × hourly wage ×
+`employerCostFactorEstimate`), always labelled. Payroll checks (`payroll.js`): missing clock times, duplicates,
+overlaps, long shifts, Tabit names Allegro could not match, payroll hours (after the rules) above the clocked hours;
+each is accepted, dismissed or corrected with a required note.
+Final payroll approval stays in the payroll system. Data quality (`quality.js`): stale and missing data, unknown POS
+codes, unmatched Tabit names, unmapped role names, checks without diners/close time. Tasks and inquiries: `work.js`.
+
+## Deploy (the Allegro admin's server, hq.allegrogruppo.com)
+
+Not done yet — ask the owner before each step that touches the server.
+1. Apply `sql/add-joya.sql` and `sql/joya-areas.sql` to the `allegro` DB (new `joya_*` tables only; single-quoted
+   strings, ANSI_QUOTES-safe).
+2. `hq/.env` (mode 600) from `env.joya-hq.example`: a new `JOYA_SESSION_SECRET`, a new `JOYA_API_KEY`,
+   `NODE_ENV=production`, `ALLEGRO_API_URL=http://localhost:3021/local-api/v1`. The DB comes from the root `.env`.
+3. `cd hq && npm install && npm run build`.
+4. Two services next to the admin's (the same way the admin is kept running): `node server.js` and
+   `node runner/index.js`, working directory `hq/`. The runner needs a logged-in `claude` CLI for its user.
+5. DNS `hq.allegrogruppo.com` → the server, and a site in the web server in front of the admin: TLS, proxy to
+   127.0.0.1:4300. Never proxy `/local-api` (the admin's data API stays private).
+6. Users need nothing: the admin users log in with their admin e-mail and password.
+Do not seed demo records on production; they only make sense with the fake API.

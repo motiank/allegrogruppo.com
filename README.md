@@ -167,6 +167,17 @@ The Vite dev server will:
 - `GET /health` - Health check
 - `/admin/*` - Protected admin routes (requires authentication)
 
+## Joya HQ (`hq/`)
+
+A separate service: the AI headquarters of the restaurants (https://hq.allegrogruppo.com, port 4300), with its
+own `package.json`. It logs in with the admin users and reads all data from the admin Local Data API
+(`local_api_readme.md`). See `hq/README.md`.
+
+```bash
+cd hq && npm install && npm run build && npm start   # :4300
+cd hq && npm run runner                              # the AI runner (answers the chat)
+```
+
 ## License
 
 MIT

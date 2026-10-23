@@ -1,0 +1,2344 @@
+{
+ "capturedAt": "2026-10-21T09:51:02.934Z",
+ "contexts": {
+  "GENERAL": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "GENERAL",
+    "contextId": null,
+    "locationId": null
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": 6,
+     "code": "DEMO-HFA",
+     "name": "ג׳ויה חיפה (דמו)",
+     "isDemo": true
+    },
+    {
+     "id": 5,
+     "code": "DEMO-TLV",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "isDemo": true
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": 5,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 5,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": 6,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 6,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": null
+  },
+  "ORDER_LIST": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "ORDER_LIST",
+    "contextId": 100,
+    "locationId": 5
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": 6,
+     "code": "DEMO-HFA",
+     "name": "ג׳ויה חיפה (דמו)",
+     "isDemo": true
+    },
+    {
+     "id": 5,
+     "code": "DEMO-TLV",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "isDemo": true
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": 5,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 5,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": 6,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 6,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": {
+    "kind": "ORDER_LIST",
+    "list": {
+     "id": 100,
+     "locationId": 5,
+     "date": "2026-10-21",
+     "status": "DRAFT"
+    },
+    "lines": [
+     {
+      "lineId": 1063,
+      "ingredientId": 34,
+      "name": "ביצים",
+      "qty": 11,
+      "unit": "תבנית",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 11
+     },
+     {
+      "lineId": 1062,
+      "ingredientId": 33,
+      "name": "בצל",
+      "qty": 4,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 4
+     },
+     {
+      "lineId": 1065,
+      "ingredientId": 36,
+      "name": "גבינת פטה",
+      "qty": 6,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 6
+     },
+     {
+      "lineId": 1070,
+      "ingredientId": 41,
+      "name": "חזה עוף",
+      "qty": 9,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 9
+     },
+     {
+      "lineId": 1064,
+      "ingredientId": 35,
+      "name": "חלב",
+      "qty": 24,
+      "unit": "l",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 24
+     },
+     {
+      "lineId": 1066,
+      "ingredientId": 37,
+      "name": "לחם מחמצת",
+      "qty": 37,
+      "unit": "יח׳",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 37
+     },
+     {
+      "lineId": 1072,
+      "ingredientId": 43,
+      "name": "לימונים",
+      "qty": 3,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 3
+     },
+     {
+      "lineId": 1061,
+      "ingredientId": 32,
+      "name": "מלפפונים",
+      "qty": 8,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 8
+     },
+     {
+      "lineId": 1074,
+      "ingredientId": 45,
+      "name": "מפיות",
+      "qty": 1,
+      "unit": "קרטון",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 1
+     },
+     {
+      "lineId": 1071,
+      "ingredientId": 42,
+      "name": "סלמון",
+      "qty": 6,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 6
+     },
+     {
+      "lineId": 1060,
+      "ingredientId": 31,
+      "name": "עגבניות",
+      "qty": 14,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 14
+     },
+     {
+      "lineId": 1073,
+      "ingredientId": 44,
+      "name": "עשבי תיבול",
+      "qty": 11,
+      "unit": "צרור",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 11
+     },
+     {
+      "lineId": 1069,
+      "ingredientId": 40,
+      "name": "פולי קפה",
+      "qty": 4,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 4
+     },
+     {
+      "lineId": 1067,
+      "ingredientId": 38,
+      "name": "פסטה",
+      "qty": 6,
+      "unit": "kg",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 6
+     },
+     {
+      "lineId": 1068,
+      "ingredientId": 39,
+      "name": "שמן זית",
+      "qty": 3,
+      "unit": "l",
+      "removed": false,
+      "origin": "RECOMMENDED",
+      "recommendedQty": 3
+     }
+    ],
+    "notDue": []
+   }
+  },
+  "STAFFING_PLAN": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "STAFFING_PLAN",
+    "contextId": 35,
+    "locationId": 5
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": 6,
+     "code": "DEMO-HFA",
+     "name": "ג׳ויה חיפה (דמו)",
+     "isDemo": true
+    },
+    {
+     "id": 5,
+     "code": "DEMO-TLV",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "isDemo": true
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": 5,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 5,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": 6,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 6,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": {
+    "kind": "STAFFING_PLAN",
+    "plan": {
+     "id": 35,
+     "locationId": 5,
+     "weekStart": "2026-10-25",
+     "status": "DRAFT"
+    },
+    "lines": [
+     {
+      "lineId": 2078,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 2,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2077,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2076,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2079,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2080,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 5,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2073,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2072,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2071,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 3,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2074,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2075,
+      "date": "2026-10-25",
+      "weekday": 0,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 7,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2088,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 1,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2087,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2086,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2089,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2090,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 4,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2083,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2082,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2081,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2084,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2085,
+      "date": "2026-10-26",
+      "weekday": 1,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 6,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2098,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 1,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2097,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2096,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2099,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2100,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 5,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2093,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2092,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2091,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2094,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2095,
+      "date": "2026-10-27",
+      "weekday": 2,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 6,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2108,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 1,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2107,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2106,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2109,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2110,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 5,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2103,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2102,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2101,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 2,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2104,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2105,
+      "date": "2026-10-28",
+      "weekday": 3,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 6,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2118,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 2,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2117,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2116,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 3,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2119,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2120,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 6,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2113,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2112,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2111,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 3,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2114,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2115,
+      "date": "2026-10-29",
+      "weekday": 4,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 8,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2123,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "barista",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2122,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 1
+     },
+     {
+      "lineId": 2121,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "cook",
+      "headcount": 3,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2124,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2125,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 9,
+      "start": "07:30:00",
+      "end": "16:00:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2126,
+      "date": "2026-10-30",
+      "weekday": 5,
+      "shiftCode": "morning",
+      "roleCode": "waiter",
+      "headcount": 1,
+      "start": "12:00:00",
+      "end": "15:00:00",
+      "isPeakExtra": true,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2129,
+      "date": "2026-10-31",
+      "weekday": 6,
+      "shiftCode": "evening",
+      "roleCode": "bartender",
+      "headcount": 2,
+      "start": "17:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2128,
+      "date": "2026-10-31",
+      "weekday": 6,
+      "shiftCode": "evening",
+      "roleCode": "checker",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2127,
+      "date": "2026-10-31",
+      "weekday": 6,
+      "shiftCode": "evening",
+      "roleCode": "cook",
+      "headcount": 3,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     },
+     {
+      "lineId": 2130,
+      "date": "2026-10-31",
+      "weekday": 6,
+      "shiftCode": "evening",
+      "roleCode": "runner",
+      "headcount": 1,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 0
+     },
+     {
+      "lineId": 2131,
+      "date": "2026-10-31",
+      "weekday": 6,
+      "shiftCode": "evening",
+      "roleCode": "waiter",
+      "headcount": 5,
+      "start": "16:00:00",
+      "end": "23:30:00",
+      "isPeakExtra": false,
+      "minRequired": 2
+     }
+    ],
+    "rules": [
+     {
+      "id": 29,
+      "locationId": null,
+      "shiftCode": "morning",
+      "days": null,
+      "roleCode": "barista",
+      "type": "FIXED",
+      "unit": null,
+      "params": {
+       "count": 1
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": true,
+      "active": true,
+      "note": "demo: one barista in the morning",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 30,
+      "locationId": null,
+      "shiftCode": "evening",
+      "days": null,
+      "roleCode": "bartender",
+      "type": "RATIO",
+      "unit": "CONCURRENT_DINERS_PEAK",
+      "params": {
+       "per": 35
+      },
+      "roleStart": "17:00:00",
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: bartenders by diners seated at once, from 17:00",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 28,
+      "locationId": null,
+      "shiftCode": "evening",
+      "days": null,
+      "roleCode": "checker",
+      "type": "FIXED",
+      "unit": null,
+      "params": {
+       "count": 1
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: one checker in the evening",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 27,
+      "locationId": null,
+      "shiftCode": "morning",
+      "days": null,
+      "roleCode": "checker",
+      "type": "FIXED",
+      "unit": null,
+      "params": {
+       "count": 1
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": true,
+      "active": true,
+      "note": "demo: one checker in the morning",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 21,
+      "locationId": null,
+      "shiftCode": null,
+      "days": null,
+      "roleCode": "cook",
+      "type": "STEPS",
+      "unit": "ORDERS_PEAK_HOUR",
+      "params": {
+       "steps": [
+        {
+         "above": 0,
+         "count": 2
+        },
+        {
+         "above": 12,
+         "count": 3
+        },
+        {
+         "above": 22,
+         "count": 4
+        }
+       ]
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: cooks by orders in the busiest hour",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 22,
+      "locationId": null,
+      "shiftCode": null,
+      "days": null,
+      "roleCode": "cook",
+      "type": "MIN",
+      "unit": null,
+      "params": {
+       "count": 2
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": true,
+      "active": true,
+      "note": "demo: never fewer than 2 cooks",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 26,
+      "locationId": null,
+      "shiftCode": null,
+      "days": null,
+      "roleCode": "runner",
+      "type": "STEPS",
+      "unit": "DINERS_PEAK_HOUR",
+      "params": {
+       "steps": [
+        {
+         "above": 0,
+         "count": 1
+        },
+        {
+         "above": 45,
+         "count": 2
+        }
+       ]
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: runners by peak-hour diners",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 23,
+      "locationId": null,
+      "shiftCode": null,
+      "days": null,
+      "roleCode": "waiter",
+      "type": "RATIO",
+      "unit": "DINERS_PER_SHIFT",
+      "params": {
+       "per": 30
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: 1 waiter per 30 diners in the shift",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 24,
+      "locationId": null,
+      "shiftCode": null,
+      "days": null,
+      "roleCode": "waiter",
+      "type": "MIN",
+      "unit": null,
+      "params": {
+       "count": 2
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": true,
+      "active": true,
+      "note": "demo: at least 2 waiters",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     },
+     {
+      "id": 25,
+      "locationId": null,
+      "shiftCode": "morning",
+      "days": null,
+      "roleCode": "waiter",
+      "type": "PEAK_EXTRA",
+      "unit": "DINERS_PEAK_HOUR",
+      "params": {
+       "end": "15:00",
+       "above": 40,
+       "count": 1,
+       "start": "12:00"
+      },
+      "roleStart": null,
+      "roleEnd": null,
+      "mandatory": false,
+      "active": true,
+      "note": "demo: lunch peak",
+      "updatedBy": "seed",
+      "updatedAt": "2026-10-14T01:28:36.000Z"
+     }
+    ]
+   }
+  },
+  "INQUIRY": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "INQUIRY",
+    "contextId": 19,
+    "locationId": 5
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": 6,
+     "code": "DEMO-HFA",
+     "name": "ג׳ויה חיפה (דמו)",
+     "isDemo": true
+    },
+    {
+     "id": 5,
+     "code": "DEMO-TLV",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "isDemo": true
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": 5,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 5,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": 6,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 6,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": {
+    "kind": "INQUIRY",
+    "inquiry": {
+     "id": 19,
+     "source": "GOOGLE",
+     "kind": "REVIEW",
+     "locationId": 5,
+     "locationName": "ג׳ויה תל אביב (דמו)",
+     "author": "דנה (דמו)",
+     "rating": 3,
+     "content": "האוכל היה טעים אבל חיכינו 40 דקות לעיקריות ביום חמישי בערב.",
+     "currentDraft": null
+    }
+   }
+  },
+  "AREA": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "AREA",
+    "contextId": 2,
+    "locationId": null,
+    "area": "MANPOWER"
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": 6,
+     "code": "DEMO-HFA",
+     "name": "ג׳ויה חיפה (דמו)",
+     "isDemo": true
+    },
+    {
+     "id": 5,
+     "code": "DEMO-TLV",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "isDemo": true
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": 5,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 5,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": 6,
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": 6,
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": null
+  }
+ }
+}

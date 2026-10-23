@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="description" content="Joya Headquarter" />
+    <title>Joya Headquarter</title>
+    <style>
+      /* Same base rules as the trade-hub phone app (trade-hub/index.html). */
+      html, body { margin: 0; padding: 0; background: #0f1115; }
+      /* A phone page must never slide sideways: whatever is too wide scrolls inside its own box. */
+      html, body { overflow-x: hidden; max-width: 100%; }
+      #root { overflow-x: hidden; }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { font-size: 120%; }
+      body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Hebrew', Arial, sans-serif; }
+      /* <Term> (client/i18n): a Latin term inside a Hebrew line — left-to-right, isolated, never broken. */
+      bdi.term { direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/client/index.js"></script>
+  </body>
+</html>
