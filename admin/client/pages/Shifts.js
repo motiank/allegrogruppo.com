@@ -232,6 +232,10 @@ const computeBreaksByRole = (emp, isHourlyMin) => {
 // Each entry: { roles: { role: { new_wage_type, wage } }, hourly_wage, ... }
 const buildWageMap = (employeesFromDb) => {
   const map = new Map();
+  // ID_nmbr values seen so far, so a SECOND distinct employee record sharing
+  // one (e.g. a duplicated DB row under a different name) can be detected —
+  // see the ambiguous-id handling below.
+  const idOwners = new Map(); // "id:<ID_nmbr>" -> Set of names claiming it
   for (const e of employeesFromDb || []) {
     const roleWage = {};
     for (const r of e.roles || []) {
@@ -253,7 +257,26 @@ const buildWageMap = (employeesFromDb) => {
       maxTravel: e.maxTravel == null ? null : Number(e.maxTravel),
       contractor: !!e.contractor,
     };
-    if (e.ID_nmbr) map.set(`id:${String(e.ID_nmbr).trim()}`, rec);
+    if (e.ID_nmbr) {
+      const idKey = `id:${String(e.ID_nmbr).trim()}`;
+      const nameKey = e.name ? String(e.name).trim() : "";
+      const owners = idOwners.get(idKey) || new Set();
+      owners.add(nameKey);
+      idOwners.set(idKey, owners);
+      if (owners.size > 1) {
+        // Ambiguous — this ID_nmbr belongs to 2+ distinct-named employee
+        // records (e.g. a duplicated DB row). An ID-based lookup can't
+        // safely pick one, so drop the key entirely: lookupEmpData then
+        // falls back to the (unambiguous) name-based key, matching how the
+        // server resolves employees (by name, never by ID_nmbr) — otherwise
+        // whichever duplicate happens to be inserted last here silently
+        // wins the ID lookup for BOTH names, even when they differ in
+        // something as important as the contractor flag.
+        map.delete(idKey);
+      } else {
+        map.set(idKey, rec);
+      }
+    }
     if (e.name) map.set(`name:${String(e.name).trim()}`, rec);
   }
   return map;
@@ -1443,11 +1466,13 @@ const Shifts = () => {
         );
       }
 
-      // 2. Save the payroll itself.
+      // 2. Save the payroll itself. dedupedEmployees, not allEmployees — see
+      // buildPayrollEmployeesPayload's comment: two DB rows sharing one
+      // מס' עובד must collapse to one.
       const payload = {
         rest: selectedRestaurant,
         month,
-        employees: allEmployees.map((e) => ({
+        employees: dedupedEmployees.map((e) => ({
           name: e.name,
           ID_nmbr: e.ID_nmbr,
           payroll_data: e.payroll_data || {},
@@ -1587,9 +1612,14 @@ const Shifts = () => {
     }
   };
 
-  // Per-employee payload for the tlush-preview and save-export endpoints.
+  // Per-employee payload for the save-export endpoint. Built from
+  // dedupedEmployees (not allEmployees) — two DB employee records sharing one
+  // מס' עובד (e.g. a duplicated employee row under a different name) must
+  // collapse to the one entry the final table and tlush view already show,
+  // or the actual Micpal/Shiklulit file ends up with that employee number
+  // duplicated even though nothing looks wrong on screen.
   const buildPayrollEmployeesPayload = () =>
-    allEmployees.map((e) => {
+    dedupedEmployees.map((e) => {
       const empData = lookupEmpData(wageMap, e);
       return {
         name: e.name,
@@ -1819,10 +1849,13 @@ const Shifts = () => {
       setDownloadError("no extracted employees to export");
       return;
     }
-    let source = allEmployees;
+    // dedupedEmployees, not allEmployees — see buildPayrollEmployeesPayload's
+    // comment: two DB rows sharing one מס' עובד must collapse to one, same as
+    // the final table and tlush view already do.
+    let source = dedupedEmployees;
     if (Array.isArray(micNumbers)) {
       const set = new Set(micNumbers.map((n) => String(n).trim()));
-      source = allEmployees.filter((e) => {
+      source = dedupedEmployees.filter((e) => {
         const n = lookupEmpData(wageMap, e)?.empNumber;
         return n != null && set.has(String(n).trim());
       });
@@ -3259,7 +3292,7 @@ const Shifts = () => {
                             <span>{e.name}</span>
                             {e.mixedRates && (
                               <span
-                                title="עובד זה עבד ביותר משכר שעתי אחד. הפירוט כאן מציג לפי תעריף, אך קובץ ה-Micpal בפועל ממזג הכל לתעריף אחד."
+                                title="עובד זה עבד בשני תעריפים שונים. קובץ ה-Micpal בפועל מייצא שתי שורות עם אותו מס' עובד, כל אחת בתעריף האמיתי שלה."
                                 style={{ color: "#e65100", cursor: "help" }}
                               >
                                 ⚠
@@ -3315,6 +3348,7 @@ const Shifts = () => {
                 if (hasGross) {
                   const cell = styles.tdTotal;
                   const nameCell = { ...cell, ...styles.stickyNameCell };
+                  const hourlyMinGross = Number(e.hourlyMinGross) || 0;
                   summaryRows.push(
                     <tr key={`${e.name}::total-gross`}>
                       <td style={nameCell}></td>
@@ -3323,7 +3357,22 @@ const Shifts = () => {
                       <td style={cell}>סה"כ ברוטו</td>
                       <td style={cell}></td>
                       <td style={cell}></td>
-                      <td style={cell}>{fmtNum(grossTotal)}</td>
+                      <td style={cell}>
+                        {fmtNum(grossTotal)}
+                        {hourlyMinGross > 0 && (
+                          <span
+                            title="מתוך הברוטו — שכר בתפקידים המבוססים על טיפים (שעתי-מינימום), כולל הבונוס (השלמה לשכר המטרה); אם כל שכרו של העובד מבוסס טיפים, כולל גם נסיעות וארוחות"
+                            style={{
+                              fontWeight: 400,
+                              marginRight: 4,
+                              color: "#c62828",
+                            }}
+                          >
+                            {" "}
+                            ({fmtNum(hourlyMinGross)})
+                          </span>
+                        )}
+                      </td>
                     </tr>,
                   );
                 }
@@ -3840,6 +3889,24 @@ const Shifts = () => {
               </ul>
             </div>
           )}
+          {payrollResult.excludedRates &&
+            payrollResult.excludedRates.length > 0 && (
+              <div style={{ marginTop: "8px", color: "#b26a00" }}>
+                <strong>
+                  ⚠️ יותר משני תעריפים לעובד — שעות לא כלולות בקובץ מיקפל, יש
+                  לשלם בנפרד ({payrollResult.excludedRates.length}):
+                </strong>
+                <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
+                  {payrollResult.excludedRates.map((e, i) => (
+                    <li key={i}>
+                      {e.name || "(ללא שם)"}
+                      {e.employeeNumber ? ` · מס' ${e.employeeNumber}` : ""} —{" "}
+                      {fmtNum(e.hours)}ש בתעריף ₪{fmtNum(e.rate)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
         </div>
       )}
     </div>

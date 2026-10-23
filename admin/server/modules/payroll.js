@@ -8,7 +8,7 @@ import ShikImportXL, {
   mergeShikRows,
   detectShikRateConflicts,
 } from "./ShikImportXL.js";
-import { buildTlush, tlushToShikRows, tlushToMicRow } from "./tlush.js";
+import { buildTlush, tlushToShikRows, tlushToMicRows } from "./tlush.js";
 import {
   normalizeRoleWage,
   normalizeRoles,
@@ -287,12 +287,21 @@ export const buildExportRow = (emp, ctx) => {
         minHourlyWage: MIN_HOURLY_WAGE,
       });
       if (rate == null) rate = hourlyWage; // fall back to employee default
+      // Only a role whose resolved wage type is exactly "hourly_net" counts
+      // as net for row-splitting purposes — hourly_min_net does NOT (matches
+      // NET_WAGE_KINDS/componentNetGross in tlush.js: a national-minimum
+      // role with a bonus top-up is still gross). Everything else (travel,
+      // bonus, meals, מפרעה) is always gross regardless of wage type.
+      const roleType =
+        (rolesByName[role] && rolesByName[role].new_wage_type) || newWageType;
       roleBreakdown.push({
         role,
         rate: rate ?? null,
         h100: rh100,
         h125: rh125,
         h150: rh150,
+        isNet: roleType === "hourly_net",
+        isHourlyMin: !!roleType && roleType.startsWith("hourly_min_"),
       });
     }
   }
@@ -309,6 +318,27 @@ export const buildExportRow = (emp, ctx) => {
   const breaks = Number(emp.breaks) || 0;
   const meals = Math.round(breaks / 0.5);
 
+  // Gross pay from hourly-min (tip-based) roles specifically, at their REAL
+  // effective rate — the national-minimum base pay from roleBreakdown (rate
+  // is already MIN_HOURLY_WAGE for these roles) plus the bonus top-up above
+  // it computed earlier. When EVERY role is hourly-min (the employee's whole
+  // wage is tip-based), travel and meals are folded in too — for such an
+  // employee there's no other pay to separate this figure from, so it may as
+  // well show their full gross. Shown in the תלוש view next to the
+  // employee's total gross so the office can see how much of it is
+  // tip-supplemented.
+  const allRolesHourlyMin =
+    roleBreakdown.length > 0 && roleBreakdown.every((rb) => rb.isHourlyMin);
+  const hourlyMinGross =
+    roleBreakdown.reduce((s, rb) => {
+      if (!rb.isHourlyMin) return s;
+      return s + (rb.h100 + rb.h125 * 1.25 + rb.h150 * 1.5) * (rb.rate || 0);
+    }, 0) +
+    (Number(bonus) || 0) +
+    (allRolesHourlyMin
+      ? (Number(travelAmount) || 0) + meals * MEAL_WORTH
+      : 0);
+
   return {
     name,
     keyName: idNmbr ? micpalByIdNmbr.get(idNmbr) || "" : "",
@@ -321,6 +351,7 @@ export const buildExportRow = (emp, ctx) => {
     // decide which roles map to base component code 1 vs 31.
     defaultWage: hourlyWage,
     roleBreakdown,
+    hourlyMinGross,
     vacation: "",
     hourlyWage: isGlobal ? "" : (hourlyWage ?? ""),
     workdays: isGlobal ? "" : workdays || "",
@@ -2289,6 +2320,10 @@ const Router = () => {
           // Rate groups beyond the 2 supported slots — excluded from pay
           // here, reported so the office can handle them manually.
           excludedRateGroups: (c.tlush && c.tlush.excludedRateGroups) || [],
+          // Gross pay from hourly-min (tip-based) roles at their real
+          // effective rate (national minimum + bonus top-up) — shown next to
+          // the total gross in the תלוש view.
+          hourlyMinGross: (c.tlush && c.tlush.hourlyMinGross) || 0,
         }));
       res.json({ payrollSoft, employees });
     } catch (err) {
@@ -2387,6 +2422,10 @@ const Router = () => {
       // Rate-conflict alerts: same recordType+componentCode with differing rates
       // for one employee (can't merge into a single Shiklulit line).
       const alerts = [];
+      // Micpal only: a 3rd+ distinct rate for an employee, excluded from the
+      // export entirely (see buildMicRows/groupRoleBreakdownByRate — only 2
+      // rate slots exist) and needing manual handling.
+      const excludedRates = [];
       if (payrollSoft === "shik") {
         const allRows = [];
         for (const t of exportableTlushes) {
@@ -2409,8 +2448,31 @@ const Router = () => {
         filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
       } else {
         const xl = new MicpImportXL({ company, year: y || "", month: monthInt });
-        buf = await xl.generate(exportableTlushes.map(tlushToMicRow));
+        // Sorted by employee number (מס עובד) — a stable sort keeps a
+        // multi-row employee's rows adjacent since they share a number.
+        const sortedTlushes = [...exportableTlushes].sort((a, b) => {
+          const an = Number(a.employeeNumber);
+          const bn = Number(b.employeeNumber);
+          if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+          return String(a.employeeNumber ?? "").localeCompare(
+            String(b.employeeNumber ?? ""),
+          );
+        });
+        buf = await xl.generate(sortedTlushes.flatMap(tlushToMicRows));
         filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+        // 3rd+ distinct rate for an employee — excluded from the export
+        // entirely (Micpal's row format only fits 2), needs manual handling.
+        for (const t of exportableTlushes) {
+          for (const g of t.excludedRateGroups || []) {
+            excludedRates.push({
+              employeeNumber: t.employeeNumber ?? null,
+              name: t.name || "",
+              ID_nmbr: t.ID_nmbr || "",
+              rate: g.rate,
+              hours: g.hours,
+            });
+          }
+        }
       }
 
       const unexportable = classified
@@ -2437,6 +2499,7 @@ const Router = () => {
         exported: exportableTlushes.length,
         unexportable,
         alerts,
+        excludedRates,
       });
     } catch (err) {
       console.error("payroll/save-export error:", err);
@@ -2999,9 +3062,10 @@ const Router = () => {
         const row = ws.addRow({
           // Name/employee number only on the first row of this employee's
           // block — blank on the rest, matching the on-screen table. A ⚠
-          // suffix flags employees whose real Micpal export merges these
-          // rate groups back into one rate; a second ⚠ flags hours excluded
-          // entirely (more than the 2 rate slots this תלוש supports) that
+          // suffix flags employees with a genuine second rate (exported as a
+          // real second Micpal row, same employee number — see
+          // buildMicRows); a second ⚠ flags hours excluded entirely (a 3rd+
+          // rate — more than the 2 slots Micpal's row format supports) that
           // still need to be paid manually.
           name:
             ci === 0
