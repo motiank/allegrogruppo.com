@@ -2,7 +2,7 @@
 // the same rules and the same demand always give the same answer, and every
 // number carries the rule and the calculation that produced it.
 //
-// Rule types (joya_staffing_rules.rule_type):
+// Rule types (rule.type in the staffingRules config):
 //   FIXED      exactly params.count                      demand is not used
 //   MIN        never fewer than params.count             with `mandatory` = a floor managers cannot go under
 //   MAX        never more than params.count

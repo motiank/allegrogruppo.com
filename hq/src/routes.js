@@ -14,7 +14,6 @@ import { requireJoya, requireAdmin, requirePayroll, scopeLocations, canLocation 
 import { requireMachineKey } from './auth/machineKey.js';
 import { q, parseJson, todayLocal } from './db.js';
 import * as master from './services/master.js';
-import * as imports from './services/imports.js';
 import * as repl from './services/replenishment.js';
 import * as staffing from './services/staffing.js';
 import * as analytics from './services/analytics.js';
@@ -125,20 +124,6 @@ r.post('/joya/source/refresh', h(async () => {
   return { ok: true };
 }));
 
-// ---------------------------------------------------------------- imports
-r.get('/joya/import/kinds', h(async (req) => ({ kinds: imports.describeKinds(req.joya) })));
-r.post('/joya/import/preview', h(async (req) => imports.preview(req.joya, req.body || {})));
-r.post(
-  '/joya/import',
-  h(async (req) => {
-    const out = await imports.runImport(req.joya, req.body || {});
-    if (req.body?.kind === 'ORDER_HISTORY' && req.body.locationId) await repl.refreshPatterns(locId(req.body.locationId)).catch(() => {});
-    return out;
-  }),
-);
-r.get('/joya/import/batches', h(async (req) => ({ batches: await imports.listBatches(req.joya, { locationIds: req.joya.locationIds, limit: req.query.limit }) })));
-r.delete('/joya/import/batches/:id', h(async (req) => imports.deleteBatch(req.joya, id(req))));
-
 // ---------------------------------------------------------------- replenishment
 r.get('/joya/orders', h(async (req) => ({ lists: await repl.listLists(req.joya, { locationIds: locsOf(req), status: req.query.status, limit: req.query.limit }) })));
 r.post('/joya/orders/generate', h(async (req) => repl.generate(req.joya, locId(req.body?.locationId), req.body?.date, { force: !!req.body?.force })));
@@ -152,11 +137,6 @@ r.post('/joya/orders/:id/reject', h(async (req) => repl.reject(req.joya, id(req)
 r.post('/joya/orders/:id/reopen', h(async (req) => repl.reopen(req.joya, id(req))));
 r.get('/joya/orders/:id/text', h(async (req) => ({ text: await repl.listText(req.joya, id(req)) })));
 r.get('/joya/patterns', h(async (req) => ({ patterns: await repl.getPatterns(req.joya, locId(req.query.locationId)) })));
-r.post('/joya/patterns/refresh', h(async (req) => {
-  const loc = locId(req.body?.locationId);
-  if (!canLocation(req.joya, loc)) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
-  return { items: await repl.refreshPatterns(loc) };
-}));
 r.get('/joya/shortages', h(async (req) => ({ shortages: await repl.listShortages(req.joya, { locationIds: locsOf(req), days: req.query.days }) })));
 r.post('/joya/shortages', h(async (req) => repl.reportShortage(req.joya, req.body || {})));
 r.delete('/joya/shortages/:id', h(async (req) => (await repl.deleteShortage(req.joya, id(req)), { ok: true })));
@@ -211,14 +191,8 @@ r.post('/joya/payroll/corrections', h(async (req) => payroll.correctAttendance(r
 r.get('/joya/payroll/attendance', h(async (req) => ({ rows: await payroll.attendanceRows(req.joya, locId(req.query.locationId), ...period(req)) })));
 r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLines(req.joya, locId(req.query.locationId), req.query.period)));
 
-// ---------------------------------------------------------------- quality, tasks, inquiries, overview, audit
+// ---------------------------------------------------------------- quality, overview, audit
 r.get('/joya/quality', h(async (req) => quality.report(req.joya, locsOf(req))));
-r.get('/joya/tasks', h(async (req) => ({ tasks: await work.listTasks(req.joya, { locationIds: locsOf(req), status: req.query.status, owner: req.query.owner, overdue: req.query.overdue === '1' }) })));
-r.post('/joya/tasks', h(async (req) => ({ task: await work.saveTask(req.joya, req.body || {}) })));
-r.get('/joya/inquiries', h(async (req) => ({ inquiries: await work.listInquiries(req.joya, { locationIds: locsOf(req), status: req.query.status }) })));
-r.post('/joya/inquiries', h(async (req) => ({ inquiry: await work.saveInquiry(req.joya, req.body || {}) })));
-r.get('/joya/inquiries/:id', h(async (req) => ({ inquiry: await work.getInquiry(req.joya, id(req)) })));
-r.post('/joya/inquiries/:id/action', h(async (req) => ({ inquiry: await work.inquiryAction(req.joya, id(req), req.body || {}) })));
 r.get('/joya/overview', h(async (req) => work.overview(req.joya, locsOf(req), { days: req.query.days || 7 })));
 r.get(
   '/joya/audit',

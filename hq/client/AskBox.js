@@ -66,7 +66,6 @@ function ProposalPreview({ p, classes }) {
   const { t } = useT();
   const { roleName } = useJoya();
   if (!p) return null;
-  if (p.type === 'INQUIRY_DRAFT') return <div className={classes.propLine} dir="auto">{p.text}</div>;
   const lines = p.preview || [];
   return (
     <>
@@ -177,7 +176,7 @@ function Answer({ r, classes, onChanged }) {
 
 /**
  * @param {object} p
- * @param {'GENERAL'|'ORDER_LIST'|'STAFFING_PLAN'|'INQUIRY'} p.contextKind
+ * @param {'GENERAL'|'ORDER_LIST'|'STAFFING_PLAN'|'AREA'} p.contextKind
  * @param {number} [p.contextId]
  * @param {number} [p.locationId]
  * @param {string[]} [p.examples]   example questions (translated), shown as buttons

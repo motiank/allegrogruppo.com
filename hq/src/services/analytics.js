@@ -149,7 +149,7 @@ export async function salesByShift(locationIds, from, to) {
       outsideShifts: { checks: outside.checks, revenue: r2(outside.revenue) },
     });
   }
-  return { period: { from, to }, source: `${SALES_SOURCE} + joya_shift_defs`, locations: out };
+  return { period: { from, to }, source: `${SALES_SOURCE} + the location shifts (joya_settings)`, locations: out };
 }
 
 /** Dishes: units and revenue in the period vs the previous period of the same length. */

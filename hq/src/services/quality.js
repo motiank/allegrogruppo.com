@@ -1,7 +1,8 @@
 // Data quality: what is missing, stale or wrongly mapped, per location and source.
 // Nothing here fills a gap — it only says where the gaps are. The source data is in Allegro;
 // its /status says how far each branch is loaded, so "not loaded yet" is told apart from "missing".
-import { q, one, getSettings, todayLocal } from '../db.js';
+import { q, parseJson, getSettings, todayLocal } from '../db.js';
+import { locationConfig } from './master.js';
 import { addDays, daysBetween } from '../lib/recommend.js';
 import { apiBase } from '../../lib/allegro.js';
 import { status, locations, checks as sourceChecks, dishSales, rawShifts, roleAliases } from './source.js';
@@ -40,9 +41,8 @@ export async function report(access, locationIds) {
     const L = known.get(loc);
     if (!L) continue;
     const issues = [];
-    const shifts = await one(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id=:l AND active=1`, { l: loc });
-    const lastImport = await q(`SELECT kind, source, MAX(created_at) AS at FROM joya_import_batches WHERE location_id=:l GROUP BY kind, source`, { l: loc });
-    const base = { locationId: loc, locationName: L.name, isDemo: L.isDemo, lastImports: lastImport.map((r) => ({ kind: r.kind, source: r.source, at: r.at })) };
+    const shifts = { n: (await locationConfig(loc)).shifts.filter((s) => s.active !== false).length };
+    const base = { locationId: loc, locationName: L.name, isDemo: L.isDemo };
     if (unreachable) {
       issues.push({ code: 'ALLEGRO_UNREACHABLE', severity: 'HIGH', message: unreachable });
       if (!Number(shifts?.n)) issues.push({ code: 'NO_SHIFTS_DEFINED', severity: 'HIGH' });
@@ -93,12 +93,8 @@ export async function report(access, locationIds) {
       }
     }
     if (unmatched.size) issues.push({ code: 'UNMATCHED_ITEM_CODES', severity: 'MEDIUM', count: unmatched.size, items: [...unmatched.values()].sort((a, b) => b.rows - a.rows).slice(0, 20) });
-    const menu = await one(
-      `SELECT COUNT(*) AS n, SUM(NOT EXISTS (SELECT 1 FROM joya_recipe_lines r WHERE r.menu_item_id = m.id)) AS no_recipe,
-              (SELECT COUNT(*) FROM joya_recipe_lines r JOIN joya_menu_items m2 ON m2.id = r.menu_item_id WHERE m2.location_id = :l AND r.qty IS NULL) AS no_qty
-         FROM joya_menu_items m WHERE m.location_id=:l AND m.active=1`,
-      { l: loc },
-    );
+    const recipes = (await q(`SELECT recipe_json FROM joya_menu_items WHERE location_id=:l AND active=1`, { l: loc })).map((m) => parseJson(m.recipe_json) || []);
+    const menu = { n: recipes.length, no_recipe: recipes.filter((r) => !r.length).length, no_qty: recipes.flat().filter((l) => l.qty == null).length };
     if (!Number(menu?.n)) issues.push({ code: 'NO_MENU', severity: 'HIGH' });
     if (Number(menu?.no_recipe)) issues.push({ code: 'DISHES_WITHOUT_INGREDIENTS', severity: 'MEDIUM', count: Number(menu.no_recipe), of: Number(menu.n) });
     if (Number(menu?.no_qty)) issues.push({ code: 'RECIPE_LINES_WITHOUT_QTY', severity: 'INFO', count: Number(menu.no_qty) });

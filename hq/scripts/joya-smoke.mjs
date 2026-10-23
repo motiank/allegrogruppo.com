@@ -77,20 +77,14 @@ const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toI
 // a location id is the Allegro branch id: the fake API's demo branches
 const tlv = 'demo-tlv';
 const hfa = 'demo-hfa';
-if (!(await sql(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id IN (:t, :h)`, { t: tlv, h: hfa }))[0].n) {
+if (!(await sql(`SELECT COUNT(*) AS n FROM joya_settings WHERE name IN (:t, :h)`, { t: `location:${tlv}`, h: `location:${hfa}` }))[0].n) {
   console.error('no demo data — run scripts/joya-seed-demo.mjs first');
   process.exit(1);
 }
 // Everything the test users created goes away again, so the next run starts from the same state.
 async function cleanup() {
   const p = { a: ADMIN, m: MGR };
-  await sql(`DELETE e FROM joya_order_edits e JOIN joya_order_lists l ON l.id = e.list_id WHERE l.created_by IN (:a, :m)`, p);
-  await sql(`DELETE x FROM joya_order_list_lines x JOIN joya_order_lists l ON l.id = x.list_id WHERE l.created_by IN (:a, :m)`, p);
-  await sql(`DELETE x FROM joya_order_recommendation_lines x JOIN joya_order_lists l ON l.id = x.list_id WHERE l.created_by IN (:a, :m)`, p);
   await sql(`DELETE FROM joya_order_lists WHERE created_by IN (:a, :m)`, p);
-  await sql(`DELETE e FROM joya_staffing_edits e JOIN joya_staffing_plans x ON x.id = e.plan_id WHERE x.created_by IN (:a, :m)`, p);
-  await sql(`DELETE l FROM joya_staffing_plan_lines l JOIN joya_staffing_plans x ON x.id = l.plan_id WHERE x.created_by IN (:a, :m)`, p);
-  await sql(`DELETE l FROM joya_staffing_proposal_lines l JOIN joya_staffing_plans x ON x.id = l.plan_id WHERE x.created_by IN (:a, :m)`, p);
   await sql(`DELETE FROM joya_staffing_plans WHERE created_by IN (:a, :m)`, p);
   await sql(`DELETE FROM joya_attendance_corrections WHERE created_by IN (:a, :m)`, p);
   await sql(`DELETE FROM joya_payroll_issues WHERE location_id IN (:t, :h)`, { t: tlv, h: hfa });
@@ -169,7 +163,7 @@ try {
   check(tom2.qty > tom.recommended.qty, `the raised quantity moves the next recommendation (${tom.recommended.qty} → ${tom2.qty})`);
   await call('admin', 'POST', `/api/joya/orders/${r.data.listId}/reject`, { note: 'smoke cleanup' });
   r = await call('admin', 'GET', `/api/joya/patterns?locationId=${tlv}`);
-  check(r.status === 200 && r.data.patterns.length > 0, 'learned patterns are stored per location');
+  check(r.status === 200 && r.data.patterns.length > 0, 'learned patterns are computed per location');
 
   console.log('staffing');
   const nextSunday = addDays(today, 7 - new Date(today + 'T00:00:00Z').getUTCDay());
@@ -205,8 +199,6 @@ try {
   const issues = r.data.locations[0].issues.map((i) => i.code);
   check(issues.includes('MISSING_SALES_DAYS') && issues.includes('UNMATCHED_ITEM_CODES') && issues.includes('UNMATCHED_EMPLOYEE_IDS'), 'quality report finds missing days, unknown POS codes and unknown employee ids', issues);
   check(r.data.integrations.find((i) => i.source === 'ALLEGRO')?.connected === true && r.data.integrations.filter((i) => i.source !== 'ALLEGRO').every((i) => i.connected === false), 'only the Allegro API is connected; Instagram and Google are not');
-  const imp = await call('admin', 'POST', '/api/joya/import/preview', { kind: 'SALES_CHECKS', source: 'BIKUM_POS', csv: 'a\n1' });
-  check(imp.status === 400 && /Allegro/.test(imp.data.error), 'sales cannot be imported: they come from the Allegro API', imp.data);
   const missDay = r.data.locations[0].issues.find((i) => i.code === 'MISSING_SALES_DAYS').dates[0];
   r = await call('admin', 'GET', `/api/joya/sales/daily?locationIds=${tlv}&from=${missDay}&to=${missDay}`);
   const day = r.data.series[0].days[0];
@@ -261,38 +253,21 @@ try {
   check(r.status === 200 && r.data.results.every((x) => !x.error && x.result), 'the hub computes the numbers', r.data.results?.map((x) => x.error));
   check(r.data.results[0].result.source && r.data.results[0].result.period, 'every result carries its period and source');
   check(r.data.proposal?.type === 'STAFFING_OPS', 'what-if becomes a proposal (rules unchanged)', r.data.proposalError);
-  const rulesBefore = (await sql(`SELECT COUNT(*) AS n FROM joya_staffing_rules`))[0].n;
+  const rulesBefore = (await sql(`SELECT JSON_LENGTH(value_json) AS n FROM joya_settings WHERE name='staffingRules'`))[0].n;
   r = await call(null, 'POST', `/api/joya/ai/runner/${aid}/answer`, { answer: 'test answer', meta: { unverifiedNumbers: [] } }, machine);
   r = await call('mgr', 'GET', `/api/joya/ai/requests/${aid}`);
   check(r.status === 404, "another user cannot read someone's question");
   r = await call('admin', 'POST', `/api/joya/ai/requests/${aid}/apply`, {});
   check(r.status === 200 && r.data.request.proposalStatus === 'APPLIED', 'applied after the user confirms', r.data);
-  const rulesAfter = (await sql(`SELECT COUNT(*) AS n FROM joya_staffing_rules`))[0].n;
+  const rulesAfter = (await sql(`SELECT JSON_LENGTH(value_json) AS n FROM joya_settings WHERE name='staffingRules'`))[0].n;
   check(rulesBefore === rulesAfter, 'a chat recalculation never changes the stored rules');
-  const viaChat = (await sql(`SELECT COUNT(*) AS n FROM joya_staffing_edits WHERE plan_id=:p AND via='CHAT'`, { p: aiPlan }))[0].n;
-  check(viaChat > 0, 'chat edits are logged as via CHAT');
-  const runners = (await call('admin', 'GET', `/api/joya/staffing/plans/${aiPlan}`)).data.lines.filter((l) => l.roleCode === 'runner');
+  const aiPlanNow = (await call('admin', 'GET', `/api/joya/staffing/plans/${aiPlan}`)).data;
+  check(aiPlanNow.edits.some((e) => e.via === 'CHAT'), 'chat edits are logged as via CHAT');
+  const runners = aiPlanNow.lines.filter((l) => l.roleCode === 'runner');
   check(runners.length > 0 && runners.every((l) => l.headcount === 2), 'what-if result applied to the plan: 2 runners in every shift');
   await call('admin', 'POST', `/api/joya/staffing/plans/${aiPlan}/reject`, { note: 'smoke cleanup' });
 
-  console.log('inquiries');
-  r = await call('mgr', 'POST', '/api/joya/inquiries', { source: 'GOOGLE', kind: 'REVIEW', locationId: hfa, author: 'smoke', content: 'שירות מעולה!', rating: 5 });
-  check(r.status === 200 && r.data.inquiry.enteredVia === 'MANUAL', 'manual entry of a review');
-  const inq = r.data.inquiry.id;
-  r = await call('mgr', 'POST', `/api/joya/inquiries/${inq}/action`, { action: 'approve' });
-  check(r.status === 400, 'cannot approve a reply that does not exist');
-  r = await call('mgr', 'POST', `/api/joya/inquiries/${inq}/action`, { action: 'draft', draft: 'תודה רבה!' });
-  r = await call('mgr', 'POST', `/api/joya/inquiries/${inq}/action`, { action: 'approve' });
-  r = await call('mgr', 'POST', `/api/joya/inquiries/${inq}/action`, { action: 'responded' });
-  check(r.data.inquiry.status === 'RESPONDED' && r.data.inquiry.respondedBy === MGR && r.data.inquiry.responseApprovedBy === MGR, 'draft → approved → marked responded by a person (nothing sent)');
-  await sql(`DELETE FROM joya_inquiries WHERE id=:id`, { id: inq });
-
-  console.log('tasks + overview');
-  r = await call('admin', 'POST', '/api/joya/tasks', { locationId: tlv, title: 'smoke task', dueDate: addDays(today, -1), sourceKind: 'DATA_QUALITY', sourceRef: 'MISSING_SALES_DAYS' });
-  check(r.status === 200 && r.data.task.status === 'OPEN', 'task from a finding');
-  r = await call('admin', 'GET', `/api/joya/tasks?overdue=1&locationIds=${tlv}`);
-  check(r.data.tasks.some((t) => t.title === 'smoke task'), 'overdue tasks listed');
-  await sql(`DELETE FROM joya_tasks WHERE title='smoke task'`);
+  console.log('overview');
   r = await call('admin', 'GET', '/api/joya/overview');
   check(r.status === 200 && r.data.pending.length >= 2 && r.data.sales.locations.length >= 2, 'chain overview');
 } finally {

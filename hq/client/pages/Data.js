@@ -1,10 +1,10 @@
 // /data — where the data comes from, how fresh it is, and what is missing or
 // not mapped. Nothing here fills a gap: a missing day is shown as missing, never as zero.
-import React, { useState } from 'react';
+import React from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { useNavigate } from 'react-router-dom';
 import { api, qs } from '../api.js';
-import { Page, Card, Row, Btn, Badge, Modal, Loading, Empty, ErrorBox, Details, useLoad, useAction, fmtDay, fmtWhen, addDays, statusTone, Term, Val } from '../ui.js';
+import { Page, Card, Row, Btn, Badge, Loading, Empty, ErrorBox, useLoad, fmtDay, statusTone, Term, Val } from '../ui.js';
 import { useJoya } from '../context.js';
 import { useT } from '../i18n/index.js';
 
@@ -20,11 +20,9 @@ const useStyles = createUseStyles((theme) => ({
   chip: { fontSize: '0.72rem', border: `1px solid ${theme.border}`, borderRadius: 6, padding: '0.1rem 0.4rem' },
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.4rem' },
   warn: { color: '#d29922', fontSize: '0.78rem', marginTop: '0.3rem' },
-  batch: { borderTop: `1px solid ${theme.border}`, padding: '0.5rem 0', fontSize: '0.84rem' },
 }));
 
 const ENV_SOURCES = ['SALES_CHECKS', 'SALES_ITEMS', 'ATTENDANCE', 'PAYROLL'];
-const UNDOABLE = ['MENU'];
 const LINKS = {
   UNMATCHED_ITEM_CODES: ['/menu', 'joya.data.goMenu'],
   NO_MENU: ['/menu', 'joya.data.goMenu'],
@@ -36,6 +34,8 @@ const LINKS = {
 };
 
 const issueText = (t, i) => t(`joya.data.issue.${i.code}`, { days: i.days ?? '', count: i.count ?? '', of: i.of ?? '', message: i.message ?? '', source: i.source ?? '', reason: i.reason ?? '' });
+/** A data kind's name (SALES_CHECKS…), or the code itself when there is no translation. */
+const kindName = (t, k) => (t(`joya.data.kind.${k}`) === `joya.data.kind.${k}` ? k : t(`joya.data.kind.${k}`));
 const daysOld = (from, to) => Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 864e5);
 
 function Integrations({ list, c }) {
@@ -53,7 +53,7 @@ function Integrations({ list, c }) {
             </span>
           </div>
           <div className={c.sub}>
-            {t('joya.data.kinds')}: {(i.kinds || []).map((k) => (k === 'INQUIRIES' ? t('joya.nav.inquiries') : t(`joya.imp.kind.${k}`))).join(' · ')}
+            {t('joya.data.kinds')}: {(i.kinds || []).map((k) => kindName(t, k)).join(' · ')}
             {i.exportOnly ? <> · {t('joya.data.exportOnly', { what: i.exportOnly })}</> : null}
           </div>
           <div className={c.sub}>{i.credentialsConfigured ? t('joya.data.cred.set') : t('joya.data.cred.notSet')}</div>
@@ -63,7 +63,7 @@ function Integrations({ list, c }) {
   );
 }
 
-function Issue({ issue, loc, today, c, created, onCreate, busy }) {
+function Issue({ issue, c }) {
   const { t } = useT();
   const navigate = useNavigate();
   const link = LINKS[issue.code];
@@ -117,25 +117,18 @@ function Issue({ issue, loc, today, c, created, onCreate, busy }) {
           ))}
         </div>
       )}
-      <div className={c.actions}>
-        {link ? (
+      {link ? (
+        <div className={c.actions}>
           <Btn small onClick={() => navigate(link[0])}>
             {t(link[1])}
           </Btn>
-        ) : null}
-        {created ? (
-          <Badge tone="ok">{t('joya.data.taskCreated')}</Badge>
-        ) : (
-          <Btn small disabled={busy} onClick={() => onCreate({ locationId: loc, title: issueText(t, issue), dueDate: addDays(today, 3), sourceKind: 'DATA_QUALITY', sourceRef: issue.code })}>
-            {t('joya.data.createTask')}
-          </Btn>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function LocationBox({ L, today, staleDays, c, created, onCreate, busy }) {
+function LocationBox({ L, today, staleDays, c }) {
   const { t } = useT();
   const stale = (d) => d && daysOld(d, today) > staleDays;
   return (
@@ -145,7 +138,7 @@ function LocationBox({ L, today, staleDays, c, created, onCreate, busy }) {
         const s = L.sources[k];
         const last = k === 'PAYROLL' ? s.lastPeriod : s.lastDate;
         return (
-          <Row key={k} label={t(`joya.imp.kind.${k}`)}>
+          <Row key={k} label={kindName(t, k)}>
             {s.rows ? (
               <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <Term>{k === 'PAYROLL' ? last : fmtDay(last)}</Term>
@@ -161,128 +154,11 @@ function LocationBox({ L, today, staleDays, c, created, onCreate, busy }) {
           </Row>
         );
       })}
-      <div className={c.section}>{t('joya.data.lastImports')}</div>
-      {L.lastImports.length ? (
-        L.lastImports.map((i) => (
-          <Row key={`${i.kind}|${i.source}`} label={`${t(`joya.imp.kind.${i.kind}`) === `joya.imp.kind.${i.kind}` ? i.kind : t(`joya.imp.kind.${i.kind}`)} · ${t(`joya.src.${i.source}`)}`}>
-            <Term>{fmtWhen(i.at)}</Term>
-          </Row>
-        ))
-      ) : (
-        <div className={c.sub}>{t('joya.data.noImports')}</div>
-      )}
       <div className={c.section}>{t('joya.data.issues')}</div>
       {L.issues.length ? (
-        L.issues.map((i) => <Issue key={i.code} issue={i} loc={L.locationId} today={today} c={c} created={created.has(`${L.locationId}|${i.code}`)} onCreate={onCreate} busy={busy} />)
+        L.issues.map((i) => <Issue key={i.code} issue={i} c={c} />)
       ) : (
         <div className={c.sub}>{t('joya.data.noIssues')}</div>
-      )}
-    </Card>
-  );
-}
-
-function Batches({ c }) {
-  const { t } = useT();
-  const { locName } = useJoya();
-  const b = useLoad(() => api('/import/batches?limit=30'), []);
-  const [undo, setUndo] = useState(null);
-  const [done, setDone] = useState(null);
-  const act = useAction();
-  if (b.loading && !b.data) return <Loading />;
-  const list = b.data?.batches || [];
-  return (
-    <Card title={t('joya.data.recentImports')}>
-      <ErrorBox error={b.error} />
-      {done ? <Badge tone="ok">{t('joya.data.undoneRows', { n: done.deleted })}</Badge> : null}
-      {!list.length && !b.error ? <div className={c.sub}>{t('joya.data.noImports')}</div> : null}
-      {list.map((x) => {
-        const undone = (x.errors || []).includes('undone');
-        const errs = (x.errors || []).filter((e) => typeof e === 'object');
-        return (
-          <div key={x.id} className={c.batch}>
-            <div className={c.integHead}>
-              <span>
-                {t(`joya.imp.kind.${x.kind}`) === `joya.imp.kind.${x.kind}` ? <Term>{x.kind}</Term> : t(`joya.imp.kind.${x.kind}`)} · {t(`joya.src.${x.source}`)}
-              </span>
-              <span style={{ display: 'flex', gap: '0.3rem' }}>
-                {x.isDemo || x.source === 'DEMO' ? <Badge tone="warn">{t('joya.demo')}</Badge> : null}
-                {undone ? <Badge tone="muted">{t('joya.data.undone')}</Badge> : null}
-              </span>
-            </div>
-            <div className={c.sub}>
-              {x.locationId ? <bdi dir="auto">{locName(x.locationId)}</bdi> : t('joya.data.chainLevel')}
-              {x.fileName ? (
-                <>
-                  {' '}
-                  · {t('joya.data.file')}: <Term>{x.fileName}</Term>
-                </>
-              ) : null}
-              {x.from ? (
-                <>
-                  {' '}
-                  · <Term>{fmtDay(x.from)} – {fmtDay(x.to)}</Term>
-                </>
-              ) : null}
-            </div>
-            <div className={c.sub}>
-              {t('joya.data.accepted')}: <Term>{x.rows}</Term> · {t('joya.data.rejected')}: <Term>{x.rejected}</Term> · <Term>{x.by || '—'}</Term> · <Term>{fmtWhen(x.at)}</Term>
-            </div>
-            {errs.length ? (
-              <Details summary={`${t('joya.data.errors')} (${errs.length})`}>
-                {errs.map((e, i) => (
-                  <div key={i} className={c.sub} dir="auto">
-                    {t('joya.data.line')} <Term>{e.line}</Term>
-                    {e.field ? (
-                      <>
-                        {' '}
-                        · <Term>{e.field}</Term>
-                      </>
-                    ) : null}{' '}
-                    · {e.reason}
-                  </div>
-                ))}
-              </Details>
-            ) : null}
-            {UNDOABLE.includes(x.kind) && x.rows > 0 && !undone ? (
-              <div className={c.actions}>
-                <Btn small kind="danger" onClick={() => setUndo(x)}>
-                  {t('joya.data.undo')}
-                </Btn>
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
-      {undo && (
-        <Modal
-          title={t('joya.data.undoTitle')}
-          onClose={() => setUndo(null)}
-          footer={
-            <>
-              <Btn onClick={() => setUndo(null)}>{t('joya.cancel')}</Btn>
-              <Btn
-                kind="danger"
-                disabled={act.busy}
-                onClick={() =>
-                  act.run(async () => {
-                    const r = await api(`/import/batches/${undo.id}`, { method: 'DELETE' });
-                    setDone(r);
-                    setUndo(null);
-                    b.reload();
-                  })
-                }
-              >
-                {t('joya.data.undo')}
-              </Btn>
-            </>
-          }
-        >
-          <p style={{ marginTop: 0, fontSize: '0.86rem' }}>{t('joya.data.undoText')}</p>
-          <div className={c.sub}>
-            {t(`joya.imp.kind.${undo.kind}`)} · <Term>{undo.rows}</Term> {t('joya.data.rows')} · <Term>{fmtWhen(undo.at)}</Term>
-          </div>
-          <ErrorBox error={act.error} />
-        </Modal>
       )}
     </Card>
   );
@@ -295,24 +171,16 @@ export default function Data() {
   const j = useJoya();
   const scopeKey = j.scope.join(',');
   const r = useLoad(() => api(`/quality${qs({ locationIds: j.scope })}`), [scopeKey]);
-  const [created, setCreated] = useState(() => new Set());
-  const act = useAction();
-  const onCreate = (body) =>
-    act.run(async () => {
-      await api('/tasks', { method: 'POST', body });
-      setCreated((s) => new Set(s).add(`${body.locationId}|${body.sourceRef}`));
-    });
 
   return (
     <Page title={t('joya.data.title')} sub={t('joya.data.sub')}>
       <Integrations list={r.data?.integrations || j.me?.integrations || []} c={c} />
-      <ErrorBox error={r.error || act.error} />
+      <ErrorBox error={r.error} />
       {r.loading && !r.data ? <Loading /> : null}
       {r.data && !r.data.locations.length ? <Empty>{t('joya.none')}</Empty> : null}
       {r.data?.locations.map((L) => (
-        <LocationBox key={L.locationId} L={L} today={r.data.today} staleDays={r.data.staleDays} c={c} created={created} onCreate={onCreate} busy={act.busy} />
+        <LocationBox key={L.locationId} L={L} today={r.data.today} staleDays={r.data.staleDays} c={c} />
       ))}
-      <Batches c={c} />
     </Page>
   );
 }

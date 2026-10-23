@@ -89,6 +89,36 @@ export function clearSettingsCache() {
   settingsCache.map = null;
 }
 
+/** A config document of joya_settings (roles, roleAliases, staffingRules, location:<id>…), or `fallback`. */
+export async function getConfig(name, fallback) {
+  const all = await getSettings();
+  return all[name] ?? fallback;
+}
+
+/** Read-modify-write one config document under a row lock: fn(current copy) returns the new value. */
+export async function updateConfig(name, fallback, by, fn) {
+  const value = await tx(async (c) => {
+    const row = await c.one(`SELECT value_json FROM joya_settings WHERE name=:n FOR UPDATE`, { n: name });
+    const next = await fn(structuredClone(row ? parseJson(row.value_json) ?? fallback : fallback));
+    await c.q(`INSERT INTO joya_settings (name, value_json, updated_by) VALUES (:n, :v, :by) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_by=VALUES(updated_by)`, {
+      n: name,
+      v: JSON.stringify(next),
+      by: by ?? null,
+    });
+    return next;
+  });
+  clearSettingsCache();
+  return value;
+}
+
+/** Read one JSON row for update inside a transaction: lockRow(c, 'joya_staffing_plans', id). */
+export async function lockRow(c, table, id) {
+  return c.one(`SELECT * FROM ${table} WHERE id=:id FOR UPDATE`, { id });
+}
+
+/** The next id for a list of { id } (the lines and edits kept inside a JSON column). */
+export const nextId = (arr) => (arr || []).reduce((m, x) => Math.max(m, Number(x.id) || 0), 0) + 1;
+
 /** IN-list placeholders for named params: inList('l', [1,2]) → { sql: ':l0,:l1', params: {l0:1,l1:2} } */
 export function inList(prefix, values) {
   const params = {};

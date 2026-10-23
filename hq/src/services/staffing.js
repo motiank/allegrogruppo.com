@@ -2,16 +2,16 @@
 // The arithmetic is in ../lib/staffingRules.js (pure, tested); this file loads the rules,
 // the forecast and past plans, and stores the results.
 //
-// Kept apart: joya_staffing_proposal_lines (the system's proposal, never changed),
-// joya_staffing_plan_lines (what the manager edits), joya_staffing_edits (every change),
-// joya_staffing_plans.final_json (frozen at approval).
-import { q, one, tx, err, audit, parseJson, ymd, hms, inList, getSettings, todayLocal } from '../db.js';
+// Kept apart, all on the joya_staffing_plans row: proposal_json (the system's proposal, never changed),
+// lines_json (what the manager edits), edits_json (every change), final_json (frozen at approval).
+// The rules are the staffingRules config document; shifts and baseline are in the location's document.
+import { q, one, tx, err, audit, parseJson, ymd, inList, getSettings, todayLocal, getConfig, updateConfig, lockRow, nextId } from '../db.js';
 import { assertLocation } from '../access.js';
 import { computeSlot, normalizeRule, validateRule, learnedAdjustments, normTime } from '../lib/staffingRules.js';
 import { addDays } from '../lib/recommend.js';
 import { forecastWeek, actualDemand } from './demand.js';
 import * as source from './source.js';
-import { listRoles, listShifts } from './master.js';
+import { listRoles, listShifts, locationConfig, updateLocationConfig } from './master.js';
 import { effectiveAttendance } from './attendance.js';
 import { toCsv } from '../lib/csv.js';
 
@@ -27,26 +27,27 @@ const durH = (s, e) => {
 
 // ---------------------------------------------------------------- rules and baseline
 
+const allRules = async () => getConfig('staffingRules', []);
+
 export async function listRules(access, locationId = null) {
-  const rows = await q(`SELECT * FROM joya_staffing_rules ORDER BY role_code, location_id IS NULL DESC, location_id, shift_code, id`);
-  return rows
-    .filter((r) => r.location_id == null || access.isAdmin || access.locationIds.includes(r.location_id))
-    .filter((r) => locationId == null || r.location_id == null || r.location_id === String(locationId))
-    .map((r) => ({ ...normalizeRule(r), updatedBy: r.updated_by, updatedAt: r.updated_at }));
+  return (await allRules())
+    .filter((r) => r.locationId == null || access.isAdmin || access.locationIds.includes(r.locationId))
+    .filter((r) => locationId == null || r.locationId == null || r.locationId === String(locationId))
+    .sort((a, b) => a.roleCode.localeCompare(b.roleCode) || Number(a.locationId != null) - Number(b.locationId != null) || String(a.locationId).localeCompare(String(b.locationId)) || String(a.shiftCode).localeCompare(String(b.shiftCode)) || a.id - b.id);
 }
 
 /** Chain-wide and mandatory rules: chain admin only. A location manager may edit their location's other rules. */
 function canEditRule(access, rule) {
   if (access.isAdmin) return true;
-  return rule.location_id != null && access.locationIds.includes(String(rule.location_id)) && !rule.mandatory;
+  return rule.locationId != null && access.locationIds.includes(String(rule.locationId)) && !rule.mandatory;
 }
 
 export async function saveRule(access, input) {
   const r = {
-    id: input.id || null,
-    location_id: input.locationId ?? null,
+    id: input.id ? Number(input.id) : null,
+    location_id: input.locationId == null ? null : String(input.locationId),
     shift_code: input.shiftCode || null,
-    days: Array.isArray(input.days) && input.days.length ? input.days.map(Number) : null,
+    days_json: Array.isArray(input.days) && input.days.length ? input.days.map(Number) : null,
     role_code: input.roleCode,
     rule_type: input.type,
     demand_unit: ['FIXED', 'MIN', 'MAX'].includes(input.type) ? null : input.unit || null,
@@ -59,84 +60,70 @@ export async function saveRule(access, input) {
   };
   const bad = validateRule(r);
   if (bad) throw err('BAD_REQUEST', bad);
-  if (!(await one(`SELECT code FROM joya_staff_roles WHERE code=:c`, { c: r.role_code }))) throw err('BAD_REQUEST', `unknown role ${r.role_code}`);
-  if (r.id) {
-    const prev = await one(`SELECT * FROM joya_staffing_rules WHERE id=:id`, { id: r.id });
-    if (!prev) throw err('NOT_FOUND', 'rule not found');
-    if (!canEditRule(access, prev)) throw err('FORBIDDEN', 'only the chain admin can change this rule');
-  }
-  if (!canEditRule(access, r)) throw err('FORBIDDEN', 'only the chain admin can create chain-wide or mandatory rules');
-  const p = { ...r, days: r.days ? JSON.stringify(r.days) : null, params: JSON.stringify(r.params), by: access.username };
-  if (r.id) {
-    await q(
-      `UPDATE joya_staffing_rules SET location_id=:location_id, shift_code=:shift_code, days_json=:days, role_code=:role_code, rule_type=:rule_type, demand_unit=:demand_unit,
-              params_json=:params, role_start=:role_start, role_end=:role_end, mandatory=:mandatory, active=:active, note=:note, updated_by=:by WHERE id=:id`,
-      p,
-    );
-  } else {
-    r.id = (
-      await q(
-        `INSERT INTO joya_staffing_rules (location_id, shift_code, days_json, role_code, rule_type, demand_unit, params_json, role_start, role_end, mandatory, active, note, updated_by)
-         VALUES (:location_id, :shift_code, :days, :role_code, :rule_type, :demand_unit, :params, :role_start, :role_end, :mandatory, :active, :note, :by)`,
-        p,
-      )
-    ).insertId;
-  }
-  await audit(access.username, 'STAFFING_RULE_SAVED', 'staffing_rule', r.id, r.location_id, { ...r, params: r.params });
-  return r.id;
+  if (!(await listRoles()).some((x) => x.code === r.role_code)) throw err('BAD_REQUEST', `unknown role ${r.role_code}`);
+  const rule = { ...normalizeRule({ ...r, params_json: r.params }), updatedBy: access.username, updatedAt: new Date().toISOString() };
+  if (!canEditRule(access, rule)) throw err('FORBIDDEN', 'only the chain admin can create chain-wide or mandatory rules');
+  await updateConfig('staffingRules', [], access.username, (rules) => {
+    if (rule.id) {
+      const prev = rules.find((x) => x.id === rule.id);
+      if (!prev) throw err('NOT_FOUND', 'rule not found');
+      if (!canEditRule(access, prev)) throw err('FORBIDDEN', 'only the chain admin can change this rule');
+    } else rule.id = nextId(rules);
+    return [...rules.filter((x) => x.id !== rule.id), rule];
+  });
+  await audit(access.username, 'STAFFING_RULE_SAVED', 'staffing_rule', rule.id, rule.locationId, rule);
+  return rule.id;
 }
 
 export async function deleteRule(access, id) {
-  const prev = await one(`SELECT * FROM joya_staffing_rules WHERE id=:id`, { id });
-  if (!prev) throw err('NOT_FOUND', 'rule not found');
-  if (!canEditRule(access, prev)) throw err('FORBIDDEN', 'only the chain admin can delete this rule');
-  await q(`DELETE FROM joya_staffing_rules WHERE id=:id`, { id });
-  await audit(access.username, 'STAFFING_RULE_DELETED', 'staffing_rule', id, prev.location_id, normalizeRule(prev));
+  let prev = null;
+  await updateConfig('staffingRules', [], access.username, (rules) => {
+    prev = rules.find((x) => x.id === Number(id));
+    if (!prev) throw err('NOT_FOUND', 'rule not found');
+    if (!canEditRule(access, prev)) throw err('FORBIDDEN', 'only the chain admin can delete this rule');
+    return rules.filter((x) => x.id !== prev.id);
+  });
+  await audit(access.username, 'STAFFING_RULE_DELETED', 'staffing_rule', prev.id, prev.locationId, prev);
 }
 
 export async function listBaseline(access, locationId) {
   assertLocation(access, locationId);
-  return (await q(`SELECT * FROM joya_staffing_baseline WHERE location_id=:l ORDER BY shift_code, weekday, role_code`, { l: locationId })).map((r) => ({
-    id: r.id,
-    locationId: r.location_id,
-    shiftCode: r.shift_code,
-    weekday: r.weekday,
-    roleCode: r.role_code,
-    headcount: r.headcount,
-    note: r.note,
-  }));
+  return (await locationConfig(locationId)).baseline
+    .map((b) => ({ locationId: String(locationId), ...b }))
+    .sort((a, b) => a.shiftCode.localeCompare(b.shiftCode) || a.weekday - b.weekday || a.roleCode.localeCompare(b.roleCode));
 }
 
 export async function saveBaseline(access, { locationId, shiftCode, weekday, roleCode, headcount, note = null }) {
   assertLocation(access, locationId);
   if (!(Number.isInteger(Number(headcount)) && Number(headcount) >= 0)) throw err('BAD_REQUEST', 'headcount must be a whole number ≥ 0');
   if (!(weekday >= 0 && weekday <= 6)) throw err('BAD_REQUEST', 'weekday 0..6');
-  await q(
-    `INSERT INTO joya_staffing_baseline (location_id, shift_code, weekday, role_code, headcount, note, updated_by) VALUES (:l, :s, :w, :r, :h, :n, :by)
-     ON DUPLICATE KEY UPDATE headcount=VALUES(headcount), note=VALUES(note), updated_by=VALUES(updated_by)`,
-    { l: locationId, s: shiftCode, w: weekday, r: roleCode, h: Number(headcount), n: note, by: access.username },
-  );
-  await audit(access.username, 'STAFFING_BASELINE_SAVED', 'staffing_baseline', null, locationId, { shiftCode, weekday, roleCode, headcount });
+  const entry = { shiftCode, weekday: Number(weekday), roleCode, headcount: Number(headcount), note };
+  const same = (b) => b.shiftCode === entry.shiftCode && b.weekday === entry.weekday && b.roleCode === entry.roleCode;
+  await updateLocationConfig(access, locationId, (cfg) => ({ ...cfg, baseline: [...cfg.baseline.filter((b) => !same(b)), entry] }));
+  await audit(access.username, 'STAFFING_BASELINE_SAVED', 'staffing_baseline', null, locationId, entry);
 }
 
 // ---------------------------------------------------------------- the proposal
 
 async function pastPlanDiffs(locationId, beforeWeek, limit) {
   const plans = await q(
-    `SELECT id, week_start, final_json FROM joya_staffing_plans WHERE location_id=:l AND status='APPROVED' AND week_start < :w ORDER BY week_start DESC LIMIT ${Number(limit) || 4}`,
+    `SELECT id, week_start, proposal_json, final_json FROM joya_staffing_plans WHERE location_id=:l AND status='APPROVED' AND week_start < :w ORDER BY week_start DESC LIMIT ${Number(limit) || 4}`,
     { l: locationId, w: beforeWeek },
   );
   const out = [];
   for (const p of plans) {
-    const prop = await q(`SELECT work_date, shift_code, role_code, SUM(headcount) AS h FROM joya_staffing_proposal_lines WHERE plan_id=:id AND is_peak_extra=0 GROUP BY work_date, shift_code, role_code`, { id: p.id });
-    const fin = new Map();
-    for (const l of parseJson(p.final_json) || []) {
-      if (l.isPeakExtra) continue;
-      const k = `${l.date}|${l.shiftCode}|${l.roleCode}`;
-      fin.set(k, (fin.get(k) || 0) + l.headcount);
-    }
-    const keys = new Set([...prop.map((r) => `${ymd(r.work_date)}|${r.shift_code}|${r.role_code}`), ...fin.keys()]);
-    const propMap = new Map(prop.map((r) => [`${ymd(r.work_date)}|${r.shift_code}|${r.role_code}`, Number(r.h)]));
+    const sum = (lines) => {
+      const m = new Map();
+      for (const l of lines || []) {
+        if (l.isPeakExtra) continue;
+        const k = `${l.date}|${l.shiftCode}|${l.roleCode}`;
+        m.set(k, (m.get(k) || 0) + l.headcount);
+      }
+      return m;
+    };
+    const propMap = sum(parseJson(p.proposal_json));
+    const fin = sum(parseJson(p.final_json));
+    const keys = new Set([...propMap.keys(), ...fin.keys()]);
     out.push({
       planId: p.id,
       weekStart: ymd(p.week_start),
@@ -156,8 +143,7 @@ async function pastPlanDiffs(locationId, beforeWeek, limit) {
 export async function computeProposal(locationId, weekStart, { extraRules = [] } = {}) {
   const st = await getSettings('staffing');
   const forecast = await forecastWeek(locationId, weekStart);
-  const rulesRows = await q(`SELECT * FROM joya_staffing_rules WHERE active=1 AND (location_id IS NULL OR location_id=:l)`, { l: locationId });
-  let rules = rulesRows.map(normalizeRule);
+  let rules = (await allRules()).filter((r) => r.active && (r.locationId == null || r.locationId === String(locationId)));
   if (extraRules.length) {
     const extra = extraRules.map((r, i) => ({ ...normalizeRule({ ...r, id: 1e9 + i, active: 1, location_id: locationId }), whatIf: true }));
     // a what-if rule replaces stored rules of the same role and type for its scope
@@ -165,7 +151,7 @@ export async function computeProposal(locationId, weekStart, { extraRules = [] }
   }
   const roles = await listRoles();
   const roleOrder = roles.map((r) => r.code);
-  const baselineRows = await q(`SELECT * FROM joya_staffing_baseline WHERE location_id=:l`, { l: locationId });
+  const baselineRows = (await locationConfig(locationId)).baseline;
   const learned = learnedAdjustments(await pastPlanDiffs(locationId, weekStart, st.learnedAdjustWindow || 4), { minPlans: st.learnedAdjustMinPlans || 3, window: st.learnedAdjustWindow || 4 });
 
   const lines = [];
@@ -175,11 +161,11 @@ export async function computeProposal(locationId, weekStart, { extraRules = [] }
     const res = computeSlot(rules, { locationId, shiftCode: slot.shiftCode, weekday: slot.weekday, start: slot.start, end: slot.end }, demand, roleOrder);
     const ruled = new Set(rules.filter((r) => r.active).map((r) => r.roleCode));
     // baseline: roles that no rule covers keep the staffing example as the proposal
-    for (const b of baselineRows.filter((b) => b.shift_code === slot.shiftCode && b.weekday === slot.weekday)) {
-      const line = res.lines.find((l) => l.roleCode === b.role_code && !l.isPeakExtra);
+    for (const b of baselineRows.filter((b) => b.shiftCode === slot.shiftCode && b.weekday === slot.weekday)) {
+      const line = res.lines.find((l) => l.roleCode === b.roleCode && !l.isPeakExtra);
       if (line) line.explain.baseline = b.headcount;
-      else if (!ruled.has(b.role_code) && b.headcount > 0) {
-        res.lines.push({ roleCode: b.role_code, headcount: b.headcount, start: slot.start, end: slot.end, isPeakExtra: false, minRequired: 0, explain: { rules: [], demand: null, calc: [`BASELINE = ${b.headcount}`], notes: [{ code: 'FROM_BASELINE' }], baseline: b.headcount } });
+      else if (!ruled.has(b.roleCode) && b.headcount > 0) {
+        res.lines.push({ roleCode: b.roleCode, headcount: b.headcount, start: slot.start, end: slot.end, isPeakExtra: false, minRequired: 0, explain: { rules: [], demand: null, calc: [`BASELINE = ${b.headcount}`], notes: [{ code: 'FROM_BASELINE' }], baseline: b.headcount } });
       }
     }
     // learned adjustments: shown with their reason, never below the floor, never a rule change
@@ -208,58 +194,49 @@ export async function propose(access, locationId, weekStart, { force = false } =
   if (!shifts.length) throw err('BAD_REQUEST', 'this location has no shifts defined yet (Settings → Shifts)');
   const p = await computeProposal(locationId, ws);
   const demo = await source.isDemoLocation(locationId);
-  const planId = await tx(async (c) => {
-    const id = (
-      await c.q(`INSERT INTO joya_staffing_plans (location_id, week_start, status, forecast_json, rules_json, is_demo, created_by) VALUES (:l, :w, 'DRAFT', :f, :r, :d, :by)`, {
+  const proposal = p.lines.map((l, i) => ({ id: i + 1, date: l.date, shiftCode: l.shiftCode, roleCode: l.roleCode, headcount: l.headcount, start: l.start, end: l.end, isPeakExtra: !!l.isPeakExtra, minRequired: l.minRequired, explain: l.explain }));
+  const lines = proposal.map(({ explain, ...l }) => ({ ...l, origin: 'PROPOSED', proposalLineId: l.id, note: null, updatedBy: access.username }));
+  const planId = (
+    await q(
+      `INSERT INTO joya_staffing_plans (location_id, week_start, status, forecast_json, rules_json, proposal_json, lines_json, edits_json, is_demo, created_by)
+       VALUES (:l, :w, 'DRAFT', :f, :r, :p, :x, '[]', :d, :by)`,
+      {
         l: locationId,
         w: ws,
         f: JSON.stringify({ ...p.forecast, warnings: p.warnings }),
         r: JSON.stringify(p.rules),
+        p: JSON.stringify(proposal),
+        x: JSON.stringify(lines),
         d: demo ? 1 : 0,
         by: access.username,
-      })
-    ).insertId;
-    for (const l of p.lines) {
-      const pid = (
-        await c.q(
-          `INSERT INTO joya_staffing_proposal_lines (plan_id, work_date, shift_code, role_code, headcount, start_time, end_time, is_peak_extra, min_required, explain_json)
-           VALUES (:p, :d, :s, :r, :h, :st, :en, :pk, :m, :e)`,
-          { p: id, d: l.date, s: l.shiftCode, r: l.roleCode, h: l.headcount, st: l.start, en: l.end, pk: l.isPeakExtra ? 1 : 0, m: l.minRequired, e: JSON.stringify(l.explain) },
-        )
-      ).insertId;
-      await c.q(
-        `INSERT INTO joya_staffing_plan_lines (plan_id, work_date, shift_code, role_code, headcount, start_time, end_time, is_peak_extra, min_required, origin, proposal_line_id, updated_by)
-         VALUES (:p, :d, :s, :r, :h, :st, :en, :pk, :m, 'PROPOSED', :pid, :by)`,
-        { p: id, d: l.date, s: l.shiftCode, r: l.roleCode, h: l.headcount, st: l.start, en: l.end, pk: l.isPeakExtra ? 1 : 0, m: l.minRequired, pid, by: access.username },
-      );
-    }
-    return id;
-  });
+      },
+    )
+  ).insertId;
   await audit(access.username, 'STAFFING_PROPOSED', 'staffing_plan', planId, locationId, { weekStart: ws, lines: p.lines.length, warnings: p.warnings.length });
   return { planId, existing: false };
 }
 
-const shapeLine = (r) => ({
-  id: r.id,
-  date: ymd(r.work_date),
-  weekday: weekdayOf(ymd(r.work_date)),
-  shiftCode: r.shift_code,
-  roleCode: r.role_code,
-  headcount: r.headcount,
-  start: hms(r.start_time),
-  end: hms(r.end_time),
-  hours: Math.round(durH(hms(r.start_time), hms(r.end_time)) * 100) / 100,
-  isPeakExtra: !!r.is_peak_extra,
-  minRequired: r.min_required,
+const shapeLine = (l) => ({
+  id: l.id,
+  date: l.date,
+  weekday: weekdayOf(l.date),
+  shiftCode: l.shiftCode,
+  roleCode: l.roleCode,
+  headcount: l.headcount,
+  start: l.start,
+  end: l.end,
+  hours: Math.round(durH(l.start, l.end) * 100) / 100,
+  isPeakExtra: !!l.isPeakExtra,
+  minRequired: l.minRequired || 0,
 });
+const lineOrder = (a, b) => a.date.localeCompare(b.date) || a.shiftCode.localeCompare(b.shiftCode) || Number(a.isPeakExtra) - Number(b.isPeakExtra) || a.roleCode.localeCompare(b.roleCode) || a.id - b.id;
 
 export async function getPlan(access, planId) {
-  const p = await one(`SELECT p.* FROM joya_staffing_plans p WHERE p.id=:id`, { id: planId });
+  const p = await one(`SELECT * FROM joya_staffing_plans WHERE id=:id`, { id: planId });
   if (!p) throw err('NOT_FOUND', 'plan not found');
   assertLocation(access, p.location_id);
-  const lines = await q(`SELECT * FROM joya_staffing_plan_lines WHERE plan_id=:id ORDER BY work_date, shift_code, is_peak_extra, role_code, id`, { id: planId });
-  const props = await q(`SELECT * FROM joya_staffing_proposal_lines WHERE plan_id=:id ORDER BY work_date, shift_code, is_peak_extra, role_code, id`, { id: planId });
-  const edits = await q(`SELECT * FROM joya_staffing_edits WHERE plan_id=:id ORDER BY id`, { id: planId });
+  const lines = [...(parseJson(p.lines_json) || [])].sort(lineOrder);
+  const props = [...(parseJson(p.proposal_json) || [])].sort(lineOrder);
   const propById = new Map(props.map((x) => [x.id, x]));
   return {
     plan: {
@@ -280,13 +257,30 @@ export async function getPlan(access, planId) {
       final: parseJson(p.final_json),
     },
     lines: lines.map((r) => {
-      const prop = r.proposal_line_id ? propById.get(r.proposal_line_id) : null;
-      return { ...shapeLine(r), origin: r.origin, note: r.note, updatedBy: r.updated_by, proposed: prop ? { headcount: prop.headcount, start: hms(prop.start_time), end: hms(prop.end_time) } : null, explain: prop ? parseJson(prop.explain_json) : null };
+      const prop = r.proposalLineId ? propById.get(r.proposalLineId) : null;
+      return { ...shapeLine(r), origin: r.origin, note: r.note, updatedBy: r.updatedBy, proposed: prop ? { headcount: prop.headcount, start: prop.start, end: prop.end } : null, explain: prop ? prop.explain : null };
     }),
-    proposal: props.map((r) => ({ ...shapeLine(r), explain: parseJson(r.explain_json) })),
-    edits: edits.map((e) => ({ id: e.id, lineId: e.line_id, action: e.action, before: parseJson(e.before_json), after: parseJson(e.after_json), note: e.note, via: e.via, by: e.username, at: e.created_at })),
+    proposal: props.map((r) => ({ ...shapeLine(r), explain: r.explain })),
+    edits: parseJson(p.edits_json) || [],
     violations: violations(lines.map(shapeLine)),
   };
+}
+
+/**
+ * Change one plan row inside a transaction under a row lock: fn(row, { lines, edits, addEdit }) may change
+ * `lines` and call addEdit({ lineId?, action, before?, after?, note? }); returns the extra columns to set.
+ */
+async function updatePlan(access, planId, { via = 'UI' } = {}, fn) {
+  await tx(async (c) => {
+    const row = await lockRow(c, 'joya_staffing_plans', planId);
+    if (!row) throw err('NOT_FOUND', 'plan not found');
+    const lines = parseJson(row.lines_json) || [];
+    const edits = parseJson(row.edits_json) || [];
+    const addEdit = (e) => edits.push({ id: nextId(edits), lineId: null, before: null, after: null, note: null, ...e, via, by: access.username, at: new Date().toISOString() });
+    const set = (await fn(row, { lines, edits, addEdit })) || {};
+    const cols = { ...set, lines_json: JSON.stringify(lines), edits_json: JSON.stringify(edits) };
+    await c.q(`UPDATE joya_staffing_plans SET ${Object.keys(cols).map((k) => `${k}=:${k}`).join(', ')} WHERE id=:id`, { ...cols, id: planId });
+  });
 }
 
 /** Slots where the planned headcount is under the mandatory minimum. */
@@ -308,13 +302,12 @@ export async function listPlans(access, { locationIds, limit = 30 }) {
   const locs = inList('loc', locationIds);
   const names = await source.locationNames();
   const rows = await q(
-    `SELECT p.id, p.location_id, p.week_start, p.status, p.is_demo, p.created_by, p.approved_by, p.approved_at,
-            (SELECT SUM(headcount) FROM joya_staffing_plan_lines x WHERE x.plan_id = p.id) AS people
+    `SELECT p.id, p.location_id, p.week_start, p.status, p.is_demo, p.created_by, p.approved_by, p.approved_at, p.lines_json
        FROM joya_staffing_plans p
       WHERE p.location_id IN (${locs.sql}) ORDER BY p.week_start DESC, p.id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 30, 1), 200)}`,
     locs.params,
   );
-  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: names.get(r.location_id) ?? null, weekStart: ymd(r.week_start), status: r.status, isDemo: !!r.is_demo, people: Number(r.people) || 0, createdBy: r.created_by, approvedBy: r.approved_by, approvedAt: r.approved_at }));
+  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: names.get(r.location_id) ?? null, weekStart: ymd(r.week_start), status: r.status, isDemo: !!r.is_demo, people: (parseJson(r.lines_json) || []).reduce((s, l) => s + (Number(l.headcount) || 0), 0), createdBy: r.created_by, approvedBy: r.approved_by, approvedAt: r.approved_at }));
 }
 
 /**
@@ -374,52 +367,23 @@ export async function checkOps(access, planId, ops) {
 
 export async function applyOps(access, planId, ops, { via = 'UI' } = {}) {
   const checked = await checkOps(access, planId, ops);
-  await tx(async (c) => {
+  await updatePlan(access, planId, { via }, (row, { lines, addEdit }) => {
+    if (row.status !== 'DRAFT') throw err('CONFLICT', `the plan is ${row.status}; reopen it to edit`);
     for (const o of checked) {
       if (o.op === 'add') {
-        const id = (
-          await c.q(
-            `INSERT INTO joya_staffing_plan_lines (plan_id, work_date, shift_code, role_code, headcount, start_time, end_time, origin, note, updated_by) VALUES (:p, :d, :s, :r, :h, :st, :en, 'ADDED', :n, :by)`,
-            { p: planId, d: o.date, s: o.shiftCode, r: o.roleCode, h: o.headcount, st: o.start, en: o.end, n: o.note, by: access.username },
-          )
-        ).insertId;
-        await c.q(`INSERT INTO joya_staffing_edits (plan_id, line_id, action, after_json, note, via, username) VALUES (:p, :l, 'ADD', :a, :n, :via, :u)`, {
-          p: planId,
-          l: id,
-          a: JSON.stringify(o),
-          n: o.note,
-          via,
-          u: access.username,
-        });
-      } else if (o.op === 'remove' || (o.op === 'set' && o.headcount === 0)) {
-        await c.q(`DELETE FROM joya_staffing_plan_lines WHERE id=:id AND plan_id=:p`, { id: o.lineId, p: planId });
-        await c.q(`INSERT INTO joya_staffing_edits (plan_id, line_id, action, before_json, note, via, username) VALUES (:p, :l, 'REMOVE', :b, :n, :via, :u)`, {
-          p: planId,
-          l: o.lineId,
-          b: JSON.stringify(o.before),
-          n: o.note,
-          via,
-          u: access.username,
-        });
+        const id = nextId(lines);
+        lines.push({ id, date: o.date, shiftCode: o.shiftCode, roleCode: o.roleCode, headcount: o.headcount, start: o.start, end: o.end, isPeakExtra: false, minRequired: 0, origin: 'ADDED', proposalLineId: null, note: o.note, updatedBy: access.username });
+        addEdit({ lineId: id, action: 'ADD', after: o, note: o.note });
+        continue;
+      }
+      const i = lines.findIndex((l) => l.id === o.lineId);
+      if (i < 0) throw err('BAD_REQUEST', `line ${o.lineId} is not on this plan`);
+      if (o.op === 'remove' || (o.op === 'set' && o.headcount === 0)) {
+        lines.splice(i, 1);
+        addEdit({ lineId: o.lineId, action: 'REMOVE', before: o.before, note: o.note });
       } else {
-        await c.q(`UPDATE joya_staffing_plan_lines SET headcount=:h, start_time=:st, end_time=:en, note=COALESCE(:n, note), updated_by=:by WHERE id=:id AND plan_id=:p`, {
-          h: o.headcount,
-          st: o.start,
-          en: o.end,
-          n: o.note,
-          by: access.username,
-          id: o.lineId,
-          p: planId,
-        });
-        await c.q(`INSERT INTO joya_staffing_edits (plan_id, line_id, action, before_json, after_json, note, via, username) VALUES (:p, :l, 'SET', :b, :a, :n, :via, :u)`, {
-          p: planId,
-          l: o.lineId,
-          b: JSON.stringify(o.before),
-          a: JSON.stringify({ headcount: o.headcount, start: o.start, end: o.end }),
-          n: o.note,
-          via,
-          u: access.username,
-        });
+        Object.assign(lines[i], { headcount: o.headcount, start: o.start, end: o.end, note: o.note ?? lines[i].note, updatedBy: access.username });
+        addEdit({ lineId: o.lineId, action: 'SET', before: o.before, after: { headcount: o.headcount, start: o.start, end: o.end }, note: o.note });
       }
     }
   });
@@ -431,8 +395,11 @@ export async function approve(access, planId, { note } = {}) {
   if (plan.status !== 'DRAFT') throw err('CONFLICT', `the plan is ${plan.status}`);
   if (v.length) throw Object.assign(err('MANDATORY_MIN', 'the plan is under a mandatory minimum'), { details: { violations: v } });
   const final = lines.map((l) => ({ lineId: l.id, date: l.date, shiftCode: l.shiftCode, roleCode: l.roleCode, headcount: l.headcount, start: l.start, end: l.end, isPeakExtra: l.isPeakExtra, origin: l.origin, proposedHeadcount: l.proposed?.headcount ?? null }));
-  await q(`UPDATE joya_staffing_plans SET status='APPROVED', final_json=:f, approved_by=:u, approved_at=NOW(), note=COALESCE(:n, note) WHERE id=:id AND status='DRAFT'`, { f: JSON.stringify(final), u: access.username, n: note || null, id: planId });
-  await q(`INSERT INTO joya_staffing_edits (plan_id, action, note, username) VALUES (:p, 'APPROVE', :n, :u)`, { p: planId, n: note || null, u: access.username });
+  await updatePlan(access, planId, {}, (row, { addEdit }) => {
+    if (row.status !== 'DRAFT') throw err('CONFLICT', `the plan is ${row.status}`);
+    addEdit({ action: 'APPROVE', note: note || null });
+    return { status: 'APPROVED', final_json: JSON.stringify(final), approved_by: access.username, approved_at: new Date(), note: note || row.note };
+  });
   await audit(access.username, 'STAFFING_APPROVED', 'staffing_plan', planId, plan.locationId, { lines: final.length });
   return getPlan(access, planId);
 }
@@ -440,8 +407,10 @@ export async function approve(access, planId, { note } = {}) {
 export async function reject(access, planId, { note } = {}) {
   const { plan } = await getPlan(access, planId);
   if (plan.status !== 'DRAFT') throw err('CONFLICT', `the plan is ${plan.status}`);
-  await q(`UPDATE joya_staffing_plans SET status='REJECTED', rejected_by=:u, rejected_at=NOW(), note=COALESCE(:n, note) WHERE id=:id`, { u: access.username, n: note || null, id: planId });
-  await q(`INSERT INTO joya_staffing_edits (plan_id, action, note, username) VALUES (:p, 'REJECT', :n, :u)`, { p: planId, n: note || null, u: access.username });
+  await updatePlan(access, planId, {}, (row, { addEdit }) => {
+    addEdit({ action: 'REJECT', note: note || null });
+    return { status: 'REJECTED', rejected_by: access.username, rejected_at: new Date(), note: note || row.note };
+  });
   await audit(access.username, 'STAFFING_REJECTED', 'staffing_plan', planId, plan.locationId, { note });
   return getPlan(access, planId);
 }
@@ -449,8 +418,10 @@ export async function reject(access, planId, { note } = {}) {
 export async function reopen(access, planId) {
   const { plan } = await getPlan(access, planId);
   if (plan.status !== 'APPROVED') throw err('CONFLICT', 'only an approved plan can be reopened');
-  await q(`UPDATE joya_staffing_plans SET status='DRAFT', final_json=NULL, approved_by=NULL, approved_at=NULL WHERE id=:id`, { id: planId });
-  await q(`INSERT INTO joya_staffing_edits (plan_id, action, before_json, username) VALUES (:p, 'REOPEN', :b, :u)`, { p: planId, b: JSON.stringify(plan.final), u: access.username });
+  await updatePlan(access, planId, {}, (row, { addEdit }) => {
+    addEdit({ action: 'REOPEN', before: plan.final });
+    return { status: 'DRAFT', final_json: null, approved_by: null, approved_at: null };
+  });
   await audit(access.username, 'STAFFING_REOPENED', 'staffing_plan', planId, plan.locationId, {});
   return getPlan(access, planId);
 }

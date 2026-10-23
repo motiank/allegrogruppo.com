@@ -10,10 +10,10 @@
 //   freshness      /status
 //
 // What Joya keeps is its own: decisions, edits, rules, notes, corrections (keyed by the ids above),
-// and joya_role_aliases (Allegro role name → Joya role code). Dated data is fetched per branch and
+// and the roleAliases config (Allegro role name → Joya role code). Dated data is fetched per branch and
 // calendar month, so the 5-minute memory cache serves every question about the same month.
 import { get } from '../../lib/allegro.js';
-import { q, todayLocal } from '../db.js';
+import { getConfig, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import log from '../../lib/log.js';
 
@@ -77,7 +77,7 @@ let aliasCache = { at: 0, map: null };
 /** Allegro role name → Joya role code (null = not mapped yet). */
 export async function roleAliases() {
   if (!aliasCache.map || Date.now() - aliasCache.at > 30_000) {
-    aliasCache = { at: Date.now(), map: new Map((await q(`SELECT alias, role_code FROM joya_role_aliases`)).map((r) => [r.alias, r.role_code])) };
+    aliasCache = { at: Date.now(), map: new Map(Object.entries(await getConfig('roleAliases', {}))) };
   }
   return aliasCache.map;
 }

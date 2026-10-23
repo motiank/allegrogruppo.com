@@ -2,7 +2,7 @@
 // Order (later files win):
 //   1. the Allegro repo-root `.env` — the DB settings every Allegro service uses (the `allegro` DB)
 //   2. `hq/.env`        — Joya's own secrets on the server (JOYA_SESSION_SECRET, JOYA_API_KEY …)
-//   3. `hq/.env.local`  — local development: points the DB at a LOCAL MySQL, never at production
+//   3. `hq/.env.local`  — local development settings; it doesn't override DB_* (dev uses the production DB too)
 // All three are gitignored.
 import dotenv from 'dotenv';
 import path from 'path';

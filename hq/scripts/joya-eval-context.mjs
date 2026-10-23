@@ -1,6 +1,6 @@
 /**
  * Saves fixed contexts for the Joya runner's planner eval (hq/runner/scripts/eval.mjs):
- * one per context kind (GENERAL, ORDER_LIST, STAFFING_PLAN, INQUIRY), built from the demo data on
+ * one per context kind (GENERAL, ORDER_LIST, STAFFING_PLAN), built from the demo data on
  * the LOCAL MIRROR with the same code the runner route uses (services/ai.js buildContext).
  *
  *   node scripts/joya-eval-context.mjs [out.json]     (default runner/eval/contexts.json)
@@ -34,7 +34,7 @@ const sql = async (s, p = {}) => (await executeSql(s, p))[0];
 
 // the demo locations: the fake API's branches (a location id is the Allegro branch id)
 const locations = BRANCHES.map((b) => ({ id: b.id }));
-if (!(await sql(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id = :l`, { l: locations[0].id }))[0].n) {
+if (!(await sql(`SELECT COUNT(*) AS n FROM joya_settings WHERE name = :n`, { n: `location:${locations[0].id}` }))[0].n) {
   console.error('no demo locations: run scripts/joya-seed-demo.mjs first');
   process.exit(1);
 }
@@ -45,13 +45,11 @@ const row = (kind, contextId = null) => ({ id: 0, question: '', lang: 'he', cont
 const list = await repl.generate(access, loc, todayLocal(), { force: true, createdBy: 'joya-eval' });
 const { listId } = list;
 const { planId } = await staffing.propose(access, loc, addDays(todayLocal(), 7), { force: true });
-const inquiry = (await sql(`SELECT id FROM joya_inquiries WHERE location_id = :l ORDER BY id LIMIT 1`, { l: loc }))[0];
 
 const contexts = {
   GENERAL: await buildContext(access, row('GENERAL')),
   ORDER_LIST: await buildContext(access, row('ORDER_LIST', listId)),
   STAFFING_PLAN: await buildContext(access, row('STAFFING_PLAN', planId)),
-  ...(inquiry ? { INQUIRY: await buildContext(access, row('INQUIRY', inquiry.id)) } : {}),
 };
 await repl.reject(access, listId, { note: 'eval context' });
 await staffing.reject(access, planId, { note: 'eval context' });
