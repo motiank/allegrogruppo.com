@@ -22,6 +22,7 @@ import * as repl from '../src/services/replenishment.js';
 import * as staffing from '../src/services/staffing.js';
 import { todayLocal } from '../src/db.js';
 import { addDays } from '../src/lib/recommend.js';
+import { BRANCHES } from './demo-defs.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = process.argv[2] || path.join(here, '../runner/eval/contexts.json');
@@ -31,8 +32,9 @@ if (!['127.0.0.1', 'localhost'].includes(process.env.DB_HOST || '')) {
 }
 const sql = async (s, p = {}) => (await executeSql(s, p))[0];
 
-const locations = await sql(`SELECT id FROM joya_locations WHERE is_demo = 1 ORDER BY id`);
-if (!locations.length) {
+// the demo locations: the fake API's branches (a location id is the Allegro branch id)
+const locations = BRANCHES.map((b) => ({ id: b.id }));
+if (!(await sql(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id = :l`, { l: locations[0].id }))[0].n) {
   console.error('no demo locations: run scripts/joya-seed-demo.mjs first');
   process.exit(1);
 }

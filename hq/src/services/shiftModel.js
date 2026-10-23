@@ -34,7 +34,7 @@ export async function profile(access, locationId, { weeks } = {}) {
   assertLocation(access, locationId);
   const s = await settings();
   const w = Math.min(Number(weeks) || s.weeks, 26);
-  const h = await history(Number(locationId), w, s);
+  const h = await history(locationId, w, s);
   return {
     period: { from: h.from, to: h.to },
     source: 'Beecomm checks via Allegro (/beecomm/orders/stored)',
@@ -51,8 +51,8 @@ export async function forecastWeek(access, locationId, { weekStart, weeks } = {}
   const today = todayLocal();
   let start = weekStart || addDays(today, 1);
   while (new Date(start + 'T00:00:00Z').getUTCDay() !== 0) start = addDays(start, 1);
-  const h = await history(Number(locationId), w, s);
-  const staff = await source.shiftStaff(Number(locationId), h.from, h.to, { split: s.split, minHours: s.minHours });
+  const h = await history(locationId, w, s);
+  const staff = await source.shiftStaff(locationId, h.from, h.to, { split: s.split, minHours: s.minHours });
   const aliases = await source.roleAliases();
   const isKitchen = (role) => s.kitchen.includes(role) || aliases.get(role) === 'cook';
   const prof = shiftProfile(h.load);

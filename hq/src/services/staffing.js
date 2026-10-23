@@ -5,11 +5,12 @@
 // Kept apart: joya_staffing_proposal_lines (the system's proposal, never changed),
 // joya_staffing_plan_lines (what the manager edits), joya_staffing_edits (every change),
 // joya_staffing_plans.final_json (frozen at approval).
-import { q, one, tx, err, audit, parseJson, ymd, hms, getSettings, todayLocal } from '../db.js';
+import { q, one, tx, err, audit, parseJson, ymd, hms, inList, getSettings, todayLocal } from '../db.js';
 import { assertLocation } from '../access.js';
 import { computeSlot, normalizeRule, validateRule, learnedAdjustments, normTime } from '../lib/staffingRules.js';
 import { addDays } from '../lib/recommend.js';
 import { forecastWeek, actualDemand } from './demand.js';
+import * as source from './source.js';
 import { listRoles, listShifts } from './master.js';
 import { effectiveAttendance } from './attendance.js';
 import { toCsv } from '../lib/csv.js';
@@ -30,14 +31,14 @@ export async function listRules(access, locationId = null) {
   const rows = await q(`SELECT * FROM joya_staffing_rules ORDER BY role_code, location_id IS NULL DESC, location_id, shift_code, id`);
   return rows
     .filter((r) => r.location_id == null || access.isAdmin || access.locationIds.includes(r.location_id))
-    .filter((r) => locationId == null || r.location_id == null || r.location_id === Number(locationId))
+    .filter((r) => locationId == null || r.location_id == null || r.location_id === String(locationId))
     .map((r) => ({ ...normalizeRule(r), updatedBy: r.updated_by, updatedAt: r.updated_at }));
 }
 
 /** Chain-wide and mandatory rules: chain admin only. A location manager may edit their location's other rules. */
 function canEditRule(access, rule) {
   if (access.isAdmin) return true;
-  return rule.location_id != null && access.locationIds.includes(Number(rule.location_id)) && !rule.mandatory;
+  return rule.location_id != null && access.locationIds.includes(String(rule.location_id)) && !rule.mandatory;
 }
 
 export async function saveRule(access, input) {
@@ -206,7 +207,7 @@ export async function propose(access, locationId, weekStart, { force = false } =
   const shifts = (await listShifts([locationId])).filter((s) => s.active);
   if (!shifts.length) throw err('BAD_REQUEST', 'this location has no shifts defined yet (Settings → Shifts)');
   const p = await computeProposal(locationId, ws);
-  const loc = await one(`SELECT is_demo FROM joya_locations WHERE id=:l`, { l: locationId });
+  const demo = await source.isDemoLocation(locationId);
   const planId = await tx(async (c) => {
     const id = (
       await c.q(`INSERT INTO joya_staffing_plans (location_id, week_start, status, forecast_json, rules_json, is_demo, created_by) VALUES (:l, :w, 'DRAFT', :f, :r, :d, :by)`, {
@@ -214,7 +215,7 @@ export async function propose(access, locationId, weekStart, { force = false } =
         w: ws,
         f: JSON.stringify({ ...p.forecast, warnings: p.warnings }),
         r: JSON.stringify(p.rules),
-        d: loc?.is_demo ? 1 : 0,
+        d: demo ? 1 : 0,
         by: access.username,
       })
     ).insertId;
@@ -253,7 +254,7 @@ const shapeLine = (r) => ({
 });
 
 export async function getPlan(access, planId) {
-  const p = await one(`SELECT p.*, l.name AS location_name FROM joya_staffing_plans p JOIN joya_locations l ON l.id = p.location_id WHERE p.id=:id`, { id: planId });
+  const p = await one(`SELECT p.* FROM joya_staffing_plans p WHERE p.id=:id`, { id: planId });
   if (!p) throw err('NOT_FOUND', 'plan not found');
   assertLocation(access, p.location_id);
   const lines = await q(`SELECT * FROM joya_staffing_plan_lines WHERE plan_id=:id ORDER BY work_date, shift_code, is_peak_extra, role_code, id`, { id: planId });
@@ -264,7 +265,7 @@ export async function getPlan(access, planId) {
     plan: {
       id: p.id,
       locationId: p.location_id,
-      locationName: p.location_name,
+      locationName: (await source.locationNames()).get(p.location_id) ?? null,
       weekStart: ymd(p.week_start),
       status: p.status,
       isDemo: !!p.is_demo,
@@ -304,13 +305,16 @@ function violations(lines) {
 
 export async function listPlans(access, { locationIds, limit = 30 }) {
   if (!locationIds.length) return [];
+  const locs = inList('loc', locationIds);
+  const names = await source.locationNames();
   const rows = await q(
-    `SELECT p.id, p.location_id, p.week_start, p.status, p.is_demo, p.created_by, p.approved_by, p.approved_at, l.name AS location_name,
+    `SELECT p.id, p.location_id, p.week_start, p.status, p.is_demo, p.created_by, p.approved_by, p.approved_at,
             (SELECT SUM(headcount) FROM joya_staffing_plan_lines x WHERE x.plan_id = p.id) AS people
-       FROM joya_staffing_plans p JOIN joya_locations l ON l.id = p.location_id
-      WHERE p.location_id IN (${locationIds.map(Number).join(',')}) ORDER BY p.week_start DESC, p.id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 30, 1), 200)}`,
+       FROM joya_staffing_plans p
+      WHERE p.location_id IN (${locs.sql}) ORDER BY p.week_start DESC, p.id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 30, 1), 200)}`,
+    locs.params,
   );
-  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: r.location_name, weekStart: ymd(r.week_start), status: r.status, isDemo: !!r.is_demo, people: Number(r.people) || 0, createdBy: r.created_by, approvedBy: r.approved_by, approvedAt: r.approved_at }));
+  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: names.get(r.location_id) ?? null, weekStart: ymd(r.week_start), status: r.status, isDemo: !!r.is_demo, people: Number(r.people) || 0, createdBy: r.created_by, approvedBy: r.approved_by, approvedAt: r.approved_at }));
 }
 
 /**

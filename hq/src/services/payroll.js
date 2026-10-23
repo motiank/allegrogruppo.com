@@ -4,7 +4,7 @@
 import { q, one, err, audit, parseJson, ymd, ymdhms, inList, getSettings } from '../db.js';
 import { assertLocation } from '../access.js';
 import { effectiveAttendance } from './attendance.js';
-import { rawShifts, employeeNames, payroll as sourcePayroll, shiftsSummary } from './source.js';
+import { rawShifts, employeeNames, locationNames, payroll as sourcePayroll, shiftsSummary } from './source.js';
 import { addDays } from '../lib/recommend.js';
 
 const monthRange = (period) => {
@@ -117,8 +117,9 @@ export async function listIssues(access, { locationIds, period, status }) {
   const l = inList('l', locationIds);
   const st = status ? String(status).split(',') : null;
   const names = await employeeNames(locationIds).catch(() => new Map());
+  const locNames = await locationNames();
   const rows = await q(
-    `SELECT i.*, loc.name AS location_name FROM joya_payroll_issues i JOIN joya_locations loc ON loc.id = i.location_id
+    `SELECT i.* FROM joya_payroll_issues i
       WHERE i.location_id IN (${l.sql}) ${period ? 'AND i.period = :p' : ''} ${st ? `AND i.status IN (${st.map((s) => `'${s.replace(/[^A-Z_]/g, '')}'`).join(',')})` : ''}
       ORDER BY FIELD(i.status,'OPEN','CORRECTED','ACCEPTED','DISMISSED'), i.period DESC, i.kind, i.id`,
     { ...l.params, p: period },
@@ -131,7 +132,7 @@ export async function listIssues(access, { locationIds, period, status }) {
       id: r.id,
       period: r.period,
       locationId: r.location_id,
-      locationName: r.location_name,
+      locationName: locNames.get(r.location_id) ?? null,
       employeeId: r.employee_id,
       employeeName: (r.employee_id != null ? names.get(Number(r.employee_id)) : null) ?? (String(r.external_employee_id || '').startsWith('name:') ? r.external_employee_id.slice(5) : null),
       externalId: r.external_employee_id,
@@ -167,11 +168,11 @@ export async function resolveIssue(access, id, { status, note }) {
  * row's location and date, so the row can be found in Allegro; the raw row is never changed.
  */
 export async function correctAttendance(access, { attendanceId, locationId, date, action, clockIn, clockOut, note, issueId = null }) {
-  if (!Number(locationId) || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw err('BAD_REQUEST', 'locationId and date of the row are required');
-  assertLocation(access, Number(locationId));
-  const raw = (await rawShifts(Number(locationId), date, date)).find((r) => r.id === Number(attendanceId));
+  if (!locationId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw err('BAD_REQUEST', 'locationId and date of the row are required');
+  assertLocation(access, locationId);
+  const raw = (await rawShifts(locationId, date, date)).find((r) => r.id === Number(attendanceId));
   if (!raw) throw err('NOT_FOUND', 'attendance row not found');
-  const a = { location_id: Number(locationId), clock_in: raw.clockIn, clock_out: raw.clockOut };
+  const a = { location_id: String(locationId), clock_in: raw.clockIn, clock_out: raw.clockOut };
   if (!['SET_TIMES', 'EXCLUDE'].includes(action)) throw err('BAD_REQUEST', 'action must be SET_TIMES or EXCLUDE');
   if (!String(note || '').trim()) throw err('BAD_REQUEST', 'a correction needs a note (who confirmed it, why)');
   const fmt = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) + ':00' : null);

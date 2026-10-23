@@ -34,8 +34,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 `/api/joya/ai/runner/` blocked from the internet):
 - All source data from the admin Local Data API (`src/services/source.js`, 5-min memory cache). Menu and
   reservations from the API are postponed (owner).
-- Top bar: company → restaurant (company from Allegro `/branches`); demo restaurants in the "חברת דמו" company;
-  switched-off (closed) branches hidden from the picker.
+- Locations: no Joya table — a location id IS the Allegro branch id; branches, names and companies come from
+  Allegro `/branches`, "active" from `/status` (Beecomm orders in the last 60 days). Top bar: company → restaurant;
+  demo restaurants in the "חברת דמו" company (from the fake API); inactive (closed) branches hidden from the picker.
+  The local DB was moved with `sql/joya-locations-from-allegro.sql` (2026-10-24).
 - Main menu = three chat areas: מלאי ורכש (`/stock`), כח אדם (`/people`), ביצועים (`/performance`)
   (`client/pages/Area.js`, chat context `AREA` 1/2/3, suggestions while typing). Other pages keep their routes but
   are not in the menu. Settings is at the bottom for a chain admin.

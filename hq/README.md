@@ -64,8 +64,11 @@ The chat needs the AI runner running, and all data needs the Allegro admin runni
 5. **Execution / outcome** — `joya_order_lists.ordered_json` + `ordered_by/at` (marked as really ordered, separate
    from approved); actual demand and worked hours, computed from the source data ("planned vs actual").
 
-Ids: a location is a link row `joya_locations.allegro_branch_id` (made on first sight of a branch, active when it had
-Beecomm orders in the last 60 days; only `active` is set here); an employee id is Allegro's `employeeId`; an
+Ids: a location id **is** the Allegro branch id (every `location_id` column is `VARCHAR(64)`). Joya keeps no locations
+table: the list of branches, their names and companies come from `/branches` (the admin's `shared/restaurants.json`),
+and a location is active when its branch had Beecomm orders in the last 60 days (`/status`); an inactive one (for
+example a closed branch) is hidden from the picker. When Allegro cannot be reached, the last list read since the
+server started is used. An employee id is Allegro's `employeeId`; an
 attendance id is Allegro's raw shift id. `joya_role_aliases` maps Allegro role names ('מלצר', 'פס חם'…) to Joya role
 codes (Settings → Role names; unmapped names are listed on the data page). National ids and phones from Allegro are
 never kept or shown.
@@ -79,7 +82,7 @@ never kept or shown.
 `Host: localhost`), so joya-hq must run next to the Allegro admin or reach it through an SSH tunnel. When it cannot be
 reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) — nothing is shown from a copy.
 `/status` tells "not loaded yet" apart from "missing" (missing sales days are counted only up to Allegro's last
-loaded day). Settings → Connections checks the API; Settings → Locations → "Read Allegro again now" clears the cache.
+loaded day). Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.
 
 Instagram and Google inquiries/reviews are **entered by hand**. The staffing plan is exported as a **CSV for Tabit**.
 Nothing is sent to a supplier, Tabit, Instagram or Google.
@@ -199,8 +202,8 @@ codes, unmatched Tabit names, unmapped role names, checks without diners/close t
 ## Deploy (the Allegro admin's server, hq.allegrogruppo.com)
 
 Not done yet — ask the owner before each step that touches the server.
-1. Apply `sql/add-joya.sql` and `sql/joya-areas.sql` to the `allegro` DB (new `joya_*` tables only; single-quoted
-   strings, ANSI_QUOTES-safe).
+1. Apply `sql/add-joya.sql` to the `allegro` DB (new `joya_*` tables only; single-quoted strings, ANSI_QUOTES-safe).
+   `sql/joya-areas.sql` and `sql/joya-locations-from-allegro.sql` are only for an older DB made before those changes.
 2. `hq/.env` (mode 600) from `env.joya-hq.example`: a new `JOYA_SESSION_SECRET`, a new `JOYA_API_KEY`,
    `NODE_ENV=production`, `ALLEGRO_API_URL=http://localhost:3021/local-api/v1`. The DB comes from the root `.env`.
 3. `cd hq && npm install && npm run build`.

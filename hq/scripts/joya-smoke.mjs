@@ -74,9 +74,10 @@ async function call(who, method, path, body, headers = {}) {
 }
 const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 
-const tlv = (await sql(`SELECT id FROM joya_locations WHERE code='DEMO-TLV'`))[0]?.id;
-const hfa = (await sql(`SELECT id FROM joya_locations WHERE code='DEMO-HFA'`))[0]?.id;
-if (!tlv || !hfa) {
+// a location id is the Allegro branch id: the fake API's demo branches
+const tlv = 'demo-tlv';
+const hfa = 'demo-hfa';
+if (!(await sql(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id IN (:t, :h)`, { t: tlv, h: hfa }))[0].n) {
   console.error('no demo data — run scripts/joya-seed-demo.mjs first');
   process.exit(1);
 }

@@ -2,7 +2,7 @@
 // missing, so a page (or the AI answer) can say where a number came from. The data comes
 // from the Allegro API (./source.js); nothing here is stored.
 // A day with no POS rows is MISSING, never a day with zero sales.
-import { q, ymd, getSettings } from '../db.js';
+import { q, ymd, inList, getSettings } from '../db.js';
 import { addDays, daysBetween } from '../lib/recommend.js';
 import { median } from '../lib/demand.js';
 import { effectiveAttendance } from './attendance.js';
@@ -317,10 +317,11 @@ export async function laborSummary(access, locationIds, from, to) {
 /** Planned (approved staffing plans) vs worked hours, per location and week. */
 export async function plannedVsActual(access, locationIds, from, to) {
   if (!locationIds.length) return { period: { from, to }, weeks: [] };
+  const locs = inList('loc', locationIds);
   const plans = await q(
-    `SELECT id, location_id, week_start, final_json FROM joya_staffing_plans WHERE status='APPROVED' AND location_id IN (${locationIds.map(Number).join(',')})
+    `SELECT id, location_id, week_start, final_json FROM joya_staffing_plans WHERE status='APPROVED' AND location_id IN (${locs.sql})
       AND week_start BETWEEN :a AND :b ORDER BY week_start`,
-    { a: addDays(from, -6), b: to },
+    { ...locs.params, a: addDays(from, -6), b: to },
   );
   const att = (await effectiveAttendance(locationIds, addDays(from, -6), addDays(to, 6))).filter((a) => !a.excluded);
   const weeks = plans.map((p) => {

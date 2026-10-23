@@ -26,7 +26,7 @@ export function companiesOf(locations) {
   }
   return out;
 }
-// a location switched off (Settings → Locations, e.g. a closed branch) is left out of the picker and of "all"
+// an inactive location (no Beecomm orders in 60 days, e.g. a closed branch) is left out of the picker and of "all"
 const usable = (me) => (me?.locations || []).filter((l) => l.active);
 
 export function JoyaProvider({ children }) {
@@ -34,7 +34,7 @@ export function JoyaProvider({ children }) {
   const [locationId, setLoc] = useState(() => {
     try {
       const v = localStorage.getItem(LOC_KEY);
-      return v ? Number(v) : null;
+      return v || null;
     } catch {
       return null;
     }
@@ -105,7 +105,7 @@ export function useJoya() {
       ...c,
       /** the user's locations that are switched on */
       locations,
-      /** all the user's locations, also the switched-off ones (Settings → Locations) */
+      /** all the user's locations, also the inactive ones */
       allLocations,
       location,
       companies,

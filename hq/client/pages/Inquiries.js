@@ -119,7 +119,7 @@ export default function Inquiries() {
             </Select>
           </Field>
           <Field label={t('joya.location')}>
-            <Select value={form.locationId ?? ''} onChange={(e) => setForm({ ...form, locationId: e.target.value ? Number(e.target.value) : null })}>
+            <Select value={form.locationId ?? ''} onChange={(e) => setForm({ ...form, locationId: e.target.value || null })}>
               {j.me?.isAdmin && <option value="">{t('joya.tasks.chain')}</option>}
               {j.locations.map((l) => (
                 <option key={l.id} value={l.id}>{l.name}</option>

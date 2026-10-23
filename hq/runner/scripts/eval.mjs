@@ -34,7 +34,7 @@ function same(actual, expected) {
 const partial = (obj, exp) => obj && Object.entries(exp).every(([k, v]) => same(obj[k], v));
 const locIds = (p) => {
   const v = p?.locationIds ?? (p?.locationId != null ? [p.locationId] : null);
-  return v == null ? null : (Array.isArray(v) ? v : [v]).map(Number).sort();
+  return v == null ? null : (Array.isArray(v) ? v : [v]).map(String).sort();
 };
 
 function grade(f, plan) {

@@ -42,7 +42,7 @@ function LocationSelect({ spec, value, onChange }) {
   const j = useJoya();
   return (
     <Field label={t('joya.imp.location')}>
-      <Select value={value ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+      <Select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
         {!spec?.needsLocation && j.me?.isAdmin ? <option value="">{t('joya.imp.noLocation')}</option> : null}
         {j.locations.map((l) => (
           <option key={l.id} value={l.id}>

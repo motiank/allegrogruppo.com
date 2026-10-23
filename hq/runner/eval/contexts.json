@@ -17,21 +17,23 @@
    "today": "2026-10-21",
    "locations": [
     {
-     "id": 6,
-     "code": "DEMO-HFA",
+     "id": "demo-hfa",
      "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     },
     {
-     "id": 5,
-     "code": "DEMO-TLV",
+     "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     }
    ],
    "shifts": [
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -46,7 +48,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -61,7 +63,7 @@
      "end": "23:30:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -76,7 +78,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -126,7 +128,7 @@
    "calculations": [
     {
      "name": "sales_summary",
-     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
      "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
     },
     {
@@ -249,7 +251,7 @@
     "lang": "he",
     "contextKind": "ORDER_LIST",
     "contextId": 100,
-    "locationId": 5
+    "locationId": "demo-tlv"
    },
    "user": {
     "role": "CHAIN_ADMIN",
@@ -258,21 +260,23 @@
    "today": "2026-10-21",
    "locations": [
     {
-     "id": 6,
-     "code": "DEMO-HFA",
+     "id": "demo-hfa",
      "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     },
     {
-     "id": 5,
-     "code": "DEMO-TLV",
+     "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     }
    ],
    "shifts": [
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -287,7 +291,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -302,7 +306,7 @@
      "end": "23:30:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -317,7 +321,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -367,7 +371,7 @@
    "calculations": [
     {
      "name": "sales_summary",
-     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
      "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
     },
     {
@@ -485,7 +489,7 @@
     "kind": "ORDER_LIST",
     "list": {
      "id": 100,
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "date": "2026-10-21",
      "status": "DRAFT"
     },
@@ -651,7 +655,7 @@
     "lang": "he",
     "contextKind": "STAFFING_PLAN",
     "contextId": 35,
-    "locationId": 5
+    "locationId": "demo-tlv"
    },
    "user": {
     "role": "CHAIN_ADMIN",
@@ -660,21 +664,23 @@
    "today": "2026-10-21",
    "locations": [
     {
-     "id": 6,
-     "code": "DEMO-HFA",
+     "id": "demo-hfa",
      "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     },
     {
-     "id": 5,
-     "code": "DEMO-TLV",
+     "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     }
    ],
    "shifts": [
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -689,7 +695,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -704,7 +710,7 @@
      "end": "23:30:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -719,7 +725,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -769,7 +775,7 @@
    "calculations": [
     {
      "name": "sales_summary",
-     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
      "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
     },
     {
@@ -887,7 +893,7 @@
     "kind": "STAFFING_PLAN",
     "plan": {
      "id": 35,
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "weekStart": "2026-10-25",
      "status": "DRAFT"
     },
@@ -1851,7 +1857,7 @@
     "lang": "he",
     "contextKind": "INQUIRY",
     "contextId": 19,
-    "locationId": 5
+    "locationId": "demo-tlv"
    },
    "user": {
     "role": "CHAIN_ADMIN",
@@ -1860,21 +1866,23 @@
    "today": "2026-10-21",
    "locations": [
     {
-     "id": 6,
-     "code": "DEMO-HFA",
+     "id": "demo-hfa",
      "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     },
     {
-     "id": 5,
-     "code": "DEMO-TLV",
+     "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     }
    ],
    "shifts": [
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -1889,7 +1897,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -1904,7 +1912,7 @@
      "end": "23:30:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -1919,7 +1927,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -1969,7 +1977,7 @@
    "calculations": [
     {
      "name": "sales_summary",
-     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
      "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
     },
     {
@@ -2089,7 +2097,7 @@
      "id": 19,
      "source": "GOOGLE",
      "kind": "REVIEW",
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "locationName": "ג׳ויה תל אביב (דמו)",
      "author": "דנה (דמו)",
      "rating": 3,
@@ -2115,21 +2123,23 @@
    "today": "2026-10-21",
    "locations": [
     {
-     "id": 6,
-     "code": "DEMO-HFA",
+     "id": "demo-hfa",
      "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     },
     {
-     "id": 5,
-     "code": "DEMO-TLV",
+     "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
      "isDemo": true
     }
    ],
    "shifts": [
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -2144,7 +2154,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 5,
+     "locationId": "demo-tlv",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -2159,7 +2169,7 @@
      "end": "23:30:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "morning",
      "name": "בוקר",
      "days": [
@@ -2174,7 +2184,7 @@
      "end": "16:00:00"
     },
     {
-     "locationId": 6,
+     "locationId": "demo-hfa",
      "code": "evening",
      "name": "ערב",
      "days": [
@@ -2224,7 +2234,7 @@
    "calculations": [
     {
      "name": "sales_summary",
-     "params": "{ locationIds?: number[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
      "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
     },
     {

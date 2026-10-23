@@ -6,9 +6,10 @@
 //   joya_order_list_lines            the working list the manager edits
 //   joya_order_edits                 every change (who, when, before/after, UI or chat)
 //   joya_order_lists.final_json      frozen at approval;  ordered_json  when marked ordered
-import { q, one, tx, err, audit, parseJson, ymd, getSettings, todayLocal } from '../db.js';
+import { q, one, tx, err, audit, parseJson, ymd, inList, getSettings, todayLocal } from '../db.js';
 import { assertLocation } from '../access.js';
 import { recommend, convert, addDays, daysBetween, RECOMMENDER_VERSION } from '../lib/recommend.js';
+import * as source from './source.js';
 import { dishSales } from './source.js';
 
 // ---------------------------------------------------------------- inputs for the recommender
@@ -145,13 +146,13 @@ export async function generate(access, locationId, date, { force = false, create
   }
   const inputs = await buildInputs(locationId, asOf);
   const result = recommend(inputs);
-  const loc = await one(`SELECT is_demo FROM joya_locations WHERE id=:l`, { l: locationId });
+  const demo = await source.isDemoLocation(locationId);
   const listId = await tx(async (c) => {
     const id = (
       await c.q(
         `INSERT INTO joya_order_lists (location_id, list_date, origin, status, recommender_version, params_json, is_demo, created_by)
          VALUES (:l, :d, 'RECOMMENDATION', 'DRAFT', :v, :p, :demo, :by)`,
-        { l: locationId, d: asOf, v: RECOMMENDER_VERSION, p: JSON.stringify({ settings: result.settings, examplesUsed: result.examplesUsed }), demo: loc?.is_demo ? 1 : 0, by: createdBy || access.username },
+        { l: locationId, d: asOf, v: RECOMMENDER_VERSION, p: JSON.stringify({ settings: result.settings, examplesUsed: result.examplesUsed }), demo: demo ? 1 : 0, by: createdBy || access.username },
       )
     ).insertId;
     for (const l of result.lines) {
@@ -189,17 +190,20 @@ export async function createManual(access, locationId, date) {
 export async function listLists(access, { locationIds, status, limit = 60 }) {
   if (!locationIds.length) return [];
   const st = status ? String(status).split(',').filter((s) => ['DRAFT', 'APPROVED', 'ORDERED', 'REJECTED'].includes(s)) : null;
+  const locs = inList('loc', locationIds);
+  const names = await source.locationNames();
   const rows = await q(
-    `SELECT l.*, loc.name AS location_name,
+    `SELECT l.*,
             (SELECT COUNT(*) FROM joya_order_list_lines x WHERE x.list_id = l.id AND x.removed = 0) AS line_count
-       FROM joya_order_lists l JOIN joya_locations loc ON loc.id = l.location_id
-      WHERE l.location_id IN (${locationIds.map(Number).join(',')}) ${st?.length ? `AND l.status IN (${st.map((s) => `'${s}'`).join(',')})` : ''}
+       FROM joya_order_lists l
+      WHERE l.location_id IN (${locs.sql}) ${st?.length ? `AND l.status IN (${st.map((s) => `'${s}'`).join(',')})` : ''}
       ORDER BY l.list_date DESC, l.id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 60, 1), 300)}`,
+    locs.params,
   );
   return rows.map((r) => ({
     id: r.id,
     locationId: r.location_id,
-    locationName: r.location_name,
+    locationName: names.get(r.location_id) ?? null,
     date: ymd(r.list_date),
     origin: r.origin,
     status: r.status,
@@ -214,7 +218,7 @@ export async function listLists(access, { locationIds, status, limit = 60 }) {
 }
 
 export async function getList(access, id) {
-  const l = await one(`SELECT l.*, loc.name AS location_name FROM joya_order_lists l JOIN joya_locations loc ON loc.id = l.location_id WHERE l.id=:id`, { id });
+  const l = await one(`SELECT l.* FROM joya_order_lists l WHERE l.id=:id`, { id });
   if (!l) throw err('NOT_FOUND', 'list not found');
   assertLocation(access, l.location_id);
   const lines = await q(
@@ -231,7 +235,7 @@ export async function getList(access, id) {
     list: {
       id: l.id,
       locationId: l.location_id,
-      locationName: l.location_name,
+      locationName: (await source.locationNames()).get(l.location_id) ?? null,
       date: ymd(l.list_date),
       origin: l.origin,
       status: l.status,
@@ -497,12 +501,14 @@ export async function reportShortage(access, { locationId, ingredientId = null, 
 
 export async function listShortages(access, { locationIds, days = 30 }) {
   if (!locationIds.length) return [];
+  const locs = inList('loc', locationIds);
+  const names = await source.locationNames();
   const rows = await q(
-    `SELECT s.*, i.name AS ing_name, l.name AS location_name FROM joya_shortages s LEFT JOIN joya_ingredients i ON i.id = s.ingredient_id JOIN joya_locations l ON l.id = s.location_id
-      WHERE s.location_id IN (${locationIds.map(Number).join(',')}) AND s.reported_date >= :a ORDER BY s.reported_date DESC, s.id DESC`,
-    { a: addDays(todayLocal(), -Math.min(Math.max(parseInt(days, 10) || 30, 1), 365)) },
+    `SELECT s.*, i.name AS ing_name FROM joya_shortages s LEFT JOIN joya_ingredients i ON i.id = s.ingredient_id
+      WHERE s.location_id IN (${locs.sql}) AND s.reported_date >= :a ORDER BY s.reported_date DESC, s.id DESC`,
+    { ...locs.params, a: addDays(todayLocal(), -Math.min(Math.max(parseInt(days, 10) || 30, 1), 365)) },
   );
-  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: r.location_name, ingredientId: r.ingredient_id, name: r.ing_name || r.item_text, unmatched: !r.ingredient_id, date: ymd(r.reported_date), note: r.note, by: r.reported_by, isDemo: !!r.is_demo }));
+  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: names.get(r.location_id) ?? null, ingredientId: r.ingredient_id, name: r.ing_name || r.item_text, unmatched: !r.ingredient_id, date: ymd(r.reported_date), note: r.note, by: r.reported_by, isDemo: !!r.is_demo }));
 }
 
 export async function deleteShortage(access, id) {

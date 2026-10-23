@@ -7,7 +7,7 @@
 --
 -- Source data is NOT stored here. Sales, dish sales, employees, clock times, payroll and labor cost
 -- are read from the Allegro admin Local Data API on demand (src/services/source.js). Joya keeps only
--- its own records, linked to Allegro ids: a location is a link row (allegro_branch_id), an employee id
+-- its own records, linked to Allegro ids: a location id is the Allegro branch id, an employee id
 -- is Allegro's employeeId, an attendance id is Allegro's raw shift id.
 --
 -- Five kinds of data are kept apart on purpose:
@@ -22,17 +22,8 @@
 -- smoke test). The UI labels them everywhere.
 -- Missing values are NULL, never 0: a NULL quantity or diner count means "not known".
 
-CREATE TABLE IF NOT EXISTS joya_locations (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  code VARCHAR(40) NOT NULL,                      -- stable id used in imports (never the name)
-  name VARCHAR(120) NOT NULL,                     -- follows the Allegro branch name
-  allegro_branch_id VARCHAR(64) NULL,             -- the Allegro/Beecomm branch id; NULL = not linked (hidden)
-  active TINYINT(1) NOT NULL DEFAULT 1,
-  is_demo TINYINT(1) NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_code (code),
-  UNIQUE KEY uq_branch (allegro_branch_id)
-);
+-- Locations are NOT stored here: a location id (every `location_id` below, VARCHAR(64)) IS the Allegro
+-- branch id. Name, company and the list of branches come from the Allegro API /branches.
 
 -- Users and their rights are NOT stored here: they are the Allegro admin users (repo-root users.json).
 
@@ -42,7 +33,7 @@ CREATE TABLE IF NOT EXISTS joya_audit_log (
   action VARCHAR(60) NOT NULL,                    -- e.g. ORDER_LIST_APPROVED, STAFFING_RULE_UPDATED
   entity VARCHAR(40) NOT NULL,
   entity_id BIGINT NULL,
-  location_id INT NULL,
+  location_id VARCHAR(64) NULL,
   detail_json JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_entity (entity, entity_id),
@@ -63,7 +54,7 @@ CREATE TABLE IF NOT EXISTS joya_import_batches (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   source ENUM('BIKUM_POS','TABIT','PAYROLL','MANUAL','DEMO') NOT NULL,
   kind VARCHAR(30) NOT NULL,                      -- SALES_ITEMS, SALES_CHECKS, MENU, RECIPES, EMPLOYEES, ATTENDANCE, PAYROLL, ORDER_HISTORY
-  location_id INT NULL,
+  location_id VARCHAR(64) NULL,
   file_name VARCHAR(255) NULL,
   mapping_json JSON NULL,                         -- { targetField: 'source column' }
   row_count INT NOT NULL DEFAULT 0,
@@ -92,7 +83,7 @@ CREATE TABLE IF NOT EXISTS joya_import_mappings (
 
 CREATE TABLE IF NOT EXISTS joya_menu_items (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   external_code VARCHAR(80) NOT NULL,             -- the POS item code (Bikum); sales match on this, not the name
   name VARCHAR(200) NOT NULL,
   category VARCHAR(100) NULL,
@@ -136,7 +127,7 @@ CREATE TABLE IF NOT EXISTS joya_recipe_lines (
 CREATE TABLE IF NOT EXISTS joya_attendance_corrections (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   attendance_id BIGINT NOT NULL,
-  location_id INT NULL,
+  location_id VARCHAR(64) NULL,
   business_date DATE NULL,
   raw_clock_in DATETIME NULL,
   raw_clock_out DATETIME NULL,
@@ -154,7 +145,7 @@ CREATE TABLE IF NOT EXISTS joya_payroll_issues (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   fingerprint VARCHAR(160) NOT NULL,              -- kind + rows, so a re-run never duplicates an issue
   period CHAR(7) NOT NULL,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   employee_id BIGINT NULL,                        -- Allegro employeeId
   external_employee_id VARCHAR(80) NULL,          -- employeeId as text, or 'name:<Tabit name>' when unmatched
   kind ENUM('MISSING_CLOCK_OUT','MISSING_CLOCK_IN','DUPLICATE','OVERLAP','UNMATCHED_EMPLOYEE','HOURS_MISMATCH','NO_ATTENDANCE','LONG_SHIFT') NOT NULL,
@@ -172,7 +163,7 @@ CREATE TABLE IF NOT EXISTS joya_payroll_issues (
 
 CREATE TABLE IF NOT EXISTS joya_shortages (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   ingredient_id BIGINT NULL,                      -- NULL when typed as free text
   item_text VARCHAR(200) NULL,
   reported_date DATE NOT NULL,
@@ -188,7 +179,7 @@ CREATE TABLE IF NOT EXISTS joya_shortages (
 --   ORDERED  manager says the order was actually placed (ordered_json); REJECTED  thrown away.
 CREATE TABLE IF NOT EXISTS joya_order_lists (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   list_date DATE NOT NULL,
   origin ENUM('RECOMMENDATION','MANUAL','HISTORICAL_IMPORT') NOT NULL,
   status ENUM('DRAFT','APPROVED','ORDERED','REJECTED') NOT NULL DEFAULT 'DRAFT',
@@ -258,7 +249,7 @@ CREATE TABLE IF NOT EXISTS joya_order_edits (
 -- What the system has learned per location and item, recomputed after every approved or
 -- ordered list. A cache with its reasons: the recommendation explains itself from it.
 CREATE TABLE IF NOT EXISTS joya_item_patterns (
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   ingredient_id BIGINT NOT NULL,
   stats_json JSON NOT NULL,
   examples INT NOT NULL,
@@ -288,7 +279,7 @@ CREATE TABLE IF NOT EXISTS joya_role_aliases (
 -- A shift of a location: which days it runs and its hours (local time).
 CREATE TABLE IF NOT EXISTS joya_shift_defs (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   code VARCHAR(40) NOT NULL,                      -- morning, evening, …
   name VARCHAR(80) NOT NULL,
   days_json JSON NOT NULL,                        -- [0..6], 0 = Sunday
@@ -308,7 +299,7 @@ CREATE TABLE IF NOT EXISTS joya_shift_defs (
 --   PEAK_EXTRA params.count more staff from params.start to params.end when the peak demand > params.above
 CREATE TABLE IF NOT EXISTS joya_staffing_rules (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NULL,                           -- NULL = all locations
+  location_id VARCHAR(64) NULL,                           -- NULL = all locations
   shift_code VARCHAR(40) NULL,                    -- NULL = all shifts
   days_json JSON NULL,                            -- NULL = all days
   role_code VARCHAR(40) NOT NULL,
@@ -328,7 +319,7 @@ CREATE TABLE IF NOT EXISTS joya_staffing_rules (
 -- Existing staffing examples (what the restaurant really staffed before this system): a baseline.
 CREATE TABLE IF NOT EXISTS joya_staffing_baseline (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   shift_code VARCHAR(40) NOT NULL,
   weekday TINYINT NOT NULL,                       -- 0 = Sunday
   role_code VARCHAR(40) NOT NULL,
@@ -340,7 +331,7 @@ CREATE TABLE IF NOT EXISTS joya_staffing_baseline (
 
 CREATE TABLE IF NOT EXISTS joya_staffing_plans (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NOT NULL,
+  location_id VARCHAR(64) NOT NULL,
   week_start DATE NOT NULL,                       -- a Sunday
   status ENUM('DRAFT','APPROVED','REJECTED') NOT NULL DEFAULT 'DRAFT',
   forecast_json JSON NULL,                        -- the demand forecast per day and shift, with its history
@@ -410,7 +401,7 @@ CREATE TABLE IF NOT EXISTS joya_staffing_edits (
 
 CREATE TABLE IF NOT EXISTS joya_tasks (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  location_id INT NULL,                           -- NULL = chain level
+  location_id VARCHAR(64) NULL,                           -- NULL = chain level
   title VARCHAR(300) NOT NULL,
   description TEXT NULL,
   owner_username VARCHAR(255) NULL,
@@ -431,7 +422,7 @@ CREATE TABLE IF NOT EXISTS joya_inquiries (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   source ENUM('INSTAGRAM','GOOGLE','OTHER') NOT NULL,
   kind ENUM('REVIEW','MESSAGE','COMMENT') NOT NULL,
-  location_id INT NULL,
+  location_id VARCHAR(64) NULL,
   author_name VARCHAR(200) NULL,
   content TEXT NOT NULL,
   rating TINYINT NULL,
@@ -458,7 +449,7 @@ CREATE TABLE IF NOT EXISTS joya_inquiries (
 CREATE TABLE IF NOT EXISTS joya_ai_requests (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(255) NOT NULL,
-  location_id INT NULL,
+  location_id VARCHAR(64) NULL,
   context_kind ENUM('GENERAL','ORDER_LIST','STAFFING_PLAN','INQUIRY','AREA') NOT NULL DEFAULT 'GENERAL',
   context_id BIGINT NULL,                         -- AREA: 1 stock and purchasing, 2 manpower, 3 performance
   question TEXT NOT NULL,

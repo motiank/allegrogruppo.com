@@ -110,7 +110,7 @@ function Shell() {
               ))}
             </select>
           )}
-          <select className={c.loc} value={j.locationId ?? ''} onChange={(e) => j.setLocationId(e.target.value ? Number(e.target.value) : null)} aria-label={t('joya.location')}>
+          <select className={c.loc} value={j.locationId ?? ''} onChange={(e) => j.setLocationId(e.target.value || null)} aria-label={t('joya.location')}>
             {me.isAdmin && <option value="">{j.companyKey != null && j.companies.length > 1 ? t('joya.allCompanyLocations') : t('joya.allLocations')}</option>}
             {j.inCompany.map((l) => (
               <option key={l.id} value={l.id}>

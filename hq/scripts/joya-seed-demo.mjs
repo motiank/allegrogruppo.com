@@ -22,8 +22,9 @@ const rnd = seeded(20261012);
 const today = todayOf();
 
 async function remove() {
-  const locs = (await q(`SELECT id FROM joya_locations WHERE is_demo=1`)).map((r) => r.id);
-  const L = locs.length ? locs.join(',') : 'NULL';
+  // the demo locations are the fake API's branches (a location id is the Allegro branch id)
+  const locs = BRANCHES.map((b) => b.id);
+  const L = locs.map((id) => `'${id}'`).join(',');
   const del = [
     `DELETE FROM joya_attendance_corrections WHERE location_id IN (${L})`,
     `DELETE FROM joya_payroll_issues WHERE location_id IN (${L})`,
@@ -48,7 +49,6 @@ async function remove() {
     `DELETE FROM joya_import_batches WHERE is_demo=1 OR location_id IN (${L})`,
     `DELETE r FROM joya_recipe_lines r JOIN joya_ingredients i ON i.id = r.ingredient_id WHERE i.is_demo=1`,
     `DELETE FROM joya_ingredients WHERE is_demo=1`,
-    `DELETE FROM joya_locations WHERE is_demo=1`,
   ];
   for (const s of del) await q(s);
   console.log(`removed demo data (${locs.length} demo locations)`);
@@ -62,9 +62,9 @@ async function create() {
   const made = [];
   const demoLocs = [];
   for (const L of BRANCHES) {
-    const loc = (await q(`INSERT INTO joya_locations (code, name, allegro_branch_id, is_demo) VALUES (:c, :n, :b, 1)`, { c: L.code, n: L.name, b: L.id })).insertId;
+    const loc = L.id;
     demoLocs.push(loc);
-    made.push(`${L.code} (id ${loc}, branch ${L.id})`);
+    made.push(`${L.code} (location ${loc})`);
     await q(`INSERT INTO joya_shift_defs (location_id, code, name, days_json, start_time, end_time) VALUES (:l, 'morning', 'בוקר', '[0,1,2,3,4,5]', '07:30:00', '16:00:00')`, { l: loc });
     await q(`INSERT INTO joya_shift_defs (location_id, code, name, days_json, start_time, end_time) VALUES (:l, 'evening', 'ערב', '[0,1,2,3,4,6]', '16:00:00', '23:30:00')`, { l: loc });
 

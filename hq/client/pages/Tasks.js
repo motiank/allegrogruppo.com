@@ -118,7 +118,7 @@ export default function Tasks() {
             <TextArea value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} />
           </Field>
           <Field label={t('joya.location')}>
-            <Select value={edit.locationId ?? ''} onChange={(e) => setEdit({ ...edit, locationId: e.target.value ? Number(e.target.value) : null })}>
+            <Select value={edit.locationId ?? ''} onChange={(e) => setEdit({ ...edit, locationId: e.target.value || null })}>
               {j.me?.isAdmin ? <option value="">{t('joya.tasks.chain')}</option> : <option value="">—</option>}
               {j.locations.map((l) => (
                 <option key={l.id} value={l.id}>{l.name}</option>

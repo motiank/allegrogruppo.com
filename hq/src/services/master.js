@@ -1,6 +1,6 @@
 // Master data: locations, users, settings, roles, shifts, menu, ingredients, recipes, employees.
-// Locations and employees come from Allegro (./source.js); Joya keeps the link rows, which
-// locations are active here, and how Allegro role names map to Joya roles.
+// Locations and employees come from Allegro (./source.js); a location id IS the Allegro branch id.
+// Joya keeps how Allegro role names map to Joya roles.
 import { q, one, err, audit, parseJson, inList, clearSettingsCache, hms, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import { assertLocation, accessFor } from '../access.js';
@@ -10,44 +10,22 @@ import * as source from './source.js';
 
 // ---------------------------------------------------------------- locations
 
-/** The Allegro branches this user may see, as Joya locations (link rows are made on first sight). */
+/** The Allegro branches this user may see, as Joya locations (read from Allegro, nothing stored). */
 export async function listLocations(access) {
-  const rows = await q(`SELECT * FROM joya_locations WHERE allegro_branch_id IS NOT NULL ORDER BY active DESC, name`);
-  const companies = await source.branchCompanies();
-  return rows.filter((r) => access.isAdmin || access.locationIds.includes(r.id)).map((r) => shapeLocation(r, companies));
-}
-// company: the Allegro company the branch belongs to (null when Allegro cannot be reached).
-// The demo restaurants are not real Allegro branches, so they always sit in the demo company
-// (the same one scripts/demo-defs.mjs gives the fake API).
-export const DEMO_COMPANY = { key: 'demo', label: 'חברת דמו' };
-const shapeLocation = (r, companies) => ({
-  id: r.id,
-  code: r.code,
-  name: r.name,
-  branchId: r.allegro_branch_id,
-  active: !!r.active,
-  isDemo: !!r.is_demo,
-  company: r.is_demo ? DEMO_COMPANY : (companies?.get(r.allegro_branch_id) ?? null),
-});
-
-/** Names and branches come from Allegro; here the admin only says whether Joya works with a location. */
-export async function upsertLocation(access, { id, active = true }) {
-  const prev = id ? await one(`SELECT * FROM joya_locations WHERE id=:id AND allegro_branch_id IS NOT NULL`, { id }) : null;
-  if (!prev) throw err('BAD_REQUEST', 'locations come from the Allegro branches; only an existing location can be switched on or off');
-  await q(`UPDATE joya_locations SET active=:a WHERE id=:id`, { id, a: active ? 1 : 0 });
-  await audit(access.username, 'LOCATION_SAVED', 'location', id, id, { active });
-  return shapeLocation(await one(`SELECT * FROM joya_locations WHERE id=:id`, { id }), await source.branchCompanies());
+  return (await source.locations())
+    .filter((l) => access.locationIds.includes(l.id))
+    .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name));
 }
 
 // ---------------------------------------------------------------- users
 
 /** Every Allegro admin user with their Joya access (from the Allegro role; read-only here — users are managed in the admin). */
 export async function listUsers() {
-  const linked = await q(`SELECT id, allegro_branch_id FROM joya_locations WHERE allegro_branch_id IS NOT NULL`);
+  const known = (await source.locations()).map((l) => l.id);
   return loadUsers()
     .filter((u) => u.email)
     .map((u) => {
-      const a = u.status === 'active' ? accessFor({ username: u.email, role: u.role, restaurants: Array.isArray(u.restaurants) ? u.restaurants : [] }, linked) : null;
+      const a = u.status === 'active' ? accessFor({ username: u.email, role: u.role, restaurants: Array.isArray(u.restaurants) ? u.restaurants : [] }, known) : null;
       return { username: u.email, allegroRole: u.role, allegroActive: u.status === 'active', role: a?.role ?? null, locationIds: a && !a.isAdmin ? a.locationIds : [], payroll: !!a?.payroll };
     })
     .sort((a, b) => (a.role || 'Z').localeCompare(b.role || 'Z') || a.username.localeCompare(b.username));
@@ -136,7 +114,7 @@ export async function saveMenuItem(access, { id, locationId, code, name, categor
   if (!code || !name) throw err('BAD_REQUEST', 'code and name are required');
   if (id) {
     const prev = await one(`SELECT location_id FROM joya_menu_items WHERE id=:id`, { id });
-    if (!prev || prev.location_id !== Number(locationId)) throw err('NOT_FOUND', 'menu item not found');
+    if (!prev || prev.location_id !== String(locationId)) throw err('NOT_FOUND', 'menu item not found');
     await q(`UPDATE joya_menu_items SET external_code=:code, name=:name, category=:cat, active=:a WHERE id=:id`, { id, code, name, cat: category, a: active ? 1 : 0 });
   } else {
     id = (

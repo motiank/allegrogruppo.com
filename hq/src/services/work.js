@@ -3,6 +3,13 @@ import { q, one, err, audit, ymd, inList, todayLocal } from '../db.js';
 import { assertLocation } from '../access.js';
 import { addDays } from '../lib/recommend.js';
 import { salesSummary } from './analytics.js';
+import { locationNames } from './source.js';
+
+/** rows of Joya records → the same rows with location_name, from Allegro (the location id is a branch id) */
+async function withNames(rows) {
+  const names = await locationNames();
+  return rows.map((r) => ({ ...r, location_name: r.location_id == null ? null : names.get(r.location_id) ?? null }));
+}
 
 // ---------------------------------------------------------------- tasks
 
@@ -40,11 +47,11 @@ export async function listTasks(access, { locationIds, status, owner, overdue })
     params.today = todayLocal();
   }
   const rows = await q(
-    `SELECT t.*, loc.name AS location_name FROM joya_tasks t LEFT JOIN joya_locations loc ON loc.id = t.location_id WHERE ${where.join(' AND ')}
+    `SELECT t.* FROM joya_tasks t WHERE ${where.join(' AND ')}
       ORDER BY FIELD(t.status,'OPEN','IN_PROGRESS','DONE','CANCELLED'), t.due_date IS NULL, t.due_date, t.id DESC LIMIT 300`,
     params,
   );
-  return rows.map(shapeTask);
+  return (await withNames(rows)).map(shapeTask);
 }
 
 export async function saveTask(access, { id, locationId = null, title, description = null, owner = null, dueDate = null, status = 'OPEN', sourceKind = 'MANUAL', sourceRef = null }) {
@@ -64,7 +71,7 @@ export async function saveTask(access, { id, locationId = null, title, descripti
     id = (await q(`INSERT INTO joya_tasks (location_id, title, description, owner_username, due_date, status, source_kind, source_ref, created_by) VALUES (:l, :t, :d, :o, :due, :s, :sk, :sr, :by)`, p)).insertId;
   }
   await audit(access.username, 'TASK_SAVED', 'task', id, locationId, { title, owner, dueDate, status, sourceKind, sourceRef });
-  return shapeTask(await one(`SELECT t.*, loc.name AS location_name FROM joya_tasks t LEFT JOIN joya_locations loc ON loc.id = t.location_id WHERE t.id=:id`, { id }));
+  return shapeTask((await withNames([await one(`SELECT t.* FROM joya_tasks t WHERE t.id=:id`, { id })]))[0]);
 }
 
 // ---------------------------------------------------------------- inquiries and reviews
@@ -98,20 +105,20 @@ export async function listInquiries(access, { locationIds, status }) {
   const l = inList('l', locationIds);
   const st = status ? String(status).split(',').filter((s) => ['NEW', 'IN_PROGRESS', 'DRAFT_READY', 'RESPONDED', 'CLOSED'].includes(s)) : null;
   const rows = await q(
-    `SELECT i.*, loc.name AS location_name FROM joya_inquiries i LEFT JOIN joya_locations loc ON loc.id = i.location_id
+    `SELECT i.* FROM joya_inquiries i
       WHERE (i.location_id IN (${l.sql})${access.isAdmin ? ' OR i.location_id IS NULL' : ''}) ${st?.length ? `AND i.status IN (${st.map((s) => `'${s}'`).join(',')})` : ''}
       ORDER BY FIELD(i.status,'NEW','IN_PROGRESS','DRAFT_READY','RESPONDED','CLOSED'), COALESCE(i.received_at, i.created_at) DESC LIMIT 300`,
     l.params,
   );
-  return rows.map(shapeInquiry);
+  return (await withNames(rows)).map(shapeInquiry);
 }
 
 export async function getInquiry(access, id) {
-  const r = await one(`SELECT i.*, loc.name AS location_name FROM joya_inquiries i LEFT JOIN joya_locations loc ON loc.id = i.location_id WHERE i.id=:id`, { id });
+  const r = await one(`SELECT i.* FROM joya_inquiries i WHERE i.id=:id`, { id });
   if (!r) throw err('NOT_FOUND', 'not found');
   if (r.location_id != null) assertLocation(access, r.location_id);
   else if (!access.isAdmin) throw err('FORBIDDEN', 'chain-level item');
-  return shapeInquiry(r);
+  return shapeInquiry((await withNames([r]))[0]);
 }
 
 export async function saveInquiry(access, input) {
@@ -164,33 +171,36 @@ export async function inquiryAction(access, id, { action, draft, owner, note }) 
 /** What waits for a decision, per location. */
 export async function pending(access, locationIds) {
   if (!locationIds.length) return [];
-  const ids = locationIds.map(Number).join(',');
   const today = todayLocal();
-  const rows = await q(
-    `SELECT l.id AS location_id, l.name,
-       (SELECT COUNT(*) FROM joya_order_lists o WHERE o.location_id=l.id AND o.status='DRAFT') AS draft_lists,
-       (SELECT COUNT(*) FROM joya_order_lists o WHERE o.location_id=l.id AND o.status='APPROVED') AS approved_not_ordered,
-       (SELECT COUNT(*) FROM joya_staffing_plans p WHERE p.location_id=l.id AND p.status='DRAFT') AS draft_plans,
-       (SELECT COUNT(*) FROM joya_payroll_issues i WHERE i.location_id=l.id AND i.status='OPEN') AS open_payroll_issues,
-       (SELECT COUNT(*) FROM joya_inquiries q WHERE q.location_id=l.id AND q.status IN ('NEW','IN_PROGRESS','DRAFT_READY')) AS open_inquiries,
-       (SELECT COUNT(*) FROM joya_tasks t WHERE t.location_id=l.id AND t.status IN ('OPEN','IN_PROGRESS') AND t.due_date < :today) AS overdue_tasks,
-       (SELECT COUNT(*) FROM joya_tasks t WHERE t.location_id=l.id AND t.status IN ('OPEN','IN_PROGRESS')) AS open_tasks,
-       (SELECT COUNT(*) FROM joya_shortages s WHERE s.location_id=l.id AND s.reported_date >= :week) AS shortages_7d
-     FROM joya_locations l WHERE l.id IN (${ids}) ORDER BY l.name`,
-    { today, week: addDays(today, -7) },
-  );
-  return rows.map((r) => ({
-    locationId: r.location_id,
-    name: r.name,
-    draftLists: Number(r.draft_lists),
-    approvedNotOrdered: Number(r.approved_not_ordered),
-    draftPlans: Number(r.draft_plans),
-    openPayrollIssues: Number(r.open_payroll_issues),
-    openInquiries: Number(r.open_inquiries),
-    overdueTasks: Number(r.overdue_tasks),
-    openTasks: Number(r.open_tasks),
-    shortages7d: Number(r.shortages_7d),
-  }));
+  const names = await locationNames();
+  const out = [];
+  for (const loc of locationIds) {
+    const r = await one(
+      `SELECT
+         (SELECT COUNT(*) FROM joya_order_lists o WHERE o.location_id=:l AND o.status='DRAFT') AS draft_lists,
+         (SELECT COUNT(*) FROM joya_order_lists o WHERE o.location_id=:l AND o.status='APPROVED') AS approved_not_ordered,
+         (SELECT COUNT(*) FROM joya_staffing_plans p WHERE p.location_id=:l AND p.status='DRAFT') AS draft_plans,
+         (SELECT COUNT(*) FROM joya_payroll_issues i WHERE i.location_id=:l AND i.status='OPEN') AS open_payroll_issues,
+         (SELECT COUNT(*) FROM joya_inquiries q WHERE q.location_id=:l AND q.status IN ('NEW','IN_PROGRESS','DRAFT_READY')) AS open_inquiries,
+         (SELECT COUNT(*) FROM joya_tasks t WHERE t.location_id=:l AND t.status IN ('OPEN','IN_PROGRESS') AND t.due_date < :today) AS overdue_tasks,
+         (SELECT COUNT(*) FROM joya_tasks t WHERE t.location_id=:l AND t.status IN ('OPEN','IN_PROGRESS')) AS open_tasks,
+         (SELECT COUNT(*) FROM joya_shortages s WHERE s.location_id=:l AND s.reported_date >= :week) AS shortages_7d`,
+      { l: loc, today, week: addDays(today, -7) },
+    );
+    out.push({
+      locationId: loc,
+      name: names.get(loc) ?? loc,
+      draftLists: Number(r.draft_lists),
+      approvedNotOrdered: Number(r.approved_not_ordered),
+      draftPlans: Number(r.draft_plans),
+      openPayrollIssues: Number(r.open_payroll_issues),
+      openInquiries: Number(r.open_inquiries),
+      overdueTasks: Number(r.overdue_tasks),
+      openTasks: Number(r.open_tasks),
+      shortages7d: Number(r.shortages_7d),
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function overview(access, locationIds, { days = 7 } = {}) {
