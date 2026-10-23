@@ -10,7 +10,7 @@
  * user's Apply in the app.
  *
  * Env (names only):
- *   JOYA_HQ_URL        joya-hq API base (http://localhost:4300/api)
+ *   JOYA_HQ_URL        joya-hq API base (default http://<JOYA_HQ_HOST>:<JOYA_HQ_PORT>/api = http://127.0.0.1:4300/api)
  *   JOYA_API_KEY       machine key (X-Joya-Key); with none, joya-hq accepts loopback only
  *   JOYA_MODEL         sonnet
  *   JOYA_POLL_MS       3000
@@ -27,7 +27,8 @@ import { handle } from './runner.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const env = process.env;
 const cfg = {
-  hubUrl: (env.JOYA_HQ_URL ?? 'http://localhost:4300/api').replace(/\/$/, ''),
+  // The same host and port joya-hq listens on (server.js): 'localhost' may resolve to ::1, where it does not listen.
+  hubUrl: (env.JOYA_HQ_URL ?? `http://${env.JOYA_HQ_HOST || '127.0.0.1'}:${env.JOYA_HQ_PORT || env.PORT || 4300}/api`).replace(/\/$/, ''),
   apiKey: env.JOYA_API_KEY || null,
   model: env.JOYA_MODEL ?? 'sonnet',
   pollMs: Number(env.JOYA_POLL_MS ?? 3000),
