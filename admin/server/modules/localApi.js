@@ -24,6 +24,8 @@ const MAX_BEECOMM_DAYS = 93;
 const MAX_STORED_DAYS = 800;
 // /beecomm/items?byDay=1 makes one Beecomm call per day per restaurant.
 const MAX_ITEMS_DAYS_BY_DAY = 31;
+// /shifts/by-shift reads every clock pair in range — a bit over a year is enough to learn from.
+const MAX_BY_SHIFT_DAYS = 400;
 
 const LOOPBACK_ADDRS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -372,6 +374,81 @@ const hoursBetween = (a, b) =>
     ? round2((Date.parse(`${b.replace(" ", "T")}Z`) - Date.parse(`${a.replace(" ", "T")}Z`)) / 3600000)
     : null;
 
+// ── people per shift ─────────────────────────────────────────────────────
+
+const SHIFTS = ["morning", "evening"];
+// Work after midnight belongs to the evening of the work date, up to this hour (as in Beecomm).
+const BUSINESS_DAY_END = "06:00";
+
+const localMs = (s) => Date.parse(`${s.replace(" ", "T")}Z`);
+const localStr = (ms) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+const nextDay = (date) => localStr(localMs(`${date} 00:00:00`) + 86400000).slice(0, 10);
+
+// The two shift windows of a work date: morning [00:00, split), evening [split, next day 06:00).
+function shiftWindows(date, split) {
+  const start = localMs(`${date} 00:00:00`);
+  const cut = localMs(`${date} ${split}:00`);
+  const end = localMs(`${nextDay(date)} ${BUSINESS_DAY_END}:00`);
+  return { morning: [start, cut], evening: [cut, end] };
+}
+
+// Clock pairs (tabit_shifts rows) → one row per branch × date × shift × role: distinct people
+// with ≥ minHours inside the shift window, and the raw clock hours inside it. A person is the
+// matched employeeId, else the Tabit name without "*". Pairs without a clock-out are skipped.
+function shiftsByShift(rows, resolve, { split, minHours }) {
+  const groups = new Map();
+  let missingClockOut = 0;
+  let unmatched = 0;
+  for (const r of rows) {
+    if (!r.clock_in) continue;
+    if (!r.clock_out) {
+      missingClockOut += 1;
+      continue;
+    }
+    const who = resolve(r.rest, r.employee_name, r.clock_id);
+    if (!who.employeeId) unmatched += 1;
+    const person = who.employeeId ? `id:${who.employeeId}` : `name:${exactName(r.employee_name)}`;
+    const inMs = localMs(r.clock_in);
+    const outMs = localMs(r.clock_out);
+    const windows = shiftWindows(r.work_date, split);
+    for (const shift of SHIFTS) {
+      const [ws, we] = windows[shift];
+      const ms = Math.min(outMs, we) - Math.max(inMs, ws);
+      if (ms <= 0) continue;
+      const key = `${r.rest}|${r.work_date}|${shift}|${r.role}`;
+      if (!groups.has(key))
+        groups.set(key, {
+          branch: r.rest, date: r.work_date, shift, role: r.role,
+          start: localStr(ws), end: localStr(we), people: new Map(),
+        });
+      const g = groups.get(key);
+      g.people.set(person, (g.people.get(person) || 0) + ms / 3600000);
+    }
+  }
+  const data = [...groups.values()]
+    .map((g) => {
+      const hours = [...g.people.values()];
+      return {
+        branch: g.branch,
+        date: g.date,
+        shift: g.shift,
+        role: g.role,
+        people: hours.filter((h) => h >= minHours).length,
+        hours: round2(hours.reduce((s, h) => s + h, 0)),
+        start: g.start,
+        end: g.end,
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.branch.localeCompare(b.branch) ||
+        a.date.localeCompare(b.date) ||
+        SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift) ||
+        String(a.role).localeCompare(String(b.role)),
+    );
+  return { data, missingClockOut, unmatched };
+}
+
 // ── router ───────────────────────────────────────────────────────────────
 
 const ENDPOINTS = [
@@ -383,6 +460,7 @@ const ENDPOINTS = [
   "GET /shifts?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /shifts/summary?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /shifts/raw?from=&to=|updatedSince=[&branch=a,b][&employeeId=]",
+  "GET /shifts/by-shift?from=&to=[&branch=a,b][&split=HH:MM][&minHours=]",
   "GET /payroll/months?branch=",
   "GET /payroll?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /payroll/labor-cost?branch=&month=YYYY-MM",
@@ -740,6 +818,33 @@ const Router = () => {
     };
   });
 
+  // People and clock hours per branch × date × shift × role, from the raw Tabit clock pairs.
+  get("/shifts/by-shift", async (req) => {
+    const branchIds = await optionalBranches(req);
+    if (!req.query.to) throw badRequest("to must be YYYY-MM-DD");
+    const { from, to } = requireDateRange(req, MAX_BY_SHIFT_DAYS);
+    const split = String(req.query.split || "17:00").trim();
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(split)) throw badRequest("split must be HH:MM");
+    const minHours = req.query.minHours == null || req.query.minHours === "" ? 1 : Number(req.query.minHours);
+    if (!Number.isFinite(minHours) || minHours < 0)
+      throw badRequest("minHours must be a number ≥ 0");
+    const asOf = new Date().toISOString();
+    const params = { from, to };
+    const [rows] = await executeSql(
+      `SELECT rest, employee_name, clock_id, ${dayCol("work_date", "work_date")}, role,
+              ${localCol("clock_in", "clock_in")}, ${localCol("clock_out", "clock_out")}
+         FROM tabit_shifts
+        WHERE work_date BETWEEN :from AND :to ${inBranches("rest", branchIds, params)}`,
+      params,
+    );
+    const resolve = await employeeResolver(branchIds);
+    const { data, missingClockOut, unmatched } = shiftsByShift(rows, resolve, { split, minHours });
+    return {
+      data,
+      meta: { branches: branchesMeta(branchIds), from, to, split, minHours, asOf, missingClockOut, unmatched },
+    };
+  });
+
   // ── payroll / salaries ──
 
   get("/payroll/months", async (req) => {
@@ -1092,4 +1197,4 @@ const Router = () => {
   return router;
 };
 
-export { Router, employeeResolver };
+export { Router, employeeResolver, shiftsByShift };

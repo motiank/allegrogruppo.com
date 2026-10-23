@@ -119,6 +119,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /shifts?month=\|updatedSince=[&branch=][&employeeId=]` | Daily shifts after payroll rules: one row per employee/day/role | `payroll` |
 | `GET /shifts/summary?month=\|updatedSince=[&branch=][&employeeId=]` | Monthly hours/tips per employee and role | `payroll` |
 | `GET /shifts/raw?from=&to=\|updatedSince=[&branch=][&employeeId=]` | Raw clock-in/out times from Tabit | `tabit_shifts` ¹ |
+| `GET /shifts/by-shift?from=&to=[&branch=][&split=][&minHours=]` | People and clock hours per branch/date/shift/role | `tabit_shifts` ¹ |
 | `GET /payroll/months?branch=` | Months that have saved payroll | `payroll` |
 | `GET /payroll?month=\|updatedSince=[&branch=][&employeeId=]` | Saved payroll + payslip components (tlush) | `payroll` |
 | `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. labor cost | `bcom_cash` |
@@ -257,7 +258,7 @@ The same shape for one employee, or `404` if not found. Works for any branch, ac
 There are two kinds of shift data:
 
 - **`/shifts` and `/shifts/summary`: hours after the payroll rules.** Tabit hours as processed on the admin **Shifts → Create payroll** screen (breaks, overtime buckets, tips), stored per employee per month in `payroll.payroll_data` when the month is saved. There are no clock times, and **a month has nothing until its payroll is saved**.
-- **`/shifts/raw`: raw clock-in/out times**, as loaded from the Tabit detailed report on the **Upload files** page. Available as soon as the report is uploaded, before payroll.
+- **`/shifts/raw`: raw clock-in/out times**, as loaded from the Tabit detailed report on the **Upload files** page. Available as soon as the report is uploaded, before payroll. **`/shifts/by-shift`** counts the same pairs per shift.
 
 ### `GET /shifts?month=YYYY-MM|updatedSince=[&branch=id1,id2][&employeeId=]`
 
@@ -354,6 +355,45 @@ One row per clock-in/out pair from the Tabit detailed report (`tabit_shifts`), s
 Rows nobody matches safely keep `employeeId: null`, and the API never guesses between two people. Tested on Raanana: 108 people matched by clock id and all 113 employees by base name, with no wrong matches. People in the Tabit list who aren't in `employees` (mostly former staff) stay unmatched.
 
 `meta.unmatched` = rows without an `employeeId`. `meta.missingClockOut` = rows with a clock-in and no clock-out.
+
+### `GET /shifts/by-shift?from=&to=[&branch=id1,id2][&split=HH:MM][&minHours=]`
+
+How many people of each role really worked each shift, and how many clock hours, from the same Tabit clock pairs as `/shifts/raw`. One row per **branch × date × shift × role**, sorted by branch, date, shift (morning first) and role. `from` and `to` are both required and filter on the work date; up to 400 days.
+
+```json
+{
+  "branch": "5ff419934676f0fddabaef3a",
+  "date": "2026-09-04",
+  "shift": "evening",
+  "role": "מלצר",
+  "people": 6,
+  "hours": 31.5,
+  "start": "2026-09-04 17:00:00",
+  "end": "2026-09-05 06:00:00"
+}
+```
+
+Every work date has two shifts:
+- **`morning`**: from 00:00 of the work date up to `split` (default `17:00`).
+- **`evening`**: from `split` up to 06:00 of the next day. Work after midnight belongs to the evening of the work date (business-day logic, as in Beecomm).
+
+Each clock pair adds the hours that fall inside each window: with the split at 17:00, a pair from 11:00 to 21:00 gives 6 h morning and 4 h evening. Time after 06:00 of the next day isn't counted.
+
+| Field | Meaning |
+|---|---|
+| `shift` | `morning` or `evening`. |
+| `role` | The `role` of the clock rows, as in `/shifts/raw`. |
+| `people` | Distinct people of this role with at least `minHours` (default `1`) in the shift, summed over their pairs. A person is the matched `employeeId`, or the Tabit name without `*` when unmatched. |
+| `hours` | Sum of all their clock hours inside the window: raw clock time, before payroll rules, 2 decimals. Hours of people under `minHours` still count. |
+| `start`, `end` | The shift window, Israel local time. |
+
+- A date with no clock rows for a branch has **no rows**, not rows with zero. Use `/status` (`tabitShifts`) to tell "no shifts" from "not uploaded".
+- Pairs without a clock-out are left out and counted in `meta.missingClockOut`. `meta.unmatched` = pairs with no `employeeId` that were counted by name.
+- No names, phones or national ids in the output.
+
+`meta`: `{ branches, from, to, split, minHours, asOf, count, missingClockOut, unmatched }`.
+
+The calculation is `shiftsByShift` in `localApi.js`; `node scripts/test_local_api_by_shift.js` checks it (a pair crossing the split, one past midnight).
 
 ---
 
@@ -723,6 +763,7 @@ Until a table exists, its endpoints answer `503 not_loaded` and `/status` lists 
 | `MAX_BEECOMM_DAYS` | `localApi.js` | 93-day cap on live Beecomm ranges. |
 | `MAX_STORED_DAYS` | `localApi.js` | 800-day cap on stored ranges (`/shifts/raw`, `/beecomm/*/stored`). |
 | `MAX_ITEMS_DAYS_BY_DAY` | `localApi.js` | 31-day cap on `/beecomm/items?byDay=1`. |
+| `MAX_BY_SHIFT_DAYS` | `localApi.js` | 400-day cap on `/shifts/by-shift`. |
 
 - Live Beecomm calls make one request per Beecomm restaurant in range. Allow a few seconds for all branches over a month.
 - No pagination: each response is complete. The largest is `/beecomm/orders` for all branches: about 13k orders for the first 19 days of October 2026. Narrow it with `branch` where you can.
@@ -743,6 +784,10 @@ curl -s "$API/shifts/summary?branch=$R&month=2026-09" | jq '.data[] | {name, tot
 
 # Raw shifts with no clock-out, all branches, September
 curl -s "$API/shifts/raw?from=2026-09-01&to=2026-09-30" | jq '[.data[] | select(.clockIn and (.clockOut | not))]'
+
+# Waiters per evening shift in September, split at 16:00
+curl -s "$API/shifts/by-shift?branch=$R&from=2026-09-01&to=2026-09-30&split=16:00" \
+  | jq '.data[] | select(.shift == "evening" and .role == "מלצר") | {date, people, hours}'
 
 # What changed in employees since the last sync
 curl -s "$API/employees?updatedSince=2026-10-20T06:00:00Z" | jq '.meta.asOf, (.data | length)'
