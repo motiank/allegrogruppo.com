@@ -5,12 +5,14 @@
 // Shape (per employee):
 //   { payrollSoft, employeeNumber, ID_nmbr, name,
 //     components: [ { recordType?, code, label, quantity, wage } ],
-//     micRow? }            // wide Micpal row, present only for payrollSoft "mic"
+//     micRows? }           // 1-2 wide Micpal rows, present only for payrollSoft "mic"
 //
 // - Shiklulit: `components` ARE the long-format rows (one per component); the
 //   export rebuilds the rows from them 1:1 (tlushToShikRows).
 // - Micpal: `components` is a friendly breakdown for display; the export uses the
-//   stored `micRow` verbatim (tlushToMicRow) so the file round-trips exactly.
+//   stored `micRows` verbatim (tlushToMicRows, flatMapped) so the file round-trips
+//   exactly. 2 rows (same employee number — Micpal sums them) when the employee
+//   has a genuine second rate; see buildMicRows.
 
 import {
   buildShikRowsForEmployee,
@@ -89,13 +91,63 @@ const pickMicRow = (row) => {
   return out;
 };
 
+// Group a list of {rate, h100, h125, h150} entries by real rate, summed and
+// sorted by total hours descending (most hours first).
+function groupByRate(entries) {
+  const byRate = new Map();
+  for (const r of entries) {
+    const key = r.rate == null ? "null" : String(r.rate);
+    if (!byRate.has(key)) {
+      byRate.set(key, { rate: r.rate, h100: 0, h125: 0, h150: 0 });
+    }
+    const g = byRate.get(key);
+    g.h100 += Number(r.h100) || 0;
+    g.h125 += Number(r.h125) || 0;
+    g.h150 += Number(r.h150) || 0;
+  }
+  return [...byRate.values()].sort(
+    (a, b) => b.h100 + b.h125 + b.h150 - (a.h100 + a.h125 + a.h150),
+  );
+}
+
+// Split an employee's per-role hours (row.roleBreakdown) into up to 4 real,
+// unblended rate groups: NET and GROSS can never share a Micpal row (one נטו
+// flag per row), and only a role whose resolved wage type is exactly
+// "hourly_net" counts as net (hourly_min_net does not — matches
+// NET_WAGE_KINDS/componentNetGross below; everything non-wage-rate — travel,
+// bonus, meals, מפרעה — is always gross regardless). Within EACH of the
+// net/gross buckets, group by real rate and keep at most 2 (the real Micpal
+// row format only has room for 2 rate slots per row) — any further distinct
+// rate in a bucket is excluded and returned in `excludedRateGroups` for the
+// caller to report (not paid through the automated export — needs manual
+// handling). Shared by both the readable תלוש breakdown and the actual
+// Micpal row builder (buildMicRows) so the two always show/pay the exact
+// same numbers.
+function splitRoleBreakdown(roleBreakdown) {
+  const netGroups = groupByRate(roleBreakdown.filter((r) => r.isNet));
+  const grossGroups = groupByRate(roleBreakdown.filter((r) => !r.isNet));
+  const netKept = netGroups.slice(0, 2).map((g) => ({ ...g, isNet: true }));
+  const grossKept = grossGroups.slice(0, 2).map((g) => ({ ...g, isNet: false }));
+  const excludedRateGroups = [
+    ...netGroups.slice(2).map((g) => ({ ...g, isNet: true })),
+    ...grossGroups.slice(2).map((g) => ({ ...g, isNet: false })),
+  ].map((g) => ({
+    rate: g.rate,
+    h100: g.h100,
+    h125: g.h125,
+    h150: g.h150,
+    hours: g.h100 + g.h125 + g.h150,
+    isNet: g.isNet,
+  }));
+  return { netKept, grossKept, excludedRateGroups };
+}
+
 // Micpal display breakdown — each meaningful column becomes a {code,label,
 // quantity,wage} line. Mirrors the exporter's "blank cells are skipped" rule.
 const decomposeMicComponents = (row) => {
   const comps = [];
-  const isNet = NET_WAGE_KINDS.has(row.netKind);
   // Hour-based line: quantity = hours, wage = rate. Skipped when no hours.
-  const addHours = (code, label, hours, rate) => {
+  const addHours = (code, label, hours, rate, isNet) => {
     const q = num(hours);
     if (q == null || q === 0) return;
     comps.push({
@@ -107,7 +159,7 @@ const decomposeMicComponents = (row) => {
     });
   };
   // Amount line: quantity = count, wage = amount. Skipped when no amount.
-  const addAmount = (code, label, quantity, amount) => {
+  const addAmount = (code, label, quantity, amount, isNet = false) => {
     const w = num(amount);
     if (w == null || w === 0) return;
     comps.push({
@@ -118,80 +170,145 @@ const decomposeMicComponents = (row) => {
       netGross: componentNetGross(code, isNet),
     });
   };
-  // PREVIEW-ONLY rate grouping: Micpal's real xlsx (MicpImportXL.js) has
-  // exactly one hourly-rate column set per employee — row.hours100/125/150
-  // already sums every role into that one rate. Here, for the on-screen
-  // breakdown only, split by each role's OWN rate (row.roleBreakdown, already
-  // computed for the Shiklulit exporter): the group matching the row's own
-  // default rate keeps the existing "שכר יסוד שעתי" labels/codes; the single
-  // OTHER distinct rate with the most hours becomes the "extra" group ("שכר
-  // נוסף שעתי" / "שעות נ. X%", code 31 like Shiklulit's "other rate"
-  // convention). mixedRates flags when this happened, so the caller can warn
-  // that the real Micpal file won't reflect the split (it still exports the
-  // merged single-rate totals).
-  //
-  // Only 2 rate "slots" exist per employee in this payroll's reporting
-  // (base + one other) — if there are 2+ OTHER distinct rates beyond the
-  // default, only the largest-by-hours one gets a slot; the rest are excluded
-  // from pay here entirely and returned as `excludedRateGroups` so the caller
-  // can report them (e.g. for manual payment) instead of silently emitting
-  // unlimited extra-rate lines the real payroll software has no room for.
+  // Split by each role's OWN real rate AND net/gross status (row.roleBreakdown,
+  // already computed for the Shiklulit exporter and now ALSO used verbatim by
+  // the actual Micpal row builder, buildMicRows below — so this breakdown and
+  // the real export always show/pay the exact same rates, never a blended
+  // number). Within each net/gross bucket, the group with the most hours
+  // keeps the "שכר יסוד שעתי" labels/codes; the next-most becomes the "extra"
+  // group ("שכר נוסף שעתי" / "שעות נ. X%", code 31 like Shiklulit's "other
+  // rate" convention). mixedRates flags when this employee needs more than
+  // one row. A 3rd+ distinct rate within a bucket is excluded from both this
+  // breakdown and the real export, returned as `excludedRateGroups` so the
+  // caller can report it (needs manual handling).
   let mixedRates = false;
   let excludedRateGroups = [];
   if (row.isGlobal) {
-    addAmount(1, "שכר גלובאלי", 1, row.amount);
+    const isNet = NET_WAGE_KINDS.has(row.netKind);
+    addAmount(1, "שכר גלובאלי", 1, row.amount, isNet);
   } else {
     const breakdown = Array.isArray(row.roleBreakdown) ? row.roleBreakdown : [];
     if (breakdown.length > 0) {
-      const byRate = new Map();
-      for (const r of breakdown) {
-        const key = r.rate == null ? "null" : String(r.rate);
-        if (!byRate.has(key)) {
-          byRate.set(key, { rate: r.rate, h100: 0, h125: 0, h150: 0 });
-        }
-        const g = byRate.get(key);
-        g.h100 += Number(r.h100) || 0;
-        g.h125 += Number(r.h125) || 0;
-        g.h150 += Number(r.h150) || 0;
-      }
-      const defaultKey = row.hourlyWage == null ? "null" : String(row.hourlyWage);
-      const primary = byRate.get(defaultKey) || null;
-      byRate.delete(defaultKey);
-      const allOthers = [...byRate.values()].sort(
-        (a, b) => b.h100 + b.h125 + b.h150 - (a.h100 + a.h125 + a.h150),
-      );
-      const keptExtra = allOthers[0] || null;
-      excludedRateGroups = allOthers.slice(1).map((g) => ({
-        rate: g.rate,
-        h100: g.h100,
-        h125: g.h125,
-        h150: g.h150,
-        hours: g.h100 + g.h125 + g.h150,
-      }));
-      mixedRates = !!keptExtra;
+      const { netKept, grossKept, excludedRateGroups: excl } =
+        splitRoleBreakdown(breakdown);
+      excludedRateGroups = excl;
+      mixedRates = netKept.length + grossKept.length > 1;
 
-      addHours(1, "שכר יסוד שעתי", primary?.h100, row.hourlyWage);
-      addHours(38, "שעות 125%", primary?.h125, row.hourlyWage != null ? row.hourlyWage * 1.25 : null);
-      addHours(39, "שעות 150%", primary?.h150, row.hourlyWage != null ? row.hourlyWage * 1.5 : null);
-      if (keptExtra) {
-        addHours(31, "שכר נוסף שעתי", keptExtra.h100, keptExtra.rate);
-        addHours(38, "שעות נ. 125%", keptExtra.h125, keptExtra.rate != null ? keptExtra.rate * 1.25 : null);
-        addHours(39, "שעות נ. 150%", keptExtra.h150, keptExtra.rate != null ? keptExtra.rate * 1.5 : null);
-      }
+      const addGroup = (g, isFirstOfBucket, isNet) => {
+        const code = isFirstOfBucket ? 1 : 31;
+        const label = isFirstOfBucket ? "שכר יסוד שעתי" : "שכר נוסף שעתי";
+        addHours(code, label, g.h100, g.rate, isNet);
+        addHours(
+          38,
+          isFirstOfBucket ? "שעות 125%" : "שעות נ. 125%",
+          g.h125,
+          g.rate != null ? g.rate * 1.25 : null,
+          isNet,
+        );
+        addHours(
+          39,
+          isFirstOfBucket ? "שעות 150%" : "שעות נ. 150%",
+          g.h150,
+          g.rate != null ? g.rate * 1.5 : null,
+          isNet,
+        );
+      };
+      netKept.forEach((g, i) => addGroup(g, i === 0, true));
+      grossKept.forEach((g, i) => addGroup(g, i === 0, false));
     } else {
       // No per-role breakdown available — fall back to the merged totals.
-      addHours(1, "שכר יסוד שעתי", row.hours100, row.hourlyWage);
-      addHours(38, "שעות 125%", row.hours125, row.wage125);
-      addHours(39, "שעות 150%", row.hours150, row.wage150);
+      const isNet = NET_WAGE_KINDS.has(row.netKind);
+      addHours(1, "שכר יסוד שעתי", row.hours100, row.hourlyWage, isNet);
+      addHours(38, "שעות 125%", row.hours125, row.wage125, isNet);
+      addHours(39, "שעות 150%", row.hours150, row.wage150, isNet);
     }
-    addHours("shabbat", "שבת", row.shabbat, row.hourlyWage);
-    addHours("holiday", "חג", row.holiday, row.hourlyWage);
+    // שבת/חג aren't tracked per role, so there's no per-hour net/gross split
+    // available for them — always gross, same as travel/bonus/meals below.
+    addHours("shabbat", "שבת", row.shabbat, row.hourlyWage, false);
+    addHours("holiday", "חג", row.holiday, row.hourlyWage, false);
   }
   addAmount(3, "נסיעות", 1, row.travel);
   addAmount(32, "בונוס", 1, row.bonus);
   if (num(row.meals)) addAmount(21, "ארוחות", row.meals, row.mealWorth);
   return { comps, mixedRates, excludedRateGroups };
 };
+
+// Employee-level (non-role) fields that must appear on only ONE of an
+// employee's Micpal rows — Micpal sums rows sharing a מס עובד (employee
+// number), so putting these on every row would double-count them.
+const MIC_ROW_SHARED_ONLY_FIELDS = [
+  "vacation",
+  "workdays",
+  "shabbat",
+  "holiday",
+  "amount",
+  "travel",
+  "completion",
+  "bonus",
+  "standardDays",
+  "standardHours",
+  "inAdvance",
+  "meals",
+  "mealWorth",
+];
+
+// Build the actual Micpal row(s) for one employee — real, unblended rates
+// only. Up to 4 rows are emitted (see splitRoleBreakdown: net/gross × up to
+// 2 rates each), all carrying the SAME מס עובד/keyName; Micpal sums rows
+// sharing an employee number, so a genuine second rate — or a net/gross
+// split, which can never share Micpal's single נטו flag per row — becomes a
+// genuine extra row instead of a synthetic blended rate or a wrongly-flagged
+// net/gross mix. A 3rd+ distinct rate within a bucket is excluded here too
+// (not exported at all — needs manual handling, reported via the tlush's own
+// excludedRateGroups since it's computed from the same grouping).
+//
+// The employee-level fields (travel, bonus, meals, מפרעה, workdays,
+// vacation, standard days/hours, שבת/חג) are always gross (only explicitly
+// hourly_net wage-rate hours — or a global_net salary — are net), so they're
+// only ever put on the FIRST GROSS row — or, for a purely net-paid employee
+// with no gross-typed hours at all, a dedicated zero-hours gross row created
+// just to carry them.
+function buildMicRows(row) {
+  const shared = pickMicRow(row);
+  const blankShared = Object.fromEntries(
+    MIC_ROW_SHARED_ONLY_FIELDS.map((k) => [k, ""]),
+  );
+  if (row.isGlobal) {
+    if (shared.net !== "נ") return [shared];
+    // Global NET salary (amount) can't share a row with the always-gross
+    // shared fields (travel/meals/bonus/etc) — split into a net amount-only
+    // row and a gross row for everything else.
+    return [
+      { ...shared, ...blankShared, amount: shared.amount, net: "נ" },
+      { ...shared, amount: "", net: "" },
+    ];
+  }
+  const breakdown = Array.isArray(row.roleBreakdown) ? row.roleBreakdown : [];
+  if (breakdown.length === 0) return [shared];
+
+  const { netKept, grossKept } = splitRoleBreakdown(breakdown);
+  const rateRow = (g, isNet, carriesShared) => ({
+    ...(carriesShared ? shared : { ...shared, ...blankShared }),
+    hourlyWage: g?.rate ?? "",
+    hours100: g?.h100 || "",
+    wage125: g?.rate != null && g.h125 ? g.rate * 1.25 : "",
+    hours125: g?.h125 || "",
+    wage150: g?.rate != null && g.h150 ? g.rate * 1.5 : "",
+    hours150: g?.h150 || "",
+    hoursSum: g ? (g.h100 || 0) + (g.h125 || 0) + (g.h150 || 0) || "" : "",
+    net: isNet ? "נ" : "",
+  });
+
+  const rows = netKept.map((g) => rateRow(g, true, false));
+  if (grossKept.length > 0) {
+    grossKept.forEach((g, i) => rows.push(rateRow(g, false, i === 0)));
+  } else {
+    // Purely net-paid employee — still need one gross row for travel/bonus/
+    // meals/etc.
+    rows.push(rateRow(null, false, true));
+  }
+  return rows;
+}
 
 // Build the tlush for one employee. `row` is a buildExportRow() result.
 export function buildTlush(row, payrollSoft, { workMonth } = {}) {
@@ -201,6 +318,10 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
     employeeNumber,
     ID_nmbr: row.ID_nmbr || "",
     name: row.name || "",
+    // Gross pay from hourly-min (tip-based) roles at their real effective
+    // rate (national minimum + bonus top-up) — shown in the תלוש view next
+    // to the employee's total gross.
+    hourlyMinGross: Number(row.hourlyMinGross) || 0,
   };
 
   if (payrollSoft === "shik") {
@@ -225,15 +346,17 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
   return {
     ...base,
     components: comps,
-    // The on-screen breakdown split this employee's hours by role rate, but
-    // the real Micpal xlsx (micRow, below) has no second-rate column and
-    // still exports everything merged into one rate.
+    // Whether this employee has a genuine second rate — now reflected as a
+    // real second Micpal row (see micRows/buildMicRows), not just a display
+    // split, so this is informational rather than a "won't be reflected"
+    // warning.
     mixedRates,
     // Rate groups beyond the 2 supported slots (base + one other) — excluded
-    // from `comps` entirely (not paid through this tlush), reported here so
-    // the caller can flag them for manual handling.
+    // from both `comps` and the real Micpal export, reported here so the
+    // caller can flag them for manual handling.
     excludedRateGroups,
-    micRow: pickMicRow(row),
+    // 1 or 2 rows (same מס עובד on both when 2) — see buildMicRows.
+    micRows: buildMicRows(row),
   };
 }
 
@@ -249,10 +372,10 @@ export function tlushToShikRows(tlush, workMonth) {
   }));
 }
 
-// tlush → Micpal wide row (consumed by MicpImportXL.generate). The exact row was
-// stored at build time, so this is verbatim.
-export function tlushToMicRow(tlush) {
-  return tlush.micRow || {};
+// tlush → Micpal wide row(s) (consumed by MicpImportXL.generate). 1 or 2 rows
+// per employee (see buildMicRows) — callers should flatMap, not map.
+export function tlushToMicRows(tlush) {
+  return tlush.micRows || [];
 }
 
 export { SHIK_COMPONENT_LABELS, SHIK_COMPONENTS };

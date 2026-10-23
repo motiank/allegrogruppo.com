@@ -1,10 +1,11 @@
 // Data quality: what is missing, stale or wrongly mapped, per location and source.
 // Nothing here fills a gap — it only says where the gaps are. The source data is in Allegro;
 // its /status says how far each branch is loaded, so "not loaded yet" is told apart from "missing".
-import { q, one, inList, getSettings, todayLocal } from '../db.js';
+import { q, parseJson, getSettings, todayLocal } from '../db.js';
+import { locationConfig } from './master.js';
 import { addDays, daysBetween } from '../lib/recommend.js';
 import { apiBase } from '../../lib/allegro.js';
-import { status, checks as sourceChecks, dishSales, rawShifts, roleAliases } from './source.js';
+import { status, locations, checks as sourceChecks, dishSales, rawShifts, roleAliases } from './source.js';
 
 /**
  * The integrations as they really are. Sales (Beecomm), clock times (Tabit), employees and payroll
@@ -34,21 +35,21 @@ export async function report(access, locationIds) {
     unreachable = e.message;
   }
   const aliases = await roleAliases();
+  const known = new Map((await locations()).map((l) => [l.id, l]));
   const out = [];
   for (const loc of locationIds) {
-    const L = await one(`SELECT * FROM joya_locations WHERE id=:l`, { l: loc });
+    const L = known.get(loc);
     if (!L) continue;
     const issues = [];
-    const shifts = await one(`SELECT COUNT(*) AS n FROM joya_shift_defs WHERE location_id=:l AND active=1`, { l: loc });
-    const lastImport = await q(`SELECT kind, source, MAX(created_at) AS at FROM joya_import_batches WHERE location_id=:l GROUP BY kind, source`, { l: loc });
-    const base = { locationId: loc, locationName: L.name, isDemo: !!L.is_demo, lastImports: lastImport.map((r) => ({ kind: r.kind, source: r.source, at: r.at })) };
+    const shifts = { n: (await locationConfig(loc)).shifts.filter((s) => s.active !== false).length };
+    const base = { locationId: loc, locationName: L.name, isDemo: L.isDemo };
     if (unreachable) {
       issues.push({ code: 'ALLEGRO_UNREACHABLE', severity: 'HIGH', message: unreachable });
       if (!Number(shifts?.n)) issues.push({ code: 'NO_SHIFTS_DEFINED', severity: 'HIGH' });
       out.push({ ...base, sources: {}, issues });
       continue;
     }
-    const S = st.branches.find((b) => b.branch === L.allegro_branch_id) || {};
+    const S = st.branches.find((b) => b.branch === L.id) || {};
     const orders = S.beecomm?.orders || null;
     const itemsSt = S.beecomm?.items || null;
     const stale = (d) => d == null || daysBetween(d, today) > staleDays;
@@ -92,12 +93,8 @@ export async function report(access, locationIds) {
       }
     }
     if (unmatched.size) issues.push({ code: 'UNMATCHED_ITEM_CODES', severity: 'MEDIUM', count: unmatched.size, items: [...unmatched.values()].sort((a, b) => b.rows - a.rows).slice(0, 20) });
-    const menu = await one(
-      `SELECT COUNT(*) AS n, SUM(NOT EXISTS (SELECT 1 FROM joya_recipe_lines r WHERE r.menu_item_id = m.id)) AS no_recipe,
-              (SELECT COUNT(*) FROM joya_recipe_lines r JOIN joya_menu_items m2 ON m2.id = r.menu_item_id WHERE m2.location_id = :l AND r.qty IS NULL) AS no_qty
-         FROM joya_menu_items m WHERE m.location_id=:l AND m.active=1`,
-      { l: loc },
-    );
+    const recipes = (await q(`SELECT recipe_json FROM joya_menu_items WHERE location_id=:l AND active=1`, { l: loc })).map((m) => parseJson(m.recipe_json) || []);
+    const menu = { n: recipes.length, no_recipe: recipes.filter((r) => !r.length).length, no_qty: recipes.flat().filter((l) => l.qty == null).length };
     if (!Number(menu?.n)) issues.push({ code: 'NO_MENU', severity: 'HIGH' });
     if (Number(menu?.no_recipe)) issues.push({ code: 'DISHES_WITHOUT_INGREDIENTS', severity: 'MEDIUM', count: Number(menu.no_recipe), of: Number(menu.n) });
     if (Number(menu?.no_qty)) issues.push({ code: 'RECIPE_LINES_WITHOUT_QTY', severity: 'INFO', count: Number(menu.no_qty) });
@@ -134,12 +131,4 @@ export async function report(access, locationIds) {
     });
   }
   return { today, staleDays, integrations: integrations(!unreachable), locations: out };
-}
-
-/** Is any of this location's data demonstration data? (for the banner) */
-export async function demoFlags(locationIds) {
-  if (!locationIds.length) return {};
-  const l = inList('l', locationIds);
-  const rows = await q(`SELECT id, is_demo FROM joya_locations WHERE id IN (${l.sql})`, l.params);
-  return Object.fromEntries(rows.map((r) => [r.id, !!r.is_demo]));
 }

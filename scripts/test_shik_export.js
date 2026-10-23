@@ -17,7 +17,7 @@ import ShikImportXL, {
 import {
   buildTlush,
   tlushToShikRows,
-  tlushToMicRow,
+  tlushToMicRows,
 } from "../admin/server/modules/tlush.js";
 
 const HOURLY_RATE = 40;
@@ -499,7 +499,7 @@ assert.deepEqual(SHIK_HEADERS, [
 // ─── Tlush round-trip ───────────────────────────────────────────────────────
 // The tlush is the source of truth for the export: rebuilding the export rows
 // from the tlush must reproduce the direct buildShikRowsForEmployee output
-// exactly (Shiklulit), and tlushToMicRow must reproduce the Micpal wide row.
+// exactly (Shiklulit), and tlushToMicRows must give one Micpal row per kept real rate.
 const tShik = buildTlush(hourlyRow, "shik", { workMonth });
 assert.deepEqual(
   tlushToShikRows(tShik, workMonth),
@@ -507,10 +507,25 @@ assert.deepEqual(
   "tlush → shik rows round-trip",
 );
 const tMic = buildTlush(hourlyRow, "mic", { workMonth });
-const micRow = tlushToMicRow(tMic);
-for (const k of ["keyName", "hourlyWage", "hours100", "hours125", "hours150"]) {
-  assert.equal(micRow[k], hourlyRow[k], `tlush mic row preserves ${k}`);
-}
+const micRows = tlushToMicRows(tMic);
+// Three gross rates: the two with most hours get a row each (same employee
+// number, travel only on the first); the third is excluded for manual payment.
+assert.equal(micRows.length, 2, "two kept rates → two Micpal rows");
+assert.deepEqual(
+  micRows.map((r) => [r.keyName, r.hourlyWage, r.hours100, r.hours125, r.hours150, r.net]),
+  [
+    [hourlyRow.keyName, 40, 50, 6, 2, ""], // מלצר + ראנר
+    [hourlyRow.keyName, 50, 20, 3, 1, ""], // בר
+  ],
+  "tlush mic rows split by real rate",
+);
+assert.equal(micRows[0].travel, hourlyRow.travel, "travel on the first row");
+assert.equal(micRows[1].travel, "", "travel not repeated on the second row");
+assert.deepEqual(
+  tMic.excludedRateGroups.map((g) => [g.rate, g.hours]),
+  [[35.4, 20]],
+  "3rd rate (מתלמד) excluded",
+);
 console.log("✓ tlush round-trip assertions passed");
 
 const xl = new ShikImportXL({ year: "2026", month: String(workMonth) });

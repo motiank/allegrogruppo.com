@@ -10,51 +10,46 @@
 // Every route checks the location it touches with canLocation(); lists are filtered
 // with scopeLocations(). The AI calculations run with the asking user's access too.
 import { getSessionUser, allegroUser } from './auth/session.js';
-import { q } from './db.js';
-import { syncLocations } from './services/source.js';
+import { locations } from './services/source.js';
 
 /**
- * The Joya access of an Allegro user (allegroUser shape); linked = the location link rows
- * [{ id, allegro_branch_id }]. null = no Joya access.
+ * The Joya access of an Allegro user (allegroUser shape); known = the location ids (Allegro branch
+ * ids) Allegro has now. null = no Joya access.
  */
-export function accessFor(user, linked) {
+export function accessFor(user, known) {
   let role;
   let ids;
   let payroll;
   if (user.role === 'admin') {
     role = 'CHAIN_ADMIN';
-    ids = [];
+    ids = known;
     payroll = true;
   } else if (user.role === 'restMngr') {
     role = 'LOCATION_MANAGER';
     const all = user.restaurants.includes('*');
-    ids = linked.filter((l) => all || user.restaurants.includes(l.allegro_branch_id)).map((l) => l.id);
+    ids = known.filter((id) => all || user.restaurants.includes(id));
     payroll = true;
   } else return null;
-  const isAdmin = role === 'CHAIN_ADMIN';
-  const known = linked.map((l) => l.id);
-  return { username: user.username, role, isAdmin, locationIds: isAdmin ? known : ids.filter((id) => known.includes(id)), payroll };
+  return { username: user.username, role, isAdmin: role === 'CHAIN_ADMIN', locationIds: ids, payroll };
 }
 
 export async function loadAccess(username) {
   if (!username) return null;
   const user = allegroUser(username);
   if (!user) return null;
-  // locations are the Allegro branches (link rows made on first sight; refreshed at most every 5 min)
-  await syncLocations();
-  const linked = await q(`SELECT id, allegro_branch_id FROM joya_locations WHERE allegro_branch_id IS NOT NULL`);
-  return accessFor(user, linked);
+  // locations are the Allegro branches (read from the API, kept in memory for 5 min)
+  return accessFor(user, (await locations()).map((l) => l.id));
 }
 
+// Also for the chain admin: a location id must be a branch Allegro knows.
 export function canLocation(access, locationId) {
-  if (!access) return false;
-  if (access.isAdmin) return true;
-  return access.locationIds.includes(Number(locationId));
+  if (!access || locationId == null) return false;
+  return access.locationIds.includes(String(locationId));
 }
 
 /** The requested location ids limited to what the user may see (all allowed when none asked). */
 export function scopeLocations(access, requested) {
-  const asked = requested == null || requested === '' ? null : String(requested).split(',').map(Number).filter(Number.isFinite);
+  const asked = requested == null || requested === '' ? null : String(requested).split(',').map((s) => s.trim()).filter(Boolean);
   if (!asked) return access.locationIds;
   return asked.filter((id) => canLocation(access, id));
 }

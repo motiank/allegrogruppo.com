@@ -68,11 +68,6 @@ function Locations({ c }) {
   const j = useJoya();
   const act = useAction();
   const [refreshed, setRefreshed] = useState(false);
-  const setActive = (l, active) =>
-    act.run(async () => {
-      await api('/locations', { method: 'POST', body: { id: l.id, active } });
-      j.reload();
-    });
   const refresh = () =>
     act.run(async () => {
       await api('/source/refresh', { method: 'POST', body: {} });
@@ -110,13 +105,8 @@ function Locations({ c }) {
                 }
               >
                 <Row label={t('joya.set.branchId')}>
-                  <Term>{l.branchId}</Term>
+                  <Term>{l.id}</Term>
                 </Row>
-                <div className={c.actions}>
-                  <Btn small disabled={act.busy} onClick={() => setActive(l, !l.active)}>
-                    {l.active ? t('joya.set.turnOff') : t('joya.set.turnOn')}
-                  </Btn>
-                </div>
               </Card>
             ))}
         </React.Fragment>

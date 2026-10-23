@@ -1,5 +1,5 @@
 // /workspace — the restaurant manager's home (phone first): today's order list,
-// a quick shortage report, next week's shifts, tasks, inquiries, payroll issues and
+// a quick shortage report, next week's shifts, payroll issues and
 // yesterday's sales, for one location.
 import React, { useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
@@ -14,8 +14,6 @@ const useStyles = createUseStyles((theme) => ({
   big: { fontSize: '1rem', fontWeight: 650 },
   line: { fontSize: '0.84rem', marginTop: '0.25rem' },
   muted: { fontSize: '0.78rem', color: theme.textSecondary, marginTop: '0.2rem' },
-  item: { fontSize: '0.82rem', padding: '0.3rem 0', borderTop: `1px solid ${theme.border}` },
-  overdue: { color: '#f2a3a8' },
   ok: { fontSize: '0.8rem', color: '#3fb950', marginTop: '0.3rem' },
   actions: { display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' },
 }));
@@ -37,15 +35,13 @@ export default function Workspace() {
   const { data, error, loading } = useLoad(async () => {
     if (!loc) return null;
     const ids = [loc];
-    const [ov, lists, plans, tasks, inq, sales] = await Promise.all([
+    const [ov, lists, plans, sales] = await Promise.all([
       api(`/overview${qs({ locationIds: ids, days: 7 })}`),
       api(`/orders${qs({ locationIds: ids, status: 'DRAFT', limit: 10 })}`),
       api(`/staffing/plans${qs({ locationIds: ids, limit: 10 })}`),
-      api(`/tasks${qs({ locationIds: ids, status: 'OPEN,IN_PROGRESS' })}`),
-      api(`/inquiries${qs({ locationIds: ids, status: 'NEW,IN_PROGRESS,DRAFT_READY' })}`),
       api(`/sales/summary${qs({ locationIds: ids, from: addDays(today, -1), to: addDays(today, -1) })}`),
     ]);
-    return { ov, lists: lists.lists, plans: plans.plans, tasks: tasks.tasks, inquiries: inq.inquiries, sales };
+    return { ov, lists: lists.lists, plans: plans.plans, sales };
   }, [loc, today]);
 
   if (!loc) return <Page title={t('joya.ws.title')}><Empty>{t('joya.chooseLocation')}</Empty></Page>;
@@ -145,39 +141,6 @@ export default function Workspace() {
           </div>
         )}
         <SourceLine source={data.sales.source} period={data.sales.period} />
-      </Card>
-
-      <Card title={t('joya.ws.tasksTitle')} right={<Btn kind="ghost" small onClick={() => navigate('/tasks')}>{t('joya.ws.seeAll')}</Btn>}>
-        {data.tasks.length === 0 ? (
-          <div className={c.muted}>{t('joya.none')}</div>
-        ) : (
-          data.tasks.slice(0, 6).map((task) => {
-            const late = task.dueDate && task.dueDate < today;
-            return (
-              <div key={task.id} className={c.item}>
-                <span dir="auto">{task.title}</span>
-                {task.dueDate ? (
-                  <span className={late ? c.overdue : undefined}>
-                    {' '}· <Term>{fmtDay(task.dueDate)}</Term> {late ? `(${t('joya.ws.late')})` : ''}
-                  </span>
-                ) : null}
-              </div>
-            );
-          })
-        )}
-      </Card>
-
-      <Card title={t('joya.ws.inqTitle')} right={<Btn kind="ghost" small onClick={() => navigate('/inquiries')}>{t('joya.ws.seeAll')}</Btn>}>
-        {data.inquiries.length === 0 ? (
-          <div className={c.muted}>{t('joya.none')}</div>
-        ) : (
-          data.inquiries.slice(0, 5).map((q) => (
-            <div key={q.id} className={c.item} style={{ cursor: 'pointer' }} onClick={() => navigate(`/inquiries/${q.id}`)}>
-              <Badge tone="info">{t(`joya.src.${q.source}`)}</Badge> <Badge tone={statusTone(q.status)}>{t(`joya.status.${q.status}`)}</Badge>{' '}
-              <span dir="auto">{String(q.content).slice(0, 80)}</span>
-            </div>
-          ))
-        )}
       </Card>
 
       <Card title={t('joya.ws.payrollTitle')} onClick={() => navigate('/payroll')}>

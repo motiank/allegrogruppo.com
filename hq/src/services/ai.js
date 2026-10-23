@@ -30,7 +30,7 @@ export const MAX_CALCS = 6;
 function locs(access, p) {
   const ids = p.locationIds ?? (p.locationId != null ? [p.locationId] : null);
   if (!ids) return access.locationIds;
-  const asked = (Array.isArray(ids) ? ids : [ids]).map(Number);
+  const asked = (Array.isArray(ids) ? ids : [ids]).map(String);
   const allowed = asked.filter((id) => canLocation(access, id));
   if (!allowed.length) throw err('FORBIDDEN', 'no access to the requested location(s)');
   return allowed;
@@ -44,7 +44,7 @@ function range(p) {
 /** The calculations the model may ask for. Each result carries its period and source. */
 export const CALCS = {
   sales_summary: {
-    params: '{ locationIds?: number[], from: "YYYY-MM-DD", to: "YYYY-MM-DD" }',
+    params: '{ locationIds?: string[], from: "YYYY-MM-DD", to: "YYYY-MM-DD" }',
     about: 'revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect',
     run: (a, p) => analytics.salesSummary(locs(a, p), ...range(p)),
   },
@@ -63,20 +63,20 @@ export const CALCS = {
     about: 'demand units (diners per shift, peak hour, orders…) on the recent same weekdays',
     run: async (a, p) => {
       assertLocation(a, p.locationId);
-      const rows = await recentSameWeekday(Number(p.locationId), Number(p.weekday), p.shiftCode || null, Math.min(Number(p.weeks) || 8, 26), todayLocal());
+      const rows = await recentSameWeekday(String(p.locationId), Number(p.weekday), p.shiftCode || null, Math.min(Number(p.weeks) || 8, 26), todayLocal());
       return { period: { from: rows[rows.length - 1]?.date ?? null, to: rows[0]?.date ?? null }, source: 'Beecomm via Allegro (/beecomm/orders/stored)', rows };
     },
   },
   shift_profile: {
     params: '{ locationId, weeks? }',
     about: 'the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)',
-    run: (a, p) => shiftModel.profile(a, Number(p.locationId), { weeks: p.weeks }),
+    run: (a, p) => shiftModel.profile(a, String(p.locationId), { weeks: p.weeks }),
   },
   staffing_forecast_week: {
     params: '{ locationId, weekStart?: "YYYY-MM-DD" (a Sunday; default next week), weeks? }',
     about:
       'people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks',
-    run: (a, p) => shiftModel.forecastWeek(a, Number(p.locationId), { weekStart: p.weekStart, weeks: p.weeks }),
+    run: (a, p) => shiftModel.forecastWeek(a, String(p.locationId), { weekStart: p.weekStart, weeks: p.weeks }),
   },
   staffing_plan_lines: {
     params: '{ planId, date?, shiftCode?, roleCode? }',
@@ -84,7 +84,7 @@ export const CALCS = {
     run: async (a, p) => {
       const plan = await staffing.getPlan(a, Number(p.planId));
       const lines = plan.lines.filter((l) => (!p.date || l.date === p.date) && (!p.shiftCode || l.shiftCode === p.shiftCode) && (!p.roleCode || l.roleCode === p.roleCode));
-      return { period: { from: plan.plan.weekStart, to: addDays(plan.plan.weekStart, 6) }, source: 'joya_staffing_plan_lines + joya_staffing_proposal_lines', planStatus: plan.plan.status, lines, violations: plan.violations };
+      return { period: { from: plan.plan.weekStart, to: addDays(plan.plan.weekStart, 6) }, source: 'joya_staffing_plans (lines_json + proposal_json)', planStatus: plan.plan.status, lines, violations: plan.violations };
     },
   },
   staffing_forecast: {
@@ -96,7 +96,7 @@ export const CALCS = {
       return { period: { from: plan.plan.weekStart, to: addDays(plan.plan.weekStart, 6) }, source: 'joya_staffing_plans.forecast_json (from Beecomm orders via Allegro)', method: 'median of the same weekday over the previous weeks', slots };
     },
   },
-  staffing_rules: { params: '{ locationId }', about: 'the staffing rules that apply to a location', run: async (a, p) => ({ source: 'joya_staffing_rules', rules: await staffing.listRules(a, p.locationId) }) },
+  staffing_rules: { params: '{ locationId }', about: 'the staffing rules that apply to a location', run: async (a, p) => ({ source: 'staffingRules (joya_settings)', rules: await staffing.listRules(a, p.locationId) }) },
   order_list: {
     params: '{ listId }',
     about: 'an order list: working lines, the original recommendation with the basis of each quantity, and the edits',
@@ -105,11 +105,11 @@ export const CALCS = {
       return { period: { date: l.list.date }, source: 'joya_order_lists + recommendation lines', ...l };
     },
   },
-  item_patterns: { params: '{ locationId }', about: 'what was learned per item from final order lists', run: async (a, p) => ({ source: 'joya_item_patterns', patterns: await repl.getPatterns(a, Number(p.locationId)) }) },
+  item_patterns: { params: '{ locationId }', about: 'what was learned per item from final order lists', run: async (a, p) => ({ source: 'computed from the final order lists (joya_order_lists)', patterns: await repl.getPatterns(a, String(p.locationId)) }) },
   shortages: { params: '{ locationIds?, days? }', about: 'reported shortages', run: async (a, p) => ({ source: 'joya_shortages', shortages: await repl.listShortages(a, { locationIds: locs(a, p), days: p.days || 30 }) }) },
   data_quality: { params: '{ locationIds? }', about: 'missing, stale and unmapped data per location', run: (a, p) => quality.report(a, locs(a, p)) },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },
-  pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open issues, overdue tasks per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
+  pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };
 
 export function catalogue() {
@@ -147,14 +147,13 @@ async function contextAllowed(access, kind, id) {
   }
   if (kind === 'ORDER_LIST') return repl.getList(access, id);
   if (kind === 'STAFFING_PLAN') return staffing.getPlan(access, id);
-  if (kind === 'INQUIRY') return work.getInquiry(access, id);
   return null;
 }
 
 export async function ask(access, { question, locationId = null, contextKind = 'GENERAL', contextId = null, lang = 'he' }) {
   if (!String(question || '').trim()) throw err('BAD_REQUEST', 'the question is empty');
   if (String(question).length > 2000) throw err('BAD_REQUEST', 'the question is too long');
-  if (!['GENERAL', 'ORDER_LIST', 'STAFFING_PLAN', 'INQUIRY', 'AREA'].includes(contextKind)) throw err('BAD_REQUEST', 'bad context');
+  if (!['GENERAL', 'ORDER_LIST', 'STAFFING_PLAN', 'AREA'].includes(contextKind)) throw err('BAD_REQUEST', 'bad context');
   if (locationId != null) assertLocation(access, locationId);
   if (contextKind !== 'GENERAL') await contextAllowed(access, contextKind, contextId);
   const id = (
@@ -194,10 +193,7 @@ export async function applyProposal(access, id) {
   let result;
   if (p.type === 'ORDER_OPS') result = await repl.applyOps(access, p.listId, p.ops, { via: 'CHAT' });
   else if (p.type === 'STAFFING_OPS') result = await staffing.applyOps(access, p.planId, p.ops, { via: 'CHAT' });
-  else if (p.type === 'INQUIRY_DRAFT') {
-    result = await work.inquiryAction(access, p.inquiryId, { action: 'draft', draft: p.text });
-    await q(`UPDATE joya_inquiries SET draft_by=:d WHERE id=:id`, { d: `AI (${access.username})`, id: p.inquiryId });
-  } else throw err('BAD_REQUEST', 'unknown proposal');
+  else throw err('BAD_REQUEST', 'unknown proposal');
   await q(`UPDATE joya_ai_requests SET proposal_status='APPLIED' WHERE id=:id`, { id });
   await audit(access.username, 'AI_PROPOSAL_APPLIED', 'ai_request', id, r.locationId, { type: p.type });
   return { request: await getRequest(access, id), result };
@@ -266,9 +262,6 @@ export async function buildContext(access, r) {
       lines: p.lines.map((x) => ({ lineId: x.id, date: x.date, weekday: x.weekday, shiftCode: x.shiftCode, roleCode: x.roleCode, headcount: x.headcount, start: x.start, end: x.end, isPeakExtra: x.isPeakExtra, minRequired: x.minRequired })),
       rules: await staffing.listRules(access, p.plan.locationId),
     };
-  } else if (r.context_kind === 'INQUIRY') {
-    const i = await work.getInquiry(access, r.context_id);
-    object = { kind: 'INQUIRY', inquiry: { id: i.id, source: i.source, kind: i.kind, locationId: i.locationId, locationName: i.locationName, author: i.author, rating: i.rating, content: i.content, currentDraft: i.draft } };
   }
   return {
     request: {
@@ -282,7 +275,7 @@ export async function buildContext(access, r) {
     },
     user: { role: access.role, payroll: access.payroll },
     today,
-    locations: locations.map((l) => ({ id: l.id, code: l.code, name: l.name, isDemo: l.isDemo })),
+    locations: locations.map((l) => ({ id: l.id, name: l.name, company: l.company?.label ?? null, active: l.active, isDemo: l.isDemo })),
     shifts: shifts.map((s) => ({ locationId: s.locationId, code: s.code, name: s.name, days: s.days, start: s.start, end: s.end })),
     roles: roles.map((x) => ({ code: x.code, he: x.nameHe, en: x.nameEn })),
     calculations: catalogue(),
@@ -305,14 +298,13 @@ export const CHANGE_FORMATS = {
     '{ "op": "remove", "lineId": number }',
     'what-if (nothing saved, the plan diff is proposed): { "whatIf": [ { "role_code", "rule_type": "RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA", "demand_unit"?, "params": {…}, "shift_code"?, "days_json"?: [0-6] } ] }',
   ],
-  INQUIRY: ['{ "draft": "the reply text" }'],
 };
 
 /**
  * Run the model's plan: calculations with the user's access, and validation of the
  * proposed change. Errors are returned per calculation (the model can explain them).
  */
-export async function compute(id, { calcs = [], ops = null, whatIf = null, draft = null }) {
+export async function compute(id, { calcs = [], ops = null, whatIf = null }) {
   const { r, access } = await requestAccess(id);
   if (r.status !== 'THINKING') throw err('CONFLICT', 'request is not open');
   const results = [];
@@ -347,8 +339,6 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, draft
     } else if (r.context_kind === 'STAFFING_PLAN' && Array.isArray(ops) && ops.length) {
       const checked = await staffing.checkOps(access, r.context_id, ops);
       proposal = { type: 'STAFFING_OPS', planId: r.context_id, ops: checked.map(toStaffingOp), preview: checked };
-    } else if (r.context_kind === 'INQUIRY' && draft) {
-      proposal = { type: 'INQUIRY_DRAFT', inquiryId: r.context_id, text: String(draft).slice(0, 4000) };
     }
   } catch (e) {
     proposalError = { code: e.code || 'ERROR', message: e.message, details: e.details || null };

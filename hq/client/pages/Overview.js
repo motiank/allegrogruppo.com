@@ -1,7 +1,7 @@
 // /overview — chain management overview (chain admin).
 // One box per location: last 7 days of sales (Bikum checks) with the change split into
 // volume (more/fewer checks) and average spend, missing days, what waits for a decision,
-// and data alerts. Chain totals on top, pending decisions and overdue tasks below.
+// and data alerts. Chain totals on top, pending decisions below.
 import React from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { api, qs } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { useJoya } from '../context.js';
 import AskBox from '../AskBox.js';
-import { Page, Card, Grid, Row, Badge, SourceLine, Val, Loading, ErrorBox, Empty, useLoad, fmtILS, fmtNum, fmtPctSigned, fmtDay, addDays, statusTone, Term } from '../ui.js';
+import { Page, Card, Grid, Row, Badge, SourceLine, Val, Loading, ErrorBox, Empty, useLoad, fmtILS, fmtNum, fmtPctSigned, fmtDay, addDays, Term } from '../ui.js';
 
 const useStyles = createUseStyles((theme) => ({
   chips: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem' },
@@ -81,13 +81,12 @@ export default function Overview() {
   const scope = j.scope;
 
   const { data, error, loading } = useLoad(async () => {
-    const [ov, an, qu, overdue] = await Promise.all([
+    const [ov, an, qu] = await Promise.all([
       api(`/overview${qs({ locationIds: scope, days: 7 })}`),
       api(`/sales/anomalies${qs({ locationIds: scope, from: addDays(today, -14), to: addDays(today, -1) })}`).catch(() => null),
       api(`/quality${qs({ locationIds: scope })}`).catch(() => null),
-      api(`/tasks${qs({ locationIds: scope, overdue: 1 })}`).catch(() => ({ tasks: [] })),
     ]);
-    return { ov, an, qu, overdue: overdue.tasks };
+    return { ov, an, qu };
   }, [scope.join(','), today]);
 
   const go = (locationId, path) => {
@@ -97,7 +96,7 @@ export default function Overview() {
 
   if (loading && !data) return <Page title={t('joya.ov.title')}><Loading /></Page>;
   if (error) return <Page title={t('joya.ov.title')}><ErrorBox error={error} /></Page>;
-  const { ov, an, qu, overdue } = data;
+  const { ov, an, qu } = data;
   const sales = ov.sales;
   const tot = sumTotals(sales.locations);
   const pendingFor = (id) => ov.pending.find((p) => p.locationId === id);
@@ -109,8 +108,6 @@ export default function Overview() {
     ['approvedNotOrdered', '/orders', 'joya.ov.p.approvedNotOrdered'],
     ['draftPlans', '/staffing', 'joya.ov.p.draftPlans'],
     ['openPayrollIssues', '/payroll', 'joya.ov.p.openPayrollIssues'],
-    ['openInquiries', '/inquiries', 'joya.ov.p.openInquiries'],
-    ['overdueTasks', '/tasks', 'joya.ov.p.overdueTasks'],
     ['shortages7d', '/shortages', 'joya.ov.p.shortages7d'],
   ];
   const pendingAll = ov.pending.flatMap((p) => chipDefs.filter(([k]) => p[k] > 0 && k !== 'shortages7d').map(([k, path, label]) => ({ p, k, path, label })));
@@ -172,20 +169,6 @@ export default function Overview() {
           pendingAll.map(({ p, k, path, label }) => (
             <div key={`${p.locationId}-${k}`} className={c.item} onClick={() => go(p.locationId, path)}>
               {p.name} · {t(label)}: <Term>{p[k]}</Term>
-            </div>
-          ))
-        )}
-      </Card>
-
-      <div className={c.section}>{t('joya.ov.overdueTitle')}</div>
-      <Card>
-        {overdue.length === 0 ? (
-          <Empty>{t('joya.ov.noOverdue')}</Empty>
-        ) : (
-          overdue.map((task) => (
-            <div key={task.id} className={c.item} onClick={() => go(task.locationId, '/tasks')}>
-              <span dir="auto">{task.title}</span> · {task.locationName || t('joya.ov.chainLevel')} · <Badge tone="bad"><Term>{fmtDay(task.dueDate)}</Term></Badge>{' '}
-              <Badge tone={statusTone(task.status)}>{t(`joya.status.${task.status}`)}</Badge>
             </div>
           ))
         )}

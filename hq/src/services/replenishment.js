@@ -1,14 +1,15 @@
 // Replenishment: recommendation → manager edits → approved final list → marked as ordered.
 // The learning is in ../lib/recommend.js; this file loads its inputs and stores its outputs.
 //
-// Kept apart (see sql/add-joya.sql):
-//   joya_order_recommendation_lines  the system's proposal, never changed
-//   joya_order_list_lines            the working list the manager edits
-//   joya_order_edits                 every change (who, when, before/after, UI or chat)
-//   joya_order_lists.final_json      frozen at approval;  ordered_json  when marked ordered
-import { q, one, tx, err, audit, parseJson, ymd, getSettings, todayLocal } from '../db.js';
+// Kept apart, all on the joya_order_lists row (see sql/add-joya.sql):
+//   recommendation_json  the system's proposal, never changed
+//   lines_json           the working list the manager edits
+//   edits_json           every change (who, when, before/after, UI or chat)
+//   final_json           frozen at approval;  ordered_json  when marked ordered
+import { q, one, tx, err, audit, parseJson, ymd, inList, getSettings, todayLocal, lockRow, nextId } from '../db.js';
 import { assertLocation } from '../access.js';
 import { recommend, convert, addDays, daysBetween, RECOMMENDER_VERSION } from '../lib/recommend.js';
+import * as source from './source.js';
 import { dishSales } from './source.js';
 
 // ---------------------------------------------------------------- inputs for the recommender
@@ -23,11 +24,11 @@ async function loadExamples(locationId, asOf, limit, excludeListId = null) {
   const out = [];
   for (const l of lists) {
     const final = parseJson(l.status === 'ORDERED' && l.ordered_json ? l.ordered_json : l.final_json) || [];
-    const rec = l.origin === 'RECOMMENDATION' ? (await q(`SELECT ingredient_id FROM joya_order_recommendation_lines WHERE list_id=:id AND section='SUGGESTED'`, { id: l.id })).map((r) => r.ingredient_id) : null;
+    const rec = l.origin === 'RECOMMENDATION' ? (parseJson(l.recommendation_json) || []).filter((r) => r.section === 'SUGGESTED').map((r) => r.ingredientId) : null;
     out.push({
       listId: l.id,
       date: ymd(l.list_date),
-      status: l.origin === 'HISTORICAL_IMPORT' ? 'HISTORICAL' : l.status,
+      status: l.status,
       lines: final.filter((x) => x.ingredientId != null).map((x) => ({ ingredientId: x.ingredientId, qty: x.qty == null ? null : Number(x.qty) })),
       recommended: rec,
     });
@@ -56,16 +57,15 @@ async function loadSales(locationId, from, to) {
 }
 
 async function loadRecipes(locationId) {
-  const rows = await q(
-    `SELECT r.ingredient_id, r.menu_item_id, r.qty, r.unit, i.unit AS ing_unit, m.name AS dish
-       FROM joya_recipe_lines r JOIN joya_menu_items m ON m.id = r.menu_item_id JOIN joya_ingredients i ON i.id = r.ingredient_id
-      WHERE m.location_id=:l AND m.active=1`,
-    { l: locationId },
-  );
+  const menu = await q(`SELECT id, name, recipe_json FROM joya_menu_items WHERE location_id=:l AND active=1 AND recipe_json IS NOT NULL`, { l: locationId });
+  const lines = menu.flatMap((m) => (parseJson(m.recipe_json) || []).map((r) => ({ ...r, ingredientId: Number(r.ingredientId), menuItemId: m.id, dish: m.name })));
+  const ids = [...new Set(lines.map((l) => l.ingredientId))];
+  const ingUnit = ids.length ? new Map((await q(`SELECT id, unit FROM joya_ingredients WHERE id IN (${ids.join(',')})`)).map((i) => [Number(i.id), i.unit])) : new Map();
   const byIng = new Map();
-  for (const r of rows) {
-    if (!byIng.has(r.ingredient_id)) byIng.set(r.ingredient_id, []);
-    byIng.get(r.ingredient_id).push({ menuItemId: r.menu_item_id, dish: r.dish, qty: r.qty == null ? null : Number(r.qty), unit: r.unit || r.ing_unit || null });
+  for (const r of lines) {
+    if (!ingUnit.has(r.ingredientId)) continue;
+    if (!byIng.has(r.ingredientId)) byIng.set(r.ingredientId, []);
+    byIng.get(r.ingredientId).push({ menuItemId: r.menuItemId, dish: r.dish, qty: r.qty == null ? null : Number(r.qty), unit: r.unit || ingUnit.get(r.ingredientId) || null });
   }
   return byIng;
 }
@@ -145,43 +145,33 @@ export async function generate(access, locationId, date, { force = false, create
   }
   const inputs = await buildInputs(locationId, asOf);
   const result = recommend(inputs);
-  const loc = await one(`SELECT is_demo FROM joya_locations WHERE id=:l`, { l: locationId });
-  const listId = await tx(async (c) => {
-    const id = (
-      await c.q(
-        `INSERT INTO joya_order_lists (location_id, list_date, origin, status, recommender_version, params_json, is_demo, created_by)
-         VALUES (:l, :d, 'RECOMMENDATION', 'DRAFT', :v, :p, :demo, :by)`,
-        { l: locationId, d: asOf, v: RECOMMENDER_VERSION, p: JSON.stringify({ settings: result.settings, examplesUsed: result.examplesUsed }), demo: loc?.is_demo ? 1 : 0, by: createdBy || access.username },
-      )
-    ).insertId;
-    for (const l of result.lines) {
-      const recId = (
-        await c.q(
-          `INSERT INTO joya_order_recommendation_lines (list_id, ingredient_id, section, qty, unit, method, confidence, basis_json)
-           VALUES (:id, :i, :s, :q, :u, :m, :c, :b)`,
-          { id, i: l.ingredientId, s: l.section, q: l.qty, u: l.unit, m: l.method, c: l.confidence, b: JSON.stringify(l.basis) },
-        )
-      ).insertId;
-      if (l.section !== 'NOT_DUE') {
-        await c.q(`INSERT INTO joya_order_list_lines (list_id, ingredient_id, qty, unit, origin, rec_line_id, updated_by) VALUES (:id, :i, :q, :u, 'RECOMMENDED', :r, :by)`, {
-          id,
-          i: l.ingredientId,
-          q: l.qty,
-          u: l.unit,
-          r: recId,
-          by: access.username,
-        });
-      }
-    }
-    return id;
-  });
+  const demo = await source.isDemoLocation(locationId);
+  const recommendation = result.lines.map((l, i) => ({ id: i + 1, ingredientId: l.ingredientId, section: l.section, qty: l.qty, unit: l.unit, method: l.method, confidence: l.confidence, basis: l.basis }));
+  const lines = recommendation
+    .filter((r) => r.section !== 'NOT_DUE')
+    .map((r, i) => ({ id: i + 1, ingredientId: r.ingredientId, itemText: null, qty: r.qty, unit: r.unit, origin: 'RECOMMENDED', recLineId: r.id, removed: false, note: null, updatedBy: access.username }));
+  const listId = (
+    await q(
+      `INSERT INTO joya_order_lists (location_id, list_date, origin, status, params_json, recommendation_json, lines_json, edits_json, is_demo, created_by)
+       VALUES (:l, :d, 'RECOMMENDATION', 'DRAFT', :p, :r, :x, '[]', :demo, :by)`,
+      {
+        l: locationId,
+        d: asOf,
+        p: JSON.stringify({ recommenderVersion: RECOMMENDER_VERSION, settings: result.settings, examplesUsed: result.examplesUsed }),
+        r: JSON.stringify(recommendation),
+        x: JSON.stringify(lines),
+        demo: demo ? 1 : 0,
+        by: createdBy || access.username,
+      },
+    )
+  ).insertId;
   await audit(access.username, 'ORDER_LIST_GENERATED', 'order_list', listId, locationId, { lines: result.lines.length, examples: result.examplesUsed.length });
   return { listId, existing: false };
 }
 
 export async function createManual(access, locationId, date) {
   assertLocation(access, locationId);
-  const id = (await q(`INSERT INTO joya_order_lists (location_id, list_date, origin, status, created_by) VALUES (:l, :d, 'MANUAL', 'DRAFT', :by)`, { l: locationId, d: date || todayLocal(), by: access.username })).insertId;
+  const id = (await q(`INSERT INTO joya_order_lists (location_id, list_date, origin, status, lines_json, edits_json, created_by) VALUES (:l, :d, 'MANUAL', 'DRAFT', '[]', '[]', :by)`, { l: locationId, d: date || todayLocal(), by: access.username })).insertId;
   await audit(access.username, 'ORDER_LIST_CREATED', 'order_list', id, locationId, { origin: 'MANUAL' });
   return { listId: id };
 }
@@ -189,21 +179,23 @@ export async function createManual(access, locationId, date) {
 export async function listLists(access, { locationIds, status, limit = 60 }) {
   if (!locationIds.length) return [];
   const st = status ? String(status).split(',').filter((s) => ['DRAFT', 'APPROVED', 'ORDERED', 'REJECTED'].includes(s)) : null;
+  const locs = inList('loc', locationIds);
+  const names = await source.locationNames();
   const rows = await q(
-    `SELECT l.*, loc.name AS location_name,
-            (SELECT COUNT(*) FROM joya_order_list_lines x WHERE x.list_id = l.id AND x.removed = 0) AS line_count
-       FROM joya_order_lists l JOIN joya_locations loc ON loc.id = l.location_id
-      WHERE l.location_id IN (${locationIds.map(Number).join(',')}) ${st?.length ? `AND l.status IN (${st.map((s) => `'${s}'`).join(',')})` : ''}
+    `SELECT l.id, l.location_id, l.list_date, l.origin, l.status, l.lines_json, l.is_demo, l.created_by, l.approved_by, l.approved_at, l.ordered_by, l.ordered_at
+       FROM joya_order_lists l
+      WHERE l.location_id IN (${locs.sql}) ${st?.length ? `AND l.status IN (${st.map((s) => `'${s}'`).join(',')})` : ''}
       ORDER BY l.list_date DESC, l.id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 60, 1), 300)}`,
+    locs.params,
   );
   return rows.map((r) => ({
     id: r.id,
     locationId: r.location_id,
-    locationName: r.location_name,
+    locationName: names.get(r.location_id) ?? null,
     date: ymd(r.list_date),
     origin: r.origin,
     status: r.status,
-    lines: Number(r.line_count),
+    lines: (parseJson(r.lines_json) || []).filter((x) => !x.removed).length,
     isDemo: !!r.is_demo,
     createdBy: r.created_by,
     approvedBy: r.approved_by,
@@ -213,25 +205,44 @@ export async function listLists(access, { locationIds, status, limit = 60 }) {
   }));
 }
 
+const ingredientNames = async (ids) => {
+  const list = [...new Set(ids.filter((x) => x != null).map(Number))];
+  return list.length ? new Map((await q(`SELECT id, name, unit FROM joya_ingredients WHERE id IN (${list.join(',')})`)).map((i) => [Number(i.id), i])) : new Map();
+};
+const SECTION_ORDER = ['SUGGESTED', 'CHECK', 'NOT_DUE'];
+
 export async function getList(access, id) {
-  const l = await one(`SELECT l.*, loc.name AS location_name FROM joya_order_lists l JOIN joya_locations loc ON loc.id = l.location_id WHERE l.id=:id`, { id });
+  const l = await one(`SELECT * FROM joya_order_lists WHERE id=:id`, { id });
   if (!l) throw err('NOT_FOUND', 'list not found');
   assertLocation(access, l.location_id);
-  const lines = await q(
-    `SELECT x.*, i.name AS ing_name, i.unit AS ing_unit FROM joya_order_list_lines x LEFT JOIN joya_ingredients i ON i.id = x.ingredient_id WHERE x.list_id=:id ORDER BY x.removed, x.origin DESC, i.name, x.id`,
-    { id },
-  );
-  const recs = await q(
-    `SELECT r.*, i.name AS ing_name FROM joya_order_recommendation_lines r JOIN joya_ingredients i ON i.id = r.ingredient_id WHERE r.list_id=:id ORDER BY FIELD(r.section,'SUGGESTED','CHECK','NOT_DUE'), i.name`,
-    { id },
-  );
-  const edits = await q(`SELECT * FROM joya_order_edits WHERE list_id=:id ORDER BY id`, { id });
+  const lines = parseJson(l.lines_json) || [];
+  const recs = parseJson(l.recommendation_json) || [];
+  const ings = await ingredientNames([...lines.map((x) => x.ingredientId), ...recs.map((r) => r.ingredientId)]);
   const recById = new Map(recs.map((r) => [r.id, r]));
+  const shaped = lines.map((x) => {
+    const rec = x.recLineId ? recById.get(x.recLineId) : null;
+    const ing = x.ingredientId != null ? ings.get(Number(x.ingredientId)) : null;
+    return {
+      id: x.id,
+      ingredientId: x.ingredientId ?? null,
+      name: ing?.name || x.itemText,
+      freeText: x.ingredientId == null,
+      qty: x.qty == null ? null : Number(x.qty),
+      unit: x.unit || ing?.unit || null,
+      origin: x.origin,
+      removed: !!x.removed,
+      note: x.note,
+      recommended: rec ? { qty: rec.qty == null ? null : Number(rec.qty), section: rec.section, method: rec.method, confidence: rec.confidence } : null,
+      changed: rec ? !!x.removed || Number(rec.qty ?? NaN) !== Number(x.qty ?? NaN) : true,
+      updatedBy: x.updatedBy,
+    };
+  });
+  shaped.sort((a, b) => Number(a.removed) - Number(b.removed) || String(b.origin).localeCompare(String(a.origin)) || String(a.name).localeCompare(String(b.name)) || a.id - b.id);
   return {
     list: {
       id: l.id,
       locationId: l.location_id,
-      locationName: l.location_name,
+      locationName: (await source.locationNames()).get(l.location_id) ?? null,
       date: ymd(l.list_date),
       origin: l.origin,
       status: l.status,
@@ -249,39 +260,32 @@ export async function getList(access, id) {
       final: parseJson(l.final_json),
       ordered: parseJson(l.ordered_json),
     },
-    lines: lines.map((x) => {
-      const rec = x.rec_line_id ? recById.get(x.rec_line_id) : null;
-      return {
-        id: x.id,
-        ingredientId: x.ingredient_id,
-        name: x.ing_name || x.item_text,
-        freeText: !x.ingredient_id,
-        qty: x.qty == null ? null : Number(x.qty),
-        unit: x.unit || x.ing_unit || null,
-        origin: x.origin,
-        removed: !!x.removed,
-        note: x.note,
-        recommended: rec ? { qty: rec.qty == null ? null : Number(rec.qty), section: rec.section, method: rec.method, confidence: rec.confidence } : null,
-        changed: rec ? !!x.removed || Number(rec.qty ?? NaN) !== Number(x.qty ?? NaN) : true,
-        updatedBy: x.updated_by,
-      };
-    }),
-    recommendation: recs.map((r) => ({
-      id: r.id,
-      ingredientId: r.ingredient_id,
-      name: r.ing_name,
-      section: r.section,
-      qty: r.qty == null ? null : Number(r.qty),
-      unit: r.unit,
-      method: r.method,
-      confidence: r.confidence,
-      basis: parseJson(r.basis_json),
-    })),
-    edits: edits.map((e) => ({ id: e.id, lineId: e.line_id, action: e.action, before: parseJson(e.before_json), after: parseJson(e.after_json), note: e.note, via: e.via, by: e.username, at: e.created_at })),
+    lines: shaped,
+    recommendation: recs
+      .map((r) => ({ id: r.id, ingredientId: r.ingredientId, name: ings.get(Number(r.ingredientId))?.name ?? null, section: r.section, qty: r.qty == null ? null : Number(r.qty), unit: r.unit, method: r.method, confidence: r.confidence, basis: r.basis }))
+      .sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section) || String(a.name).localeCompare(String(b.name))),
+    edits: parseJson(l.edits_json) || [],
   };
 }
 
-const lineSnap = (x) => (x ? { ingredientId: x.ingredient_id, itemText: x.item_text, qty: x.qty == null ? null : Number(x.qty), unit: x.unit, removed: !!x.removed, note: x.note } : null);
+/**
+ * Change one list row inside a transaction under a row lock: fn(row, { lines, addEdit }) may change
+ * `lines` and call addEdit({ lineId?, action, before?, after?, note? }); returns the extra columns to set.
+ */
+async function updateList(access, listId, { via = 'UI' } = {}, fn) {
+  await tx(async (c) => {
+    const row = await lockRow(c, 'joya_order_lists', listId);
+    if (!row) throw err('NOT_FOUND', 'list not found');
+    const lines = parseJson(row.lines_json) || [];
+    const edits = parseJson(row.edits_json) || [];
+    const addEdit = (e) => edits.push({ id: nextId(edits), lineId: null, before: null, after: null, note: null, ...e, via, by: access.username, at: new Date().toISOString() });
+    const set = (await fn(row, { lines, addEdit })) || {};
+    const cols = { ...set, lines_json: JSON.stringify(lines), edits_json: JSON.stringify(edits) };
+    await c.q(`UPDATE joya_order_lists SET ${Object.keys(cols).map((k) => `${k}=:${k}`).join(', ')} WHERE id=:id`, { ...cols, id: listId });
+  });
+}
+
+const lineSnap = (x) => (x ? { ingredientId: x.ingredientId ?? null, itemText: x.itemText ?? null, qty: x.qty == null ? null : Number(x.qty), unit: x.unit, removed: !!x.removed, note: x.note } : null);
 
 /**
  * Validate a change set without saving (the chat preview), or apply it.
@@ -321,47 +325,25 @@ export async function checkOps(access, listId, ops) {
 
 export async function applyOps(access, listId, ops, { via = 'UI' } = {}) {
   const checked = await checkOps(access, listId, ops);
-  await tx(async (c) => {
+  await updateList(access, listId, { via }, (row, { lines, addEdit }) => {
+    if (row.status !== 'DRAFT') throw err('CONFLICT', `the list is ${row.status}; reopen it to edit`);
     for (const o of checked) {
       if (o.op === 'add') {
-        const id = (
-          await c.q(`INSERT INTO joya_order_list_lines (list_id, ingredient_id, item_text, qty, unit, origin, note, updated_by) VALUES (:l, :i, :t, :q, :u, 'ADDED', :n, :by)`, {
-            l: listId,
-            i: o.ingredientId,
-            t: o.ingredientId ? null : o.name,
-            q: o.qty,
-            u: o.unit,
-            n: o.note,
-            by: access.username,
-          })
-        ).insertId;
-        await c.q(`INSERT INTO joya_order_edits (list_id, line_id, action, after_json, note, via, username) VALUES (:l, :id, 'ADD', :a, :n, :via, :u)`, {
-          l: listId,
-          id,
-          a: JSON.stringify({ ingredientId: o.ingredientId, name: o.name, qty: o.qty, unit: o.unit }),
-          n: o.note,
-          via,
-          u: access.username,
-        });
+        const id = nextId(lines);
+        lines.push({ id, ingredientId: o.ingredientId, itemText: o.ingredientId ? null : o.name, qty: o.qty, unit: o.unit, origin: 'ADDED', recLineId: null, removed: false, note: o.note, updatedBy: access.username });
+        addEdit({ lineId: id, action: 'ADD', after: { ingredientId: o.ingredientId, name: o.name, qty: o.qty, unit: o.unit }, note: o.note });
         continue;
       }
-      const before = await c.one(`SELECT * FROM joya_order_list_lines WHERE id=:id AND list_id=:l FOR UPDATE`, { id: o.lineId, l: listId });
-      if (o.op === 'set_qty') await c.q(`UPDATE joya_order_list_lines SET qty=:q, removed=0, updated_by=:u WHERE id=:id`, { q: o.qty, u: access.username, id: o.lineId });
-      if (o.op === 'remove') await c.q(`UPDATE joya_order_list_lines SET removed=1, updated_by=:u WHERE id=:id`, { u: access.username, id: o.lineId });
-      if (o.op === 'restore') await c.q(`UPDATE joya_order_list_lines SET removed=0, updated_by=:u WHERE id=:id`, { u: access.username, id: o.lineId });
-      if (o.op === 'note') await c.q(`UPDATE joya_order_list_lines SET note=:n, updated_by=:u WHERE id=:id`, { n: o.note, u: access.username, id: o.lineId });
-      const after = await c.one(`SELECT * FROM joya_order_list_lines WHERE id=:id`, { id: o.lineId });
+      const line = lines.find((l) => l.id === o.lineId);
+      if (!line) throw err('BAD_REQUEST', `line ${o.lineId} is not on this list`);
+      const before = lineSnap(line);
+      if (o.op === 'set_qty') Object.assign(line, { qty: o.qty, removed: false });
+      if (o.op === 'remove') line.removed = true;
+      if (o.op === 'restore') line.removed = false;
+      if (o.op === 'note') line.note = o.note;
+      line.updatedBy = access.username;
       const action = { set_qty: 'SET_QTY', remove: 'REMOVE', restore: 'RESTORE', note: 'NOTE' }[o.op];
-      await c.q(`INSERT INTO joya_order_edits (list_id, line_id, action, before_json, after_json, note, via, username) VALUES (:l, :id, :a, :b, :af, :n, :via, :u)`, {
-        l: listId,
-        id: o.lineId,
-        a: action,
-        b: JSON.stringify(lineSnap(before)),
-        af: JSON.stringify(lineSnap(after)),
-        n: o.op === 'note' ? null : o.note,
-        via,
-        u: access.username,
-      });
+      addEdit({ lineId: o.lineId, action, before, after: lineSnap(line), note: o.op === 'note' ? null : o.note });
     }
   });
   return getList(access, listId);
@@ -375,15 +357,12 @@ export async function approve(access, listId, { note } = {}) {
   const noQty = active.filter((l) => l.qty == null);
   if (noQty.length) throw Object.assign(err('BAD_REQUEST', `set a quantity or remove: ${noQty.map((l) => l.name).join(', ')}`), { details: { lineIds: noQty.map((l) => l.id) } });
   const final = active.map((l) => ({ lineId: l.id, ingredientId: l.ingredientId, name: l.name, qty: l.qty, unit: l.unit, origin: l.origin, recommendedQty: l.recommended?.qty ?? null, note: l.note || null }));
-  await q(`UPDATE joya_order_lists SET status='APPROVED', final_json=:f, approved_by=:u, approved_at=NOW(), note=COALESCE(:n, note) WHERE id=:id AND status='DRAFT'`, {
-    f: JSON.stringify(final),
-    u: access.username,
-    n: note || null,
-    id: listId,
+  await updateList(access, listId, {}, (row, { addEdit }) => {
+    if (row.status !== 'DRAFT') throw err('CONFLICT', `the list is ${row.status}`);
+    addEdit({ action: 'APPROVE', after: { lines: final.length }, note: note || null });
+    return { status: 'APPROVED', final_json: JSON.stringify(final), approved_by: access.username, approved_at: new Date(), note: note || row.note };
   });
-  await q(`INSERT INTO joya_order_edits (list_id, action, after_json, note, username) VALUES (:l, 'APPROVE', :a, :n, :u)`, { l: listId, a: JSON.stringify({ lines: final.length }), n: note || null, u: access.username });
   await audit(access.username, 'ORDER_LIST_APPROVED', 'order_list', listId, list.locationId, { lines: final.length });
-  await refreshPatterns(list.locationId).catch(() => {});
   return getList(access, listId);
 }
 
@@ -405,40 +384,34 @@ export async function markOrdered(access, listId, { note, changes } = {}) {
       })
       .filter(Boolean);
   }
-  await q(`UPDATE joya_order_lists SET status='ORDERED', ordered_json=:o, ordered_by=:u, ordered_at=NOW(), note=COALESCE(:n, note) WHERE id=:id AND status='APPROVED'`, {
-    o: JSON.stringify(ordered),
-    u: access.username,
-    n: note || null,
-    id: listId,
-  });
-  await q(`INSERT INTO joya_order_edits (list_id, action, after_json, note, username) VALUES (:l, 'MARK_ORDERED', :a, :n, :u)`, {
-    l: listId,
-    a: JSON.stringify({ lines: ordered.length, changed: ordered.filter((x) => x.changedAtOrder).length }),
-    n: note || null,
-    u: access.username,
+  await updateList(access, listId, {}, (row, { addEdit }) => {
+    if (row.status !== 'APPROVED') throw err('CONFLICT', 'only an approved list can be marked as ordered');
+    addEdit({ action: 'MARK_ORDERED', after: { lines: ordered.length, changed: ordered.filter((x) => x.changedAtOrder).length }, note: note || null });
+    return { status: 'ORDERED', ordered_json: JSON.stringify(ordered), ordered_by: access.username, ordered_at: new Date(), note: note || row.note };
   });
   await audit(access.username, 'ORDER_LIST_ORDERED', 'order_list', listId, list.locationId, { lines: ordered.length });
-  await refreshPatterns(list.locationId).catch(() => {});
   return getList(access, listId);
 }
 
 export async function reject(access, listId, { note } = {}) {
   const { list } = await getList(access, listId);
   if (!['DRAFT', 'APPROVED'].includes(list.status)) throw err('CONFLICT', `the list is ${list.status}`);
-  await q(`UPDATE joya_order_lists SET status='REJECTED', rejected_by=:u, rejected_at=NOW(), note=COALESCE(:n, note) WHERE id=:id`, { u: access.username, n: note || null, id: listId });
-  await q(`INSERT INTO joya_order_edits (list_id, action, note, username) VALUES (:l, 'REJECT', :n, :u)`, { l: listId, n: note || null, u: access.username });
+  await updateList(access, listId, {}, (row, { addEdit }) => {
+    addEdit({ action: 'REJECT', note: note || null });
+    return { status: 'REJECTED', rejected_by: access.username, rejected_at: new Date(), note: note || row.note };
+  });
   await audit(access.username, 'ORDER_LIST_REJECTED', 'order_list', listId, list.locationId, { note });
-  if (list.status === 'APPROVED') await refreshPatterns(list.locationId).catch(() => {});
   return getList(access, listId);
 }
 
 export async function reopen(access, listId) {
   const { list } = await getList(access, listId);
   if (list.status !== 'APPROVED') throw err('CONFLICT', 'only an approved (not yet ordered) list can be reopened');
-  await q(`UPDATE joya_order_lists SET status='DRAFT', final_json=NULL, approved_by=NULL, approved_at=NULL WHERE id=:id`, { id: listId });
-  await q(`INSERT INTO joya_order_edits (list_id, action, before_json, username) VALUES (:l, 'REOPEN', :b, :u)`, { l: listId, b: JSON.stringify(list.final), u: access.username });
+  await updateList(access, listId, {}, (row, { addEdit }) => {
+    addEdit({ action: 'REOPEN', before: list.final });
+    return { status: 'DRAFT', final_json: null, approved_by: null, approved_at: null };
+  });
   await audit(access.username, 'ORDER_LIST_REOPENED', 'order_list', listId, list.locationId, {});
-  await refreshPatterns(list.locationId).catch(() => {});
   return getList(access, listId);
 }
 
@@ -452,26 +425,16 @@ export async function listText(access, listId) {
 
 // ---------------------------------------------------------------- learned patterns
 
-/** Recompute and store what was learned per item for one location (after each approve/order). */
-export async function refreshPatterns(locationId) {
-  const asOf = todayLocal();
-  const inputs = await buildInputs(locationId, asOf);
-  const res = recommend(inputs);
-  await q(`DELETE FROM joya_item_patterns WHERE location_id=:l`, { l: locationId });
-  for (const p of res.patterns) {
-    if (!p.examples && !p.suggestedCount) continue;
-    await q(`INSERT INTO joya_item_patterns (location_id, ingredient_id, stats_json, examples) VALUES (:l, :i, :s, :n)`, { l: locationId, i: p.ingredientId, s: JSON.stringify(p), n: p.examples });
-  }
-  return res.patterns.length;
-}
-
+/** What was learned per item for one location, computed now from the final lists (nothing stored). */
 export async function getPatterns(access, locationId) {
   assertLocation(access, locationId);
-  const rows = await q(
-    `SELECT p.*, i.name, i.unit FROM joya_item_patterns p JOIN joya_ingredients i ON i.id = p.ingredient_id WHERE p.location_id=:l ORDER BY p.examples DESC, i.name`,
-    { l: locationId },
-  );
-  return rows.map((r) => ({ ingredientId: r.ingredient_id, name: r.name, unit: r.unit, examples: r.examples, stats: parseJson(r.stats_json), computedAt: r.computed_at }));
+  const computedAt = new Date().toISOString();
+  const res = recommend(await buildInputs(locationId, todayLocal()));
+  const patterns = res.patterns.filter((p) => p.examples || p.suggestedCount);
+  const ings = await ingredientNames(patterns.map((p) => p.ingredientId));
+  return patterns
+    .map((p) => ({ ingredientId: p.ingredientId, name: ings.get(Number(p.ingredientId))?.name ?? null, unit: ings.get(Number(p.ingredientId))?.unit ?? null, examples: p.examples, stats: p, computedAt }))
+    .sort((a, b) => b.examples - a.examples || String(a.name).localeCompare(String(b.name)));
 }
 
 // ---------------------------------------------------------------- shortages
@@ -497,12 +460,14 @@ export async function reportShortage(access, { locationId, ingredientId = null, 
 
 export async function listShortages(access, { locationIds, days = 30 }) {
   if (!locationIds.length) return [];
+  const locs = inList('loc', locationIds);
+  const names = await source.locationNames();
   const rows = await q(
-    `SELECT s.*, i.name AS ing_name, l.name AS location_name FROM joya_shortages s LEFT JOIN joya_ingredients i ON i.id = s.ingredient_id JOIN joya_locations l ON l.id = s.location_id
-      WHERE s.location_id IN (${locationIds.map(Number).join(',')}) AND s.reported_date >= :a ORDER BY s.reported_date DESC, s.id DESC`,
-    { a: addDays(todayLocal(), -Math.min(Math.max(parseInt(days, 10) || 30, 1), 365)) },
+    `SELECT s.*, i.name AS ing_name FROM joya_shortages s LEFT JOIN joya_ingredients i ON i.id = s.ingredient_id
+      WHERE s.location_id IN (${locs.sql}) AND s.reported_date >= :a ORDER BY s.reported_date DESC, s.id DESC`,
+    { ...locs.params, a: addDays(todayLocal(), -Math.min(Math.max(parseInt(days, 10) || 30, 1), 365)) },
   );
-  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: r.location_name, ingredientId: r.ingredient_id, name: r.ing_name || r.item_text, unmatched: !r.ingredient_id, date: ymd(r.reported_date), note: r.note, by: r.reported_by, isDemo: !!r.is_demo }));
+  return rows.map((r) => ({ id: r.id, locationId: r.location_id, locationName: names.get(r.location_id) ?? null, ingredientId: r.ingredient_id, name: r.ing_name || r.item_text, unmatched: !r.ingredient_id, date: ymd(r.reported_date), note: r.note, by: r.reported_by, isDemo: !!r.is_demo }));
 }
 
 export async function deleteShortage(access, id) {

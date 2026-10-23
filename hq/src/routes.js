@@ -10,11 +10,10 @@
  * Source data (sales, employees, clock times, payroll) is read from the Allegro API — see services/source.js.
  */
 import { Router } from 'express';
-import { requireJoya, requireAdmin, requirePayroll, scopeLocations } from './access.js';
+import { requireJoya, requireAdmin, requirePayroll, scopeLocations, canLocation } from './access.js';
 import { requireMachineKey } from './auth/machineKey.js';
 import { q, parseJson, todayLocal } from './db.js';
 import * as master from './services/master.js';
-import * as imports from './services/imports.js';
 import * as repl from './services/replenishment.js';
 import * as staffing from './services/staffing.js';
 import * as analytics from './services/analytics.js';
@@ -26,7 +25,6 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, apiBase } from '../lib/allegro.js';
-import { syncLocations } from './services/source.js';
 
 const r = Router();
 const STATUS = { BAD_REQUEST: 400, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, MANDATORY_MIN: 422, UPSTREAM: 502, NOT_LOADED: 503 };
@@ -48,6 +46,8 @@ const id = (req, key = 'id') => {
   if (!Number.isFinite(n) || n <= 0) throw Object.assign(new Error(`bad ${key}`), { code: 'BAD_REQUEST' });
   return n;
 };
+// a location id is an Allegro branch id (a string)
+const locId = (v) => (v == null || v === '' ? null : String(v).trim());
 const locsOf = (req) => scopeLocations(req.joya, req.query.locationIds ?? req.query.locationId);
 function period(req) {
   const to = req.query.to || addDays(todayLocal(), -1);
@@ -77,7 +77,7 @@ r.get(
       isAdmin: a.isAdmin,
       payroll: a.payroll,
       locations,
-      demo: await quality.demoFlags(locations.map((l) => l.id)),
+      demo: Object.fromEntries(locations.map((l) => [l.id, l.isDemo])),
       roles: await master.listRoles(),
       shifts: await master.listShifts(a.locationIds),
       integrations: quality.integrations(null),
@@ -86,7 +86,6 @@ r.get(
   }),
 );
 r.get('/joya/locations', h(async (req) => ({ locations: await master.listLocations(req.joya) })));
-r.post('/joya/locations', requireAdmin, h(async (req) => ({ location: await master.upsertLocation(req.joya, req.body || {}) })));
 r.get('/joya/users', requireAdmin, h(async () => ({ users: await master.listUsers() })));
 r.get('/joya/settings', h(async () => ({ settings: await master.listSettings() })));
 r.put('/joya/settings/:name', requireAdmin, h(async (req) => (await master.saveSetting(req.joya, req.params.name, req.body?.value), { settings: await master.listSettings() })));
@@ -97,8 +96,8 @@ r.post('/joya/shifts', h(async (req) => ({ shift: await master.saveShift(req.joy
 r.get(
   '/joya/menu',
   h(async (req) => {
-    const loc = Number(req.query.locationId);
-    if (!scopeLocations(req.joya, loc).length) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
+    const loc = locId(req.query.locationId);
+    if (!canLocation(req.joya, loc)) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
     return { items: await master.listMenu(loc) };
   }),
 );
@@ -119,31 +118,16 @@ r.get('/joya/source/check', h(async () => {
     return { connected: false, url: apiBase(), error: e.message };
   }
 }));
-// read Allegro again now (after a change there): forget the 5-minute memory cache, look for new branches
+// read Allegro again now (after a change there): forget the 5-minute memory cache (also the branches)
 r.post('/joya/source/refresh', h(async () => {
   clearAllegroCache();
-  await syncLocations({ force: true });
   return { ok: true };
 }));
 
-// ---------------------------------------------------------------- imports
-r.get('/joya/import/kinds', h(async (req) => ({ kinds: imports.describeKinds(req.joya) })));
-r.post('/joya/import/preview', h(async (req) => imports.preview(req.joya, req.body || {})));
-r.post(
-  '/joya/import',
-  h(async (req) => {
-    const out = await imports.runImport(req.joya, req.body || {});
-    if (req.body?.kind === 'ORDER_HISTORY' && req.body.locationId) await repl.refreshPatterns(Number(req.body.locationId)).catch(() => {});
-    return out;
-  }),
-);
-r.get('/joya/import/batches', h(async (req) => ({ batches: await imports.listBatches(req.joya, { locationIds: req.joya.locationIds, limit: req.query.limit }) })));
-r.delete('/joya/import/batches/:id', h(async (req) => imports.deleteBatch(req.joya, id(req))));
-
 // ---------------------------------------------------------------- replenishment
 r.get('/joya/orders', h(async (req) => ({ lists: await repl.listLists(req.joya, { locationIds: locsOf(req), status: req.query.status, limit: req.query.limit }) })));
-r.post('/joya/orders/generate', h(async (req) => repl.generate(req.joya, Number(req.body?.locationId), req.body?.date, { force: !!req.body?.force })));
-r.post('/joya/orders/manual', h(async (req) => repl.createManual(req.joya, Number(req.body?.locationId), req.body?.date)));
+r.post('/joya/orders/generate', h(async (req) => repl.generate(req.joya, locId(req.body?.locationId), req.body?.date, { force: !!req.body?.force })));
+r.post('/joya/orders/manual', h(async (req) => repl.createManual(req.joya, locId(req.body?.locationId), req.body?.date)));
 r.get('/joya/orders/:id', h(async (req) => repl.getList(req.joya, id(req))));
 r.post('/joya/orders/:id/check-ops', h(async (req) => ({ preview: await repl.checkOps(req.joya, id(req), req.body?.ops) })));
 r.post('/joya/orders/:id/ops', h(async (req) => repl.applyOps(req.joya, id(req), req.body?.ops)));
@@ -152,32 +136,27 @@ r.post('/joya/orders/:id/ordered', h(async (req) => repl.markOrdered(req.joya, i
 r.post('/joya/orders/:id/reject', h(async (req) => repl.reject(req.joya, id(req), req.body || {})));
 r.post('/joya/orders/:id/reopen', h(async (req) => repl.reopen(req.joya, id(req))));
 r.get('/joya/orders/:id/text', h(async (req) => ({ text: await repl.listText(req.joya, id(req)) })));
-r.get('/joya/patterns', h(async (req) => ({ patterns: await repl.getPatterns(req.joya, Number(req.query.locationId)) })));
-r.post('/joya/patterns/refresh', h(async (req) => {
-  const loc = Number(req.body?.locationId);
-  if (!scopeLocations(req.joya, loc).length) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
-  return { items: await repl.refreshPatterns(loc) };
-}));
+r.get('/joya/patterns', h(async (req) => ({ patterns: await repl.getPatterns(req.joya, locId(req.query.locationId)) })));
 r.get('/joya/shortages', h(async (req) => ({ shortages: await repl.listShortages(req.joya, { locationIds: locsOf(req), days: req.query.days }) })));
 r.post('/joya/shortages', h(async (req) => repl.reportShortage(req.joya, req.body || {})));
 r.delete('/joya/shortages/:id', h(async (req) => (await repl.deleteShortage(req.joya, id(req)), { ok: true })));
 
 // ---------------------------------------------------------------- staffing
-r.get('/joya/staffing/rules', h(async (req) => ({ rules: await staffing.listRules(req.joya, req.query.locationId ? Number(req.query.locationId) : null) })));
+r.get('/joya/staffing/rules', h(async (req) => ({ rules: await staffing.listRules(req.joya, locId(req.query.locationId)) })));
 r.post('/joya/staffing/rules', h(async (req) => ({ id: await staffing.saveRule(req.joya, req.body || {}) })));
 r.delete('/joya/staffing/rules/:id', h(async (req) => (await staffing.deleteRule(req.joya, id(req)), { ok: true })));
-r.get('/joya/staffing/baseline', h(async (req) => ({ baseline: await staffing.listBaseline(req.joya, Number(req.query.locationId)) })));
-r.post('/joya/staffing/baseline', h(async (req) => (await staffing.saveBaseline(req.joya, req.body || {}), { baseline: await staffing.listBaseline(req.joya, Number(req.body?.locationId)) })));
+r.get('/joya/staffing/baseline', h(async (req) => ({ baseline: await staffing.listBaseline(req.joya, locId(req.query.locationId)) })));
+r.post('/joya/staffing/baseline', h(async (req) => (await staffing.saveBaseline(req.joya, req.body || {}), { baseline: await staffing.listBaseline(req.joya, locId(req.body?.locationId)) })));
 r.get(
   '/joya/staffing/forecast',
   h(async (req) => {
-    const loc = Number(req.query.locationId);
-    if (!scopeLocations(req.joya, loc).length) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
+    const loc = locId(req.query.locationId);
+    if (!canLocation(req.joya, loc)) throw Object.assign(new Error('no access to this location'), { code: 'FORBIDDEN' });
     return forecastWeek(loc, staffing.sundayOf(req.query.weekStart || addDays(todayLocal(), 7)));
   }),
 );
 r.get('/joya/staffing/plans', h(async (req) => ({ plans: await staffing.listPlans(req.joya, { locationIds: locsOf(req), limit: req.query.limit }) })));
-r.post('/joya/staffing/plans/propose', h(async (req) => staffing.propose(req.joya, Number(req.body?.locationId), req.body?.weekStart, { force: !!req.body?.force })));
+r.post('/joya/staffing/plans/propose', h(async (req) => staffing.propose(req.joya, locId(req.body?.locationId), req.body?.weekStart, { force: !!req.body?.force })));
 r.get('/joya/staffing/plans/:id', h(async (req) => staffing.getPlan(req.joya, id(req))));
 r.post('/joya/staffing/plans/:id/check-ops', h(async (req) => ({ preview: await staffing.checkOps(req.joya, id(req), req.body?.ops) })));
 r.post('/joya/staffing/plans/:id/ops', h(async (req) => staffing.applyOps(req.joya, id(req), req.body?.ops)));
@@ -205,21 +184,15 @@ r.get('/joya/labor/summary', h(async (req) => analytics.laborSummary(req.joya, l
 r.get('/joya/labor/planned-vs-actual', h(async (req) => analytics.plannedVsActual(req.joya, locsOf(req), ...period(req))));
 
 // ---------------------------------------------------------------- payroll checks
-r.post('/joya/payroll/checks', h(async (req) => payroll.runChecks(req.joya, Number(req.body?.locationId), req.body?.period)));
+r.post('/joya/payroll/checks', h(async (req) => payroll.runChecks(req.joya, locId(req.body?.locationId), req.body?.period)));
 r.get('/joya/payroll/issues', h(async (req) => ({ issues: await payroll.listIssues(req.joya, { locationIds: locsOf(req), period: req.query.period, status: req.query.status }) })));
 r.post('/joya/payroll/issues/:id/resolve', h(async (req) => (await payroll.resolveIssue(req.joya, id(req), req.body || {}), { ok: true })));
 r.post('/joya/payroll/corrections', h(async (req) => payroll.correctAttendance(req.joya, req.body || {})));
-r.get('/joya/payroll/attendance', h(async (req) => ({ rows: await payroll.attendanceRows(req.joya, Number(req.query.locationId), ...period(req)) })));
-r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLines(req.joya, Number(req.query.locationId), req.query.period)));
+r.get('/joya/payroll/attendance', h(async (req) => ({ rows: await payroll.attendanceRows(req.joya, locId(req.query.locationId), ...period(req)) })));
+r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLines(req.joya, locId(req.query.locationId), req.query.period)));
 
-// ---------------------------------------------------------------- quality, tasks, inquiries, overview, audit
+// ---------------------------------------------------------------- quality, overview, audit
 r.get('/joya/quality', h(async (req) => quality.report(req.joya, locsOf(req))));
-r.get('/joya/tasks', h(async (req) => ({ tasks: await work.listTasks(req.joya, { locationIds: locsOf(req), status: req.query.status, owner: req.query.owner, overdue: req.query.overdue === '1' }) })));
-r.post('/joya/tasks', h(async (req) => ({ task: await work.saveTask(req.joya, req.body || {}) })));
-r.get('/joya/inquiries', h(async (req) => ({ inquiries: await work.listInquiries(req.joya, { locationIds: locsOf(req), status: req.query.status }) })));
-r.post('/joya/inquiries', h(async (req) => ({ inquiry: await work.saveInquiry(req.joya, req.body || {}) })));
-r.get('/joya/inquiries/:id', h(async (req) => ({ inquiry: await work.getInquiry(req.joya, id(req)) })));
-r.post('/joya/inquiries/:id/action', h(async (req) => ({ inquiry: await work.inquiryAction(req.joya, id(req), req.body || {}) })));
 r.get('/joya/overview', h(async (req) => work.overview(req.joya, locsOf(req), { days: req.query.days || 7 })));
 r.get(
   '/joya/audit',

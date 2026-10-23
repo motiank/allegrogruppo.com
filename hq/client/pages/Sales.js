@@ -7,7 +7,7 @@ import { api, qs } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { useJoya } from '../context.js';
 import { ChangeSentence } from './Overview.js';
-import { Page, Card, Grid, Row, Btn, Badge, Field, Input, Tabs, SourceLine, Val, Loading, Empty, ErrorBox, useLoad, useAction, fmtILS, fmtNum, fmtPctSigned, fmtDay, addDays, Term } from '../ui.js';
+import { Page, Card, Grid, Row, Btn, Badge, Field, Input, Tabs, SourceLine, Val, Loading, Empty, ErrorBox, useLoad, fmtILS, fmtNum, fmtPctSigned, fmtDay, addDays, Term } from '../ui.js';
 
 const useStyles = createUseStyles((theme) => ({
   picker: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '0.5rem' },
@@ -20,7 +20,6 @@ const useStyles = createUseStyles((theme) => ({
   days: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.4rem', marginTop: '0.5rem' },
   day: { border: `1px solid ${theme.border}`, borderRadius: 6, padding: '0.35rem 0.5rem', fontSize: '0.76rem' },
   dayMissing: { borderStyle: 'dashed', borderColor: '#d29922', color: '#d29922' },
-  ok: { fontSize: '0.78rem', color: '#3fb950' },
 }));
 
 function Chart({ days }) {
@@ -67,8 +66,6 @@ export default function Sales() {
   const [to, setTo] = useState(() => addDays(today, -1));
   const [from, setFrom] = useState(() => addDays(today, -7));
   const [tab, setTab] = useState('summary');
-  const [taskDone, setTaskDone] = useState({});
-  const act = useAction();
   const scope = j.scope;
   const preset = (n) => {
     setTo(addDays(today, -1));
@@ -76,15 +73,6 @@ export default function Sales() {
   };
   const path = { summary: '/sales/summary', daily: '/sales/daily', shifts: '/sales/shifts', dishes: '/sales/dishes', anomalies: '/sales/anomalies' }[tab];
   const { data, error, loading } = useLoad(() => api(`${path}${qs({ locationIds: scope, from, to, limit: tab === 'dishes' ? 60 : undefined })}`), [path, scope.join(','), from, to]);
-
-  const createTask = (a) =>
-    act.run(async () => {
-      await api('/tasks', {
-        method: 'POST',
-        body: { locationId: a.locationId, title: t('joya.sales.taskTitle', { date: a.date, pct: fmtPctSigned(a.deviationPct) }), dueDate: addDays(today, 3), sourceKind: 'SALES_ANOMALY', sourceRef: a.date },
-      });
-      setTaskDone((s) => ({ ...s, [`${a.locationId}-${a.date}`]: true }));
-    });
 
   const body = () => {
     if (loading) return <Loading />; // the previous tab's data has another shape
@@ -207,7 +195,6 @@ export default function Sales() {
           </div>
           <SourceLine source={data.source} period={data.period} />
         </Card>
-        <ErrorBox error={act.error} />
         {data.anomalies.length === 0 && <Empty>{t('joya.sales.noAnomalies')}</Empty>}
         <Grid>
           {data.anomalies.map((a) => (
@@ -217,11 +204,6 @@ export default function Sales() {
               <Row label={t('joya.sales.expected')}><Term>{fmtILS(a.expected)}</Term></Row>
               <Row label={t('joya.ov.checks')}><Term>{fmtNum(a.checks)}</Term></Row>
               <div className={c.formula}>{t('joya.sales.basis', { weeks: a.basis.weeks })}</div>
-              {taskDone[`${a.locationId}-${a.date}`] ? (
-                <div className={c.ok}>✓ {t('joya.sales.taskCreated')}</div>
-              ) : (
-                <Btn small disabled={act.busy} onClick={() => createTask(a)} style={{ marginTop: '0.4rem' }}>{t('joya.sales.createTask')}</Btn>
-              )}
             </Card>
           ))}
         </Grid>

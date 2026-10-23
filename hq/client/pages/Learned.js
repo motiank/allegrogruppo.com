@@ -1,7 +1,7 @@
 // /learned — what the system learned per item for one location, from the final order lists.
 import React from 'react';
 import { api } from '../api.js';
-import { Page, Card, Row, Btn, Badge, Val, Loading, Empty, ErrorBox, useLoad, useAction, fmtDay, fmtWhen, Term } from '../ui.js';
+import { Page, Card, Row, Badge, Val, Loading, Empty, ErrorBox, useLoad, fmtDay, fmtWhen, Term } from '../ui.js';
 import { useJoya } from '../context.js';
 import { useT } from '../i18n/index.js';
 
@@ -9,25 +9,11 @@ export default function Learned() {
   const { t } = useT();
   const j = useJoya();
   const loc = j.oneLocationId;
-  const { data, error, loading, reload } = useLoad(() => (loc == null ? Promise.resolve({ patterns: [] }) : api(`/patterns?locationId=${loc}`)), [loc]);
-  const act = useAction();
-  const refresh = () =>
-    act.run(async () => {
-      await api('/patterns/refresh', { method: 'POST', body: { locationId: loc } });
-      reload();
-    });
+  const { data, error, loading } = useLoad(() => (loc == null ? Promise.resolve({ patterns: [] }) : api(`/patterns?locationId=${loc}`)), [loc]);
   const patterns = data?.patterns || [];
 
   return (
-    <Page
-      title={t('joya.learned.title')}
-      sub={j.locName(loc)}
-      actions={
-        <Btn onClick={refresh} disabled={act.busy || loc == null}>
-          {t('joya.refresh')}
-        </Btn>
-      }
-    >
+    <Page title={t('joya.learned.title')} sub={j.locName(loc)}>
       {j.locationId == null && loc != null && <div style={{ fontSize: '0.8rem', marginBottom: '0.6rem' }}>{t('joya.learned.showingFirst', { name: j.locName(loc) })}</div>}
       <Card title={t('joya.learned.howTitle')}>
         {['how1', 'how2', 'how3', 'how4', 'how5', 'how6'].map((k) => (
@@ -36,7 +22,6 @@ export default function Learned() {
           </div>
         ))}
       </Card>
-      <ErrorBox error={act.error} />
       <ErrorBox error={error} />
       {loading && <Loading />}
       {data && !patterns.length && <Empty>{t('joya.learned.none')}</Empty>}

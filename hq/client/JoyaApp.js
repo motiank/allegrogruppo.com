@@ -19,12 +19,8 @@ import Rules from './pages/Rules.js';
 import Labor from './pages/Labor.js';
 import Payroll from './pages/Payroll.js';
 import Sales from './pages/Sales.js';
-import Tasks from './pages/Tasks.js';
-import Inquiries from './pages/Inquiries.js';
-import Inquiry from './pages/Inquiry.js';
 import Ask from './pages/Ask.js';
 import Data from './pages/Data.js';
-import Import from './pages/Import.js';
 import Settings from './pages/Settings.js';
 import Menu from './pages/Menu.js';
 import Employees from './pages/Employees.js';
@@ -110,7 +106,7 @@ function Shell() {
               ))}
             </select>
           )}
-          <select className={c.loc} value={j.locationId ?? ''} onChange={(e) => j.setLocationId(e.target.value ? Number(e.target.value) : null)} aria-label={t('joya.location')}>
+          <select className={c.loc} value={j.locationId ?? ''} onChange={(e) => j.setLocationId(e.target.value || null)} aria-label={t('joya.location')}>
             {me.isAdmin && <option value="">{j.companyKey != null && j.companies.length > 1 ? t('joya.allCompanyLocations') : t('joya.allLocations')}</option>}
             {j.inCompany.map((l) => (
               <option key={l.id} value={l.id}>
@@ -180,12 +176,8 @@ function Shell() {
         <Route path="payroll" element={<Payroll />} />
         <Route path="employees" element={<Employees />} />
         <Route path="sales" element={<Sales />} />
-        <Route path="tasks" element={<Tasks />} />
-        <Route path="inquiries" element={<Inquiries />} />
-        <Route path="inquiries/:id" element={<Inquiry />} />
         <Route path="ask" element={<Ask />} />
         <Route path="data" element={<Data />} />
-        <Route path="import" element={<Import />} />
         <Route path="menu" element={<Menu />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
