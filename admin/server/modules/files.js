@@ -11,7 +11,9 @@ import { executeSql } from "../sources/dbpool.js";
 import users from "../sources/users.js";
 import { nameKey } from "../uploads/workbook.js";
 import { recognizeFile, applyPermissions, KINDS } from "../uploads/recognize.js";
-import { importTabitDetailed, importBankHapoalim } from "../uploads/importers.js";
+import crypto from "crypto";
+import { importTabitDetailed, importBankHapoalim, saveTabitDetailed } from "../uploads/importers.js";
+import { TabitShiftClient, tabitShiftConfig, reportToParsed, mergeParsed, nextMonth } from "../uploads/tabitShift.js";
 import { Router as r404 } from "./r404.js";
 
 const require = createRequire(import.meta.url);
@@ -137,6 +139,80 @@ const setUploadResult = (id, status, resultJson) =>
     result: JSON.stringify(resultJson ?? null),
   });
 
+// Branches whose attendance comes from the Tabit Shift API: "tabit_shift" = their Tabit app ids
+// (Raanana has two, kitchen and floor; they are merged into one import of the branch).
+const TABIT_SHIFT_BRANCHES = (RESTAURANTS.restaurants || []).flatMap((g) =>
+  (g.branches || []).filter((b) => (b.tabit_shift || []).length).map((b) => ({ rest: b.id, name: b.name, apps: b.tabit_shift })),
+);
+
+const localMonth = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(d).slice(0, 7);
+// The current month; in the first 5 days also the previous one (late clock fixes).
+export const defaultTabitShiftMonths = (now = new Date()) => {
+  const cur = localMonth(now);
+  const day = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", day: "2-digit" }).format(now));
+  if (day > 5) return [cur];
+  const prev = localMonth(new Date(now.getTime() - 6 * 24 * 3600 * 1000));
+  return [prev, cur];
+};
+
+/**
+ * Tabit Shift API → tabit_shifts, for each month × branch, like an approved upload of the detailed report
+ * (logged in file_uploads as TABIT_SHIFT_API). dryRun: reads and counts, writes nothing.
+ */
+export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryRun = false, by = null } = {}) => {
+  const client = new TabitShiftClient(tabitShiftConfig());
+  await client.login(tabitShiftConfig());
+  const results = [];
+  try {
+    const visible = new Set((await client.siblings()).map((s) => Number(s.id)));
+    for (const month of months) {
+      for (const b of TABIT_SHIFT_BRANCHES) {
+        const base = { month, rest: b.rest, branch: b.name, apps: b.apps };
+        try {
+          const missing = b.apps.filter((id) => !visible.has(Number(id)));
+          if (missing.length) throw new Error(`this Tabit Shift login cannot see app ${missing.join(", ")}`);
+          const reports = [];
+          for (const app of b.apps) {
+            await client.switchApp(app);
+            reports.push(await client.detailedReport(month));
+          }
+          const parsed = mergeParsed(reports.map((r) => reportToParsed(r, month)));
+          const shifts = parsed.employees.reduce((n, e) => n + e.shifts.length, 0);
+          if (dryRun) {
+            const noClockOut = parsed.employees.reduce((n, e) => n + e.shifts.filter((s) => s.clock_in && !s.clock_out).length, 0);
+            results.push({ ...base, status: "DRY_RUN", result: { employees: parsed.employees.length, shifts, shiftsWithoutClockOut: noClockOut } });
+            continue;
+          }
+          const body = JSON.stringify(parsed);
+          const r = {
+            name: `Tabit Shift API ${month} — ${b.name} (app ${b.apps.join(" + ")})`,
+            hash: crypto.createHash("sha256").update(body).digest("hex"),
+            size: Buffer.byteLength(body),
+            kind: "TABIT_SHIFT_API",
+            period: { from: `${month}-01`, to: `${nextMonth(month)}-01` },
+          };
+          const uploadId = await logUpload({ user: { email: by } }, r, "FAILED", { started: true }, { rest: b.rest });
+          try {
+            const out = await saveTabitDetailed(parsed, { rest: b.rest, uploadId });
+            const status = out.skippedSheets.length ? "PARTIAL" : "OK";
+            await setUploadResult(uploadId, status, out);
+            results.push({ ...base, status, result: out });
+          } catch (e) {
+            await setUploadResult(uploadId, "FAILED", { error: e.message }).catch(() => {});
+            throw e;
+          }
+        } catch (e) {
+          results.push({ ...base, status: "FAILED", error: e.message });
+        }
+      }
+    }
+  } finally {
+    await client.logout();
+  }
+  if (!dryRun) ctxCache = null;
+  return results;
+};
+
 export const Router = function ({ restricted = false } = {}) {
   const router = express.Router();
 
@@ -255,6 +331,22 @@ export const Router = function ({ restricted = false } = {}) {
     } catch (err) {
       console.error("files/log error:", err);
       res.status(500).json({ error: err.message || "log failed" });
+    }
+  });
+
+  // Admin only: read the Tabit Shift detailed reports now. Body { months?: ['YYYY-MM'], dryRun?: true }.
+  router.post("/tabit-shift", async (req, res) => {
+    if (restricted) return res.status(403).json({ error: "admin only" });
+    const months = req.body?.months;
+    if (months != null && !(Array.isArray(months) && months.length && months.length <= 3 && months.every((m) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m)))) {
+      return res.status(400).json({ error: "months: up to 3 of 'YYYY-MM'" });
+    }
+    try {
+      const results = await fetchTabitShift({ months: months || undefined, dryRun: req.body?.dryRun === true, by: req.user?.email || null });
+      res.json({ results });
+    } catch (err) {
+      console.error("files/tabit-shift error:", err.message);
+      res.status(502).json({ error: err.message || "Tabit Shift fetch failed" });
     }
   });
 

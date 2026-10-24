@@ -6,6 +6,7 @@ import cron from "node-cron";
 import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { fetchTabitShift } from "./modules/files.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -149,4 +150,22 @@ app.listen(PORT, () => {
   );
 
   console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
+
+  // Tabit Shift attendance → tabit_shifts, daily after the business day ends (06:00). Only where
+  // TABIT_SHIFT_AUTO=1 (the production server), so a dev admin on the same DB does not run it too.
+  if (process.env.TABIT_SHIFT_AUTO === "1") {
+    cron.schedule(
+      "30 6 * * *",
+      async () => {
+        try {
+          const results = await fetchTabitShift({ by: "tabit-shift-auto" });
+          for (const r of results) console.log(`[Cron] Tabit Shift ${r.month} ${r.branch}: ${r.status} ${r.error || JSON.stringify(r.result)}`);
+        } catch (e) {
+          console.error(`[Cron] Tabit Shift error: ${e.message}`);
+        }
+      },
+      { scheduled: true, timezone: "Asia/Jerusalem" },
+    );
+    console.log("[Cron] Tabit Shift scheduled to run daily at 6:30 AM");
+  }
 });

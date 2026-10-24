@@ -14,6 +14,8 @@ import { parseTabitDetailed, parseBankHapoalim, peekTabitRoster } from "./parser
 //   null          — recognized, but nothing is imported (the reason says why)
 export const KINDS = {
   TABIT_DETAILED: { label: "Tabit — detailed attendance report (דוח מפורט)", handler: "server" },
+  // Not a file: the same report read from the Tabit Shift API (POST /admin/files/tabit-shift, daily job).
+  TABIT_SHIFT_API: { label: "Tabit Shift — detailed report from the API (no file)", handler: null },
   TABIT_ROSTER: { label: "Tabit — employee list (רשימת עובדים)", handler: "roster" },
   TABIT_SUMMARY: { label: "Tabit — summaries report (דוח סיכומים)", handler: null },
   MICPAL_INDEX: { label: "Micpal — employee data (נתוני עובד)", handler: "payrollIndex" },
