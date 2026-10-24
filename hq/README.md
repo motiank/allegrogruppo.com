@@ -170,17 +170,22 @@ minimum are refused (422 `MANDATORY_MIN`); chain-wide and mandatory rules are ch
 ### Learned staffing (no plan, no rules) — `src/lib/shiftModel.js`, `services/shiftModel.js`
 
 The chat's "how many employees per shift next week" (`staffing_forecast_week`) and "what does an average
-shift look like" (`shift_profile`) need no plan and no stored rule. From the last `profileWeeks` (13) weeks:
-- **Profile:** per weekday × shift, the average diners (sit-down checks, order type 1) and deliveries (every
-  other check). Morning = checks opened before `shiftSplit` (17:00), evening = from it (after midnight = the
+shift look like" (`shift_profile`) need no plan and no stored rule. From the last `profileWeeks` (8) weeks:
+- **Profile:** per weekday × shift, the diners (sit-down checks, order type 1) and deliveries (every other
+  check) as an exponential moving average (EMA) over the weeks, span `profileEmaWeeks` (4): each newer week
+  weighs α = 2 / (span + 1) = 0.4, so the profile follows the season quickly. Morning = checks opened before `shiftSplit` (17:00), evening = from it (after midnight = the
   evening of the business date).
 - **Ratios:** per Allegro role name and shift, diners ÷ people, from the shifts that have both sales and staff
   (Allegro `/shifts/by-shift`, computed by the Allegro admin from the Tabit clock times). Kitchen roles
-  (`kitchenRoles`, or a role mapped to `cook`) count 1 delivery as `deliveryAsDiners` (1) diners.
-- **Forecast:** people = average load ÷ ratio, rounded to the nearest; a role that worked in ≥ `minPresence`
-  (50 %) of those weekday shifts gets at least 1. The result lists the usual headcount next to it.
-Settings (`joya_settings` 'staffing', all optional): `profileWeeks`, `shiftSplit`, `deliveryAsDiners`,
-`minPresence`, `minHoursInShift`, `kitchenRoles`. Without `/shifts/by-shift` (older Allegro) or with no clock
+  (`kitchenRoles`, or a role mapped to `cook`) count 1 delivery as `deliveryAsDiners` (1) diners. A role
+  with ≥ `minWeekdayShifts` (3) shifts on a weekday also gets that weekday's own ratio (a busy Friday serves
+  more diners per person than a quiet Monday). Every Tabit role counts, trainees too; Rosh Pina has no roles
+  in Tabit, so its forecast is one total (`בלת"מ`).
+- **Forecast:** people = profile load ÷ ratio (the weekday's when learned), rounded to the nearest, at least 1
+  — only for roles that worked in ≥ `minPresence` (50 %) of those weekday shifts (a rare role's ratio comes
+  from its few shifts, so it would add a person to every shift). The result lists the usual headcount next to it.
+Settings (`joya_settings` 'staffing', all optional): `profileWeeks`, `profileEmaWeeks`, `shiftSplit`, `deliveryAsDiners`,
+`minPresence`, `minWeekdayShifts`, `minHoursInShift`, `kitchenRoles`. Without `/shifts/by-shift` (older Allegro) or with no clock
 times, the answer gives the expected diners only and says why.
 
 ## Asking in words

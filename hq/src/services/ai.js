@@ -69,13 +69,13 @@ export const CALCS = {
   },
   shift_profile: {
     params: '{ locationId, weeks? }',
-    about: 'the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)',
+    about: 'the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)',
     run: (a, p) => shiftModel.profile(a, String(p.locationId), { weeks: p.weeks }),
   },
   staffing_forecast_week: {
     params: '{ locationId, weekStart?: "YYYY-MM-DD" (a Sunday; default next week), weeks? }',
     about:
-      'people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks',
+      'people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks',
     run: (a, p) => shiftModel.forecastWeek(a, String(p.locationId), { weekStart: p.weekStart, weeks: p.weeks }),
   },
   staffing_plan_lines: {

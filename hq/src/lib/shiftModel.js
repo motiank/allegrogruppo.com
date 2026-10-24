@@ -2,13 +2,18 @@
 //
 //   1. Shift profile: for every past date with sales, the load of each shift — diners of sit-down checks,
 //      and delivery/takeaway checks. Morning = checks opened before `split`, evening = from `split`
-//      (a check opened after midnight belongs to the evening of its business date). Averaged per
-//      weekday × shift: "Sunday morning 53 diners".
+//      (a check opened after midnight belongs to the evening of its business date). Per weekday × shift an
+//      exponential moving average (EMA) over the weeks, oldest first, so recent weeks weigh more: "Sunday
+//      morning 53 diners". Span N weeks → each week's weight is α = 2 / (N + 1), the older value keeps 1 − α.
 //   2. Ratios: from the shifts that have both sales and clock data (Allegro /shifts/by-shift), per role
 //      and shift: load ÷ people = "1 waiter per 37 diners". Kitchen roles count each delivery as
 //      `deliveryAsDiners` diners; other roles count diners only. Only shifts where the role worked count.
-//   3. Forecast of a date + shift: the profile's average load ÷ the ratio, rounded to the nearest; a role
-//      that worked in at least `minPresence` of those weekday shifts gets at least 1.
+//      Also per weekday when the role worked at least `minWeekdayShifts` of them: on a busy Friday each
+//      person serves more diners than on a quiet Monday, so one all-week ratio over-staffs the peaks.
+//   3. Forecast of a date + shift: the profile's load ÷ the ratio (of that weekday when learned), rounded to the nearest, at least 1.
+//      Only roles that worked in at least `minPresence` of those weekday shifts: the ratio of a rare role
+//      is learned from the few shifts it worked, so load ÷ ratio is about 1 on every shift — it would
+//      add a person to every shift for a role that comes once a week.
 // Pure functions; src/services/shiftModel.js loads the data.
 
 export const SHIFTS = ['morning', 'evening'];
@@ -39,21 +44,35 @@ export function loadByShift(checks, split = '17:00') {
   return out;
 }
 
-/** Average load per weekday × shift over the dates that had sales. */
-export function shiftProfile(load) {
+/**
+ * Load per weekday × shift over the dates that had sales: an EMA with a span of `emaWeeks` weeks (the
+ * first date starts it), or the plain average when emaWeeks is not given.
+ */
+export function shiftProfile(load, { emaWeeks } = {}) {
+  const alpha = emaWeeks ? 2 / (Number(emaWeeks) + 1) : null;
   const acc = {};
-  for (const [date, day] of Object.entries(load)) {
+  for (const date of Object.keys(load).sort()) {
+    const day = load[date];
     const wd = weekdayOf(date);
     for (const s of SHIFTS) {
       const a = (acc[`${wd}:${s}`] ||= { weekday: wd, shift: s, days: 0, diners: 0, deliveries: 0, open: 0 });
       a.days++;
-      a.diners += day[s].diners;
-      a.deliveries += day[s].deliveries;
+      if (alpha == null) {
+        a.diners += day[s].diners;
+        a.deliveries += day[s].deliveries;
+      } else if (a.days === 1) {
+        a.diners = day[s].diners;
+        a.deliveries = day[s].deliveries;
+      } else {
+        a.diners = alpha * day[s].diners + (1 - alpha) * a.diners;
+        a.deliveries = alpha * day[s].deliveries + (1 - alpha) * a.deliveries;
+      }
       if (day[s].checks) a.open++;
     }
   }
+  const avg = (a, x) => r1(alpha == null ? x / a.days : x);
   return Object.values(acc)
-    .map((a) => ({ weekday: a.weekday, shift: a.shift, days: a.days, openDays: a.open, diners: r1(a.diners / a.days), deliveries: r1(a.deliveries / a.days) }))
+    .map((a) => ({ weekday: a.weekday, shift: a.shift, days: a.days, openDays: a.open, diners: avg(a, a.diners), deliveries: avg(a, a.deliveries) }))
     .sort((x, y) => x.weekday - y.weekday || SHIFTS.indexOf(x.shift) - SHIFTS.indexOf(y.shift));
 }
 
@@ -62,9 +81,9 @@ const loadFor = (slot, kitchen, deliveryAsDiners) => slot.diners + (kitchen ? sl
 /**
  * Learn per role and shift. staff: rows { date, shift, role, people, hours } (Allegro /shifts/by-shift).
  * Only dates with both sales and clock rows are used.
- * → [{ role, shift, kitchen, perPerson, shifts, people, hoursPerPerson, presence: { [weekday]: share }, usual: { [weekday]: avg people } }]
+ * → [{ role, shift, kitchen, perPerson, perPersonWd: { [weekday]: ratio }, shifts, people, hoursPerPerson, presence: { [weekday]: share }, usual: { [weekday]: avg people } }]
  */
-export function learnRatios(load, staff, { isKitchen = () => false, deliveryAsDiners = 1 } = {}) {
+export function learnRatios(load, staff, { isKitchen = () => false, deliveryAsDiners = 1, minWeekdayShifts = 3 } = {}) {
   const staffDates = new Set(staff.map((r) => r.date));
   const dates = Object.keys(load).filter((d) => staffDates.has(d));
   const by = new Map(); // role:shift → rows by date
@@ -89,6 +108,7 @@ export function learnRatios(load, staff, { isKitchen = () => false, deliveryAsDi
     let n = 0;
     const present = {};
     const peopleWd = {};
+    const loadWd = {};
     for (const [d, v] of m) {
       if (!v.people) continue;
       n++;
@@ -98,15 +118,18 @@ export function learnRatios(load, staff, { isKitchen = () => false, deliveryAsDi
       const wd = weekdayOf(d);
       present[wd] = (present[wd] || 0) + 1;
       peopleWd[wd] = (peopleWd[wd] || 0) + v.people;
+      loadWd[wd] = (loadWd[wd] || 0) + loadFor(load[d][shift], kitchen, deliveryAsDiners);
     }
     if (!n) continue;
     const presence = {};
     const usual = {};
+    const perPersonWd = {};
     for (const wd of Object.keys(daysOfWeekday)) {
       presence[wd] = Math.round(((present[wd] || 0) / daysOfWeekday[wd]) * 100) / 100;
       usual[wd] = r1((peopleWd[wd] || 0) / daysOfWeekday[wd]);
+      if ((present[wd] || 0) >= minWeekdayShifts && loadWd[wd] > 0) perPersonWd[wd] = r1(loadWd[wd] / peopleWd[wd]);
     }
-    out.push({ role, shift, kitchen, perPerson: loadSum > 0 ? r1(loadSum / people) : null, shifts: n, people, hoursPerPerson: r1(hours / people), presence, usual });
+    out.push({ role, shift, kitchen, perPerson: loadSum > 0 ? r1(loadSum / people) : null, perPersonWd, shifts: n, people, hoursPerPerson: r1(hours / people), presence, usual });
   }
   return out.sort((a, b) => SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift) || b.people - a.people);
 }
@@ -126,12 +149,11 @@ export function forecastShifts(dates, profile, ratios, { deliveryAsDiners = 1, m
       const roles = [];
       for (const r of ratios.filter((x) => x.shift === shift)) {
         const presence = r.presence[wd] ?? 0;
-        if (!r.perPerson || presence === 0) continue;
+        const perPerson = r.perPersonWd?.[wd] ?? r.perPerson;
+        if (!perPerson || presence < minPresence) continue;
         const load = p.diners + (r.kitchen ? p.deliveries * deliveryAsDiners : 0);
-        let people = Math.round(load / r.perPerson);
-        if (presence >= minPresence) people = Math.max(1, people);
-        if (!people) continue;
-        roles.push({ role: r.role, people, load: r1(load), perPerson: r.perPerson, usual: r.usual[wd] ?? null, presence });
+        const people = Math.max(1, Math.round(load / perPerson));
+        roles.push({ role: r.role, people, load: r1(load), perPerson, usual: r.usual[wd] ?? null, presence });
       }
       out.push({ date, weekday: wd, shift, diners: p.diners, deliveries: p.deliveries, basedOnDays: p.days, roles, totalPeople: roles.reduce((a, x) => a + x.people, 0) });
     }

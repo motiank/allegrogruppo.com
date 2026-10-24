@@ -245,6 +245,14 @@ t('profile: average diners and deliveries per weekday and shift', () => {
   const p = shiftProfile(loadByShift(smChecks));
   assert.deepEqual(p.map((x) => [x.weekday, x.shift, x.diners, x.deliveries, x.days]), [[0, 'morning', 40, 10, 2], [0, 'evening', 80, 0, 2]]);
 });
+t('profile: an EMA puts more weight on recent weeks (dates in any order)', () => {
+  const day = (diners, deliveries) => ({ morning: { diners, deliveries, checks: 1 }, evening: { diners: 0, deliveries: 0, checks: 0 } });
+  const load = { '2026-09-20': day(40, 4), '2026-09-06': day(10, 0), '2026-09-13': day(20, 2) };
+  // span 3 weeks → α = 0.5: 10 → 0.5·20 + 0.5·10 = 15 → 0.5·40 + 0.5·15 = 27.5
+  const mo = shiftProfile(load, { emaWeeks: 3 }).find((x) => x.shift === 'morning');
+  assert.deepEqual([mo.diners, mo.deliveries, mo.days, mo.openDays], [27.5, 2.5, 3, 3]); // deliveries 0 → 1 → 2.5
+  assert.equal(shiftProfile(load).find((x) => x.shift === 'morning').diners, 23.3); // the plain average
+});
 t('ratios: diners per person per role; kitchen counts deliveries; forecast rounds to the nearest', () => {
   const load = loadByShift(smChecks);
   const staff = [];
@@ -281,6 +289,34 @@ t('ratios: a shift without clock data is not used; a rare role gets no minimum o
   const ev = forecastShifts(['2026-10-25'], prof, r, { minPresence: 0.6 })[0];
   assert.equal(ev.roles.find((x) => x.role === 'ראנר'), undefined); // 20 / 80 rounds to 0 and it is rare
   assert.equal(ev.roles.find((x) => x.role === 'מלצר').people, 1); // 20 / 40 = 0.5 → 1
+  // a busy shift: 60 / 80 rounds to 1, but the runner worked only half of the Sundays → still not needed
+  const busy = forecastShifts(['2026-10-25'], [{ ...prof[0], diners: 60 }], r, { minPresence: 0.6 })[0];
+  assert.equal(busy.roles.find((x) => x.role === 'ראנר'), undefined);
+  assert.equal(busy.roles.find((x) => x.role === 'מלצר').people, 2); // 60 / 40 = 1.5 → 2
+});
+
+t('ratios: learned per weekday when the role worked enough of them (a busy Friday is not a quiet Monday)', () => {
+  // 3 Mondays: 20 diners, 1 waiter; 3 Fridays: 120 diners, 3 waiters (40 each); 2 Tuesdays: 30 diners, 1 waiter
+  const load = {};
+  const staff = [];
+  const add = (date, diners, people) => {
+    load[date] = { morning: { diners: 0, deliveries: 0, checks: 0 }, evening: { diners, deliveries: 0, checks: 1 } };
+    staff.push({ date, shift: 'evening', role: 'מלצר', people, hours: 6 * people });
+  };
+  ['2026-09-07', '2026-09-14', '2026-09-21'].forEach((d) => add(d, 20, 1));
+  ['2026-09-11', '2026-09-18', '2026-09-25'].forEach((d) => add(d, 120, 3));
+  ['2026-09-08', '2026-09-15'].forEach((d) => add(d, 30, 1));
+  const r = learnRatios(load, staff);
+  const w = r.find((x) => x.role === 'מלצר');
+  assert.equal(w.perPerson, 34.3); // all days: 480 diners / 14 people
+  assert.deepEqual(w.perPersonWd, { 1: 20, 5: 40 }); // Tuesday: only 2 shifts → no own ratio
+  const prof = [1, 2, 5].map((wd, i) => ({ weekday: wd, shift: 'evening', days: 3, openDays: 3, diners: [20, 30, 120][i], deliveries: 0 }));
+  const f = forecastShifts(['2026-10-26', '2026-10-27', '2026-10-30'], prof, r);
+  assert.deepEqual(f.map((x) => [x.weekday, x.roles[0].people, x.roles[0].perPerson]), [
+    [1, 1, 20],
+    [2, 1, 34.3], // 30 / 34.3 → 1, from the all-days ratio
+    [5, 3, 40], // 120 / 40; the all-days ratio would say 120 / 34.3 → 4
+  ]);
 });
 
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);

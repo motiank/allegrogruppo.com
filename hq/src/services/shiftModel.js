@@ -13,10 +13,12 @@ const KITCHEN = ['טבח', 'פס קר', 'פס חם', 'מחבתות', 'טאבון
 async function settings() {
   const st = await getSettings('staffing');
   return {
-    weeks: st.profileWeeks || 13,
+    weeks: st.profileWeeks || 8,
+    emaWeeks: st.profileEmaWeeks || 4,
     split: st.shiftSplit || '17:00',
     deliveryAsDiners: st.deliveryAsDiners ?? 1,
     minPresence: st.minPresence ?? 0.5,
+    minWeekdayShifts: st.minWeekdayShifts ?? 3,
     minHours: st.minHoursInShift ?? 1,
     kitchen: st.kitchenRoles || KITCHEN,
   };
@@ -38,8 +40,8 @@ export async function profile(access, locationId, { weeks } = {}) {
   return {
     period: { from: h.from, to: h.to },
     source: 'Beecomm checks via Allegro (/beecomm/orders/stored)',
-    method: `average per weekday and shift over the dates with sales; morning = checks opened before ${s.split}, evening = from ${s.split}; diners = sit-down checks, deliveries = all other checks`,
-    shifts: shiftProfile(h.load),
+    method: `per weekday and shift, an exponential moving average (EMA, span ${s.emaWeeks} weeks — recent weeks weigh more) over the dates with sales in the last ${w} weeks; morning = checks opened before ${s.split}, evening = from ${s.split}; diners = sit-down checks, deliveries = all other checks`,
+    shifts: shiftProfile(h.load, { emaWeeks: s.emaWeeks }),
   };
 }
 
@@ -55,8 +57,8 @@ export async function forecastWeek(access, locationId, { weekStart, weeks } = {}
   const staff = await source.shiftStaff(locationId, h.from, h.to, { split: s.split, minHours: s.minHours });
   const aliases = await source.roleAliases();
   const isKitchen = (role) => s.kitchen.includes(role) || aliases.get(role) === 'cook';
-  const prof = shiftProfile(h.load);
-  const ratios = staff.available ? learnRatios(h.load, staff.rows, { isKitchen, deliveryAsDiners: s.deliveryAsDiners }) : [];
+  const prof = shiftProfile(h.load, { emaWeeks: s.emaWeeks });
+  const ratios = staff.available ? learnRatios(h.load, staff.rows, { isKitchen, deliveryAsDiners: s.deliveryAsDiners, minWeekdayShifts: s.minWeekdayShifts }) : [];
   const dates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const staffDays = new Set((staff.rows || []).map((r) => r.date)).size;
   return {
@@ -64,8 +66,9 @@ export async function forecastWeek(access, locationId, { weekStart, weeks } = {}
     learnedFrom: { from: h.from, to: h.to, salesDays: Object.keys(h.load).length, staffDays },
     source: 'Beecomm checks + Allegro /shifts/by-shift (Tabit clock times)',
     method:
-      `expected load = average of the same weekday and shift over the last ${w} weeks; people = load ÷ (diners per person of that role and shift, learned from the same weeks), ` +
-      `rounded to the nearest; a role that worked in at least ${Math.round(s.minPresence * 100)}% of those shifts gets at least 1; kitchen roles count 1 delivery as ${s.deliveryAsDiners} diner(s)`,
+      `expected load = exponential moving average (EMA, span ${s.emaWeeks} weeks — recent weeks weigh more) of the same weekday and shift over the last ${w} weeks; people = load ÷ (diners per person of that role and shift, learned from the same weeks — from the same weekday ` +
+      `when the role worked at least ${s.minWeekdayShifts} of them, else from all days), ` +
+      `rounded to the nearest, at least 1; only roles that worked in at least ${Math.round(s.minPresence * 100)}% of those weekday shifts; kitchen roles count 1 delivery as ${s.deliveryAsDiners} diner(s)`,
     staffData: staff.available ? (staffDays ? 'ok' : 'none in the period') : staff.reason,
     ratios: ratios.map(({ role, shift, kitchen, perPerson, shifts, hoursPerPerson }) => ({ role, shift, kitchen, perPerson, shifts, hoursPerPerson })),
     shifts: forecastShifts(dates, prof, ratios, { deliveryAsDiners: s.deliveryAsDiners, minPresence: s.minPresence }),
