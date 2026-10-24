@@ -53,7 +53,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   internal calls — can change): daily 06:30 in the admin where `TABIT_SHIFT_AUTO=1` (server only), login
   `TABIT_SHIFT_*` in `.env`, branch → Tabit apps in `shared/restaurants.json` `tabit_shift` (Raanana = kitchen +
   floor, merged). By hand: `node scripts/tabit_shift_fetch.js --month YYYY-MM [--apply]` (dry run without
-  `--apply`). Sep + Oct 2026 imported 2026-10-24. The Upload page still takes the Excel file.
+  `--apply`). Jul–Oct 2026 imported 2026-10-24. The Upload page still takes the Excel file.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

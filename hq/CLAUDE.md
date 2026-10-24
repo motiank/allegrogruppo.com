@@ -47,10 +47,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - Main menu = three chat areas: מלאי ורכש (`/stock`), כח אדם (`/people`), ביצועים (`/performance`)
   (`client/pages/Area.js`, chat context `AREA` 1/2/3, suggestions while typing). Other pages keep their routes but
   are not in the menu. Settings is at the bottom for a chain admin.
-- Manpower forecast (`src/lib/shiftModel.js`, calcs `shift_profile` + `staffing_forecast_week`): average diners and
-  deliveries per weekday × shift over 13 weeks (morning < 17:00 ≤ evening), per-role "diners per person" learned
+- Manpower forecast (`src/lib/shiftModel.js`, calcs `shift_profile` + `staffing_forecast_week`): diners and
+  deliveries per weekday × shift over 8 weeks (EMA, span 4 — owner 2026-10-24) (morning < 17:00 ≤ evening), per-role "diners per person" learned
   from the branch's own shifts (owner: learn the numbers, do not use fixed ones), kitchen roles count 1 delivery as
-  1 diner, round to the nearest. Staff per shift comes from the admin's `/shifts/by-shift` (built, not wired in yet).
+  1 diner, round to the nearest. Staff per shift comes from the admin's `/shifts/by-shift` (Tabit clock times, read
+  daily from the Tabit Shift API since 2026-10-24; Jul–Oct 2026 loaded). Ratios per weekday when learned; rare
+  roles (< minPresence) are not forecast; trainees count as staff (owner).
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
 - Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove
   them with the prompt's `draft` field at the next prompt change). Unit 25, runner 8, smoke 63 + 1 known failure ("the raised quantity
@@ -61,8 +63,8 @@ Open, in order:
 1. **Production tables**: `hq/sql/add-joya.sql` (the simplified 10 tables) on the `allegro` DB. Ask the owner
    first; only `CREATE TABLE IF NOT EXISTS` / `INSERT IGNORE`. Then log in at
    https://hq.allegrogruppo.com with an admin e-mail and check `/api/joya/me`.
-2. **`/shifts/by-shift` in the admin** (committed 5017c4b on `feat/local-api`, not yet used by Joya) + **Tabit uploads** → then check Raanana's real
-   forecast in the כח אדם chat ("כמה עובדים צריך בכל משמרת בשבוע הבא?").
+2. **Manpower forecast on real data** (by-shift wired; Tabit clock data Jul–Oct 2026 loaded; diners = EMA span 4
+   over 8 weeks). Check the answers with the owner — some shifts are still 2–5 above the usual headcount.
 3. Next manpower tasks with the owner (the chat is the main interface; prefer prompt fixes in
    `runner/hq-analyst.js` over new pages; run `npm run eval` after each prompt change).
 4. The admin login security problems (root `CLAUDE.md`) before managers get the link.
