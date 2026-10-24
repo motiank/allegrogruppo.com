@@ -33,8 +33,11 @@ const bulk = async (conn, sql, rows) => {
 
 // Tabit detailed report → tabit_shifts. Replaces the month's rows of every employee in the file
 // (other employees of the same branch/month stay, so two partial reports can be uploaded).
-export const importTabitDetailed = async (buffer, { rest, uploadId }) => {
-  const parsed = parseTabitDetailed(await loadWorkbook(buffer));
+export const importTabitDetailed = async (buffer, { rest, uploadId }) =>
+  saveTabitDetailed(parseTabitDetailed(await loadWorkbook(buffer)), { rest, uploadId });
+
+// The same for a report already read ({ month, employees, skipped }) — the Excel file or the Tabit Shift API.
+export const saveTabitDetailed = async (parsed, { rest, uploadId }) => {
   if (!parsed.month) throw new Error("the month of the report was not found");
   const month = parsed.month;
   return inTransaction(async (conn) => {

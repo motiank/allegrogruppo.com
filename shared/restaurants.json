@@ -29,9 +29,9 @@
       "mic_company": "096",
       "branches": [
         { "id": "5fd7030f4f421bfe0e2e13bd", "name": "הרצליה", "ontopo": 2, "astrateg": 0 },
-        { "id": "5ff419934676f0fddabaef3a", "name": "רעננה", "ontopo": 3, "astrateg": 9 },
-        { "id": "6012624f0d491ef6429e127c", "name": "רמת החיל", "ontopo": 0, "astrateg": 1 },
-        { "id": "655ef6eb9df0c279bbfb7482", "name": "ראש פינה", "ontopo": -1, "astrateg": 2 }
+        { "id": "5ff419934676f0fddabaef3a", "name": "רעננה", "ontopo": 3, "astrateg": 9, "tabit_shift": [4212, 1198] },
+        { "id": "6012624f0d491ef6429e127c", "name": "רמת החיל", "ontopo": 0, "astrateg": 1, "tabit_shift": [551] },
+        { "id": "655ef6eb9df0c279bbfb7482", "name": "ראש פינה", "ontopo": -1, "astrateg": 2, "tabit_shift": [4709] }
       ]
     },
     {

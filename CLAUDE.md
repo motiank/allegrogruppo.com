@@ -49,8 +49,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
 - **Open — admin work in progress, uncommitted** in the working copy: `GET /shifts/by-shift` (people and clock
   hours per date × shift × role from `tabit_shifts`; spec from the Joya side), and payroll edits in `Shifts.js`,
   `payroll.js`, `tlush.js`. Joya HQ already reads `/shifts/by-shift` (it says "not available yet" until it exists).
-- **Open — Tabit detailed reports** are not uploaded yet (`tabit_shifts` empty), so clock times and the manpower
-  forecast have no data.
+- **Tabit detailed reports come from the Tabit Shift API** (`admin/server/uploads/tabitShift.js`, the web app's
+  internal calls — can change): daily 06:30 in the admin where `TABIT_SHIFT_AUTO=1` (server only), login
+  `TABIT_SHIFT_*` in `.env`, branch → Tabit apps in `shared/restaurants.json` `tabit_shift` (Raanana = kitchen +
+  floor, merged). By hand: `node scripts/tabit_shift_fetch.js --month YYYY-MM [--apply]` (dry run without
+  `--apply`). Sep + Oct 2026 imported 2026-10-24. The Upload page still takes the Excel file.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.
