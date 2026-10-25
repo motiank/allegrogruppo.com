@@ -9,6 +9,7 @@ import ShikImportXL, {
   detectShikRateConflicts,
 } from "./ShikImportXL.js";
 import { buildTlush, tlushToShikRows, tlushToMicRows } from "./tlush.js";
+import { fetchTabitShift } from "./files.js";
 import {
   normalizeRoleWage,
   normalizeRoles,
@@ -58,6 +59,7 @@ const serializeRoles = (roles) =>
   );
 const {
   extractEmployees,
+  extractEmployeesFromTabitReports,
 } = require("../../../payroll-summary/payroll_summary.js");
 const ExcelJS = require("exceljs");
 const RESTAURANTS = require("../../../shared/restaurants.json");
@@ -830,6 +832,121 @@ function classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet) {
   };
 }
 
+// An extract result (Excel files or Tabit Shift reports) → the /extract response: every employee, and the ones
+// not in the employees table yet.
+async function extractResponse(rest, result) {
+  const { employees, exceptions, month, shiftIssues, hourCapWarnings } = result;
+  const existingKeys = await fetchExistingKeys(rest);
+  const newOnly = employees.filter((e) => {
+    for (const k of matchKeysOf(e)) {
+      if (existingKeys.has(k)) return false;
+    }
+    return true;
+  });
+
+  const newRows = newOnly.map((e) => ({
+    rest,
+    name: e.name,
+    ID_nmbr: e.ID_nmbr,
+    clockId: e.clockId ?? null,
+    roles: e.roles,
+    payroll_data: e.payroll_data,
+  }));
+
+  const allRows = employees.map((e) => ({
+    rest,
+    name: e.name,
+    ID_nmbr: e.ID_nmbr,
+    clockId: e.clockId ?? null,
+    roles: e.roles,
+    payroll_data: e.payroll_data,
+    role_extras: e.role_extras || {},
+    workdays: e.workdays,
+    global: e.global,
+    netGross: e.netGross,
+    work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
+    daily_breakdown:
+      e.daily_breakdown && typeof e.daily_breakdown === "object"
+        ? e.daily_breakdown
+        : {},
+    daily_hours:
+      e.daily_hours && typeof e.daily_hours === "object" ? e.daily_hours : {},
+    notes: Array.isArray(e.notes) ? e.notes : [],
+  }));
+
+  return {
+    employees: newRows,
+    allEmployees: allRows,
+    month,
+    exceptions,
+    shiftIssues: shiftIssues || [],
+    hourCapWarnings: hourCapWarnings || [],
+    totalExtracted: employees.length,
+    alreadyExisting: employees.length - newOnly.length,
+  };
+}
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const TABIT_REPORTS_MISSING =
+  "The table tabit_shift_reports does not exist yet (scripts/utils/create_tabit_shift_reports_table.sql). Upload the Excel files instead.";
+
+// The months of this branch in tabit_shift_reports, newest first: [{ month, fetched_at, apps, employees }].
+async function tabitReportMonths(rest) {
+  const [rows] = await executeSql(
+    `SELECT month, MIN(fetched_at) AS fetched_at, COUNT(*) AS apps, SUM(employees) AS employees
+       FROM tabit_shift_reports WHERE rest = :rest GROUP BY month ORDER BY month DESC`,
+    { rest },
+  );
+  return (rows || []).map((r) => ({
+    month: r.month,
+    fetched_at: r.fetched_at,
+    apps: Number(r.apps),
+    employees: Number(r.employees),
+  }));
+}
+
+// An update of a saved payroll from Tabit: copy each employee's מפרעה (in_advance, typed by hand) from the
+// saved payroll rows into the new extract. One person = the saved rows with the same ID number (a person
+// renamed in Tabit gets a second employees record, and a month can have a saved row for each name), else the
+// same employee_id; the מפרעה comes from the row updated last. Returns the names of the saved people that the
+// new extract does not have.
+async function keepSavedAdvance(rest, month, allRows) {
+  const [rows] = await executeSql(
+    `SELECT p.employee_id, p.payroll_data, p.updated_at, e.name, e.ID_nmbr
+       FROM payroll p JOIN employees e ON e.employee_id = p.employee_id
+      WHERE p.rest = :rest AND p.month = :month
+      ORDER BY p.updated_at`,
+    { rest, month },
+  );
+  const personKey = (id, idNmbr) => {
+    const n = String(idNmbr || "").trim();
+    return n ? `n:${n}` : `e:${id}`;
+  };
+  const people = new Map(); // key → { name, in_advance } of the row updated last
+  for (const r of rows || []) {
+    let raw = r.payroll_data;
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = {};
+      }
+    }
+    people.set(personKey(r.employee_id, r.ID_nmbr), { name: r.name, in_advance: raw?.in_advance ?? null });
+  }
+  const matched = new Set();
+  for (const row of allRows) {
+    const id = await resolveEmployeeId(rest, row);
+    if (id == null) continue;
+    const [e] = await executeSql("SELECT ID_nmbr FROM employees WHERE employee_id = :id", { id });
+    const key = personKey(id, e?.[0]?.ID_nmbr);
+    if (!people.has(key) || matched.has(key)) continue;
+    matched.add(key);
+    row.in_advance = people.get(key).in_advance;
+  }
+  return [...people].filter(([k]) => !matched.has(k)).map(([, p]) => p.name);
+}
+
 const Router = () => {
   const router = express.Router();
 
@@ -862,65 +979,86 @@ const Router = () => {
         // deduction normally until saved and re-extracted.
         const empByName = rest ? await loadEmpByName(rest) : new Map();
         const isHourlyMinRole = isHourlyMinRoleFor(empByName);
-        const { employees, exceptions, month, shiftIssues, hourCapWarnings } =
-          await extractEmployees(items, {}, { isHourlyMinRole });
-
-        const existingKeys = await fetchExistingKeys(rest);
-        const newOnly = employees.filter((e) => {
-          for (const k of matchKeysOf(e)) {
-            if (existingKeys.has(k)) return false;
-          }
-          return true;
-        });
-
-        const newRows = newOnly.map((e) => ({
-          rest,
-          name: e.name,
-          ID_nmbr: e.ID_nmbr,
-          clockId: e.clockId ?? null,
-          roles: e.roles,
-          payroll_data: e.payroll_data,
-        }));
-
-        const allRows = employees.map((e) => ({
-          rest,
-          name: e.name,
-          ID_nmbr: e.ID_nmbr,
-          clockId: e.clockId ?? null,
-          roles: e.roles,
-          payroll_data: e.payroll_data,
-          role_extras: e.role_extras || {},
-          workdays: e.workdays,
-          global: e.global,
-          netGross: e.netGross,
-          work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
-          daily_breakdown:
-            e.daily_breakdown && typeof e.daily_breakdown === "object"
-              ? e.daily_breakdown
-              : {},
-          daily_hours:
-            e.daily_hours && typeof e.daily_hours === "object"
-              ? e.daily_hours
-              : {},
-          notes: Array.isArray(e.notes) ? e.notes : [],
-        }));
-
+        const result = await extractEmployees(items, {}, { isHourlyMinRole });
         res.json({
-          employees: newRows,
-          allEmployees: allRows,
-          month,
-          exceptions,
-          shiftIssues: shiftIssues || [],
-          hourCapWarnings: hourCapWarnings || [],
+          ...(await extractResponse(rest, result)),
           processed: items.length,
-          totalExtracted: employees.length,
-          alreadyExisting: employees.length - newOnly.length,
         });
       } catch (err) {
         console.error("payroll/extract error:", err);
         res.status(500).json({ error: err.message || "extraction failed" });
       }
     });
+  });
+
+  // The months of this branch that the daily Tabit Shift job stored (tabit_shift_reports), for a new
+  // payroll without Excel files.
+  router.post("/tabit-months", async (req, res) => {
+    const rest = String(req.body?.rest || "");
+    if (!rest) return res.status(400).json({ error: "rest is required" });
+    try {
+      res.json({ months: await tabitReportMonths(rest) });
+    } catch (err) {
+      if (err.code === "ER_NO_SUCH_TABLE")
+        return res.json({ months: [], error: TABIT_REPORTS_MISSING });
+      console.error("payroll/tabit-months error:", err);
+      res.status(500).json({ error: err.message || "failed" });
+    }
+  });
+
+  // The same as /extract, from the stored Tabit Shift reports of one month instead of Excel files.
+  // Body { rest, month, refresh, keepSaved }:
+  //   refresh   — read the month from the Tabit Shift API first (replaces its tabit_shifts and
+  //               tabit_shift_reports rows), for clock fixes made after the daily job;
+  //   keepSaved — an update of a saved payroll: keep each employee's מפרעה (in_advance) from it, and
+  //               list the saved employees that are not in Tabit any more (notInTabit).
+  router.post("/extract-tabit", async (req, res) => {
+    const rest = String(req.body?.rest || "");
+    const month = String(req.body?.month || "");
+    if (!rest || !MONTH_RE.test(month))
+      return res.status(400).json({ error: "rest and month (YYYY-MM) are required" });
+    if (req.body?.refresh) {
+      try {
+        const [r] = await fetchTabitShift({
+          months: [month],
+          rests: [rest],
+          by: req.user?.email || null,
+        });
+        if (!r || r.status === "FAILED")
+          return res.status(502).json({ error: r?.error || "Tabit Shift fetch failed" });
+        if (r.result?.reportsError)
+          return res.status(500).json({ error: r.result.reportsError });
+      } catch (err) {
+        console.error("payroll/extract-tabit refresh error:", err.message);
+        return res.status(502).json({ error: err.message || "Tabit Shift fetch failed" });
+      }
+    }
+    try {
+      const [rows] = await executeSql(
+        "SELECT app_id, report, fetched_at FROM tabit_shift_reports WHERE rest = :rest AND month = :month ORDER BY app_id",
+        { rest, month },
+      );
+      if (!rows || rows.length === 0)
+        return res.status(404).json({ error: `No Tabit Shift report of ${month} for this branch` });
+      const reports = rows.map((r) => ({ app: r.app_id, report: JSON.parse(r.report) }));
+      const empByName = await loadEmpByName(rest);
+      const result = extractEmployeesFromTabitReports(reports, month, {
+        isHourlyMinRole: isHourlyMinRoleFor(empByName),
+      });
+      const out = await extractResponse(rest, result);
+      if (req.body?.keepSaved) out.notInTabit = await keepSavedAdvance(rest, month, out.allEmployees);
+      res.json({
+        ...out,
+        processed: rows.length,
+        fetchedAt: rows.reduce((m, r) => (!m || r.fetched_at < m ? r.fetched_at : m), null),
+        months: await tabitReportMonths(rest),
+      });
+    } catch (err) {
+      if (err.code === "ER_NO_SUCH_TABLE")
+        return res.status(404).json({ error: TABIT_REPORTS_MISSING });
+      console.error("payroll/extract-tabit error:", err);
+      res.status(500).json({ error: err.message || "extraction failed" });
+    }
   });
 
   router.post("/employees", async (req, res) => {
@@ -2199,6 +2337,61 @@ const Router = () => {
     } catch (err) {
       console.error("payroll/payroll-load error:", err);
       res.status(500).json({ error: err.message || "payroll load failed" });
+    }
+  });
+
+  // מפרעה typed in the final table → only payroll_data.in_advance of the saved row(s) of this person and month.
+  // Body { rest, month, name, ID_nmbr, in_advance }. The person: the employees record by name (the name the
+  // table shows), else by ID number; all of the month's rows with that ID number are set (a person renamed in
+  // Tabit can have a row under each name). { updated: 0 } = the month is not saved for this person yet — the
+  // value is saved with the payroll.
+  router.post("/payroll-advance", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      const name = String(req.body?.name || "").trim();
+      const idNmbr = String(req.body?.ID_nmbr || "").trim();
+      const raw = req.body?.in_advance;
+      const value = raw === "" || raw == null ? 0 : Number(raw);
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+      if (!name && !idNmbr) return res.status(400).json({ error: "missing name" });
+      if (!Number.isFinite(value)) return res.status(400).json({ error: "in_advance must be a number" });
+
+      let emp = null;
+      if (name) {
+        const [rows] = await executeSql(
+          "SELECT employee_id, ID_nmbr FROM employees WHERE rest = :rest AND name = :name LIMIT 1",
+          { rest, name },
+        );
+        emp = rows?.[0] || null;
+      }
+      if (!emp && idNmbr) {
+        const [rows] = await executeSql(
+          "SELECT employee_id, ID_nmbr FROM employees WHERE rest = :rest AND ID_nmbr = :id LIMIT 1",
+          { rest, id: idNmbr },
+        );
+        emp = rows?.[0] || null;
+      }
+      if (!emp) return res.json({ updated: 0 });
+
+      const personId = String(emp.ID_nmbr || "").trim();
+      // Only rows in the wrapped format ({ payroll_data, …, in_advance }) — see /payroll-load.
+      const [r] = await executeSql(
+        `UPDATE payroll p
+            SET p.payroll_data = JSON_SET(p.payroll_data, '$.in_advance', :value)
+          WHERE p.rest = :rest AND p.month = :month
+            AND JSON_CONTAINS_PATH(p.payroll_data, 'one', '$.payroll_data')
+            AND (p.employee_id = :employee_id
+                 OR (:personId <> '' AND p.employee_id IN
+                     (SELECT e.employee_id FROM employees e WHERE e.rest = :rest AND e.ID_nmbr = :personId)))`,
+        { rest, month, value, employee_id: emp.employee_id, personId },
+      );
+      res.json({ updated: r?.affectedRows || 0, in_advance: value });
+    } catch (err) {
+      console.error("payroll/payroll-advance error:", err);
+      res.status(500).json({ error: err.message || "save failed" });
     }
   });
 
