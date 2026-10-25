@@ -1921,7 +1921,6 @@ async function extractEmployees(items, configMap = {}, opts = {}) {
   const rawRows = [];
   const exceptions = [];
   const shiftIssues = [];
-  const hourCapWarnings = [];
   const monthCounts = new Map();
   for (const item of items) {
     const filename = item.filename || item.name || "uploaded.xlsx";
@@ -1965,6 +1964,16 @@ async function extractEmployees(items, configMap = {}, opts = {}) {
     }
     month = best ? best[0] : null;
   }
+  const { list, hourCapWarnings } = finishEmployees(employees, isHourlyMinRole);
+  return { employees: list, exceptions, month, shiftIssues, hourCapWarnings };
+}
+
+// The per-employee aggregates (built by processWorkbookSheets or
+// collectTabitReport) → the extract result rows: per-role payroll_data, the
+// break deduction and the hour-cap warnings. Shared by both sources so the
+// Excel files and the Tabit Shift API give the same payroll.
+function finishEmployees(employees, isHourlyMinRole) {
+  const hourCapWarnings = [];
   const list = [...employees.values()].map((emp) => {
     const payroll_data = {};
     const role_extras = {};
@@ -2123,10 +2132,242 @@ async function extractEmployees(items, configMap = {}, opts = {}) {
     };
   });
   list.sort((a, b) => a.name.localeCompare(b.name, "he"));
+  return { list, hourCapWarnings };
+}
+
+// ---------- Tabit Shift API reports ----------
+//
+// The detailed report JSON of the Tabit Shift API (admin/server/uploads/tabitShift.js) holds the same data as
+// the Excel file, in another shape: data[] = one entry per employee with header.employee {id, name},
+// header.details [{title, value}] (Clock id / מזהה שעון, חוזה עבודה), data[] = one row per day (date,
+// role_N/start_N/end_N/notes_N per shift block, ISO times, and the day's hours/tip columns) and summary[] = one
+// row per role ("<role> summary" / "סיכום <role>") + the general row (class "info"). Column keys:
+//   day_100 → 100%, day_125 → 125%, day_150 → 150%, rest_100 (שבת) + holiday_100 (חג) → added to 150%
+//   tip (סה״כ טיפ), or cash_tip when tip is missing → tip
+//   supplement (השלמה) + credit_tip (טיפ אשראי) → completion
+//   total_days of the general row → work days
+// A key is missing when its value is 0 (the Excel cell is empty then).
+
+const TABIT_TIME_ZONE = "Asia/Jerusalem";
+
+const tabitNum = (v) => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// ISO time → "HH:MM" / epoch ms, in restaurant time.
+const tabitClock = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TABIT_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+const tabitTimeText = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? tabitClock.format(d) : "";
+};
+const tabitMs = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.getTime() : null;
+};
+
+const tabitTodayKey = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: TABIT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+// Shift block numbers of a day row (0, 1, …), from its role_N/start_N/end_N keys.
+const tabitBlocks = (row) =>
+  [
+    ...new Set(
+      Object.keys(row)
+        .map((k) => k.match(/^(?:role|start|end)_(\d+)$/)?.[1])
+        .filter(Boolean)
+        .map(Number),
+    ),
+  ].sort((a, b) => a - b);
+
+// A summary or day row → the fields extractFromSummaryRow returns for an Excel row.
+function tabitRowData(row) {
+  const tip = tabitNum(row.tip) ?? tabitNum(row.cash_tip);
+  return {
+    hours100: tabitNum(row.day_100),
+    hours125: tabitNum(row.day_125),
+    hours150: tabitNum(row.day_150),
+    shabbat: tabitNum(row.rest_100),
+    hag: tabitNum(row.holiday_100),
+    shabbatHag: null,
+    rate: null,
+    tip,
+    completion: sumNullable(tabitNum(row.supplement), tabitNum(row.credit_tip)),
+    travel: null,
+    workdays: tabitNum(row.total_days),
+    notes: "",
+  };
+}
+
+// "מלצר summary" / "סיכום מלצר" → "מלצר"; the general row → "כללי".
+function tabitSummaryRole(s) {
+  if (s.class === "info" || /^general summary$/i.test(normalize(s.title))) return "כללי";
+  const t = normalize(s.title);
+  const fromSuffix = t.replace(/\s+summary$/i, "").trim();
+  if (fromSuffix !== t) return extractRoleFromLabel(`${SUMMARY_PREFIX} ${fromSuffix}`);
+  return extractRoleFromLabel(t);
+}
+
+const tabitDetail = (entry, titles) =>
+  normalize(
+    (entry.header?.details || []).find((d) => titles.includes(normalize(d.title)))?.value,
+  );
+
+// One employee entry of one report → the same aggregates processWorkbookSheets
+// builds from one Excel sheet.
+function collectTabitReport(entry, ctx) {
+  const { source, month, employees, exceptions, shiftIssues } = ctx;
+  const employeeName = normalize(entry.header?.employee?.name);
+  const sheetName = String(entry.header?.employee?.id ?? "?");
+  if (!employeeName) {
+    exceptions.push({ file: source, sheet: sheetName, name: "", issue: "missing employee name" });
+    return;
+  }
+  const rows = (entry.data || []).filter(
+    (r) => /^\d{4}-\d{2}-\d{2}$/.test(String(r.date || "")) && (!month || r.date.startsWith(`${month}-`)),
+  );
+  // A report of several months has one entry per employee per month: skip the other months.
+  if (month && rows.length === 0 && (entry.data || []).length > 0) return;
+  const summaries = (entry.summary || []).map((s) => {
+    const data = tabitRowData(s);
+    return { role: tabitSummaryRole(s), data, h150Normalized: normalize150(data, null).value };
+  });
+  if (summaries.length === 0) {
+    exceptions.push({ file: source, sheet: sheetName, name: employeeName, issue: "No summary row found" });
+    return;
+  }
+
+  const emp = getOrCreateEmployee(employees, employeeName);
+  const sheetKey = `${source}::${sheetName}`;
+  emp.sheetsSeen.add(sheetKey);
+  emp.clockId = chooseFirst(emp.clockId, tabitDetail(entry, ["Clock id", "מזהה שעון"]) || null);
+
+  // Global wage: a global keyword anywhere in the employee's report (the Excel reader scans every cell).
+  const texts = [
+    ...(entry.header?.details || []).map((d) => d.value),
+    ...rows.flatMap((r) => tabitBlocks(r).flatMap((i) => [r[`role_${i}`], r[`notes_${i}`]])),
+  ].map(normalize);
+  if (texts.some((t) => GLOBAL_KEYWORDS.some((kw) => t.includes(kw)))) emp.global = true;
+
+  const todayKey = tabitTodayKey();
+  for (const r of rows) {
+    const blocks = tabitBlocks(r);
+    let rowHours = 0;
+    let worked = false;
+    let role = null;
+    blocks.forEach((i, idx) => {
+      const blockRole = normalize(r[`role_${i}`]);
+      if (!role && blockRole) role = blockRole;
+      const start = r[`start_${i}`];
+      const end = r[`end_${i}`];
+      if (!start && !end) return;
+      if (!start || !end) {
+        if (r.date !== todayKey) {
+          shiftIssues.push({
+            file: source,
+            sheet: sheetName,
+            employee: employeeName,
+            date: r.date,
+            slot: idx + 1,
+            role: blockRole,
+            entry: tabitTimeText(start),
+            exit: tabitTimeText(end),
+            missing: start ? "exit" : "entry",
+          });
+        }
+        return;
+      }
+      worked = true;
+      const a = tabitMs(start);
+      const b = tabitMs(end);
+      if (a == null || b == null) return;
+      const minutes = (b - a) / 60000;
+      // Same sanity cap as collectDailyHours.
+      if (minutes > 0 && minutes <= 18 * 60) rowHours += minutes / 60;
+    });
+    if (worked) emp.workDates.add(r.date);
+    if (rowHours > 0) emp.dailyHours.set(r.date, (emp.dailyHours.get(r.date) || 0) + rowHours);
+    for (const i of blocks) {
+      const note = normalize(r[`notes_${i}`]);
+      if (looksLikeNoteText(note)) emp.dailyNotes.push({ date: r.date, note });
+    }
+
+    const data = tabitRowData(r);
+    const h100 = data.hours100 || 0;
+    const h125 = data.hours125 || 0;
+    const h150 = normalize150(data, null).value || 0;
+    const tip = data.tip || 0;
+    const completion = data.completion || 0;
+    if (h100 === 0 && h125 === 0 && h150 === 0 && tip === 0 && completion === 0) continue;
+    if (!emp.dailyBreakdown.has(r.date)) emp.dailyBreakdown.set(r.date, []);
+    emp.dailyBreakdown.get(r.date).push({ role, h100, h125, h150, tip, completion });
+  }
+
+  // Aggregate every summary row, as processWorkbookSheets does. No hourly rate in the report, so — like an
+  // Excel sheet without a rate column — a row with 100% hours marks the employee global (isGlobal there).
+  let usedAny = false;
+  let workdays = null;
+  for (const { role, data, h150Normalized } of summaries) {
+    if (role === "כללי") workdays = data.workdays;
+    if (bucketIsEmpty(data, h150Normalized)) continue;
+    usedAny = true;
+    if (role === "כללי") {
+      emp.hasGeneral = true;
+      addToBucket(emp.general, data, h150Normalized, null);
+    } else {
+      if (!emp.rolesData.has(role)) emp.rolesData.set(role, newBucket());
+      addToBucket(emp.rolesData.get(role), data, h150Normalized, null);
+    }
+    if (data.hours100 != null) emp.global = true;
+  }
+  if (usedAny) {
+    if (workdays == null) workdays = new Set(rows.map((r) => r.date)).size || null;
+    emp.workdaysPerSheet.set(sheetKey, { count: workdays, source: "report" });
+  }
+}
+
+/**
+ * Tabit Shift API detailed reports of one branch and month → the same result as extractEmployees for the
+ * Excel files of that month. reports: [{ app, report }] — Raanana has two Tabit apps (kitchen + floor), like
+ * its two Excel files.
+ */
+function extractEmployeesFromTabitReports(reports, month, opts = {}) {
+  const isHourlyMinRole =
+    typeof opts.isHourlyMinRole === "function" ? opts.isHourlyMinRole : () => false;
+  const employees = new Map();
+  const exceptions = [];
+  const shiftIssues = [];
+  for (const { app, report } of reports) {
+    const source = `Tabit app ${app}`;
+    for (const entry of report?.data || []) {
+      try {
+        collectTabitReport(entry, { source, month, employees, exceptions, shiftIssues });
+      } catch (err) {
+        exceptions.push({
+          file: source,
+          sheet: String(entry?.header?.employee?.id ?? "?"),
+          name: "",
+          issue: `Failed to process employee: ${err.message}`,
+        });
+      }
+    }
+  }
+  const { list, hourCapWarnings } = finishEmployees(employees, isHourlyMinRole);
   return { employees: list, exceptions, month, shiftIssues, hourCapWarnings };
 }
 
-module.exports = { extractEmployees, main };
+module.exports = { extractEmployees, extractEmployeesFromTabitReports, main };
 
 if (require.main === module) {
   main().catch((err) => {

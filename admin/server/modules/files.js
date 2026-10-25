@@ -12,7 +12,7 @@ import users from "../sources/users.js";
 import { nameKey } from "../uploads/workbook.js";
 import { recognizeFile, applyPermissions, KINDS } from "../uploads/recognize.js";
 import crypto from "crypto";
-import { importTabitDetailed, importBankHapoalim, saveTabitDetailed } from "../uploads/importers.js";
+import { importTabitDetailed, importBankHapoalim, saveTabitDetailed, saveTabitShiftReports } from "../uploads/importers.js";
 import { TabitShiftClient, tabitShiftConfig, reportToParsed, mergeParsed, nextMonth } from "../uploads/tabitShift.js";
 import { Router as r404 } from "./r404.js";
 
@@ -156,17 +156,20 @@ export const defaultTabitShiftMonths = (now = new Date()) => {
 };
 
 /**
- * Tabit Shift API → tabit_shifts, for each month × branch, like an approved upload of the detailed report
- * (logged in file_uploads as TABIT_SHIFT_API). dryRun: reads and counts, writes nothing.
+ * Tabit Shift API → tabit_shifts (+ the full reports → tabit_shift_reports), for each month × branch, like an
+ * approved upload of the detailed report (logged in file_uploads as TABIT_SHIFT_API). dryRun: reads and counts,
+ * writes nothing. rests: only these branch ids (default: every branch with Tabit Shift apps).
  */
-export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryRun = false, by = null } = {}) => {
+export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryRun = false, by = null, rests = null } = {}) => {
+  const branches = rests ? TABIT_SHIFT_BRANCHES.filter((b) => rests.includes(b.rest)) : TABIT_SHIFT_BRANCHES;
+  if (!branches.length) throw new Error("no Tabit Shift app for this branch (shared/restaurants.json tabit_shift)");
   const client = new TabitShiftClient(tabitShiftConfig());
   await client.login(tabitShiftConfig());
   const results = [];
   try {
     const visible = new Set((await client.siblings()).map((s) => Number(s.id)));
     for (const month of months) {
-      for (const b of TABIT_SHIFT_BRANCHES) {
+      for (const b of branches) {
         const base = { month, rest: b.rest, branch: b.name, apps: b.apps };
         try {
           const missing = b.apps.filter((id) => !visible.has(Number(id)));
@@ -174,9 +177,9 @@ export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryR
           const reports = [];
           for (const app of b.apps) {
             await client.switchApp(app);
-            reports.push(await client.detailedReport(month));
+            reports.push({ app, report: await client.detailedReport(month) });
           }
-          const parsed = mergeParsed(reports.map((r) => reportToParsed(r, month)));
+          const parsed = mergeParsed(reports.map((r) => reportToParsed(r.report, month)));
           const shifts = parsed.employees.reduce((n, e) => n + e.shifts.length, 0);
           if (dryRun) {
             const noClockOut = parsed.employees.reduce((n, e) => n + e.shifts.filter((s) => s.clock_in && !s.clock_out).length, 0);
@@ -194,7 +197,15 @@ export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryR
           const uploadId = await logUpload({ user: { email: by } }, r, "FAILED", { started: true }, { rest: b.rest });
           try {
             const out = await saveTabitDetailed(parsed, { rest: b.rest, uploadId });
-            const status = out.skippedSheets.length ? "PARTIAL" : "OK";
+            // The full reports, for the payroll. A failure here (e.g. the table is not created yet) does not
+            // undo the shifts import; it is reported and makes the status PARTIAL.
+            try {
+              out.reportsSaved = await saveTabitShiftReports(reports, { rest: b.rest, month, uploadId });
+            } catch (e) {
+              console.error(`tabit_shift_reports ${month} ${b.name}:`, e.message);
+              out.reportsError = e.message;
+            }
+            const status = out.skippedSheets.length || out.reportsError ? "PARTIAL" : "OK";
             await setUploadResult(uploadId, status, out);
             results.push({ ...base, status, result: out });
           } catch (e) {

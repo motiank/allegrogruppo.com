@@ -415,10 +415,12 @@ const Shifts = () => {
     }
   }, [allowedRestaurants, flatAvailable, selectedRestaurant]);
 
-  // Step 1 — past-payroll selection
+  // Step 1 — month selection: the months with a saved payroll and the months
+  // the daily Tabit Shift job stored. selectedPayroll is "" (nothing yet),
+  // "excel" (a new payroll from uploaded Excel files, step 2) or a YYYY-MM.
   const [payrollOptions, setPayrollOptions] = useState([]);
   const [loadingPayrolls, setLoadingPayrolls] = useState(false);
-  const [selectedPayroll, setSelectedPayroll] = useState("new");
+  const [selectedPayroll, setSelectedPayroll] = useState("");
   const [loadingExistingPayroll, setLoadingExistingPayroll] = useState(false);
   const [loadPayrollError, setLoadPayrollError] = useState(null);
 
@@ -442,6 +444,23 @@ const Shifts = () => {
   // Step 2 → 3 (extract)
   const [processing, setProcessing] = useState(false);
   const [extractError, setExtractError] = useState(null);
+
+  // The months stored from the Tabit Shift API (tabit_shift_reports, daily
+  // job): [{ month, fetched_at, apps, employees }], newest first.
+  const [tabitMonths, setTabitMonths] = useState([]);
+  const [loadingTabitMonths, setLoadingTabitMonths] = useState(false);
+  const [tabitError, setTabitError] = useState(null);
+  // Where the employees on screen came from: "saved" (a stored payroll),
+  // "tabit" (a new payroll from the stored Tabit month), "update" (a saved
+  // payroll read again from Tabit) or "excel".
+  const [payrollSource, setPayrollSource] = useState(null);
+  const [tabitFetchedAt, setTabitFetchedAt] = useState(null);
+  // update: saved employees of the month that Tabit does not have any more.
+  const [notInTabit, setNotInTabit] = useState([]);
+  // The restaurant each month list was last loaded for (the ?month= deep
+  // link waits for both).
+  const [payrollsFor, setPayrollsFor] = useState("");
+  const [tabitMonthsFor, setTabitMonthsFor] = useState("");
 
   // Step 3 — Employee data upload (attach phones); supports multiple .xlsx
   // files dropped/selected at once. Each file is posted independently to the
@@ -716,7 +735,7 @@ const Shifts = () => {
   useEffect(() => {
     if (!selectedRestaurant) {
       setPayrollOptions([]);
-      setSelectedPayroll("new");
+      setSelectedPayroll("");
       return;
     }
     let cancelled = false;
@@ -733,20 +752,68 @@ const Shifts = () => {
         setPayrollOptions(
           Array.isArray(res.data?.months) ? res.data.months : [],
         );
-        setSelectedPayroll("new");
+        setSelectedPayroll("");
       })
       .catch(() => {
         if (cancelled) return;
         setPayrollOptions([]);
-        setSelectedPayroll("new");
+        setSelectedPayroll("");
       })
       .finally(() => {
-        if (!cancelled) setLoadingPayrolls(false);
+        if (cancelled) return;
+        setLoadingPayrolls(false);
+        setPayrollsFor(selectedRestaurant);
       });
     return () => {
       cancelled = true;
     };
   }, [selectedRestaurant]);
+
+  // ---------- Step 1: months stored from the Tabit Shift API ----------
+  useEffect(() => {
+    if (!selectedRestaurant) {
+      setTabitMonths([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTabitMonths(true);
+    setTabitError(null);
+    axios
+      .post(
+        "/admin/payroll/tabit-months",
+        { rest: selectedRestaurant },
+        { withCredentials: true },
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setTabitMonths(Array.isArray(res.data?.months) ? res.data.months : []);
+        if (res.data?.error) setTabitError(res.data.error);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setTabitMonths([]);
+        setTabitError(err.response?.data?.error || err.message);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoadingTabitMonths(false);
+        setTabitMonthsFor(selectedRestaurant);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRestaurant]);
+
+  // The month dropdown: every month with a saved payroll or a Tabit report,
+  // newest first.
+  const monthOptions = useMemo(() => {
+    const byMonth = new Map();
+    for (const m of payrollOptions) byMonth.set(m, { month: m, saved: true });
+    for (const t of tabitMonths) {
+      byMonth.set(t.month, { ...byMonth.get(t.month), month: t.month, tabit: t });
+    }
+    return [...byMonth.values()].sort((a, b) => (a.month < b.month ? 1 : -1));
+  }, [payrollOptions, tabitMonths]);
 
   // ---------- Reset helpers ----------
   const resetFromStep2 = () => {
@@ -766,6 +833,12 @@ const Shifts = () => {
     setShiftIssues([]);
     setShiftIssuesAcknowledged(false);
     setHourCapWarnings([]);
+    setPayrollSource(null);
+    setTabitFetchedAt(null);
+    setNotInTabit([]);
+    setAdvanceStatus({});
+    setUpdateResult(null);
+    setTlushData(null);
   };
 
   // ---------- Step 2 file handling ----------
@@ -804,7 +877,37 @@ const Shifts = () => {
     resetFromStep2();
   };
 
-  // ---------- Extract: step 2 → 3 ----------
+  // ---------- Extract → step 3 ----------
+  // Both routes return the same shape; this puts it on screen.
+  const applyExtract = (data, source) => {
+    const fresh = (data.employees || []).map((e) => ({
+      ...e,
+      new_wage_type: "",
+      wage: "",
+      travel: "",
+      maxTravel: "",
+      contractor: false,
+      roles: (e.roles || []).map((role) => ({
+        role,
+        new_wage_type: "",
+        wage: "",
+      })),
+    }));
+    setNewEmployees(fresh);
+    setAllEmployees(data.allEmployees || []);
+    setFreshExtract(true);
+    setPayrollSource(source);
+    setMonth(data.month || "");
+    setExceptions(data.exceptions || []);
+    setShiftIssues(data.shiftIssues || []);
+    setHourCapWarnings(data.hourCapWarnings || []);
+    setShiftIssuesAcknowledged(false);
+    setSaveResult(null);
+    setSaveError(null);
+    setDiffSummary(null);
+  };
+
+  // Excel files (step 2 → 3).
   const runExtract = async () => {
     if (files.length === 0 || processing) return false;
     setProcessing(true);
@@ -817,36 +920,49 @@ const Shifts = () => {
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const fresh = (res.data.employees || []).map((e) => ({
-        ...e,
-        new_wage_type: "",
-        wage: "",
-        travel: "",
-        maxTravel: "",
-        contractor: false,
-        roles: (e.roles || []).map((role) => ({
-          role,
-          new_wage_type: "",
-          wage: "",
-        })),
-      }));
-      setNewEmployees(fresh);
-      setAllEmployees(res.data.allEmployees || []);
-      setFreshExtract(true);
-      setMonth(res.data.month || "");
-      setExceptions(res.data.exceptions || []);
-      setShiftIssues(res.data.shiftIssues || []);
-      setHourCapWarnings(res.data.hourCapWarnings || []);
-      setShiftIssuesAcknowledged(false);
-      setSaveResult(null);
-      setSaveError(null);
-      setDiffSummary(null);
+      applyExtract(res.data, "excel");
       return true;
     } catch (err) {
       console.error("extract error:", err);
       setExtractError(
         err.response?.data?.error || err.message || "Extraction failed",
       );
+      return false;
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // A month from the stored Tabit Shift reports → step 3. refresh: read the
+  // month from Tabit first (clock fixes after the daily job). update: the
+  // month has a saved payroll — keep its מפרעה, list who is not in Tabit any
+  // more; the user saves it again in step 4.
+  const extractFromTabit = async (mo, { refresh = false, update = false } = {}) => {
+    if (!selectedRestaurant || !mo || processing) return false;
+    setProcessing(true);
+    setExtractError(null);
+    setLoadPayrollError(null);
+    try {
+      const res = await axios.post(
+        "/admin/payroll/extract-tabit",
+        { rest: selectedRestaurant, month: mo, refresh, keepSaved: update },
+        { withCredentials: true },
+      );
+      resetFromStep2();
+      setFiles([]);
+      applyExtract(res.data, update ? "update" : "tabit");
+      setTabitFetchedAt(res.data.fetchedAt || null);
+      setNotInTabit(Array.isArray(res.data.notInTabit) ? res.data.notInTabit : []);
+      if (Array.isArray(res.data.months)) setTabitMonths(res.data.months);
+      setStep(3);
+      return true;
+    } catch (err) {
+      console.error("extract-tabit error:", err);
+      const msg =
+        err.response?.data?.error || err.message || "Reading from Tabit failed";
+      // In step 1 the error shows under the month dropdown.
+      if (step === 1) setLoadPayrollError(msg);
+      else setExtractError(msg);
       return false;
     } finally {
       setProcessing(false);
@@ -1188,9 +1304,11 @@ const Shifts = () => {
         { withCredentials: true },
       );
       const list = Array.isArray(res.data?.employees) ? res.data.employees : [];
+      resetFromStep2();
       setNewEmployees([]);
       setAllEmployees(list);
       setFreshExtract(false);
+      setPayrollSource("saved");
       setRoleSyncNote(null);
       setMonth(res.data?.month || mo);
       setExceptions([]);
@@ -1213,14 +1331,33 @@ const Shifts = () => {
     }
   };
 
+  // A saved month opens its payroll (step 4); a month that only Tabit has is
+  // read from the stored report into a new payroll (step 3). "excel": the
+  // user goes on to step 2 to upload files.
   const handleSelectPayroll = (val) => {
     setSelectedPayroll(val);
-    if (val === "new") {
-      // Continue normal flow — user proceeds to step 2 manually.
+    setLoadPayrollError(null);
+    if (!val || val === "excel") {
+      setFiles([]);
+      resetFromStep2();
       return;
     }
-    loadExistingPayroll(val);
+    if (payrollOptions.includes(val)) loadExistingPayroll(val);
+    else extractFromTabit(val);
   };
+
+  // Step 4: read a saved payroll's month from Tabit again; the user checks
+  // step 3 and saves it again in step 4.
+  const updateFromTabit = () => {
+    if (!month) return;
+    setSelectedPayroll(month);
+    extractFromTabit(month, {
+      refresh: true,
+      update: payrollOptions.includes(month),
+    });
+  };
+  const canUpdateFromTabit =
+    !!month && tabitMonths.some((t) => t.month === month);
 
   // ---------- Deep-linking: sync restaurant + month with the URL ----------
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1243,15 +1380,21 @@ const Shifts = () => {
     if (selectedRestaurant !== urlRest) setSelectedRestaurant(urlRest);
   }, [flatAvailable, searchParams, selectedRestaurant]);
 
-  // Once the URL's restaurant is applied, auto-load the requested payroll month.
+  // Once the URL's restaurant and its month lists are loaded, open the
+  // requested month (a saved payroll, else the Tabit month).
   useEffect(() => {
     const mo = pendingMonthRef.current;
-    if (!mo || !selectedRestaurant) return;
+    if (
+      !mo ||
+      !selectedRestaurant ||
+      payrollsFor !== selectedRestaurant ||
+      tabitMonthsFor !== selectedRestaurant
+    )
+      return;
     pendingMonthRef.current = null;
-    setSelectedPayroll(mo);
-    loadExistingPayroll(mo);
+    if (monthOptions.some((o) => o.month === mo)) handleSelectPayroll(mo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRestaurant]);
+  }, [selectedRestaurant, payrollsFor, tabitMonthsFor]);
 
   // Reflect the current restaurant + month back into the URL (replace, so we
   // don't spam browser history) for shareable/bookmarkable deep links.
@@ -1423,6 +1566,16 @@ const Shifts = () => {
   };
 
   // ---------- Step 4: save payroll ----------
+  // After a save the month is a saved payroll (dropdown label, and a later
+  // update from Tabit keeps its מפרעה).
+  const markMonthSaved = () => {
+    setPayrollOptions((prev) =>
+      prev.includes(month) ? prev : [month, ...prev].sort().reverse(),
+    );
+    setSelectedPayroll(month);
+    if (payrollSource === "tabit") setPayrollSource("update");
+  };
+
   const handleSavePayroll = async () => {
     if (savingPayroll) return;
     if (!month) {
@@ -1497,6 +1650,7 @@ const Shifts = () => {
         withCredentials: true,
       });
       setPayrollResult(res.data);
+      markMonthSaved();
       // 3. Fetch labor-cost summary and open the dialog.
       try {
         setLoadingLaborSummary(true);
@@ -1561,6 +1715,44 @@ const Shifts = () => {
     setAllEmployees((prev) =>
       prev.map((e) => (e.name === name ? { ...e, in_advance: val } : e)),
     );
+    setAdvanceStatus((prev) => ({ ...prev, [name]: null }));
+  };
+
+  // Save one employee's מפרעה to the saved payroll row when the field is
+  // left (blur / Enter). Empty → 0. Not saved yet for this month → it is
+  // saved with the payroll ("עדכון" / "שמירה וייצוא").
+  // advanceStatus: { [name]: "saving" | "saved" | "later" | { error } }.
+  const [advanceStatus, setAdvanceStatus] = useState({});
+  const saveAdvance = async (name) => {
+    const emp = allEmployees.find((e) => e.name === name);
+    if (!emp || !month || !selectedRestaurant) return;
+    const value = coerceAdvance(emp.in_advance);
+    setAdvanceStatus((prev) => ({ ...prev, [name]: "saving" }));
+    try {
+      const res = await axios.post(
+        "/admin/payroll/payroll-advance",
+        {
+          rest: selectedRestaurant,
+          month,
+          name,
+          ID_nmbr: emp.ID_nmbr ?? null,
+          in_advance: value,
+        },
+        { withCredentials: true },
+      );
+      setAllEmployees((prev) =>
+        prev.map((e) => (e.name === name ? { ...e, in_advance: value } : e)),
+      );
+      setAdvanceStatus((prev) => ({
+        ...prev,
+        [name]: res.data?.updated > 0 ? "saved" : "later",
+      }));
+    } catch (err) {
+      setAdvanceStatus((prev) => ({
+        ...prev,
+        [name]: { error: err.response?.data?.error || err.message || "save failed" },
+      }));
+    }
   };
 
   const [updatingPayroll, setUpdatingPayroll] = useState(false);
@@ -1573,6 +1765,19 @@ const Shifts = () => {
     setUpdatingPayroll(true);
     setUpdateResult(null);
     try {
+      // New shifts (from Tabit or Excel) → their daily labor cost too, as
+      // "שמירה וייצוא" does. Non-fatal.
+      if (freshExtract) {
+        try {
+          await axios.post(
+            "/admin/payroll/labor-cost",
+            { rest: selectedRestaurant, items: computeDailyLaborCost() },
+            { withCredentials: true },
+          );
+        } catch (laborErr) {
+          console.error("labor-cost error:", laborErr);
+        }
+      }
       const employees = allEmployees.map((e) => ({
         name: e.name,
         ID_nmbr: e.ID_nmbr,
@@ -1603,6 +1808,7 @@ const Shifts = () => {
         prev.map((e) => ({ ...e, in_advance: coerceAdvance(e.in_advance) })),
       );
       setUpdateResult(res.data);
+      markMonthSaved();
     } catch (err) {
       setUpdateResult({
         error: err.response?.data?.error || err.message || "update failed",
@@ -1780,6 +1986,7 @@ const Shifts = () => {
         { withCredentials: true },
       );
       setPayrollResult(res.data);
+      markMonthSaved();
       const { xlsxBase64, filename, unexportable } = res.data || {};
       if (xlsxBase64) {
         const binary = atob(xlsxBase64);
@@ -1936,7 +2143,11 @@ const Shifts = () => {
 
   // ---------- Wizard navigation ----------
   const canAdvance = () => {
-    if (step === 1) return !!selectedRestaurant;
+    if (step === 1)
+      return (
+        !!selectedRestaurant &&
+        (selectedPayroll === "excel" || allEmployees.length > 0)
+      );
     if (step === 2) return files.length > 0;
     if (step === 3) {
       // Step 3 is display-only (no employee commit). Just require that any
@@ -1949,7 +2160,8 @@ const Shifts = () => {
 
   const goNext = async () => {
     if (step === 1) {
-      setStep(2);
+      if (selectedPayroll === "excel") setStep(2);
+      else setStep(payrollSource === "saved" ? 4 : 3);
     } else if (step === 2) {
       const ok = await runExtract();
       if (ok) setStep(3);
@@ -1973,7 +2185,10 @@ const Shifts = () => {
     }
   };
   const goBack = () => {
-    if (step > 1) setStep(step - 1);
+    // Step 2 is only the Excel upload; a month from Tabit or a saved payroll
+    // goes back to step 1.
+    if (step === 3 && payrollSource !== "excel") setStep(1);
+    else if (step > 1) setStep(step - 1);
   };
   const goToStep = (target) => {
     if (target === step) return;
@@ -1981,7 +2196,8 @@ const Shifts = () => {
       setStep(target);
       return;
     }
-    if (target === 2 && selectedRestaurant) setStep(2);
+    if (target === 2 && selectedRestaurant && selectedPayroll === "excel")
+      setStep(2);
     if (target === 3 && allEmployees.length > 0) setStep(3);
     if (target === 4 && allEmployees.length > 0) setStep(4);
   };
@@ -2638,7 +2854,7 @@ const Shifts = () => {
     resetFromStep2();
     setFiles([]);
     setSelectedRestaurant("");
-    setSelectedPayroll("new");
+    setSelectedPayroll("");
     setPayrollOptions([]);
     setLoadPayrollError(null);
     setStep(1);
@@ -2692,6 +2908,14 @@ const Shifts = () => {
     </div>
   );
 
+  const fmtFetchedAt = (t) => {
+    if (!t) return "";
+    const d = new Date(t);
+    return Number.isNaN(d.getTime())
+      ? String(t)
+      : d.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
+  };
+
   const renderStep1 = () => (
     <div style={styles.card}>
       <div
@@ -2732,28 +2956,64 @@ const Shifts = () => {
         {selectedRestaurant && (
           <div style={styles.selectWrapper}>
             <label htmlFor="shift-payroll-select" style={styles.label}>
-              Payroll
+              Month
             </label>
             <select
               id="shift-payroll-select"
               style={styles.select}
               value={selectedPayroll}
               onChange={(e) => handleSelectPayroll(e.target.value)}
-              disabled={loadingPayrolls || loadingExistingPayroll}
+              disabled={
+                loadingPayrolls ||
+                loadingTabitMonths ||
+                loadingExistingPayroll ||
+                processing
+              }
             >
-              <option value="new">— New payroll —</option>
-              {payrollOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+              <option value="">
+                {loadingPayrolls || loadingTabitMonths
+                  ? "Loading months…"
+                  : "-- Choose a month --"}
+              </option>
+              {monthOptions.map((o) => (
+                <option key={o.month} value={o.month}>
+                  {o.month} —{" "}
+                  {o.saved ? "saved payroll" : "new payroll from Tabit"}
                 </option>
               ))}
+              <option value="excel">New payroll from Excel files…</option>
             </select>
           </div>
         )}
       </div>
+      {(() => {
+        const t = tabitMonths.find((m) => m.month === selectedPayroll);
+        return t && !loadingExistingPayroll && !processing ? (
+          <div
+            style={{
+              marginTop: "8px",
+              color: theme.textSecondary,
+              fontSize: "0.85rem",
+            }}
+          >
+            Tabit shifts updated {fmtFetchedAt(t.fetched_at)} · {t.employees}{" "}
+            employees
+          </div>
+        ) : null;
+      })()}
       {loadingExistingPayroll && (
         <div style={{ marginTop: "12px", color: theme.textSecondary }}>
           Loading payroll…
+        </div>
+      )}
+      {processing && (
+        <div style={{ marginTop: "12px", color: theme.textSecondary }}>
+          Reading the shifts from Tabit…
+        </div>
+      )}
+      {tabitError && (
+        <div style={{ ...styles.errorBox, marginTop: "12px" }}>
+          {tabitError}
         </div>
       )}
       {loadPayrollError && (
@@ -2773,6 +3033,15 @@ const Shifts = () => {
     <div style={styles.card}>
       <div style={{ marginBottom: "12px", color: theme.text }}>
         Restaurant: <strong>{selectedLabel}</strong>
+      </div>
+      <div
+        style={{
+          marginBottom: "8px",
+          color: theme.textSecondary,
+          fontSize: "0.9rem",
+        }}
+      >
+        Upload the Tabit Excel files:
       </div>
       <div
         style={styles.dropZone}
@@ -2836,8 +3105,42 @@ const Shifts = () => {
     </div>
   );
 
+  // Steps 3 + 4: where the shifts came from, and the saved employees that
+  // Tabit does not have any more (an update keeps their saved row as it is).
+  const renderTabitNote = () =>
+    payrollSource === "tabit" || payrollSource === "update" ? (
+      <>
+        <div
+          style={{
+            marginBottom: "12px",
+            color: theme.textSecondary,
+            fontSize: "0.9rem",
+          }}
+        >
+          {payrollSource === "update"
+            ? "Saved payroll read again from Tabit — save it in step 4 to keep the changes."
+            : "New payroll from the Tabit shifts — save it in step 4."}
+          {tabitFetchedAt && ` Tabit shifts updated ${fmtFetchedAt(tabitFetchedAt)}.`}
+        </div>
+        {notInTabit.length > 0 && (
+          <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
+            ⚠️ {notInTabit.length} employee
+            {notInTabit.length === 1 ? " is" : "s are"} in the saved payroll
+            but not in Tabit now — their saved row stays as it is:{" "}
+            {notInTabit.join(", ")}
+          </div>
+        )}
+      </>
+    ) : null;
+
   const renderStep3 = () => (
     <div style={styles.card}>
+      {renderTabitNote()}
+      {extractError && (
+        <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
+          <strong>Error:</strong> {extractError}
+        </div>
+      )}
       {shiftIssues.length > 0 && !shiftIssuesAcknowledged && (
         <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
           <div style={{ fontWeight: 600, marginBottom: "6px" }}>
@@ -2899,11 +3202,23 @@ const Shifts = () => {
               type="button"
               style={styles.secondaryButton}
               onClick={() => {
-                setStep(2);
-                resetFromStep2();
+                if (payrollSource === "excel") {
+                  setStep(2);
+                  resetFromStep2();
+                } else {
+                  extractFromTabit(month, {
+                    refresh: true,
+                    update: payrollSource === "update",
+                  });
+                }
               }}
+              disabled={processing}
             >
-              Reupload fixed files
+              {payrollSource === "excel"
+                ? "Reupload fixed files"
+                : processing
+                  ? "Reading from Tabit…"
+                  : "Fixed in Tabit — read again"}
             </button>
             <button
               type="button"
@@ -3471,6 +3786,12 @@ const Shifts = () => {
         employee{allEmployees.length === 1 ? "" : "s"}
         {loadingWages && " · loading wages…"}
       </div>
+      <div style={{ marginTop: "12px" }}>{renderTabitNote()}</div>
+      {extractError && (
+        <div style={{ ...styles.errorBox, marginTop: "12px" }}>
+          <strong>Error:</strong> {extractError}
+        </div>
+      )}
 
       {roleSyncNote && (
         <div
@@ -3740,11 +4061,16 @@ const Shifts = () => {
                   </td>
                   <td style={cell}>
                     {r.first && !r.isTotal ? (
+                      <>
                       <input
                         type="number"
                         step="0.01"
                         value={r.in_advance ?? ""}
                         onChange={(e) => setInAdvance(r.name, e.target.value)}
+                        onBlur={() => saveAdvance(r.name)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                        }}
                         style={{
                           width: "64px",
                           textAlign: "center",
@@ -3754,8 +4080,26 @@ const Shifts = () => {
                           backgroundColor: theme.surface,
                           color: theme.text,
                         }}
-                        title="מפרעה מטיפים"
+                        title="מפרעה מטיפים — נשמר כשיוצאים מהשדה"
                       />
+                      {(() => {
+                        const st = advanceStatus[r.name];
+                        if (!st) return null;
+                        const [text, color, tip] =
+                          st === "saving"
+                            ? ["…", theme.textSecondary, "שומר…"]
+                            : st === "saved"
+                              ? ["✓", theme.success || "#2e7d32", "נשמר"]
+                              : st === "later"
+                                ? ["•", theme.textSecondary, "יישמר עם המשכורת (החודש עוד לא נשמר לעובד)"]
+                                : ["!", theme.error || "#e53935", st.error];
+                        return (
+                          <span title={tip} style={{ marginInlineStart: "4px", color, fontWeight: 600 }}>
+                            {text}
+                          </span>
+                        );
+                      })()}
+                      </>
                     ) : (
                       ""
                     )}
@@ -3789,6 +4133,21 @@ const Shifts = () => {
               נשמר · עודכנו {updateResult.inserted ?? 0} רשומות
             </span>
           ))}
+        {canUpdateFromTabit && (
+          <button
+            type="button"
+            style={{
+              ...styles.secondaryButton,
+              opacity: processing ? 0.7 : 1,
+              cursor: processing ? "wait" : "pointer",
+            }}
+            onClick={updateFromTabit}
+            disabled={processing || savingPayroll || updatingPayroll}
+            title="Read this month's shifts from Tabit again; the מפרעה stays. Then check step 3 and save."
+          >
+            {processing ? "Reading from Tabit…" : "Update from Tabit"}
+          </button>
+        )}
         <button
           type="button"
           style={{

@@ -71,6 +71,22 @@ export const saveTabitDetailed = async (parsed, { rest, uploadId }) => {
   });
 };
 
+// The Tabit Shift API reports of one branch and month ([{ app, report }]) → tabit_shift_reports, one row per
+// Tabit app; a new fetch replaces the row. The payroll reads its hours, tip and השלמה from here.
+export const saveTabitShiftReports = async (reports, { rest, month, uploadId }) => {
+  const pool = await getDbPool();
+  for (const { app, report } of reports) {
+    const body = JSON.stringify({ data: report?.data || [], errors: report?.errors || null });
+    await pool.execute(
+      `INSERT INTO tabit_shift_reports (rest, month, app_id, report, employees, upload_id)
+       VALUES (:rest, :month, :app, :body, :employees, :uploadId)
+       ON DUPLICATE KEY UPDATE report = VALUES(report), employees = VALUES(employees), upload_id = VALUES(upload_id), fetched_at = CURRENT_TIMESTAMP`,
+      { rest, month, app: Number(app), body, employees: (report?.data || []).length, uploadId: uploadId ?? null },
+    );
+  }
+  return reports.length;
+};
+
 // Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped.
 export const importBankHapoalim = async (buffer, { uploadId }) => {
   const wb = await loadWorkbook(buffer);

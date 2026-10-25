@@ -45,7 +45,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   fix (were on `feat/local-api`), and Joya HQ (`hq/`, moved here from the tradewit repo that day).
 - **Open — production tables** (owner's permission needed; all `CREATE TABLE IF NOT EXISTS` / `INSERT IGNORE`):
   `scripts/utils/create_file_upload_tables.sql`, `scripts/utils/create_bcom_orders_table.sql` (only tables that do
-  not exist yet), `hq/sql/add-joya.sql`. Until then the Upload page fails and Joya HQ login fails on production.
+  not exist yet), `hq/sql/add-joya.sql`. Until then the Upload
+  page fails and Joya HQ login fails.
 - **Open — admin work in progress, uncommitted** in the working copy: `GET /shifts/by-shift` (people and clock
   hours per date × shift × role from `tabit_shifts`; spec from the Joya side), and payroll edits in `Shifts.js`,
   `payroll.js`, `tlush.js`. Joya HQ already reads `/shifts/by-shift` (it says "not available yet" until it exists).
@@ -54,6 +55,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `TABIT_SHIFT_*` in `.env`, branch → Tabit apps in `shared/restaurants.json` `tabit_shift` (Raanana = kitchen +
   floor, merged). By hand: `node scripts/tabit_shift_fetch.js --month YYYY-MM [--apply]` (dry run without
   `--apply`). Jul–Oct 2026 imported 2026-10-24. The Upload page still takes the Excel file.
+  The same job saves the full report JSON in `tabit_shift_reports` (`tabit_shifts` has only clock pairs; table
+  created on prod and filled Jul–Oct 2026 on 2026-10-24). **Shifts page, step 1**: the month dropdown lists the
+  saved payroll months and the Tabit months. A saved month opens its payroll (step 4); a Tabit-only month becomes a
+  new payroll (`/payroll/extract-tabit`, same calculation as the Excel: `extractEmployeesFromTabitReports` in
+  `payroll-summary/payroll_summary.js`) → step 3. "Update from Tabit" (step 4) reads the month from Tabit again
+  (`refresh`) and keeps the saved מפרעה (`keepSaved`; one person = the saved rows with one ID number). "New payroll
+  from Excel files…" still goes to the step 2 upload. Test: `node scripts/test_payroll_tabit.js`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.
