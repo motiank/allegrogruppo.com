@@ -4,7 +4,7 @@ dotenv.config({ path: "../.env" });
 
 import moment from "moment";
 import minimist from "minimist";
-import bcomApiLoad, { getRecord, bcomGetOrders, bcomGetItemsByDay } from "./bcom_api_loader.js";
+import bcomApiLoad, { getRecord, bcomGetOrders, bcomGetItemsByDay, bcomGetPaymentsByDay } from "./bcom_api_loader.js";
 import gglSheetLoader from "./ggl_sheet_loader.js";
 import dal from "./dal.js";
 import astrateg from "./astrateg.js";
@@ -13,6 +13,7 @@ import { executeSql } from "../../../admin/server/sources/dbpool.js";
 import { saveZDetails } from "./bcom_z_details.js";
 import { saveOrders } from "./bcom_orders.js";
 import { saveItems } from "./bcom_items.js";
+import { savePayments } from "./bcom_payments.js";
 
 const src_path = "/home/moti/dataSrc/algro";
 
@@ -137,6 +138,18 @@ class App {
         console.log(`bcom_items_daily: ${saved} dish rows saved`);
       } catch (e) {
         console.log(`bcom_items_daily save failed: ${e.message}`);
+      }
+      // Payments report (דוח תשלומים) per branch per business day → bcom_payments_daily. One call per branch
+      // per day, so at most the last 14 days of the range (a longer gap: the CLI backfill in bcom_payments.js).
+      try {
+        const payEnd = moment(dates.endDate, "DD/MM/YYYY");
+        const payStart = moment.max(moment(dates.startDate, "DD/MM/YYYY"), payEnd.clone().subtract(13, "days"));
+        const saved = await savePayments(
+          await bcomGetPaymentsByDay({ startDate: payStart.format("DD/MM/YYYY"), endDate: dates.endDate }),
+        );
+        console.log(`bcom_payments_daily: ${saved} payment rows saved`);
+      } catch (e) {
+        console.log(`bcom_payments_daily save failed: ${e.message}`);
       }
       // await gglSheetLoader(ontopo, dates);
       // await gglSheetLoader(astrateg, dates);

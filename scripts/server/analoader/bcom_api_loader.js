@@ -315,6 +315,40 @@ async function bcomGetItemsByDay(dates, options = {}) {
   return rows;
 }
 
+const paymentsReport_payload = {
+  action: 'getPaymentsReport',
+  filter: { roles: [], orderNumber: null, cardNumber: null },
+};
+
+// The payments report (דוח תשלומים) for one business day, one branch per call: its rows carry no branch
+// and no date. Only the payment-type rows (master) and their card-brand rows are kept; the section sums
+// ("תשלומים", "תשלומים מחוץ לזד") and the service footers can be summed from them.
+// dates: { startDate: 'DD/MM/YYYY', endDate: 'DD/MM/YYYY' }; each row gets businessDate, branchId, restaurantId.
+async function bcomGetPaymentsByDay(dates, { branchIds } = {}) {
+  const accessToken = await getBcomAccessToken();
+  const rows = [];
+  const end = moment(dates.endDate, 'DD/MM/YYYY');
+  for (let day = moment(dates.startDate, 'DD/MM/YYYY'); !day.isAfter(end); day.add(1, 'days')) {
+    const d = day.format('DD/MM/YYYY');
+    const businessDate = day.format('YYYY-MM-DD');
+    for (const [rest_id, branches] of restaurantsFor(branchIds)) {
+      for (const branch of branches) {
+        const payload = {
+          ...paymentsReport_payload,
+          restaurantId: rest_id,
+          filter: { ...paymentsReport_payload.filter, branches: [branch.id], startDate: d, endDate: d },
+        };
+        const data = await postCube('zReports/cube', payload, accessToken);
+        for (const row of data.rows || []) {
+          if (row.isSum || row.footer || row.paymentType == null) continue;
+          rows.push({ ...row, businessDate, branchId: branch.id, restaurantId: rest_id });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
 function getRecord(row) {
   const { branchId, totalIncome, brutoIncom, serviceTotal, discountTotal, dinnersCount, startTs } = row;
   return {
@@ -330,5 +364,5 @@ function getRecord(row) {
 
 // callAmazonApi();
 export default bcomApiLoad;
-export { getRecord, getBcomAccessToken, bcomGetOrders, bcomGetExceptions, bcomGetOrdersWithExceptions, bcomGetZReports,
+export { getRecord, getBcomAccessToken, bcomGetPaymentsByDay, bcomGetOrders, bcomGetExceptions, bcomGetOrdersWithExceptions, bcomGetZReports,
   bcomGetItems, bcomGetItemsByDay };

@@ -71,6 +71,7 @@ const TABLE_MIGRATIONS = {
   bcom_z_reports: "scripts/utils/create_file_upload_tables.sql",
   bcom_orders: "scripts/utils/create_bcom_orders_table.sql",
   bcom_items_daily: "scripts/utils/create_bcom_items_table.sql",
+  bcom_payments_daily: "scripts/utils/create_bcom_payments_table.sql",
 };
 
 const missingTable = (err) => {
@@ -479,6 +480,7 @@ const ENDPOINTS = [
   "GET /beecomm/exceptions/summary?from=&to=[&branch=a,b]",
   "GET /beecomm/items?from=&to=[&branch=a,b][&hours=1|&byDay=1]",
   "GET /beecomm/items/stored?from=&to=[&branch=a,b][&group=day|dish]",
+  "GET /beecomm/payments/stored?from=&to=[&branch=a,b][&group=day|type|brand]",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -751,7 +753,7 @@ const Router = () => {
       return m;
     };
 
-    const [cash, z, orders, items, tabit, uploads, payroll, emps] = (
+    const [cash, z, orders, items, payments, tabit, uploads, payroll, emps] = (
       await Promise.all([
         grouped("beecommDaily", (f, p) =>
           `SELECT branchId AS branch, DATE_FORMAT(MAX(ts), '%Y-%m-%d') AS lastDate, COUNT(*) AS days
@@ -770,6 +772,11 @@ const Router = () => {
                   DATE_FORMAT(MAX(business_date), '%Y-%m-%d') AS lastDate,
                   MAX(updated_at) AS lastLoadAt, COUNT(*) AS rowsCount
              FROM bcom_items_daily WHERE 1 = 1 ${f("branchId", ids, p)} GROUP BY branchId`),
+        grouped("beecommPayments", (f, p) =>
+          `SELECT branchId AS branch, DATE_FORMAT(MIN(business_date), '%Y-%m-%d') AS firstDate,
+                  DATE_FORMAT(MAX(business_date), '%Y-%m-%d') AS lastDate,
+                  MAX(updated_at) AS lastLoadAt, COUNT(*) AS rowsCount
+             FROM bcom_payments_daily WHERE 1 = 1 ${f("branchId", ids, p)} GROUP BY branchId`),
         grouped("tabitShifts", (f, p) =>
           `SELECT rest AS branch, month, COUNT(*) AS shifts, COUNT(DISTINCT employee_name) AS employees,
                   SUM(clock_in IS NOT NULL AND clock_out IS NULL) AS missingClockOut,
@@ -794,6 +801,7 @@ const Router = () => {
       const zz = first(z, b.id);
       const o = first(orders, b.id);
       const it = first(items, b.id);
+      const pay = first(payments, b.id);
       const e = first(emps, b.id);
       return {
         branch: b.id,
@@ -803,6 +811,7 @@ const Router = () => {
           zReports: zz && { lastDate: zz.lastDate, lastLoadAt: zz.lastLoadAt, rows: Number(zz.rowsCount) },
           orders: o && { firstDate: o.firstDate, lastDate: o.lastDate, lastLoadAt: o.lastLoadAt, rows: Number(o.rowsCount) },
           items: it && { firstDate: it.firstDate, lastDate: it.lastDate, lastLoadAt: it.lastLoadAt, rows: Number(it.rowsCount) },
+          payments: pay && { firstDate: pay.firstDate, lastDate: pay.lastDate, lastLoadAt: pay.lastLoadAt, rows: Number(pay.rowsCount) },
         },
         tabitShifts: (tabit.get(b.id) || []).map((t) => ({
           month: t.month,
@@ -1496,6 +1505,61 @@ const Router = () => {
     );
     return {
       data: rows.map((r) => ({ businessDate: r.business_date, ...dish(r), ...amount(r), loadedAt: r.updated_at })),
+      meta: { from, to, branches: branchesMeta(branchIds), group, source: "db" },
+    };
+  });
+
+  // The payments report (דוח תשלומים) saved daily by the loader (bcom_payments_daily). group=day (default):
+  // the stored rows, one per branch + business day + payment type (cardBrand null = the type's total) and
+  // its card brands. group=type: the type totals summed over the range per branch. group=brand: the card
+  // brands summed over the range per branch + type.
+  get("/beecomm/payments/stored", async (req) => {
+    const branchIds = await optionalBranches(req);
+    const { from, to } = requireDateRange(req, MAX_STORED_DAYS);
+    const group = String(req.query.group || "day");
+    if (!["day", "type", "brand"].includes(group)) throw badRequest("group must be day, type or brand");
+    const params = { from, to };
+    const where = `WHERE business_date BETWEEN :from AND :to ${inBranches("branchId", branchIds, params)}`;
+    const amount = (r) => ({
+      totalCharges: r.total_charges,
+      totalRefunded: r.total_refunded,
+      transactions: r.transactions == null ? null : Number(r.transactions),
+      refundTransactions: r.refund_transactions == null ? null : Number(r.refund_transactions),
+      hakafaReturns: r.hakafa_returns,
+      service: r.service,
+      serviceOnly: r.service_only,
+      taxAmount: r.tax_amount,
+      noTips: r.no_tips,
+      noTipsNoTax: r.no_tips_no_tax,
+    });
+    const type = (r) => ({ branch: r.branchId, paymentType: Number(r.payment_type), paymentTypeName: r.payment_type_name, inZ: r.in_z == null ? null : !!r.in_z });
+    if (group !== "day") {
+      const [rows] = await executeSql(
+        `SELECT branchId, payment_type, ${group === "brand" ? "card_brand," : ""} MAX(payment_type_name) AS payment_type_name,
+                MAX(in_z) AS in_z, COUNT(*) AS days, SUM(total_charges) AS total_charges, SUM(total_refunded) AS total_refunded,
+                SUM(transactions) AS transactions, SUM(refund_transactions) AS refund_transactions,
+                SUM(hakafa_returns) AS hakafa_returns, SUM(service) AS service, SUM(service_only) AS service_only,
+                SUM(tax_amount) AS tax_amount, SUM(no_tips) AS no_tips, SUM(no_tips_no_tax) AS no_tips_no_tax
+           FROM bcom_payments_daily ${where} AND card_brand ${group === "brand" ? "<>" : "="} ''
+          GROUP BY branchId, payment_type${group === "brand" ? ", card_brand" : ""}
+          ORDER BY branchId, total_charges DESC`,
+        params,
+      );
+      return {
+        data: rows.map((r) => ({ ...type(r), ...(group === "brand" ? { cardBrand: r.card_brand } : {}), days: Number(r.days), ...amount(r) })),
+        meta: { from, to, branches: branchesMeta(branchIds), group, source: "db" },
+      };
+    }
+    const [rows] = await executeSql(
+      `SELECT ${dayCol("business_date", "business_date")}, branchId, payment_type, card_brand, payment_type_name, in_z,
+              total_charges, total_refunded, transactions, refund_transactions, hakafa_returns, service, service_only,
+              tax_amount, no_tips, no_tips_no_tax, updated_at
+         FROM bcom_payments_daily ${where}
+        ORDER BY business_date, branchId, payment_type, card_brand`,
+      params,
+    );
+    return {
+      data: rows.map((r) => ({ businessDate: r.business_date, ...type(r), cardBrand: r.card_brand || null, ...amount(r), loadedAt: r.updated_at })),
       meta: { from, to, branches: branchesMeta(branchIds), group, source: "db" },
     };
   });

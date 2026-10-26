@@ -133,6 +133,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /beecomm/exceptions/summary?from=&to=[&branch=]` | Exceptions per branch per business day, by type (live) | Beecomm API |
 | `GET /beecomm/items?from=&to=[&branch=][&hours=1\|&byDay=1]` | Dish sales: quantity, sales, cancels, discounts, category (live) | Beecomm API |
 | `GET /beecomm/items/stored?from=&to=[&branch=][&group=day\|dish]` | Dish sales per business day, or per dish over the range (stored) | `bcom_items_daily` ¹ |
+| `GET /beecomm/payments/stored?from=&to=[&branch=][&group=day\|type\|brand]` | Payments report (דוח תשלומים): charges, refunds, transactions and service per payment type and card brand, per business day or summed (stored) | `bcom_payments_daily` ¹ |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -530,7 +531,7 @@ The rows behind each day: one per employee per worked day, with `month`, `employ
 
 There are two kinds of Beecomm data:
 
-- **Stored** (`/beecomm/daily`, `/z-reports/stored`, `/orders/stored`, `/items/stored`): loaded into the DB every day at 06:00 by the analoader cron (`meta.source: "db"`). It's fast and gives long history (up to 800 days per call), but it's at most a day behind. `/status` shows how far each branch is loaded.
+- **Stored** (`/beecomm/daily`, `/z-reports/stored`, `/orders/stored`, `/items/stored`, `/payments/stored`): loaded into the DB every day at 06:00 by the analoader cron (`meta.source: "db"`). It's fast and gives long history (up to 800 days per call), but it's at most a day behind. `/status` shows how far each branch is loaded.
 - **Live** (`/beecomm/z-reports`, `/orders`, `/exceptions`, `/exceptions/summary`, `/items`): fetched from the Beecomm backoffice API on every call (`meta.source: "beecomm-live"`). It's always current but slower, and the range is capped at **93 days**. The code is in `scripts/server/analoader/bcom_api_loader.js`.
 
 Stored rows use **business days** (`businessDate`, the day of the Z the order or Z belongs to), so an order after midnight counts on the evening it started. Stored times are **Israel local time** (`YYYY-MM-DD HH:MM:SS`). Live rows keep Beecomm's UTC ISO times.
@@ -771,6 +772,26 @@ The same report, saved per business day by the 06:00 loader (`bcom_items_daily`)
 - `group=day` (default): one row per business day + branch + dish, with `businessDate` and `loadedAt`.
 - `group=dish`: summed over the range per branch + dish, plus `days` (days it sold), `firstSold`, `lastSold` and `avgPrice` (`totalSales / quantity`). Sorted by sales. This is the closest thing to a menu Beecomm gives this API: everything that **sold** in the range, with its category and actual average price. Dishes on the menu that never sold don't appear.
 
+#### `GET /beecomm/payments/stored?from=&to=[&branch=][&group=day|type|brand]`
+
+The Beecomm payments report (דוח תשלומים, `getPaymentsReport`), saved per branch and business day by the 06:00 loader (`bcom_payments_daily`, one Beecomm call per branch per day). Each payment type (`paymentType`: 1 אשראי, 2 מזומן, 4 וולט, 5 הקפה, 10 Sodexo, 12 תן ביס, 14 הפקדת טיפים, 24 מולטיפס…) has a total row; credit, Sodexo and 10bis also have one row per card brand (VISA, MASTERCARD, AMEX, PRIVATE LABEL BRAND - חבר, פורטל תן ביס…). The report's section sums ("תשלומים", "תשלומים מחוץ לזד") and service footers are not stored — sum the type rows.
+
+| Field | Meaning |
+|---|---|
+| `paymentType`, `paymentTypeName` | Beecomm's payment type id and Hebrew name. |
+| `cardBrand` | `group=day`: `null` on the type's total row, else the brand. |
+| `inZ` | `false` for payments outside the Z (e.g. הפקדת טיפים). |
+| `totalCharges` | Charged, service (tips) included, in whole shekels. A day's type totals with `inZ` sum to the Z `totalIncome`. |
+| `totalRefunded`, `refundTransactions` | Refunds and their count. |
+| `transactions` | Number of payments. |
+| `service` | Service (tips) inside the charges. |
+| `noTips`, `noTipsNoTax` | Beecomm's `totalNoTips`: in the data it is charges minus refunds (service still in, despite the name); and that without VAT. |
+| `taxAmount`, `hakafaReturns`, `serviceOnly` | As in Beecomm (`serviceOnly` only on brand rows). |
+
+- `group=day` (default): every stored row with `businessDate` and `loadedAt`.
+- `group=type`: the type total rows summed over the range per branch, with `days`. Sorted by charges.
+- `group=brand`: the brand rows summed over the range per branch + type + `cardBrand`.
+
 ---
 
 ## Data sources
@@ -785,6 +806,7 @@ The same report, saved per business day by the 06:00 loader (`bcom_items_daily`)
 | Beecomm Z (stored) | DB `bcom_z_reports`, same 06:00 job (`bcom_z_details.js`) | Previous day |
 | Beecomm orders (stored) | DB `bcom_orders`, same 06:00 job (`bcom_orders.js`) | Previous day |
 | Beecomm dish sales (stored) | DB `bcom_items_daily`, same 06:00 job (`bcom_items.js`), one Beecomm call per day | Previous day |
+| Beecomm payments report (stored) | DB `bcom_payments_daily`, same 06:00 job (`bcom_payments.js`), one Beecomm call per branch per day, at most the last 14 days per run | Previous day |
 | Uploads log | DB `file_uploads`, written by the Upload files page | Live |
 | Beecomm Z / orders / exceptions / dish sales (live) | Beecomm backoffice API (`20cs5hma71…amazonaws.com/prod/api`) | Live |
 
@@ -797,6 +819,7 @@ All tables exist on the production DB (created 21 Oct 2026). Beecomm history was
 | `tabit_shifts`, `file_uploads`, `bank_transactions`, `bcom_z_reports` | `scripts/utils/create_file_upload_tables.sql` | Z: `node scripts/server/analoader/bcom_z_details.js --from DD/MM/YYYY [--to DD/MM/YYYY]`. Raw shifts: upload Tabit detailed reports on the Upload files page (nothing uploaded yet). |
 | `bcom_orders` | `scripts/utils/create_bcom_orders_table.sql` | `node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one week per call). Run it **after** the Z load for the same dates, so orders get their Z's business day. |
 | `bcom_items_daily` | `scripts/utils/create_bcom_items_table.sql` | `node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one call per day per Beecomm restaurant). Independent of the Z load. |
+| `bcom_payments_daily` | `scripts/utils/create_bcom_payments_table.sql` | `node scripts/server/analoader/bcom_payments.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--branch id1,id2] [--pause ms]` (one call per branch per day). Independent of the Z load. |
 
 - Reloading is safe: Z and orders are upserted, and a reloaded dish-sales day replaces that day.
 - **Don't run backfills in parallel or without `--pause`** (default 2 s). Thousands of fast calls got the Beecomm API blocked with `403 Forbidden` (CloudFront) for about 20 minutes on 21 Oct 2026. The block hits every caller from the same IP, including the backoffice in a browser.
@@ -896,6 +919,10 @@ curl -s "$API/beecomm/orders?branch=$R&from=2026-10-01&exceptions=1" \
 # Top 10 dishes by sales in Raanana, September (stored)
 curl -s "$API/beecomm/items/stored?branch=$R&from=2026-09-01&to=2026-09-30&group=dish" \
   | jq '.data[:10] | .[] | {dishName, quantity, totalSales, avgPrice}'
+
+# Payments by type in Raanana, October (stored): credit, cash, Wolt, 10bis…
+curl -s "$API/beecomm/payments/stored?branch=$R&from=2026-10-01&to=2026-10-24&group=type" \
+  | jq '.data[] | {paymentTypeName, totalCharges, transactions, service}'
 
 # Wine-by-the-glass sales per hour yesterday, all branches (live)
 curl -s "$API/beecomm/items?from=2026-10-20&to=2026-10-20&hours=1" \
