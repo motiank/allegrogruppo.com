@@ -44,9 +44,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
 - `main` = `747f140`, deployed. It brought to production: the Upload files page, the Local Data API and a Beecomm
   fix (were on `feat/local-api`), and Joya HQ (`hq/`, moved here from the tradewit repo that day).
 - **Open — production tables** (owner's permission needed; all `CREATE TABLE IF NOT EXISTS` / `INSERT IGNORE`):
-  `scripts/utils/create_file_upload_tables.sql`, `scripts/utils/create_bcom_orders_table.sql` (only tables that do
-  not exist yet), `hq/sql/add-joya.sql`. Until then the Upload
-  page fails and Joya HQ login fails.
+  `scripts/utils/create_bcom_orders_table.sql` (only tables that do not exist yet), `hq/sql/add-joya.sql`. Until
+  then Joya HQ login fails. (`file_uploads`, `tabit_shifts`, `bank_transactions` exist on prod — checked 2026-10-26.)
 - **Open — admin work in progress, uncommitted** in the working copy: `GET /shifts/by-shift` (people and clock
   hours per date × shift × role from `tabit_shifts`; spec from the Joya side), and payroll edits in `Shifts.js`,
   `payroll.js`, `tlush.js`. Joya HQ already reads `/shifts/by-shift` (it says "not available yet" until it exists).
@@ -62,6 +61,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `payroll-summary/payroll_summary.js`) → step 3. "Update from Tabit" (step 4) reads the month from Tabit again
   (`refresh`) and keeps the saved מפרעה (`keepSaved`; one person = the saved rows with one ID number). "New payroll
   from Excel files…" still goes to the step 2 upload. Test: `node scripts/test_payroll_tabit.js`.
+- **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
+  (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
+  equal rows in the file; `UNIQUE` + `INSERT IGNORE`. Test: `node scripts/test_bank_hapoalim.js`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.
