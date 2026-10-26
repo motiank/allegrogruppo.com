@@ -69,6 +69,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   question's words decide (owner, 2026-10-26): sold at the register = Beecomm payments (`payments_summary`); received
   in the account = the bank. The menu area sets the default: PERFORMANCE → Beecomm, BANK → the bank (explicit words
   override); no area and unclear, or a comparison → both, given apart. Rules: PLAN prompt "Which source".
+- Beecomm "credit card" = VISA + MASTERCARD + AMEX only; every other brand of the credit type = "members club"
+  (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole
+  אשראי type "credit card".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
   role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
   minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. Users with payroll access only

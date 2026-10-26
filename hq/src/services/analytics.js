@@ -361,6 +361,13 @@ const brandKey = (b) => {
   return BRAND_ALIAS[k] || k;
 };
 
+// Owner, 2026-10-26: in Beecomm, "credit card" = only these brands of the credit type (אשראי); every other brand
+// of that type (PRIVATE LABEL BRAND - חבר, Diners, Mishloha…) is the "members club" (מועדון חברים).
+export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX'];
+const CREDIT_TYPE = 1;
+const isCreditCard = (brand) => CREDIT_CARD_BRANDS.includes(brandKey(brand));
+const newGroup = () => ({ charges: 0, refunded: 0, transactions: 0, prevCharges: 0, brands: new Set(), byDay: new Map() });
+
 /**
  * brands (optional, e.g. ['VISA', 'MASTERCARD', 'AMEX']): also sum only these card brands — per location
  * `selected` with a day-by-day list, and `selectedTotal` over all the locations.
@@ -369,6 +376,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
   const len = daysBetween(from, to) + 1;
   const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
   let selTotal = want ? { charges: 0, prevCharges: 0, transactions: 0 } : null;
+  const groupTotals = { creditCards: { charges: 0, prevCharges: 0 }, membersClub: { charges: 0, prevCharges: 0 } };
   const pFrom = addDays(from, -len);
   const out = [];
   let reason = null;
@@ -383,9 +391,20 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
     const days = new Set();
     const prevDays = new Set();
     const sel = want ? { charges: 0, refunded: 0, transactions: 0, prevCharges: 0, byDay: new Map() } : null;
+    const groups = { creditCards: newGroup(), membersClub: newGroup() };
     for (const r of src.rows) {
       const cur = r.date >= from;
       (cur ? days : prevDays).add(r.date);
+      if (r.type === CREDIT_TYPE && r.brand != null) {
+        const g = groups[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'];
+        g.brands.add(r.brand);
+        if (cur) {
+          g.charges += r.charges;
+          g.refunded += r.refunded;
+          g.transactions += r.transactions;
+          g.byDay.set(r.date, (g.byDay.get(r.date) || 0) + r.charges);
+        } else g.prevCharges += r.charges;
+      }
       if (sel && r.brand != null && want.has(brandKey(r.brand))) {
         if (cur) {
           sel.charges += r.charges;
@@ -425,6 +444,20 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
       selTotal.transactions += sel.transactions;
     }
     if (sel && hasPrev) selTotal.prevCharges += sel.prevCharges;
+    const groupOut = (g, withDays) => ({
+      brands: [...g.brands].sort(),
+      charges: cur(g.charges),
+      sharePct: has ? r2(div(g.charges, total) * 100) : null,
+      refunded: cur(g.refunded),
+      transactions: has ? g.transactions : null,
+      prevCharges: prev(g.prevCharges),
+      changePct: has && hasPrev ? r2(div(g.charges - g.prevCharges, g.prevCharges) * 100) : null,
+      ...(withDays ? { byDay: [...g.byDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, charges]) => ({ date, weekday: weekdayOf(date), charges: r2(charges) })) } : {}),
+    });
+    for (const k of ['creditCards', 'membersClub']) {
+      if (has) groupTotals[k].charges += groups[k].charges;
+      if (hasPrev) groupTotals[k].prevCharges += groups[k].prevCharges;
+    }
     out.push({
       locationId: loc,
       available: true,
@@ -434,6 +467,9 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
       totalCharges: cur(total),
       prevTotalCharges: prev(prevTotal),
       totalService: cur(list.filter((t) => t.inZ).reduce((a, t) => a + t.service, 0)),
+      // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX, the rest = members club
+      creditCards: groupOut(groups.creditCards, len <= 62),
+      membersClub: groupOut(groups.membersClub, len <= 62),
       types: list
         .sort((a, b) => b.charges - a.charges || b.prevCharges - a.prevCharges)
         .map((t) => ({
@@ -471,7 +507,10 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges include service (tips); shares are of the payments inside the Z',
+    note: 'creditCards = VISA + MASTERCARD + AMEX of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Diners…); the type אשראי = both',
     ...(reason ? { missing: reason } : {}),
+    creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
+    membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },
     ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
     locations: out,
   };

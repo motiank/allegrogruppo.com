@@ -124,7 +124,7 @@ export const CALCS = {
   payments_summary: {
     params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX"] }',
     about:
-      'payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)',
+      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX only) and membersClub (every other brand of the credit type: the club card, Diners…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)',
     run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands),
   },
   bank_summary: {

@@ -121,6 +121,8 @@
       "expect": { "calcs": ["bank_transactions|bank_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
     { "key": "a-bank-card-default", "kind": "AREA", "lang": "he", "question": "כמה נכנס מכרטיסי אשראי בשבוע שעבר?", "request": { "contextId": 4, "area": "BANK" },
       "expect": { "calcs": ["bank_transactions|bank_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
+    { "key": "a-perf-members-club", "kind": "AREA", "lang": "he", "question": "כמה נכנס ממועדון חברים בשבוע שעבר?", "request": { "contextId": 3, "area": "PERFORMANCE" },
+      "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
     { "key": "g-card-income-en", "kind": "GENERAL", "lang": "en", "question": "How much did we sell by credit card this month?",
       "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-10-01", "to": "2026-10-21" } } },
     { "key": "g-emp-wage", "kind": "GENERAL", "lang": "he", "question": "מה השכר השעתי של דנה?",

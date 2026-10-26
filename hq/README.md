@@ -118,6 +118,11 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
+**Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD and AMEX** of
+the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר, Diners, Mishloha…) is the
+**members club** (מועדון חברים). `payments_summary` always returns both: `creditCards` / `membersClub` per location
+and `creditCardsTotal` / `membersClubTotal`.
+
 **Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
 question decide, and the **menu area sets the default** (owner, 2026-10-26; rules in `runner/hq-analyst.js`,
 "Which source"):
