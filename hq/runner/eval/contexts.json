@@ -234,6 +234,11 @@
      "about": "missing, stale and unmapped data per location"
     },
     {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+    },
+    {
      "name": "payroll_issues",
      "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
      "about": "payroll preparation issues"
@@ -497,6 +502,11 @@
      "name": "data_quality",
      "params": "{ locationIds? }",
      "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -923,6 +933,11 @@
      "name": "data_quality",
      "params": "{ locationIds? }",
      "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -2149,6 +2164,11 @@
      "about": "missing, stale and unmapped data per location"
     },
     {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+    },
+    {
      "name": "payroll_issues",
      "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
      "about": "payroll preparation issues"
@@ -2426,6 +2446,11 @@
      "name": "data_quality",
      "params": "{ locationIds? }",
      "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
     },
     {
      "name": "payroll_issues",

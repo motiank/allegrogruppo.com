@@ -106,6 +106,12 @@
     { "key": "g-bank-company", "kind": "GENERAL", "lang": "he", "question": "כמה כסף נכנס ויצא בחשבון הבנק של חברת דמו בחודש שעבר?",
       "expect": { "calcs": ["bank_summary"], "params": { "bank_summary": { "companyKeys": ["demo"] } }, "range": { "from": "2026-09-01", "to": "2026-09-30" } } },
     { "key": "a-bank-cards", "kind": "AREA", "lang": "he", "question": "כמה נכנס מחברות האשראי בשבוע שעבר?", "request": { "contextId": 4, "area": "BANK" },
-      "expect": { "calcs": ["bank_transactions|bank_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } }
+      "expect": { "calcs": ["bank_transactions|bank_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
+    { "key": "g-emp-wage", "kind": "GENERAL", "lang": "he", "question": "מה השכר השעתי של דנה?",
+      "expect": { "calcs": ["employees"], "params": { "employees": { "q": "דנה" } } } },
+    { "key": "g-emp-role-avg", "kind": "GENERAL", "lang": "he", "question": "מה השכר הממוצע של מלצר?",
+      "expect": { "calcs": ["employees"], "params": { "employees": { "role": "מלצר" } } } },
+    { "key": "a-emp-list", "kind": "AREA", "lang": "en", "question": "List the cooks and their wages",
+      "expect": { "calcs": ["employees"] } }
   ]
 }

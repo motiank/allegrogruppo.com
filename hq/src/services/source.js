@@ -18,6 +18,7 @@ import { get } from '../../lib/allegro.js';
 import { getConfig, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import log from '../../lib/log.js';
+import { effectiveHourlyRate } from '../../../shared/wage.js';
 
 const nextMonth = (m) => addDays(`${m}-01`, 32).slice(0, 7);
 const monthEnd = (m) => addDays(`${nextMonth(m)}-01`, -1);
@@ -247,6 +248,21 @@ export async function bankStatus() {
 
 // ---------------------------------------------------------------- employees and payroll
 
+const MIN_HOURLY_WAGE = Number(process.env.MIN_HOURLY_WAGE) || 35.4;
+// role entry first, then the employee level, then the legacy hourly_wage (-1 = minimum); null = a global (monthly) wage
+function rateOf(e, role = null) {
+  const opts = { minHourlyWage: MIN_HOURLY_WAGE };
+  const r = role && role.new_wage_type ? effectiveHourlyRate(role, opts) : null;
+  if (r != null) return r;
+  const emp = e.wageType ? effectiveHourlyRate({ new_wage_type: e.wageType, wage: e.wage }, opts) : null;
+  if (emp != null) return emp;
+  if (e.hourlyWage == null || e.hourlyWage === '') return null;
+  return Number(e.hourlyWage) === -1 ? MIN_HOURLY_WAGE : Number(e.hourlyWage);
+}
+
+// the amount as set; none for a minimum-wage type or the -1 "minimum" sentinel (then hourlyRate = the minimum)
+const wageOf = (type, w) => (w == null || w === '' || Number(w) === -1 || String(type || '').startsWith('hourly_min_') ? null : Number(w));
+
 /** Every employee of the given locations (active and not), without national ids or phones. */
 export async function employees(locationIds) {
   const { data } = await get('/employees', { active: 'all' });
@@ -266,6 +282,13 @@ export async function employees(locationIds) {
       roleCode: roleNames.length ? await roleCodeOf(roleNames[0]) : null,
       wageType: e.wageType ?? null,
       hourlyWage: hourly,
+      // the raw wage (an hourly rate, or a monthly amount for global_*) and the rate per role, as the admin
+      // Shifts page resolves it (role wage, else employee wage; hourly_min_* = the minimum wage)
+      wage: wageOf(e.wageType, e.wage),
+      hourlyRate: rateOf(e),
+      roles: (e.roles || [])
+        .filter((x) => cleanRole(x.role))
+        .map((x) => ({ role: cleanRole(x.role), wageType: x.new_wage_type ?? null, wage: wageOf(x.new_wage_type, x.wage), hourlyRate: rateOf(e, x) })),
       contractor: !!e.contractor,
       active: !!e.active,
     });

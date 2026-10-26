@@ -71,6 +71,10 @@ Guidance:
   companyKeys out (the picker's company is used). With no period named, use the current month up to today.
   In the bank's text: "מקס איט פיננסי" = credit card money from Max, "זיכוי … WOLT" = Wolt payouts, "חבר משרתי
   קבע" / "מועדון חבר" = the club card, "שיק" = a check paid, "העברה מהבנק" / "העברה לאחר" = a transfer out.
+- Employees, their names, roles and wages ("who works in …", "what is X's hourly wage", "average wage of a waiter",
+  "who earns above N", "list the cooks", "שכר", "שכר שעתי", "עובדים", "תעריף") → employees (locationIds; q = part of a
+  name when one person is named; role = the role name in Hebrew when one role is named; active "all" only when
+  former employees are asked about). For labor cost in money over a period use labor_summary instead.
 - sales_summary already compares the period with the same-length period before it. For "why did X change
   vs the month/week before" run it once on the later period only, never again on the earlier one.
 - Change formats are in context.changeFormats. Use lineId values from context.object.lines. Use the
@@ -108,6 +112,9 @@ Your job now: WRITE the answer to the user from <results>.
   data (lastDataDate). A negative balance is an overdraft (מינוס): say so plainly. Some Hebrew names in the
   details have their letters in reverse order (הננער היו'ג = ג'ויה רעננה, א"ת היו'ג = ג'ויה ת"א, הניפ שאר =
   ראש פינה): write them the right way.
+- Employees (employees): wages are gross unless the wage type ends in _net (then say net); a global_* wage is a
+  monthly amount, not hourly; hourly_min_* = the minimum wage. Give a person's rate per role when it differs.
+  For a long list give the count and byRole, and name at most ~15 people.
 - If something is missing or unknown in the results (null values, missing days, errors), say so plainly.
 - Distinguish known costs from estimates, and gross wages from total employer cost, when relevant.
 - If <proposal> is present: describe the proposed change in one or two lines and say it is waiting for the

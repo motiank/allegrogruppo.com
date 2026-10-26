@@ -19,6 +19,7 @@ import * as staffing from './staffing.js';
 import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
+import * as source from './source.js';
 import { recentSameWeekday } from './demand.js';
 import { addDays } from '../lib/recommend.js';
 import { listRoles, listShifts, listLocations } from './master.js';
@@ -36,6 +37,56 @@ function locs(access, p) {
   const allowed = asked.filter((id) => canLocation(access, id));
   if (!allowed.length) throw err('FORBIDDEN', 'no access to the requested location(s)');
   return allowed;
+}
+// Employees with their wages (Allegro /employees), for users with payroll access. No national ids or phones.
+async function employeeList(access, p) {
+  if (!access.payroll) throw err('FORBIDDEN', 'wages need payroll access');
+  const ids = locs(access, p);
+  const names = new Map((await listLocations(access)).map((l) => [String(l.id), l.name]));
+  const want = p.active === 'all' ? null : p.active === false || p.active === 'false' ? false : true;
+  const text = p.q ? String(p.q).trim().toLowerCase() : null;
+  const role = p.role ? String(p.role).trim() : null;
+  const rows = (await source.employees(ids)).filter(
+    (e) =>
+      (want == null || e.active === want) &&
+      (!text || String(e.name || '').toLowerCase().includes(text)) &&
+      (!role || e.roles.some((r) => r.role.includes(role)) || e.roleNames.some((r) => r.includes(role))),
+  );
+  const max = Math.min(Math.max(Number(p.limit) || 150, 1), 300);
+  const byRole = new Map();
+  for (const e of rows)
+    for (const r of e.roles) {
+      const g = byRole.get(r.role) || { role: r.role, employees: 0, rated: 0, sum: 0, min: null, max: null };
+      g.employees++;
+      if (r.hourlyRate != null) {
+        g.rated++;
+        g.sum += r.hourlyRate;
+        g.min = g.min == null ? r.hourlyRate : Math.min(g.min, r.hourlyRate);
+        g.max = g.max == null ? r.hourlyRate : Math.max(g.max, r.hourlyRate);
+      }
+      byRole.set(r.role, g);
+    }
+  return {
+    source: 'Allegro employees (/employees); wages as set in the admin Employees page',
+    note: 'wage = the hourly rate for hourly_* types, a monthly amount for global_* (then hourlyRate is null); hourly_min_* = the minimum wage; *_net = the wage is net. Gross wages, not the employer cost',
+    filter: { active: want == null ? 'all' : want, q: p.q || null, role },
+    count: rows.length,
+    shown: Math.min(rows.length, max),
+    byRole: [...byRole.values()]
+      .sort((a, b) => b.employees - a.employees)
+      .map((g) => ({ role: g.role, employees: g.employees, avgHourlyRate: g.rated ? Math.round((g.sum / g.rated) * 100) / 100 : null, minHourlyRate: g.min, maxHourlyRate: g.max })),
+    employees: rows.slice(0, max).map((e) => ({
+      name: e.name,
+      location: names.get(e.locationId) ?? e.locationId,
+      locationId: e.locationId,
+      active: e.active,
+      contractor: e.contractor,
+      wageType: e.wageType,
+      wage: e.wage,
+      hourlyRate: e.hourlyRate,
+      roles: e.roles,
+    })),
+  };
 }
 // Bank data is per company and for the chain admin only. companyKeys (keys or names) → those companies; else the
 // companies of the locations in scope (the picker choice, see locs).
@@ -154,6 +205,12 @@ export const CALCS = {
   item_patterns: { params: '{ locationId }', about: 'what was learned per item from final order lists', run: async (a, p) => ({ source: 'computed from the final order lists (joya_order_lists)', patterns: await repl.getPatterns(a, String(p.locationId)) }) },
   shortages: { params: '{ locationIds?, days? }', about: 'reported shortages', run: async (a, p) => ({ source: 'joya_shortages', shortages: await repl.listShortages(a, { locationIds: locs(a, p), days: p.days || 30 }) }) },
   data_quality: { params: '{ locationIds? }', about: 'missing, stale and unmapped data per location', run: (a, p) => quality.report(a, locs(a, p)) },
+  employees: {
+    params: '{ locationIds?, q?: "part of a name", role?: "role name, e.g. מלצר", active?: true | false | "all" (default true), limit? }',
+    about:
+      'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only',
+    run: (a, p) => employeeList(a, p),
+  },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },
   pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };

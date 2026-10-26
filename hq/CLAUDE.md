@@ -65,6 +65,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   (`bank_transactions`), read from `/bank/transactions/stored`. An account belongs to a **company**
   (`shared/restaurants.json` `bank_accounts`; owner: Hapoalim 12-584-136663 = פסטה לינה). Some Hebrew in `details`
   is stored in reverse letter order by the bank file (the WRITE prompt reads it the right way).
+- Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
+  role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
+  minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. Users with payroll access only
+  (admin and restMngr, their own locations). No national ids or phones.
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
 - Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove
   them with the prompt's `draft` field at the next prompt change). Unit 25, runner 8, smoke 63 + 1 known failure ("the raised quantity
