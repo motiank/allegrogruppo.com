@@ -72,6 +72,7 @@ const TABLE_MIGRATIONS = {
   bcom_orders: "scripts/utils/create_bcom_orders_table.sql",
   bcom_items_daily: "scripts/utils/create_bcom_items_table.sql",
   bcom_payments_daily: "scripts/utils/create_bcom_payments_table.sql",
+  bank_transactions: "scripts/utils/create_file_upload_tables.sql",
 };
 
 const missingTable = (err) => {
@@ -139,6 +140,27 @@ async function optionalBranches(req) {
 }
 
 const branchesMeta = (ids) => (ids.length ? ids : "all");
+
+// Bank accounts per company (shared/restaurants.json bank_accounts): [{ company, bank, account }].
+const BANK_ACCOUNTS = (RESTAURANTS.restaurants || []).flatMap((g) =>
+  (g.bank_accounts || []).map((a) => ({ company: g.key, companyLabel: g.label, bank: a.bank, account: a.account })),
+);
+const bankCompany = (account) => BANK_ACCOUNTS.find((a) => a.account === account)?.company ?? null;
+
+// Optional comma-separated company keys (see /branches company.key) → their bank accounts; [] = all accounts.
+function optionalBankAccounts(req) {
+  const keys = String(req.query.company || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const account = String(req.query.account || "").trim();
+  let list = BANK_ACCOUNTS;
+  if (keys.length) {
+    const unknown = keys.filter((k) => !(RESTAURANTS.restaurants || []).some((g) => g.key === k));
+    if (unknown.length) throw new ApiError(404, "not_found", `unknown company ${unknown.join(",")}`);
+    list = list.filter((a) => keys.includes(a.company));
+  }
+  if (account) list = list.filter((a) => a.account === account);
+  if ((keys.length || account) && !list.length) return null; // asked for something with no bank account
+  return keys.length || account ? list.map((a) => a.account) : [];
+}
 
 // SQL fragment + params for `column IN (:b0, :b1, ...)`; empty list = no filter.
 function inBranches(column, ids, params) {
@@ -481,6 +503,7 @@ const ENDPOINTS = [
   "GET /beecomm/items?from=&to=[&branch=a,b][&hours=1|&byDay=1]",
   "GET /beecomm/items/stored?from=&to=[&branch=a,b][&group=day|dish]",
   "GET /beecomm/payments/stored?from=&to=[&branch=a,b][&group=day|type|brand]",
+  "GET /bank/transactions/stored?from=&to=[&company=a,b][&account=][&q=][&side=credit|debit][&group=none|day|action|details]",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -834,7 +857,21 @@ const Router = () => {
         employees: e && { active: Number(e.active), total: Number(e.total), lastUpdatedAt: e.lastUpdatedAt },
       };
     });
-    return { data, meta: { branches: branchesMeta(branchIds), asOf: new Date().toISOString(), sources: notes } };
+    // bank accounts are per company, not per branch: one line per account
+    const bankRows = await grouped("bank", () =>
+      `SELECT bank, account, DATE_FORMAT(MIN(tx_date), '%Y-%m-%d') AS firstDate, DATE_FORMAT(MAX(tx_date), '%Y-%m-%d') AS lastDate,
+              MAX(created_at) AS lastLoadAt, COUNT(*) AS rowsCount
+         FROM bank_transactions GROUP BY bank, account`);
+    const bank = bankRows.map((r) => ({
+      company: bankCompany(r.account),
+      bank: r.bank,
+      account: r.account,
+      firstDate: r.firstDate,
+      lastDate: r.lastDate,
+      lastLoadAt: r.lastLoadAt,
+      rows: Number(r.rowsCount),
+    }));
+    return { data, meta: { branches: branchesMeta(branchIds), asOf: new Date().toISOString(), sources: notes, bank } };
   });
 
   // ── employees ──
@@ -1561,6 +1598,75 @@ const Router = () => {
     return {
       data: rows.map((r) => ({ businessDate: r.business_date, ...type(r), cardBrand: r.card_brand || null, ...amount(r), loadedAt: r.updated_at })),
       meta: { from, to, branches: branchesMeta(branchIds), group, source: "db" },
+    };
+  });
+
+  // Bank transactions uploaded on the Upload files page (bank_transactions, today Bank Hapoalim "תנועות בחשבון").
+  // company = the accounts of these companies (restaurants.json bank_accounts). q = text in the action or details;
+  // side = credit (money in) or debit (money out). group=none (default): the rows, newest first; day: per account
+  // and date the money in/out and the closing balance; action: per account and action; details: per account,
+  // action and details. The bank file lists the newest row first, so a day's closing balance is the balance of
+  // its first row (lowest id) in the latest upload that has that day.
+  get("/bank/transactions/stored", async (req) => {
+    const accounts = optionalBankAccounts(req);
+    const { from, to } = requireDateRange(req, MAX_STORED_DAYS);
+    const group = String(req.query.group || "none");
+    if (!["none", "day", "action", "details"].includes(group)) throw badRequest("group must be none, day, action or details");
+    const side = String(req.query.side || "");
+    if (side && !["credit", "debit"].includes(side)) throw badRequest("side must be credit or debit");
+    const meta = { from, to, companies: String(req.query.company || "") || "all", accounts: accounts == null ? [] : accounts.length ? accounts : "all", group, side: side || "all", source: "db" };
+    if (accounts == null) return { data: [], meta };
+    const params = { from, to };
+    let where = `WHERE tx_date BETWEEN :from AND :to`;
+    if (accounts.length) {
+      accounts.forEach((a, i) => (params[`a${i}`] = a));
+      where += ` AND account IN (${accounts.map((_, i) => `:a${i}`).join(",")})`;
+    }
+    const q = String(req.query.q || "").trim();
+    if (q) {
+      params.q = `%${q}%`;
+      where += ` AND (action LIKE :q OR details LIKE :q)`;
+    }
+    if (side) where += side === "credit" ? ` AND credit IS NOT NULL` : ` AND debit IS NOT NULL`;
+    const num = (v) => (v == null ? null : Number(v));
+    if (group === "day") {
+      const [rows] = await executeSql(
+        `SELECT account, MAX(bank) AS bank, ${dayCol("tx_date", "tx_date")}, SUM(credit) AS credit, SUM(debit) AS debit,
+                SUM(credit IS NOT NULL) AS credits, SUM(debit IS NOT NULL) AS debits,
+                (SELECT b.balance FROM bank_transactions b WHERE b.account = t.account AND b.tx_date = t.tx_date
+                  ORDER BY b.upload_id DESC, b.id ASC LIMIT 1) AS closing_balance
+           FROM bank_transactions t ${where}
+          GROUP BY account, tx_date ORDER BY account, tx_date`,
+        params,
+      );
+      return {
+        data: rows.map((r) => ({ company: bankCompany(r.account), bank: r.bank, account: r.account, date: r.tx_date, credit: num(r.credit), debit: num(r.debit), credits: Number(r.credits), debits: Number(r.debits), closingBalance: q || side ? null : num(r.closing_balance) })),
+        meta,
+      };
+    }
+    if (group !== "none") {
+      const cols = group === "action" ? "action_code, action" : "action_code, action, details";
+      const [rows] = await executeSql(
+        `SELECT account, MAX(bank) AS bank, ${cols}, COUNT(*) AS n, SUM(credit) AS credit, SUM(debit) AS debit,
+                ${dayCol("MIN(tx_date)", "first_date")}, ${dayCol("MAX(tx_date)", "last_date")}
+           FROM bank_transactions ${where}
+          GROUP BY account, ${cols} ORDER BY account, COALESCE(SUM(credit), 0) + COALESCE(SUM(debit), 0) DESC`,
+        params,
+      );
+      return {
+        data: rows.map((r) => ({ company: bankCompany(r.account), bank: r.bank, account: r.account, actionCode: r.action_code, action: r.action, ...(group === "details" ? { details: r.details } : {}), transactions: Number(r.n), credit: num(r.credit), debit: num(r.debit), firstDate: r.first_date, lastDate: r.last_date })),
+        meta,
+      };
+    }
+    const [rows] = await executeSql(
+      `SELECT id, bank, account, ${dayCol("tx_date", "tx_date")}, action_code, action, details, reference, bundle, debit, credit, balance, note, created_at
+         FROM bank_transactions ${where}
+        ORDER BY tx_date DESC, upload_id DESC, id ASC`,
+      params,
+    );
+    return {
+      data: rows.map((r) => ({ id: r.id, company: bankCompany(r.account), bank: r.bank, account: r.account, date: r.tx_date, actionCode: r.action_code, action: r.action, details: r.details, reference: r.reference, bundle: r.bundle, debit: num(r.debit), credit: num(r.credit), balance: num(r.balance), note: r.note, loadedAt: r.created_at })),
+      meta,
     };
   });
 

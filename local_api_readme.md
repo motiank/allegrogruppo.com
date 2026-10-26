@@ -24,10 +24,11 @@ curl -s http://localhost:3021/local-api/v1/branches | jq
 7. [Payroll (salaries)](#payroll-salaries)
 8. [Daily labor cost](#daily-labor-cost)
 9. [Beecomm (sales)](#beecomm-sales)
-10. [Data sources](#data-sources)
-11. [Errors](#errors)
-12. [Configuration and limits](#configuration-and-limits)
-13. [Examples](#examples)
+10. [Bank](#bank)
+11. [Data sources](#data-sources)
+12. [Errors](#errors)
+13. [Configuration and limits](#configuration-and-limits)
+14. [Examples](#examples)
 
 ---
 
@@ -134,6 +135,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /beecomm/items?from=&to=[&branch=][&hours=1\|&byDay=1]` | Dish sales: quantity, sales, cancels, discounts, category (live) | Beecomm API |
 | `GET /beecomm/items/stored?from=&to=[&branch=][&group=day\|dish]` | Dish sales per business day, or per dish over the range (stored) | `bcom_items_daily` ¹ |
 | `GET /beecomm/payments/stored?from=&to=[&branch=][&group=day\|type\|brand]` | Payments report (דוח תשלומים): charges, refunds, transactions and service per payment type and card brand, per business day or summed (stored) | `bcom_payments_daily` ¹ |
+| `GET /bank/transactions/stored?from=&to=[&company=][&account=][&q=][&side=credit\|debit][&group=none\|day\|action\|details]` | Bank account transactions (uploaded bank files), per row, per day with the closing balance, or summed per action | `bank_transactions` |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -174,6 +176,8 @@ What is loaded for each branch, and up to when. Use it to tell **"no data"** apa
 - When a whole source is unavailable because its table hasn't been created yet, `meta.sources` says so, e.g. `{ "tabitShifts": { "available": false, "reason": "table tabit_shifts does not exist yet" } }`. Treat those sections as unknown, not empty.
 - `beecomm.daily.lastDate` is the last day the 06:00 loader stored. If it's more than a day or two old, the loader is failing (usually an expired Beecomm refresh token).
 - `uploads` counts files that weren't rejected (`status` OK or PARTIAL), grouped by recognized kind.
+- `meta.bank`: one line per bank account (accounts are per company, not per branch):
+  `{ company, bank, account, firstDate, lastDate, lastLoadAt, rows }`. `company` is `null` for an account not listed in `shared/restaurants.json`.
 
 ### `GET /branches`
 
@@ -794,6 +798,35 @@ The Beecomm payments report (דוח תשלומים, `getPaymentsReport`), saved 
 
 ---
 
+## Bank
+
+### `GET /bank/transactions/stored?from=&to=[&company=a,b][&account=][&q=][&side=credit|debit][&group=none|day|action|details]`
+
+The bank transactions uploaded on the admin **Upload files** page (`bank_transactions`; today Bank Hapoalim "תנועות בחשבון", `.xlsx`). A bank account belongs to a **company**, not a branch: `shared/restaurants.json` → the company's `bank_accounts` (`[{ bank, account }]`). Today: פסטה לינה (`pastaLina`) = Hapoalim `12-584-136663`.
+
+| Parameter | Meaning |
+|---|---|
+| `company` | Company keys (`company.key` of `/branches`). A company with no bank account gives no rows. Unknown key → 404. Empty = all accounts. |
+| `account` | One account number, as in the file (`12-584-136663`). |
+| `q` | Text inside the action or the details, e.g. `WOLT`, `מקס`, `ביטוח לאומי`. |
+| `side` | `credit` = money in (זכות), `debit` = money out (חובה). |
+
+| Field | Meaning |
+|---|---|
+| `date` | The transaction date (תאריך). |
+| `actionCode`, `action` | The bank's action code and name (קוד פעולה, הפעולה), e.g. 175 / מקס איט פיננסי, 493 / שיק. |
+| `details` | פרטים. Often null (checks). Some Hebrew in it is stored in reverse letter order by the bank file (e.g. `הננער היו'ג` = ג'ויה רעננה). |
+| `reference`, `bundle` | אסמכתא, צרור. |
+| `credit`, `debit` | Money in / out, ₪ (one of them is null). |
+| `balance` | The balance after this row (יתרה). |
+
+- `group=none` (default): the rows, newest date first.
+- `group=day`: per account and date: `credit`, `debit`, the number of each (`credits`, `debits`), and `closingBalance`: the balance at the end of the day. The bank file lists the newest row first, so this is the balance of the day's first row in the latest upload that has the day. `closingBalance` is `null` when `q` or `side` is given. Days with no transactions have no row.
+- `group=action`: per account + action: `transactions`, `credit`, `debit`, `firstDate`, `lastDate`, biggest first. `group=details`: the same per action + details.
+- The data is as fresh as the last uploaded bank file (`/status` → `meta.bank.lastDate`).
+
+---
+
 ## Data sources
 
 | Data | Where it comes from | Freshness |
@@ -808,6 +841,7 @@ The Beecomm payments report (דוח תשלומים, `getPaymentsReport`), saved 
 | Beecomm dish sales (stored) | DB `bcom_items_daily`, same 06:00 job (`bcom_items.js`), one Beecomm call per day | Previous day |
 | Beecomm payments report (stored) | DB `bcom_payments_daily`, same 06:00 job (`bcom_payments.js`), one Beecomm call per branch per day, at most the last 14 days per run | Previous day |
 | Uploads log | DB `file_uploads`, written by the Upload files page | Live |
+| Bank transactions | DB `bank_transactions`, written by the Upload files page from the bank file (account → company in `shared/restaurants.json` `bank_accounts`) | As of last upload |
 | Beecomm Z / orders / exceptions / dish sales (live) | Beecomm backoffice API (`20cs5hma71…amazonaws.com/prod/api`) | Live |
 
 ### Tables and history
@@ -923,6 +957,10 @@ curl -s "$API/beecomm/items/stored?branch=$R&from=2026-09-01&to=2026-09-30&group
 # Payments by type in Raanana, October (stored): credit, cash, Wolt, 10bis…
 curl -s "$API/beecomm/payments/stored?branch=$R&from=2026-10-01&to=2026-10-24&group=type" \
   | jq '.data[] | {paymentTypeName, totalCharges, transactions, service}'
+
+# Pasta Lina bank account: money in per action, October
+curl -s "$API/bank/transactions/stored?company=pastaLina&from=2026-10-01&to=2026-10-25&group=action&side=credit" \
+  | jq '.data[] | {action, transactions, credit}'
 
 # Wine-by-the-glass sales per hour yesterday, all branches (live)
 curl -s "$API/beecomm/items?from=2026-10-20&to=2026-10-20&hours=1" \

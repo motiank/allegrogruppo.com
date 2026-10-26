@@ -24,6 +24,7 @@
       "key": "pastaLina",
       "label": "פסטה לינה",
       "companyId": "5fd7022862f93c0cf1df8b63",
+      "bank_accounts": [{ "bank": "hapoalim", "account": "12-584-136663" }],
       "payroll_id": "096",
       "payroll_soft": "mic",
       "mic_company": "096",
