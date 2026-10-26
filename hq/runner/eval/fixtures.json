@@ -78,6 +78,18 @@
     { "key": "a-profile-sun-hfa", "kind": "AREA", "lang": "en", "question": "What does an average Sunday morning look like in Haifa?",
       "expect": { "calcs": ["shift_profile"], "location": ["demo-hfa"] } },
     { "key": "g-profile-tlv", "kind": "GENERAL", "lang": "he", "question": "איך נראית משמרת ממוצעת בתל אביב בשלושת החודשים האחרונים?",
-      "expect": { "calcs": ["shift_profile"], "location": ["demo-tlv"] } }
+      "expect": { "calcs": ["shift_profile"], "location": ["demo-tlv"] } },
+    { "key": "a-diners-per-waiter-tlv", "kind": "AREA", "lang": "he", "question": "כמה סועדים היו לכל מלצר בתל אביב בשבוע שעבר?",
+      "expect": { "calcs": ["staffing_actual"], "params": { "staffing_actual": { "role": "מלצר" } }, "range": { "from": "2026-10-14", "to": "2026-10-20" }, "location": ["demo-tlv"] } },
+    { "key": "a-overstaffed-hfa", "kind": "AREA", "lang": "en", "question": "Were we over-staffed in Haifa last week?",
+      "expect": { "calcs": ["staffing_actual"], "range": { "from": "2026-10-14", "to": "2026-10-20" }, "location": ["demo-hfa"] } },
+    { "key": "a-cooks-worked-sep", "kind": "AREA", "lang": "he", "question": "כמה טבחים עבדו בממוצע במשמרת ערב בחיפה בספטמבר?",
+      "expect": { "calcs": ["staffing_actual"], "range": { "from": "2026-09-01", "to": "2026-09-30" }, "location": ["demo-hfa"] } },
+    { "key": "g-payments-tlv", "kind": "GENERAL", "lang": "he", "question": "איך שילמו הלקוחות בתל אביב בחודש שעבר? כמה באשראי וכמה בוולט?",
+      "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-09-01", "to": "2026-09-30" }, "location": ["demo-tlv"] } },
+    { "key": "g-payments-10bis", "kind": "GENERAL", "lang": "en", "question": "How much did we get through 10bis last week?",
+      "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
+    { "key": "g-payments-method", "kind": "GENERAL", "lang": "he", "question": "אנא הצג לי התפלגות ההכנסות לפי צורת גביה",
+      "expect": { "calcs": ["payments_summary"] } }
   ]
 }

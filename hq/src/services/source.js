@@ -3,6 +3,7 @@
 //   locations      /branches, /status a Joya location id IS the Allegro branch id (nothing stored)
 //   sales checks   /beecomm/orders/stored   closed orders (status 2); amount = netTotal − serviceAmount
 //   dish sales     /beecomm/items/stored    per business day; amount = totalSales − order and item discounts
+//   payments       /beecomm/payments/stored per business day, payment type and card brand (דוח תשלומים)
 //   employees      /employees               Joya's employee id IS Allegro's employeeId
 //   clock times    /shifts/raw              Tabit detailed report; an attendance id IS the raw shift id
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
@@ -184,6 +185,38 @@ export async function shiftStaff(locationId, from, to, { split = '17:00', minHou
   } catch (e) {
     if (e.code === 'NOT_SUPPORTED') return { available: false, reason: 'Allegro has no /shifts/by-shift endpoint yet' };
     if (e.code === 'NOT_LOADED') return { available: false, reason: 'no Tabit clock times are loaded in Allegro' };
+    throw e;
+  }
+}
+
+/**
+ * The Beecomm payments report per business day (דוח תשלומים): one row per payment type (cardBrand null)
+ * and per card brand inside it. { available: false, reason } when Allegro does not have it yet.
+ */
+export async function payments(locationId, from, to) {
+  const branch = String(locationId);
+  try {
+    const rows = await byMonth('/beecomm/payments/stored', branch, from, to, { group: 'day' });
+    return {
+      available: true,
+      rows: rows
+        .filter((r) => r.businessDate >= from && r.businessDate <= to)
+        .map((r) => ({
+          date: r.businessDate,
+          type: Number(r.paymentType),
+          typeName: r.paymentTypeName ?? String(r.paymentType),
+          brand: r.cardBrand ?? null,
+          inZ: r.inZ !== false,
+          charges: num(r.totalCharges) ?? 0,
+          refunded: num(r.totalRefunded) ?? 0,
+          transactions: num(r.transactions) ?? 0,
+          refundTransactions: num(r.refundTransactions) ?? 0,
+          service: num(r.service) ?? 0,
+        })),
+    };
+  } catch (e) {
+    if (e.code === 'NOT_SUPPORTED') return { available: false, reason: 'Allegro has no /beecomm/payments/stored endpoint yet' };
+    if (e.code === 'NOT_LOADED') return { available: false, reason: 'the Beecomm payments report is not loaded in Allegro yet' };
     throw e;
   }
 }

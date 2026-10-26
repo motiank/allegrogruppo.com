@@ -53,6 +53,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   1 diner, round to the nearest. Staff per shift comes from the admin's `/shifts/by-shift` (Tabit clock times, read
   daily from the Tabit Shift API since 2026-10-24; Jul–Oct 2026 loaded). Ratios per weekday when learned; rare
   roles (< minPresence) are not forecast; trainees count as staff (owner).
+- Past shifts (calc `staffing_actual`, 2026-10-26): diners per person per role and shift from the Tabit clock times,
+  and people vs "needed" by the branch's learned ratio (over / under-staffed shifts). Owner: use the Tabit shift data
+  wherever it helps (forecast, waiters per diners…). Labor hours (`labor_summary`) already come from Tabit `/shifts/raw`.
+- Payments (calc `payments_summary`, 2026-10-26): the Beecomm payments report (דוח תשלומים) per type and card brand,
+  from the admin's `/beecomm/payments/stored` (table `bcom_payments_daily`, created on production 2026-10-26,
+  backfilled from 2026-01-01, daily job `scripts/server/analoader/bcom_payments.js`). Days not loaded are missing, not 0.
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
 - Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove
   them with the prompt's `draft` field at the next prompt change). Unit 25, runner 8, smoke 63 + 1 known failure ("the raised quantity

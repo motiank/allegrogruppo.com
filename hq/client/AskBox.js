@@ -46,7 +46,7 @@ const useStyles = createUseStyles((theme) => ({
 const words = (s) => String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
 
 /** Up to 5 suggestions that share the most words with what is typed (a typed word may be a word's start). */
-function matchSuggestions(text, pool) {
+export function matchSuggestions(text, pool) {
   const typed = words(text);
   if (!typed.length) return [];
   const t = text.trim().toLowerCase();
@@ -95,7 +95,10 @@ function ProposalPreview({ p, classes }) {
   );
 }
 
-function Answer({ r, classes, onChanged }) {
+/** The answer to one question: the text, how it was calculated, and a proposed change. head = show the question and time. */
+export function Answer({ r, onChanged, head = true }) {
+  const theme = useTheme();
+  const classes = useStyles(theme);
   const { t } = useT();
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -114,12 +117,16 @@ function Answer({ r, classes, onChanged }) {
   const unverified = r.meta?.unverifiedNumbers || [];
   return (
     <div>
-      <div className={classes.q} dir="auto">
-        {r.question}
-      </div>
-      <div className={classes.meta}>
-        <Term>{fmtWhen(r.createdAt)}</Term>
-      </div>
+      {head && (
+        <>
+          <div className={classes.q} dir="auto">
+            {r.question}
+          </div>
+          <div className={classes.meta}>
+            <Term>{fmtWhen(r.createdAt)}</Term>
+          </div>
+        </>
+      )}
       {r.status === 'THINKING' && <div className={classes.thinking}>{t('joya.ask.thinking')}</div>}
       {r.status === 'FAILED' && <ErrorBox error={{ message: `${t('joya.ask.failed')} ${r.error ? `(${r.error})` : ''}` }} />}
       {r.status === 'ANSWERED' && (
@@ -270,7 +277,6 @@ export default function AskBox({ contextKind = 'GENERAL', contextId = null, loca
         <Answer
           key={r.id}
           r={r}
-          classes={classes}
           onChanged={(what) => {
             load();
             if (what === 'apply') onApplied?.();

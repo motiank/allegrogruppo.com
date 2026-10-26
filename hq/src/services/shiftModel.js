@@ -1,9 +1,9 @@
 // The shift profile and the people needed per role in next week's shifts, learned from the last
 // `profileWeeks` weeks of the branch (src/lib/shiftModel.js has the method). Sales: Beecomm checks;
 // staff: Allegro /shifts/by-shift (from the Tabit clock times). Nothing is stored.
-import { getSettings, todayLocal } from '../db.js';
+import { getSettings, todayLocal, err } from '../db.js';
 import { addDays } from '../lib/recommend.js';
-import { loadByShift, shiftProfile, learnRatios, forecastShifts } from '../lib/shiftModel.js';
+import { loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../lib/shiftModel.js';
 import { assertLocation } from '../access.js';
 import * as source from './source.js';
 
@@ -72,5 +72,48 @@ export async function forecastWeek(access, locationId, { weekStart, weeks } = {}
     staffData: staff.available ? (staffDays ? 'ok' : 'none in the period') : staff.reason,
     ratios: ratios.map(({ role, shift, kitchen, perPerson, shifts, hoursPerPerson }) => ({ role, shift, kitchen, perPerson, shifts, hoursPerPerson })),
     shifts: forecastShifts(dates, prof, ratios, { deliveryAsDiners: s.deliveryAsDiners, minPresence: s.minPresence }),
+  };
+}
+
+/**
+ * Past shifts from `from` to `to` as they really were (Tabit clock times): per shift the diners and, per role,
+ * the people, hours and diners per person, vs the people the learned ratio says were needed. The ratios are
+ * learned from the `weeks` weeks ending at `to` (at least the period itself). Detail per shift only for
+ * periods up to 14 days; longer periods give the summary and the shifts with the biggest differences.
+ */
+export async function actualStaffing(access, locationId, { from, to, role, weeks } = {}) {
+  assertLocation(access, locationId);
+  const s = await settings();
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  if (days > 92) throw err('BAD_REQUEST', 'the period is longer than 92 days');
+  const w = Math.min(Math.max(Number(weeks) || s.weeks, Math.ceil(days / 7)), 26);
+  const learnFrom = addDays(to, -7 * w + 1) < from ? addDays(to, -7 * w + 1) : from;
+  const load = loadByShift(await source.checks(locationId, learnFrom, to), s.split);
+  const staff = await source.shiftStaff(locationId, learnFrom, to, { split: s.split, minHours: s.minHours });
+  const base = { period: { from, to }, source: 'Beecomm checks + Allegro /shifts/by-shift (Tabit clock times)' };
+  if (!staff.available) return { ...base, staffData: staff.reason, shifts: [], summary: [] };
+  const aliases = await source.roleAliases();
+  const isKitchen = (r) => s.kitchen.includes(r) || aliases.get(r) === 'cook';
+  const ratios = learnRatios(load, staff.rows, { isKitchen, deliveryAsDiners: s.deliveryAsDiners, minWeekdayShifts: s.minWeekdayShifts });
+  const dates = Array.from({ length: days }, (_, i) => addDays(from, i));
+  const out = staffingActual(dates, load, staff.rows, ratios, { isKitchen, deliveryAsDiners: s.deliveryAsDiners });
+  const pick = (r) => !role || r.role.includes(role);
+  const shifts = out.shifts.map((x) => ({ ...x, roles: x.roles.filter(pick) })).filter((x) => x.roles.length);
+  const big = shifts.flatMap((x) => x.roles.filter((r) => r.diff).map((r) => ({ date: x.date, weekday: x.weekday, shift: x.shift, diners: x.diners, deliveries: x.deliveries, ...r })));
+  big.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const missingSales = dates.filter((d) => !load[d]);
+  const missingClock = dates.filter((d) => load[d] && !out.shifts.some((x) => x.date === d));
+  return {
+    ...base,
+    learnedFrom: { from: learnFrom, to },
+    method:
+      `diners per person = the shift's diners (kitchen roles: + ${s.deliveryAsDiners} per delivery) ÷ the people of the role with at least ${s.minHours} h in the shift (morning < ${s.split} ≤ evening); ` +
+      `needed = the same load ÷ the role's usual diners per person, learned from the clock times of ${learnFrom}..${to} (same weekday when the role worked at least ${s.minWeekdayShifts} of them); diff = people − needed`,
+    staffData: staff.rows.length ? 'ok' : 'none in the period',
+    missingDays: { sales: missingSales, clockTimes: missingClock },
+    summary: out.summary.filter(pick),
+    ...(days <= 14 ? { shifts } : {}),
+    mostOver: big.filter((r) => r.diff > 0).slice(0, 10),
+    mostUnder: big.filter((r) => r.diff < 0).slice(0, 10),
   };
 }

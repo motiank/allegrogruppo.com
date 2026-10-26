@@ -142,6 +142,11 @@
      "about": "revenue, checks, diners per shift"
     },
     {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+    },
+    {
      "name": "sales_by_dish",
      "params": "{ locationIds?, from, to, limit? }",
      "about": "units and revenue per dish vs the previous period"
@@ -175,6 +180,11 @@
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
      "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
     },
     {
      "name": "staffing_plan_lines",
@@ -385,6 +395,11 @@
      "about": "revenue, checks, diners per shift"
     },
     {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+    },
+    {
      "name": "sales_by_dish",
      "params": "{ locationIds?, from, to, limit? }",
      "about": "units and revenue per dish vs the previous period"
@@ -418,6 +433,11 @@
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
      "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
     },
     {
      "name": "staffing_plan_lines",
@@ -789,6 +809,11 @@
      "about": "revenue, checks, diners per shift"
     },
     {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+    },
+    {
      "name": "sales_by_dish",
      "params": "{ locationIds?, from, to, limit? }",
      "about": "units and revenue per dish vs the previous period"
@@ -822,6 +847,11 @@
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
      "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
     },
     {
      "name": "staffing_plan_lines",
@@ -1991,6 +2021,11 @@
      "about": "revenue, checks, diners per shift"
     },
     {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+    },
+    {
      "name": "sales_by_dish",
      "params": "{ locationIds?, from, to, limit? }",
      "about": "units and revenue per dish vs the previous period"
@@ -2024,6 +2059,11 @@
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
      "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
     },
     {
      "name": "staffing_plan_lines",
@@ -2248,6 +2288,11 @@
      "about": "revenue, checks, diners per shift"
     },
     {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+    },
+    {
      "name": "sales_by_dish",
      "params": "{ locationIds?, from, to, limit? }",
      "about": "units and revenue per dish vs the previous period"
@@ -2281,6 +2326,11 @@
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
      "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
     },
     {
      "name": "staffing_plan_lines",

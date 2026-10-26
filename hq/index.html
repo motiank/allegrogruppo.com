@@ -10,8 +10,10 @@
       /* Same base rules as the trade-hub phone app (trade-hub/index.html). */
       html, body { margin: 0; padding: 0; background: #0f1115; }
       /* A phone page must never slide sideways: whatever is too wide scrolls inside its own box. */
-      html, body { overflow-x: hidden; max-width: 100%; }
-      #root { overflow-x: hidden; }
+      /* 'clip', not 'hidden': 'hidden' makes the box a scroll container, and the sticky top bar (company and
+         restaurant menus) then scrolls away with the page. 'hidden' stays as the fallback for old browsers. */
+      html, body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
+      #root { overflow-x: hidden; overflow-x: clip; }
       *, *::before, *::after { box-sizing: border-box; }
       html { font-size: 120%; }
       body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Hebrew', Arial, sans-serif; }

@@ -211,6 +211,7 @@ r.post('/joya/ai/ask', h(async (req) => ({ request: await ai.ask(req.joya, req.b
 r.get('/joya/ai/requests', h(async (req) => ({ requests: await ai.listRequests(req.joya, { contextKind: req.query.contextKind, contextId: req.query.contextId, limit: req.query.limit }) })));
 r.get('/joya/ai/requests/:id', h(async (req) => ({ request: await ai.getRequest(req.joya, id(req)) })));
 r.post('/joya/ai/requests/:id/apply', h(async (req) => ai.applyProposal(req.joya, id(req))));
+r.delete('/joya/ai/requests/:id', h(async (req) => (await ai.deleteRequest(req.joya, id(req)), { ok: true })));
 r.post('/joya/ai/requests/:id/discard', h(async (req) => ({ request: await ai.discardProposal(req.joya, id(req)) })));
 
 export default r;

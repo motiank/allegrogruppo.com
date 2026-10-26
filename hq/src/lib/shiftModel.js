@@ -160,3 +160,73 @@ export function forecastShifts(dates, profile, ratios, { deliveryAsDiners = 1, m
   }
   return out;
 }
+
+/**
+ * Past shifts as they really were: per date and shift the load and, per role, the people and hours from the
+ * clock times, the diners per person they served, and the people the learned ratio says were needed
+ * (needed = load ÷ the role's diners per person of that weekday when learned, else of all days; diff =
+ * people − needed, + = more people than usual for that load). Plus a summary per role and shift.
+ * load / staff: as in learnRatios; ratios: learnRatios(); only dates in `dates` with sales and clock rows.
+ */
+export function staffingActual(dates, load, staff, ratios, { isKitchen = () => false, deliveryAsDiners = 1 } = {}) {
+  const want = new Set(dates);
+  const ratio = new Map(ratios.map((r) => [`${r.role}\u0000${r.shift}`, r]));
+  const cell = new Map(); // date:shift → Map role → { people, hours }
+  for (const r of staff) {
+    if (!want.has(r.date) || !load[r.date] || !Number(r.people)) continue;
+    const k = `${r.date}\u0000${r.shift}`;
+    if (!cell.has(k)) cell.set(k, new Map());
+    const m = cell.get(k);
+    const prev = m.get(r.role) || { people: 0, hours: 0 };
+    m.set(r.role, { people: prev.people + Number(r.people), hours: prev.hours + Number(r.hours || 0) });
+  }
+  const shifts = [];
+  const sum = new Map(); // role:shift → totals
+  for (const date of [...want].sort()) {
+    const wd = weekdayOf(date);
+    for (const shift of SHIFTS) {
+      const m = cell.get(`${date}\u0000${shift}`);
+      if (!m) continue;
+      const slot = load[date][shift];
+      const roles = [];
+      for (const [role, v] of m) {
+        const kitchen = !!isKitchen(role);
+        const l = loadFor(slot, kitchen, deliveryAsDiners);
+        const sk = `${role}\u0000${shift}`;
+        const learned = ratio.get(sk);
+        const usualPerPerson = learned ? learned.perPersonWd?.[wd] ?? learned.perPerson : null;
+        const needed = usualPerPerson ? Math.max(1, Math.round(l / usualPerPerson)) : null;
+        roles.push({ role, people: v.people, hours: r1(v.hours), load: r1(l), perPerson: r1(l / v.people), usualPerPerson, needed, diff: needed == null ? null : v.people - needed });
+        if (!sum.has(sk)) sum.set(sk, { role, shift, kitchen, shifts: 0, people: 0, hours: 0, load: 0, over: 0, under: 0, min: null, max: null });
+        const s = sum.get(sk);
+        const pp = l / v.people;
+        s.shifts++;
+        s.people += v.people;
+        s.hours += v.hours;
+        s.load += l;
+        if (needed != null && v.people > needed) s.over++;
+        if (needed != null && v.people < needed) s.under++;
+        s.min = s.min == null ? pp : Math.min(s.min, pp);
+        s.max = s.max == null ? pp : Math.max(s.max, pp);
+      }
+      roles.sort((a, b) => b.people - a.people);
+      shifts.push({ date, weekday: wd, shift, diners: slot.diners, deliveries: slot.deliveries, roles, allRolesPeople: roles.reduce((a, x) => a + x.people, 0), allRolesHours: r1(roles.reduce((a, x) => a + x.hours, 0)) });
+    }
+  }
+  const summary = [...sum.values()]
+    .map((s) => ({
+      role: s.role,
+      shift: s.shift,
+      kitchen: s.kitchen,
+      shifts: s.shifts,
+      avgPeople: r1(s.people / s.shifts),
+      perPerson: s.load > 0 ? r1(s.load / s.people) : null,
+      minPerPerson: r1(s.min),
+      maxPerPerson: r1(s.max),
+      hoursPerPerson: r1(s.hours / s.people),
+      shiftsOver: s.over,
+      shiftsUnder: s.under,
+    }))
+    .sort((a, b) => SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift) || b.avgPeople * b.shifts - a.avgPeople * a.shifts);
+  return { shifts, summary };
+}

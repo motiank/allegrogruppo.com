@@ -50,6 +50,12 @@ export const CALCS = {
   },
   sales_daily: { params: '{ locationIds?, from, to }', about: 'day by day revenue, checks, diners; missing days marked', run: (a, p) => analytics.salesDaily(locs(a, p), ...range(p)) },
   sales_by_shift: { params: '{ locationIds?, from, to }', about: 'revenue, checks, diners per shift', run: (a, p) => analytics.salesByShift(locs(a, p), ...range(p)) },
+  payments_summary: {
+    params: '{ locationIds?, from, to }',
+    about:
+      'payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before',
+    run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p)),
+  },
   sales_by_dish: { params: '{ locationIds?, from, to, limit? }', about: 'units and revenue per dish vs the previous period', run: (a, p) => analytics.salesByDish(locs(a, p), ...range(p), p.limit) },
   sales_anomalies: { params: '{ locationIds?, from, to }', about: 'days with unusual revenue vs the same weekday of the 8 weeks before, and missing days', run: (a, p) => analytics.anomalies(locs(a, p), ...range(p)) },
   labor_summary: {
@@ -77,6 +83,15 @@ export const CALCS = {
     about:
       'people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks',
     run: (a, p) => shiftModel.forecastWeek(a, String(p.locationId), { weekStart: p.weekStart, weeks: p.weeks }),
+  },
+  staffing_actual: {
+    params: '{ locationId, from, to, role?: "role name, e.g. מלצר" }',
+    about:
+      'past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days',
+    run: (a, p) => {
+      const [from, to] = range(p);
+      return shiftModel.actualStaffing(a, String(p.locationId), { from, to, role: p.role, weeks: p.weeks });
+    },
   },
   staffing_plan_lines: {
     params: '{ planId, date?, shiftCode?, roleCode? }',
@@ -197,6 +212,13 @@ export async function applyProposal(access, id) {
   await q(`UPDATE joya_ai_requests SET proposal_status='APPLIED' WHERE id=:id`, { id });
   await audit(access.username, 'AI_PROPOSAL_APPLIED', 'ai_request', id, r.locationId, { type: p.type });
   return { request: await getRequest(access, id), result };
+}
+
+/** The user removes one of their questions (and its answer) from the chat. */
+export async function deleteRequest(access, id) {
+  const r = await getRequest(access, id);
+  await q(`DELETE FROM joya_ai_requests WHERE id=:id`, { id });
+  await audit(access.username, 'AI_REQUEST_DELETED', 'ai_request', id, r.locationId, { question: r.question.slice(0, 200) });
 }
 
 export async function discardProposal(access, id) {

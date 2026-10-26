@@ -188,6 +188,13 @@ Settings (`joya_settings` 'staffing', all optional): `profileWeeks`, `profileEma
 `minPresence`, `minWeekdayShifts`, `minHoursInShift`, `kitchenRoles`. Without `/shifts/by-shift` (older Allegro) or with no clock
 times, the answer gives the expected diners only and says why.
 
+**Past shifts** (`staffing_actual`, `actualStaffing`): "how many diners per waiter did we have", "were we over-staffed
+last week". For a past period (up to 92 days) per date × shift and role: the people and hours from the Tabit clock
+times, diners per person (kitchen roles + deliveries), and `needed` = the load ÷ the role's usual ratio, learned the
+same way from the `profileWeeks` weeks ending at the period's end (at least the period itself); `diff` = people −
+needed. Always a summary per role × shift (diners per person, min/max, shifts over/under) and the 10 shifts most over
+and most under; the shift-by-shift detail only for periods up to 14 days. An optional `role` keeps one role.
+
 ## Asking in words
 
 `POST /api/joya/ai/ask` → the runner plans calculations from `services/ai.js` `CALCS` (sales, labor, demand,

@@ -8,7 +8,7 @@ import { median } from '../lib/demand.js';
 import { effectiveAttendance } from './attendance.js';
 import { listShifts } from './master.js';
 import { shiftWindow } from '../lib/demand.js';
-import { checks as sourceChecks, dishSales, laborDaily, employees, monthsBetween } from './source.js';
+import { checks as sourceChecks, dishSales, laborDaily, employees, monthsBetween, payments as sourcePayments } from './source.js';
 
 const SALES_SOURCE = 'Beecomm via Allegro (/beecomm/orders/stored)';
 
@@ -347,4 +347,91 @@ export async function plannedVsActual(access, locationIds, from, to) {
     };
   });
   return { period: { from, to }, sources: { planned: 'joya_staffing_plans.final_json (approved)', actual: 'Tabit clock rows via Allegro (/shifts/raw) + corrections' }, weeks };
+}
+
+/**
+ * Payments per location for a period (Beecomm דוח תשלומים): per payment type (credit, cash, Wolt, 10bis…)
+ * the charges (tips included), their share of all charges, refunds, payments and the average payment, the
+ * service (tips) inside them, and the card brands of the type; compared with the same-length period before.
+ */
+export async function paymentsSummary(locationIds, from, to) {
+  const len = daysBetween(from, to) + 1;
+  const pFrom = addDays(from, -len);
+  const out = [];
+  let reason = null;
+  for (const loc of locationIds) {
+    const src = await sourcePayments(loc, pFrom, to);
+    if (!src.available) {
+      reason = src.reason;
+      out.push({ locationId: loc, available: false });
+      continue;
+    }
+    const types = new Map();
+    const days = new Set();
+    const prevDays = new Set();
+    for (const r of src.rows) {
+      const cur = r.date >= from;
+      (cur ? days : prevDays).add(r.date);
+      let t = types.get(r.type);
+      if (!t) types.set(r.type, (t = { type: r.type, name: r.typeName, inZ: r.inZ, charges: 0, refunded: 0, transactions: 0, refundTransactions: 0, service: 0, prevCharges: 0, brands: new Map() }));
+      if (r.brand == null) {
+        if (cur) {
+          t.charges += r.charges;
+          t.refunded += r.refunded;
+          t.transactions += r.transactions;
+          t.refundTransactions += r.refundTransactions;
+          t.service += r.service;
+        } else t.prevCharges += r.charges;
+      } else if (cur) {
+        const b = t.brands.get(r.brand) || { brand: r.brand, charges: 0, transactions: 0, refunded: 0 };
+        b.charges += r.charges;
+        b.transactions += r.transactions;
+        b.refunded += r.refunded;
+        t.brands.set(r.brand, b);
+      }
+    }
+    const list = [...types.values()];
+    // a period with no loaded day is missing, not zero
+    const has = days.size > 0;
+    const hasPrev = prevDays.size > 0;
+    const cur = (x) => (has ? r2(x) : null);
+    const prev = (x) => (hasPrev ? r2(x) : null);
+    const total = list.filter((t) => t.inZ).reduce((a, t) => a + t.charges, 0);
+    const prevTotal = list.filter((t) => t.inZ).reduce((a, t) => a + t.prevCharges, 0);
+    out.push({
+      locationId: loc,
+      available: true,
+      daysWithData: days.size,
+      prevDaysWithData: prevDays.size,
+      days: len,
+      totalCharges: cur(total),
+      prevTotalCharges: prev(prevTotal),
+      totalService: cur(list.filter((t) => t.inZ).reduce((a, t) => a + t.service, 0)),
+      types: list
+        .sort((a, b) => b.charges - a.charges || b.prevCharges - a.prevCharges)
+        .map((t) => ({
+          type: t.type,
+          name: t.name,
+          inZ: t.inZ,
+          charges: cur(t.charges),
+          sharePct: has && t.inZ ? r2(div(t.charges, total) * 100) : null,
+          prevCharges: prev(t.prevCharges),
+          prevSharePct: hasPrev && t.inZ ? r2(div(t.prevCharges, prevTotal) * 100) : null,
+          changePct: has && hasPrev ? r2(div(t.charges - t.prevCharges, t.prevCharges) * 100) : null,
+          refunded: cur(t.refunded),
+          transactions: has ? t.transactions : null,
+          refundTransactions: has ? t.refundTransactions : null,
+          avgPayment: has ? r2(div(t.charges, t.transactions)) : null,
+          service: cur(t.service),
+          brands: [...t.brands.values()].sort((a, b) => b.charges - a.charges).map((b) => ({ ...b, charges: r2(b.charges), refunded: r2(b.refunded) })),
+        })),
+    });
+  }
+  return {
+    period: { from, to },
+    comparedWith: { from: pFrom, to: addDays(from, -1) },
+    source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges include service (tips); shares are of the payments inside the Z',
+    ...(reason ? { missing: reason } : {}),
+    locations: out,
+  };
 }

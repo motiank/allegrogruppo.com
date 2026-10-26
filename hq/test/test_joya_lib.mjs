@@ -5,7 +5,7 @@ import { applyMapping, parseNumber, parseDate, parseDateTime, suggestMapping } f
 import { shiftDemand, forecastUnit } from '../src/lib/demand.js';
 import { computeSlot, learnedAdjustments, validateRule } from '../src/lib/staffingRules.js';
 import { recommend, convert } from '../src/lib/recommend.js';
-import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts } from '../src/lib/shiftModel.js';
+import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -317,6 +317,28 @@ t('ratios: learned per weekday when the role worked enough of them (a busy Frida
     [2, 1, 34.3], // 30 / 34.3 → 1, from the all-days ratio
     [5, 3, 40], // 120 / 40; the all-days ratio would say 120 / 34.3 → 4
   ]);
+});
+
+t('actual: diners per person per past shift, needed by the learned ratio, and a summary per role', () => {
+  // 4 Friday evenings: 120 diners + 10 deliveries; waiters 3, 3, 3, 5; one cook each time
+  const load = {};
+  const staff = [];
+  ['2026-09-04', '2026-09-11', '2026-09-18', '2026-09-25'].forEach((d, i) => {
+    load[d] = { morning: { diners: 0, deliveries: 0, checks: 0 }, evening: { diners: 120, deliveries: 10, checks: 40 } };
+    staff.push({ date: d, shift: 'evening', role: 'מלצר', people: i === 3 ? 5 : 3, hours: 18 }, { date: d, shift: 'evening', role: 'טבח', people: 1, hours: 7 });
+  });
+  const isKitchen = (r) => r === 'טבח';
+  const ratios = learnRatios(load, staff, { isKitchen });
+  const a = staffingActual(['2026-09-18', '2026-09-25', '2026-09-26'], load, staff, ratios, { isKitchen });
+  assert.equal(a.shifts.length, 2); // 09-26 has no data
+  const last = a.shifts[1];
+  assert.deepEqual(last.roles.map((r) => [r.role, r.people, r.perPerson, r.usualPerPerson, r.needed, r.diff]), [
+    ['מלצר', 5, 24, 34.3, 3, 2], // 120 / 5; the ratio is 480 / 14 → 120 / 34.3 → 3
+    ['טבח', 1, 130, 130, 1, 0], // a cook counts the deliveries too
+  ]);
+  assert.equal(last.allRolesPeople, 6);
+  const w = a.summary.find((x) => x.role === 'מלצר');
+  assert.deepEqual([w.shifts, w.avgPeople, w.perPerson, w.minPerPerson, w.maxPerPerson, w.shiftsOver, w.shiftsUnder], [2, 4, 30, 24, 40, 1, 0]);
 });
 
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);

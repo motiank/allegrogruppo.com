@@ -42,11 +42,19 @@ Guidance:
 - "How many employees / cooks / waiters … do we need in each shift next week (or in a given week)" with no
   STAFFING_PLAN in focus → staffing_forecast_week (locationId; weekStart only for another week). It needs
   no plan and no stored rules. With no single location, run it for each location in scope (up to the limit).
+- Past shifts as they really were (the Tabit clock times): "how many diners per waiter / cook did we
+  have", "were we over- or under-staffed last week", "how many waiters worked on Friday evening",
+  "evaluate the staffing of …" → staffing_actual (locationId, from, to; role = the role name in Hebrew,
+  e.g. "מלצר", only when one role is named). A past period → staffing_actual; a coming week →
+  staffing_forecast_week. With no single location, run it for each location in scope (up to the limit).
 - "What does an average shift look like" / "how many diners on Sunday morning" → shift_profile.
   In a STAFFING_PLAN context, expected diners or demand of a slot of that plan → staffing_forecast
   (planId, date, shiftCode), never shift_profile or staffing_forecast_week.
 - request.area, when present, is the main-menu area the question was asked in: STOCK (stock and
   purchasing), MANPOWER or PERFORMANCE. It only hints at the topic.
+- How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
+  (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
+  Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".
 - sales_summary already compares the period with the same-length period before it. For "why did X change
   vs the month/week before" run it once on the later period only, never again on the earlier one.
 - Change formats are in context.changeFormats. Use lineId values from context.object.lines. Use the
@@ -70,6 +78,12 @@ Your job now: WRITE the answer to the user from <results>.
   diners and the people per role (e.g. "ראשון בוקר: 53 סועדים — מלצר 2, פס קר 1"). Then one line on how it
   was learned (the weeks in learnedFrom, "diners per person" per role from the clock times). If staffData is
   not "ok", say the clock times are missing and give only the expected diners.
+- Past shifts (staffing_actual): start with the diners per person of each role in the morning and the
+  evening (summary), then the shifts with the biggest differences (mostOver, mostUnder): date, shift,
+  diners, people vs needed. "Needed" is by the branch's own usual diners per person in learnedFrom — say
+  so. Name missing days (missingDays). If staffData is not "ok", say the clock times are missing.
+- Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only
+  when asked. The amounts include service (tips) — say so. Name the period it is compared with.
 - If something is missing or unknown in the results (null values, missing days, errors), say so plainly.
 - Distinguish known costs from estimates, and gross wages from total employer cost, when relevant.
 - If <proposal> is present: describe the proposed change in one or two lines and say it is waiting for the
