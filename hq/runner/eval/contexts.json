@@ -21,14 +21,16 @@
      "name": "ג׳ויה חיפה (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     },
     {
      "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     }
    ],
    "shifts": [
@@ -143,8 +145,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to }",
-     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\"] }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
     },
     {
      "name": "sales_by_dish",
@@ -174,12 +186,12 @@
     {
      "name": "shift_profile",
      "params": "{ locationId, weeks? }",
-     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
     },
     {
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
-     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
     },
     {
      "name": "staffing_actual",
@@ -229,7 +241,7 @@
     {
      "name": "pending_decisions",
      "params": "{ locationIds? }",
-     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
     }
    ],
    "limits": {
@@ -274,14 +286,16 @@
      "name": "ג׳ויה חיפה (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     },
     {
      "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     }
    ],
    "shifts": [
@@ -396,8 +410,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to }",
-     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\"] }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
     },
     {
      "name": "sales_by_dish",
@@ -427,12 +451,12 @@
     {
      "name": "shift_profile",
      "params": "{ locationId, weeks? }",
-     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
     },
     {
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
-     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
     },
     {
      "name": "staffing_actual",
@@ -482,7 +506,7 @@
     {
      "name": "pending_decisions",
      "params": "{ locationIds? }",
-     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
     }
    ],
    "limits": {
@@ -688,14 +712,16 @@
      "name": "ג׳ויה חיפה (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     },
     {
      "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     }
    ],
    "shifts": [
@@ -810,8 +836,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to }",
-     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\"] }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
     },
     {
      "name": "sales_by_dish",
@@ -841,12 +877,12 @@
     {
      "name": "shift_profile",
      "params": "{ locationId, weeks? }",
-     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
     },
     {
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
-     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
     },
     {
      "name": "staffing_actual",
@@ -896,7 +932,7 @@
     {
      "name": "pending_decisions",
      "params": "{ locationIds? }",
-     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
     }
    ],
    "limits": {
@@ -1900,14 +1936,16 @@
      "name": "ג׳ויה חיפה (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     },
     {
      "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     }
    ],
    "shifts": [
@@ -2022,8 +2060,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to }",
-     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\"] }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
     },
     {
      "name": "sales_by_dish",
@@ -2053,12 +2101,12 @@
     {
      "name": "shift_profile",
      "params": "{ locationId, weeks? }",
-     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
     },
     {
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
-     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
     },
     {
      "name": "staffing_actual",
@@ -2108,7 +2156,7 @@
     {
      "name": "pending_decisions",
      "params": "{ locationIds? }",
-     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
     }
    ],
    "limits": {
@@ -2167,14 +2215,16 @@
      "name": "ג׳ויה חיפה (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     },
     {
      "id": "demo-tlv",
      "name": "ג׳ויה תל אביב (דמו)",
      "company": "חברת דמו",
      "active": true,
-     "isDemo": true
+     "isDemo": true,
+     "companyKey": "demo"
     }
    ],
    "shifts": [
@@ -2289,8 +2339,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to }",
-     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\"] }",
+     "about": "payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
     },
     {
      "name": "sales_by_dish",
@@ -2320,12 +2380,12 @@
     {
      "name": "shift_profile",
      "params": "{ locationId, weeks? }",
-     "about": "the average shift: diners and deliveries per weekday and shift (morning / evening) over the last weeks (default 13)"
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
     },
     {
      "name": "staffing_forecast_week",
      "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
-     "about": "people needed per role in every shift of a week, without a plan: expected diners from the average shift, and per role the diners per person learned from the clock times of the last weeks"
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
     },
     {
      "name": "staffing_actual",
@@ -2375,7 +2435,7 @@
     {
      "name": "pending_decisions",
      "params": "{ locationIds? }",
-     "about": "drafts waiting for approval, open issues, overdue tasks per location"
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
     }
    ],
    "limits": {

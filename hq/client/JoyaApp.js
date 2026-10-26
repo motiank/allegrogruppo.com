@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useT, LANGS } from './i18n/index.js';
-import { JoyaProvider, useJoya } from './context.js';
+import { JoyaProvider, useJoya, companyOf } from './context.js';
 import { Loading, ErrorBox, DemoBanner, ShellDemoContext } from './ui.js';
 import Overview from './pages/Overview.js';
 import Workspace from './pages/Workspace.js';
@@ -26,6 +26,17 @@ import Menu from './pages/Menu.js';
 import Employees from './pages/Employees.js';
 import Area from './pages/Area.js';
 
+// The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
+// With one company its line means "all" ('').
+const pickValue = (j) => (j.locationId != null ? j.locationId : j.companyKey != null && j.companies.length > 1 ? `co:${j.companyKey}` : '');
+function pick(j, v) {
+  if (v.startsWith('co:')) return j.setCompanyKey(v.slice(3));
+  if (!v) return j.setCompanyKey(null);
+  // a restaurant brings its company with it, so the chosen company always matches it
+  j.setCompanyKey(companyOf(j.locations.find((l) => l.id === v)));
+  j.setLocationId(v);
+}
+
 const useStyles = createUseStyles((theme) => ({
   bar: { position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.6rem', borderBottom: `1px solid ${theme.border}`, background: theme.surface },
   iconBtn: { flexShrink: 0, background: 'none', border: `1px solid ${theme.border}`, borderRadius: 6, color: theme.text, padding: '0.3rem 0.6rem', fontSize: '1.05rem', lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit' },
@@ -42,10 +53,9 @@ const useStyles = createUseStyles((theme) => ({
   bannerWrap: { maxWidth: 1100, margin: '0 auto', padding: '0.6rem 1rem 0' },
 }));
 
-/** The menu: the four main areas first, then the headquarters functions. */
-// The main menu: three areas, each a chat (pages/Area.js). The detailed pages (orders, staffing,
-// payroll…) keep their routes, so links to them still work, but the menu does not list them.
-function navGroups() {
+// The main menu: the areas, each a chat (pages/Area.js); Bank only for the chain admin. The detailed pages
+// (orders, staffing, payroll…) keep their routes, so links to them still work, but the menu does not list them.
+function navGroups(isAdmin) {
   return [
     {
       key: 'joya.nav.main',
@@ -53,6 +63,7 @@ function navGroups() {
         ['/stock', 'joya.nav.stock'],
         ['/people', 'joya.nav.manpower'],
         ['/performance', 'joya.nav.performance'],
+        ...(isAdmin ? [['/bank', 'joya.nav.bank']] : []),
       ],
     },
   ];
@@ -96,22 +107,23 @@ function Shell() {
           <span className={c.brandSub}>{t(`joya.role.${me.role}`)}</span>
         </div>
         <div className={c.pick}>
-          {j.companies.length > 1 && (
-            <select className={c.loc} value={j.companyKey ?? '*'} onChange={(e) => j.setCompanyKey(e.target.value === '*' ? null : e.target.value)} aria-label={t('joya.company')}>
-              {me.isAdmin && <option value="*">{t('joya.allCompanies')}</option>}
-              {j.companies.map((co) => (
-                <option key={co.key} value={co.key}>
+          <select className={c.loc} value={pickValue(j)} onChange={(e) => pick(j, e.target.value)} aria-label={t('joya.location')}>
+            {me.isAdmin && j.companies.length > 1 && <option value="">{t('joya.allCompanies')}</option>}
+            {j.companies.map((co) => (
+              <React.Fragment key={co.key}>
+                {/* a company is a choice of its own (admin): all its restaurants; for a manager it is a heading */}
+                <option value={j.companies.length > 1 ? `co:${co.key}` : ''} disabled={!me.isAdmin}>
                   {co.label || t('joya.noCompany')}
                 </option>
-              ))}
-            </select>
-          )}
-          <select className={c.loc} value={j.locationId ?? ''} onChange={(e) => j.setLocationId(e.target.value || null)} aria-label={t('joya.location')}>
-            {me.isAdmin && <option value="">{j.companyKey != null && j.companies.length > 1 ? t('joya.allCompanyLocations') : t('joya.allLocations')}</option>}
-            {j.inCompany.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
+                {j.locations
+                  .filter((l) => companyOf(l) === co.key)
+                  .map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {'\u00a0\u00a0\u00a0\u00a0'}
+                      {l.name}
+                    </option>
+                  ))}
+              </React.Fragment>
             ))}
           </select>
         </div>
@@ -120,7 +132,7 @@ function Shell() {
       {open && <div className={c.backdrop} onClick={() => setOpen(false)} />}
       {open && (
         <nav className={c.drawer} dir={dir} aria-label={t('joya.nav.label')}>
-          {navGroups().map((g) => (
+          {navGroups(me.isAdmin).map((g) => (
             <div key={g.key}>
               <div className={c.group}>{t(g.key)}</div>
               {g.items.map(([path, key]) => (
@@ -163,6 +175,7 @@ function Shell() {
         <Route path="stock" element={<Area area="stock" />} />
         <Route path="people" element={<Area area="people" />} />
         <Route path="performance" element={<Area area="performance" />} />
+        <Route path="bank" element={me.isAdmin ? <Area area="bank" /> : <Navigate to="/" replace />} />
         <Route path="overview" element={me.isAdmin ? <Overview /> : <Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="orders" element={<Orders />} />

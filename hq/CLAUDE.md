@@ -37,7 +37,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - All source data from the admin Local Data API (`src/services/source.js`, 5-min memory cache). Menu and
   reservations from the API are postponed (owner).
 - Locations: no Joya table — a location id IS the Allegro branch id; branches, names and companies come from
-  Allegro `/branches`, "active" from `/status` (Beecomm orders in the last 60 days). Top bar: company → restaurant;
+  Allegro `/branches`, "active" from `/status` (Beecomm orders in the last 60 days). Top bar: one picker (company, its restaurants indented; a question uses the choice, `request.scope`);
   demo restaurants in the "חברת דמו" company (from the fake API); inactive (closed) branches hidden from the picker.
 - **Schema simplified (2026-10-24, owner): 27 → 10 tables.** In this phase: manpower plans, stock & purchasing,
   payroll checks. Tasks, inquiries and CSV imports were dropped. Config lists (roles, role aliases, staffing rules,
@@ -59,6 +59,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - Payments (calc `payments_summary`, 2026-10-26): the Beecomm payments report (דוח תשלומים) per type and card brand,
   from the admin's `/beecomm/payments/stored` (table `bcom_payments_daily`, created on production 2026-10-26,
   backfilled from 2026-01-01, daily job `scripts/server/analoader/bcom_payments.js`). Days not loaded are missing, not 0.
+  `brands` (VISA/MASTERCARD/AMEX) = the owner's weekly credit card forecast: the previous Sunday–Saturday week.
+- Bank (main-menu area BANK = context AREA 4, calcs `bank_summary` / `bank_transactions`, `src/services/bank.js`,
+  2026-10-26): **chain admin only** (menu, route and calcs). Data = the bank files uploaded on the admin Upload page
+  (`bank_transactions`), read from `/bank/transactions/stored`. An account belongs to a **company**
+  (`shared/restaurants.json` `bank_accounts`; owner: Hapoalim 12-584-136663 = פסטה לינה). Some Hebrew in `details`
+  is stored in reverse letter order by the bank file (the WRITE prompt reads it the right way).
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
 - Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove
   them with the prompt's `draft` field at the next prompt change). Unit 25, runner 8, smoke 63 + 1 known failure ("the raised quantity

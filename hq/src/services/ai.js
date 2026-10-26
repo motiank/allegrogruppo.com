@@ -18,6 +18,7 @@ import * as repl from './replenishment.js';
 import * as staffing from './staffing.js';
 import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
+import * as bank from './bank.js';
 import { recentSameWeekday } from './demand.js';
 import { addDays } from '../lib/recommend.js';
 import { listRoles, listShifts, listLocations } from './master.js';
@@ -29,12 +30,31 @@ export const MAX_CALCS = 6;
 
 function locs(access, p) {
   const ids = p.locationIds ?? (p.locationId != null ? [p.locationId] : null);
-  if (!ids) return access.locationIds;
+  // no location given → the picker choice the question was asked with (access.scopeIds, see compute), else all
+  if (!ids) return access.scopeIds ?? access.locationIds;
   const asked = (Array.isArray(ids) ? ids : [ids]).map(String);
   const allowed = asked.filter((id) => canLocation(access, id));
   if (!allowed.length) throw err('FORBIDDEN', 'no access to the requested location(s)');
   return allowed;
 }
+// Bank data is per company and for the chain admin only. companyKeys (keys or names) → those companies; else the
+// companies of the locations in scope (the picker choice, see locs).
+async function bankCompanies(access, p) {
+  if (!access.isAdmin) throw err('FORBIDDEN', 'bank data is for the chain admin only');
+  const all = await listLocations(access);
+  const known = new Map();
+  for (const l of all) if (l.company?.key) known.set(l.company.key, { key: l.company.key, label: l.company.label ?? l.company.key });
+  const asked = p.companyKeys ?? (p.companyKey != null ? [p.companyKey] : null);
+  if (asked) {
+    const list = (Array.isArray(asked) ? asked : [asked]).map(String);
+    const found = [...known.values()].filter((c) => list.includes(c.key) || list.includes(c.label));
+    if (!found.length) throw err('BAD_REQUEST', `unknown company ${list.join(', ')}`);
+    return found;
+  }
+  const ids = new Set(locs(access, {}));
+  return [...known.values()].filter((c) => all.some((l) => ids.has(String(l.id)) && l.company?.key === c.key));
+}
+
 function range(p) {
   if (!DATE.test(p.from || '') || !DATE.test(p.to || '')) throw err('BAD_REQUEST', 'from and to must be YYYY-MM-DD');
   if (p.from > p.to) throw err('BAD_REQUEST', 'from is after to');
@@ -51,10 +71,21 @@ export const CALCS = {
   sales_daily: { params: '{ locationIds?, from, to }', about: 'day by day revenue, checks, diners; missing days marked', run: (a, p) => analytics.salesDaily(locs(a, p), ...range(p)) },
   sales_by_shift: { params: '{ locationIds?, from, to }', about: 'revenue, checks, diners per shift', run: (a, p) => analytics.salesByShift(locs(a, p), ...range(p)) },
   payments_summary: {
-    params: '{ locationIds?, from, to }',
+    params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX"] }',
     about:
-      'payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before',
-    run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p)),
+      'payments by type (credit card, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand (VISA, Mastercard, Amex, club card…): charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. brands: also the sum of only these card brands (selected, day by day; selectedTotal over the locations)',
+    run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands),
+  },
+  bank_summary: {
+    params: '{ companyKeys?: string[], from, to }',
+    about:
+      "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only",
+    run: async (a, p) => bank.bankSummary(await bankCompanies(a, p), ...range(p)),
+  },
+  bank_transactions: {
+    params: '{ companyKeys?, from, to, q?: "text in the action or details, e.g. WOLT, מקס, ביטוח לאומי", side?: "credit" | "debit", order?: "amount" | "date", limit? }',
+    about: 'single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only',
+    run: async (a, p) => bank.bankTransactions(await bankCompanies(a, p), ...range(p), { q: p.q, side: p.side, order: p.order, limit: p.limit }),
   },
   sales_by_dish: { params: '{ locationIds?, from, to, limit? }', about: 'units and revenue per dish vs the previous period', run: (a, p) => analytics.salesByDish(locs(a, p), ...range(p), p.limit) },
   sales_anomalies: { params: '{ locationIds?, from, to }', about: 'days with unusual revenue vs the same weekday of the 8 weeks before, and missing days', run: (a, p) => analytics.anomalies(locs(a, p), ...range(p)) },
@@ -153,11 +184,12 @@ const shape = (r) => ({
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK' };
 
 async function contextAllowed(access, kind, id) {
   if (kind === 'AREA') {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
+    if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
     return null;
   }
   if (kind === 'ORDER_LIST') return repl.getList(access, id);
@@ -165,14 +197,22 @@ async function contextAllowed(access, kind, id) {
   return null;
 }
 
-export async function ask(access, { question, locationId = null, contextKind = 'GENERAL', contextId = null, lang = 'he' }) {
+export async function ask(access, { question, locationId = null, companyKey = null, contextKind = 'GENERAL', contextId = null, lang = 'he' }) {
   if (!String(question || '').trim()) throw err('BAD_REQUEST', 'the question is empty');
   if (String(question).length > 2000) throw err('BAD_REQUEST', 'the question is too long');
   if (!['GENERAL', 'ORDER_LIST', 'STAFFING_PLAN', 'AREA'].includes(contextKind)) throw err('BAD_REQUEST', 'bad context');
   if (locationId != null) assertLocation(access, locationId);
+  // a company chosen in the picker (no single restaurant) is kept in meta_json.scope until the answer
+  let meta = null;
+  if (locationId == null && companyKey != null) {
+    const key = String(companyKey);
+    if (!(await listLocations(access)).some((l) => (l.company?.key ?? '') === key)) throw err('FORBIDDEN', 'no access to the requested company');
+    meta = { scope: { companyKey: key } };
+  }
   if (contextKind !== 'GENERAL') await contextAllowed(access, contextKind, contextId);
   const id = (
-    await q(`INSERT INTO joya_ai_requests (username, location_id, context_kind, context_id, question, lang) VALUES (:u, :l, :k, :c, :qq, :lang)`, {
+    await q(`INSERT INTO joya_ai_requests (username, location_id, context_kind, context_id, question, lang, meta_json) VALUES (:u, :l, :k, :c, :qq, :lang, :m)`, {
+      m: meta ? JSON.stringify(meta) : null,
       u: access.username,
       l: locationId,
       k: contextKind,
@@ -255,6 +295,18 @@ async function requestAccess(id) {
   return { r, access };
 }
 
+/**
+ * What the user chose in the picker when asking: one restaurant, all (active) restaurants of a company, or null =
+ * all the user's. Calculations with no location of their own use it (see locs).
+ */
+async function scopeOf(access, r) {
+  if (r.location_id != null) return { kind: 'LOCATION', locationIds: [String(r.location_id)] };
+  const key = parseJson(r.meta_json)?.scope?.companyKey;
+  if (key == null) return null;
+  const inCo = (await listLocations(access)).filter((l) => (l.company?.key ?? '') === key && l.active);
+  return { kind: 'COMPANY', company: inCo[0]?.company?.label ?? key, locationIds: inCo.map((l) => String(l.id)) };
+}
+
 /** Everything the model needs to plan: who asks, what they may see, today, the calculations, the object in view. */
 export async function contextFor(id) {
   const { r, access } = await requestAccess(id);
@@ -264,6 +316,7 @@ export async function contextFor(id) {
 /** The context for a request row (or a row-like object: the runner eval builds fixed contexts with it). */
 export async function buildContext(access, r) {
   const today = todayLocal();
+  const scope = await scopeOf(access, r);
   const locations = await listLocations(access);
   const shifts = await listShifts(access.locationIds);
   const roles = await listRoles();
@@ -293,11 +346,13 @@ export async function buildContext(access, r) {
       contextKind: r.context_kind,
       contextId: r.context_id,
       locationId: r.location_id,
+      // the picker choice: { kind: LOCATION | COMPANY, company?, locationIds }; absent = all the user's locations
+      ...(scope ? { scope } : {}),
       ...(r.context_kind === 'AREA' ? { area: AREAS[r.context_id] } : {}),
     },
     user: { role: access.role, payroll: access.payroll },
     today,
-    locations: locations.map((l) => ({ id: l.id, name: l.name, company: l.company?.label ?? null, active: l.active, isDemo: l.isDemo })),
+    locations: locations.map((l) => ({ id: l.id, name: l.name, company: l.company?.label ?? null, companyKey: l.company?.key ?? null, active: l.active, isDemo: l.isDemo })),
     shifts: shifts.map((s) => ({ locationId: s.locationId, code: s.code, name: s.name, days: s.days, start: s.start, end: s.end })),
     roles: roles.map((x) => ({ code: x.code, he: x.nameHe, en: x.nameEn })),
     calculations: catalogue(),
@@ -327,7 +382,9 @@ export const CHANGE_FORMATS = {
  * proposed change. Errors are returned per calculation (the model can explain them).
  */
 export async function compute(id, { calcs = [], ops = null, whatIf = null }) {
-  const { r, access } = await requestAccess(id);
+  const { r, access: user } = await requestAccess(id);
+  const scope = await scopeOf(user, r);
+  const access = scope?.locationIds.length ? { ...user, scopeIds: scope.locationIds } : user;
   if (r.status !== 'THINKING') throw err('CONFLICT', 'request is not open');
   const results = [];
   const list = Array.isArray(calcs) ? calcs : [];
@@ -381,6 +438,8 @@ export async function answer(id, { answer: text, failed = false, error = null, m
   const r = await one(`SELECT * FROM joya_ai_requests WHERE id=:id`, { id });
   if (!r) throw err('NOT_FOUND', 'not found');
   if (r.status !== 'THINKING') throw err('CONFLICT', 'already answered');
+  const scope = parseJson(r.meta_json)?.scope;
+  if (scope) meta = { ...(meta || {}), scope };
   await q(`UPDATE joya_ai_requests SET status=:s, answer_text=:a, error=:e, meta_json=:m, answered_at=NOW() WHERE id=:id`, {
     s: failed ? 'FAILED' : 'ANSWERED',
     a: failed ? null : String(text || '').slice(0, 20000),

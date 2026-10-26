@@ -35,7 +35,11 @@ Your job now: PLAN. Read the user's question and the context, then reply with ON
 Guidance:
 - Dates: today is context.today. "Last week" = the 7 days ending yesterday; "last month" = the last full
   calendar month. Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
-- Locations: use ids from context.locations; with no location named, use request.locationId or all.
+- Locations: use ids from context.locations. request.scope is what the user chose in the picker: one
+  restaurant (LOCATION) or all restaurants of a company (COMPANY, with its locationIds); no scope = all the
+  user's locations. With no restaurant or company named in the question, use request.scope.locationIds (for a
+  one-location calculation, run it for each of them, up to the limit). Only a restaurant, company or "all
+  branches" named in the question overrides the scope.
 - "Why do we need N <role> on <day> <shift>?" in a STAFFING_PLAN → staffing_plan_lines with planId, date,
   shiftCode, roleCode, and staffing_forecast for that slot.
 - "Show demand on recent <weekday>s" → shift_demand_recent.
@@ -51,10 +55,22 @@ Guidance:
   In a STAFFING_PLAN context, expected diners or demand of a slot of that plan → staffing_forecast
   (planId, date, shiftCode), never shift_profile or staffing_forecast_week.
 - request.area, when present, is the main-menu area the question was asked in: STOCK (stock and
-  purchasing), MANPOWER or PERFORMANCE. It only hints at the topic.
+  purchasing), MANPOWER, PERFORMANCE or BANK. It only hints at the topic.
 - How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
   (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
   Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".
+- Expected credit card income this week ("צפי הכנסות השבוע מכרטיסי אשראי", "how much will come in by card this
+  week") → payments_summary for the previous full week, Sunday to Saturday (the last Saturday before today and the
+  6 days before it — not "the 7 days ending yesterday"), with brands ["VISA", "MASTERCARD", "AMEX"] only (no club
+  card / private label, Diners or other brands unless asked). The previous week is the forecast for this week.
+- The bank account (money in / out, the balance, overdraft, deposits from Wolt or the card companies, checks,
+  transfers, VAT, ביטוח לאומי, "בנק", "יתרה", "תנועות בחשבון") → bank_summary (from, to) for totals, balance and
+  the biggest sources/uses; bank_transactions (from, to, q, side, order) for single transactions or one party
+  (q = a word from the bank's text: WOLT, מקס, ישראכרט, אמריקן אקספרס, ביטוח לאומי, מע"מ, שיק). A bank account
+  belongs to a company: companyKeys = context.locations[].companyKey of the companies named; none named → leave
+  companyKeys out (the picker's company is used). With no period named, use the current month up to today.
+  In the bank's text: "מקס איט פיננסי" = credit card money from Max, "זיכוי … WOLT" = Wolt payouts, "חבר משרתי
+  קבע" / "מועדון חבר" = the club card, "שיק" = a check paid, "העברה מהבנק" / "העברה לאחר" = a transfer out.
 - sales_summary already compares the period with the same-length period before it. For "why did X change
   vs the month/week before" run it once on the later period only, never again on the earlier one.
 - Change formats are in context.changeFormats. Use lineId values from context.object.lines. Use the
@@ -84,6 +100,14 @@ Your job now: WRITE the answer to the user from <results>.
   so. Name missing days (missingDays). If staffData is not "ok", say the clock times are missing.
 - Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only
   when asked. The amounts include service (tips) — say so. Name the period it is compared with.
+- Credit card forecast (payments_summary with brands): the forecast for this week = selected.charges of the
+  previous Sunday–Saturday week (selectedTotal for several restaurants). Name the week's dates and the brands
+  (VISA, Mastercard, Amex). Give the day-by-day amounts (selected.byDay) as the expected amount per weekday.
+  Say that other brands (club card, Diners) are not included.
+- Bank (bank_summary, bank_transactions): amounts in ₪ from the uploaded bank file — say up to which date it has
+  data (lastDataDate). A negative balance is an overdraft (מינוס): say so plainly. Some Hebrew names in the
+  details have their letters in reverse order (הננער היו'ג = ג'ויה רעננה, א"ת היו'ג = ג'ויה ת"א, הניפ שאר =
+  ראש פינה): write them the right way.
 - If something is missing or unknown in the results (null values, missing days, errors), say so plainly.
 - Distinguish known costs from estimates, and gross wages from total employer cost, when relevant.
 - If <proposal> is present: describe the proposed change in one or two lines and say it is waiting for the

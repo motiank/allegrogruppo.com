@@ -24,8 +24,12 @@ const fixtures = JSON.parse(readFileSync(path.join(here, '../eval/fixtures.json'
 const modelName = arg('model', process.env.JOYA_MODEL ?? 'sonnet');
 const model = new TriageModel({ model: modelName, workDir: path.join(stateDir, 'plan-eval'), systemPrompt: PLAN_PROMPT, timeoutMs: 120_000 });
 
-/** 'a|b' in a label accepts either; numbers compare as numbers; "10:00" matches "10:00:00". */
+/** 'a|b' in a label accepts either; numbers compare as numbers; "10:00" matches "10:00:00"; a list = the same values in any order. */
 function same(actual, expected) {
+  if (Array.isArray(expected)) {
+    const norm = (v) => (Array.isArray(v) ? v.map((x) => String(x).toUpperCase()).sort().join(',') : null);
+    return norm(actual) === norm(expected);
+  }
   if (typeof expected === 'string' && expected.includes('|')) return expected.split('|').some((e) => same(actual, e));
   if (typeof expected === 'number') return Number(actual) === expected;
   if (typeof expected === 'string' && typeof actual === 'string') return actual === expected || actual.startsWith(`${expected}:`);
@@ -78,6 +82,8 @@ function contextFor(f) {
   if (!base) throw new Error(`no context of kind ${f.kind} in eval/contexts.json`);
   const ctx = structuredClone(base);
   Object.assign(ctx.request, { question: f.question, lang: f.lang || 'he' });
+  // f.request: fields to set on the request, e.g. the picker scope
+  if (f.request) Object.assign(ctx.request, f.request);
   if (f.inquiryContent && ctx.object?.inquiry) ctx.object.inquiry.content = f.inquiryContent;
   return ctx;
 }

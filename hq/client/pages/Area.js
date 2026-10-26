@@ -1,4 +1,4 @@
-// /stock, /people, /performance — the three areas of the main menu. Each is a chat (ChatArea): the user
+// /stock, /people, /performance, /bank (chain admin) — the areas of the main menu. Each is a chat (ChatArea): the user
 // asks in words and the AI answers from the hub's calculations. The ask field suggests the area's
 // questions. The detailed pages still exist, but the menu no longer lists them.
 import React from 'react';
@@ -11,7 +11,8 @@ import { Page } from '../ui.js';
 export const AREAS = {
   stock: { id: 1, suggestions: 10 },
   people: { id: 2, suggestions: 12 },
-  performance: { id: 3, suggestions: 10 },
+  performance: { id: 3, suggestions: 11 },
+  bank: { id: 4, suggestions: 8 },
 };
 
 export default function Area({ area }) {
@@ -20,7 +21,7 @@ export default function Area({ area }) {
   const a = AREAS[area];
   const suggestions = Array.from({ length: a.suggestions }, (_, i) => t(`joya.area.${area}.s${i + 1}`));
   return (
-    <Page title={t(`joya.area.${area}.title`)} sub={j.location ? j.location.name : t('joya.allLocations')}>
+    <Page title={t(`joya.area.${area}.title`)} sub={j.location ? j.location.name : j.companyKey != null ? j.companies.find((c) => c.key === j.companyKey)?.label || t('joya.noCompany') : t('joya.allLocations')}>
       <ChatArea
         key={area}
         contextId={a.id}

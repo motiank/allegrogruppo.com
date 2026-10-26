@@ -9,6 +9,7 @@
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
 //   payroll        /payroll, /shifts/summary, /labor/daily
 //   freshness      /status
+//   bank           /bank/transactions/stored  per company (its bank accounts), from the uploaded bank files
 //
 // What Joya keeps is its own: decisions, edits, rules, notes, corrections (keyed by the ids above),
 // and the roleAliases config (Allegro role name → Joya role code). Dated data is fetched per branch and
@@ -219,6 +220,29 @@ export async function payments(locationId, from, to) {
     if (e.code === 'NOT_LOADED') return { available: false, reason: 'the Beecomm payments report is not loaded in Allegro yet' };
     throw e;
   }
+}
+
+/**
+ * Bank transactions of one company (its accounts in Allegro's restaurants.json). group: 'day' (money in/out and the
+ * closing balance per date), 'details' (summed per action + details) or 'none' (the rows). q / side filter.
+ * { available: false, reason } when Allegro does not have them.
+ */
+export async function bank(companyKey, from, to, { group = 'none', q = null, side = null } = {}) {
+  try {
+    const { data, meta } = await get('/bank/transactions/stored', { company: companyKey, from, to, group, ...(q ? { q } : {}), ...(side ? { side } : {}) });
+    const rows = (data || []).map((r) => ({ ...r, credit: num(r.credit), debit: num(r.debit), ...(r.balance !== undefined ? { balance: num(r.balance) } : {}), ...(r.closingBalance !== undefined ? { closingBalance: num(r.closingBalance) } : {}) }));
+    return { available: true, accounts: Array.isArray(meta?.accounts) ? meta.accounts : [], rows };
+  } catch (e) {
+    if (e.code === 'NOT_SUPPORTED') return { available: false, reason: 'Allegro has no /bank/transactions/stored endpoint yet' };
+    if (e.code === 'NOT_LOADED') return { available: false, reason: 'no bank file was uploaded in Allegro yet' };
+    throw e;
+  }
+}
+
+/** The bank accounts Allegro has, with how far each is loaded (/status meta.bank). */
+export async function bankStatus() {
+  const { meta } = await get('/status');
+  return meta?.bank || [];
 }
 
 // ---------------------------------------------------------------- employees and payroll

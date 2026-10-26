@@ -194,6 +194,8 @@ export default function AskBox({ contextKind = 'GENERAL', contextId = null, loca
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
+  // with no restaurant given, the question is about the company chosen in the picker (null = all)
+  const { companyKey } = useJoya();
   const [items, setItems] = useState([]);
   const [text, setText] = useState('');
   const [err, setErr] = useState(null);
@@ -230,7 +232,7 @@ export default function AskBox({ contextKind = 'GENERAL', contextId = null, loca
     setBusy(true);
     setErr(null);
     try {
-      const { request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, lang } });
+      const { request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, companyKey: locationId == null ? companyKey : null, lang } });
       setItems((xs) => [request, ...xs]);
       setText('');
     } catch (e) {

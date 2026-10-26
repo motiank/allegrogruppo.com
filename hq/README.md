@@ -115,9 +115,13 @@ The staffing plan is exported as a **CSV for Tabit**. Nothing is sent to a suppl
   all); both with payroll access (wages, payroll lines, labor cost in money). Any other role: no access. Users
   and rights are kept **only** in that JSON file (owner, 2026-10-24) — no Joya table or file of users. Every route checks the location it touches; lists are filtered to the user's locations; the AI
   calculations run with the asking user's access.
-- The top bar picks company → restaurant. Each location's company is the Allegro branch's `company` (from
-  `/branches`, not stored). The company list shows only when the user's locations span more than one company; an
-  admin may pick "all companies" or "all locations of this company", and a page then covers those locations.
+- The top bar has one picker: each company, with its restaurants indented below it. Each location's company is the
+  Allegro branch's `company` (from `/branches`, not stored). An admin may pick "all companies" (when there are
+  several) or a company line (all its restaurants), and a page then covers those locations; for a manager the
+  company lines are headings only.
+- A chat question carries the picker choice: `locationId`, or `companyKey` (kept in `joya_ai_requests.meta_json.scope`).
+  The runner sees it as `request.scope` and the planner uses it unless the question names other restaurants; a
+  calculation with no location of its own runs on it too (`scopeIds` in `ai.js` `compute`).
 
 ## Replenishment — how the recommendation learns
 

@@ -1,5 +1,5 @@
 {
-  "about": "Labelled questions for the Joya planner eval (scripts/eval.mjs). Contexts: eval/contexts.json (AREA = a GENERAL context asked in the MANPOWER area; today 2026-10-21, location demo-tlv = demo Tel Aviv, demo-hfa = demo Haifa, order list 100, staffing plan 35 = week 2026-10-25..31). expect: calcs = names that must all be planned ('a|b' = either); params = per calc, values the params must have; range = from/to of the dated calcs; location = location ids the calcs must use; ops = 'none' | 'some' | list of partial ops that must each match one planned op; whatIf / draft = true when required (default: must be absent); maxCalcs = most calcs allowed. Values 'a|b' accept either.",
+  "about": "Labelled questions for the Joya planner eval (scripts/eval.mjs). Contexts: eval/contexts.json (AREA = a GENERAL context asked in the MANPOWER area; today 2026-10-21, location demo-tlv = demo Tel Aviv, demo-hfa = demo Haifa, order list 100, staffing plan 35 = week 2026-10-25..31). expect: calcs = names that must all be planned ('a|b' = either); params = per calc, values the params must have; range = from/to of the dated calcs; location = location ids the calcs must use; ops = 'none' | 'some' | list of partial ops that must each match one planned op; whatIf / draft = true when required (default: must be absent); maxCalcs = most calcs allowed. request = fields set on the context's request (e.g. scope, the picker choice). Values 'a|b' accept either.",
   "fixtures": [
     { "key": "g-sales-lastweek", "kind": "GENERAL", "lang": "he", "question": "כמה מכרנו בשבוע שעבר?",
       "expect": { "calcs": ["sales_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
@@ -90,6 +90,22 @@
     { "key": "g-payments-10bis", "kind": "GENERAL", "lang": "en", "question": "How much did we get through 10bis last week?",
       "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } },
     { "key": "g-payments-method", "kind": "GENERAL", "lang": "he", "question": "אנא הצג לי התפלגות ההכנסות לפי צורת גביה",
-      "expect": { "calcs": ["payments_summary"] } }
+      "expect": { "calcs": ["payments_summary"] } },
+    { "key": "g-scope-location", "kind": "GENERAL", "lang": "he", "question": "כמה מכרנו בשבוע שעבר?", "request": { "locationId": "demo-hfa", "scope": { "kind": "LOCATION", "locationIds": ["demo-hfa"] } },
+      "expect": { "calcs": ["sales_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" }, "location": ["demo-hfa"] } },
+    { "key": "g-scope-company", "kind": "GENERAL", "lang": "en", "question": "How did customers pay last month?", "request": { "scope": { "kind": "COMPANY", "company": "חברת דמו", "locationIds": ["demo-tlv"] } },
+      "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-09-01", "to": "2026-09-30" }, "location": ["demo-tlv"] } },
+    { "key": "g-scope-override", "kind": "GENERAL", "lang": "he", "question": "כמה סועדים היו אתמול בתל אביב?", "request": { "locationId": "demo-hfa", "scope": { "kind": "LOCATION", "locationIds": ["demo-hfa"] } },
+      "expect": { "calcs": ["sales_daily|sales_summary"], "range": { "from": "2026-10-20", "to": "2026-10-20" }, "location": ["demo-tlv"] } },
+    { "key": "g-card-forecast", "kind": "GENERAL", "lang": "he", "question": "מה צפי הכנסות השבוע מכרטיסי אשראי?",
+      "expect": { "calcs": ["payments_summary"], "params": { "payments_summary": { "brands": ["VISA", "MASTERCARD", "AMEX"] } }, "range": { "from": "2026-10-11", "to": "2026-10-17" } } },
+    { "key": "g-bank-balance", "kind": "GENERAL", "lang": "he", "question": "מה היתרה בחשבון הבנק היום?",
+      "expect": { "calcs": ["bank_summary"] } },
+    { "key": "g-bank-wolt", "kind": "GENERAL", "lang": "he", "question": "כמה העבירה וולט החודש לחשבון הבנק?",
+      "expect": { "calcs": ["bank_transactions|bank_summary"], "params": { "bank_transactions": { "q": "WOLT|Wolt|wolt" } }, "range": { "from": "2026-10-01", "to": "2026-10-21" } } },
+    { "key": "g-bank-company", "kind": "GENERAL", "lang": "he", "question": "כמה כסף נכנס ויצא בחשבון הבנק של חברת דמו בחודש שעבר?",
+      "expect": { "calcs": ["bank_summary"], "params": { "bank_summary": { "companyKeys": ["demo"] } }, "range": { "from": "2026-09-01", "to": "2026-09-30" } } },
+    { "key": "a-bank-cards", "kind": "AREA", "lang": "he", "question": "כמה נכנס מחברות האשראי בשבוע שעבר?", "request": { "contextId": 4, "area": "BANK" },
+      "expect": { "calcs": ["bank_transactions|bank_summary"], "range": { "from": "2026-10-14", "to": "2026-10-20" } } }
   ]
 }

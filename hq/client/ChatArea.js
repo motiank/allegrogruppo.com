@@ -8,6 +8,7 @@ import { api, qs } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { ErrorBox, fmtWhen } from './ui.js';
 import { Answer, matchSuggestions } from './AskBox.js';
+import { useJoya } from './context.js';
 
 const useStyles = createUseStyles((theme) => ({
   start: { minHeight: 'calc(100vh - 190px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 680, margin: '0 auto', width: '100%' },
@@ -248,6 +249,8 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
+  // with no restaurant given, the question is about the company chosen in the picker (null = all)
+  const { companyKey } = useJoya();
   const [items, setItems] = useState(null); // newest first, as the server sends them
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -287,7 +290,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     setBusy(true);
     setErr(null);
     try {
-      const { request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, lang } });
+      const { request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, companyKey: locationId == null ? companyKey : null, lang } });
       scrollDown.current = true;
       setItems((xs) => [request, ...(xs || [])]);
       return true;

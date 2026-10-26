@@ -354,8 +354,21 @@ export async function plannedVsActual(access, locationIds, from, to) {
  * the charges (tips included), their share of all charges, refunds, payments and the average payment, the
  * service (tips) inside them, and the card brands of the type; compared with the same-length period before.
  */
-export async function paymentsSummary(locationIds, from, to) {
+// card brand names as Beecomm writes them; a few spellings people use
+const BRAND_ALIAS = { AMX: 'AMEX', 'AMERICAN EXPRESS': 'AMEX', MASTER: 'MASTERCARD', 'MASTER CARD': 'MASTERCARD' };
+const brandKey = (b) => {
+  const k = String(b || '').trim().toUpperCase();
+  return BRAND_ALIAS[k] || k;
+};
+
+/**
+ * brands (optional, e.g. ['VISA', 'MASTERCARD', 'AMEX']): also sum only these card brands — per location
+ * `selected` with a day-by-day list, and `selectedTotal` over all the locations.
+ */
+export async function paymentsSummary(locationIds, from, to, brands = null) {
   const len = daysBetween(from, to) + 1;
+  const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
+  let selTotal = want ? { charges: 0, prevCharges: 0, transactions: 0 } : null;
   const pFrom = addDays(from, -len);
   const out = [];
   let reason = null;
@@ -369,9 +382,18 @@ export async function paymentsSummary(locationIds, from, to) {
     const types = new Map();
     const days = new Set();
     const prevDays = new Set();
+    const sel = want ? { charges: 0, refunded: 0, transactions: 0, prevCharges: 0, byDay: new Map() } : null;
     for (const r of src.rows) {
       const cur = r.date >= from;
       (cur ? days : prevDays).add(r.date);
+      if (sel && r.brand != null && want.has(brandKey(r.brand))) {
+        if (cur) {
+          sel.charges += r.charges;
+          sel.refunded += r.refunded;
+          sel.transactions += r.transactions;
+          sel.byDay.set(r.date, (sel.byDay.get(r.date) || 0) + r.charges);
+        } else sel.prevCharges += r.charges;
+      }
       let t = types.get(r.type);
       if (!t) types.set(r.type, (t = { type: r.type, name: r.typeName, inZ: r.inZ, charges: 0, refunded: 0, transactions: 0, refundTransactions: 0, service: 0, prevCharges: 0, brands: new Map() }));
       if (r.brand == null) {
@@ -398,6 +420,11 @@ export async function paymentsSummary(locationIds, from, to) {
     const prev = (x) => (hasPrev ? r2(x) : null);
     const total = list.filter((t) => t.inZ).reduce((a, t) => a + t.charges, 0);
     const prevTotal = list.filter((t) => t.inZ).reduce((a, t) => a + t.prevCharges, 0);
+    if (sel && has) {
+      selTotal.charges += sel.charges;
+      selTotal.transactions += sel.transactions;
+    }
+    if (sel && hasPrev) selTotal.prevCharges += sel.prevCharges;
     out.push({
       locationId: loc,
       available: true,
@@ -425,6 +452,19 @@ export async function paymentsSummary(locationIds, from, to) {
           service: cur(t.service),
           brands: [...t.brands.values()].sort((a, b) => b.charges - a.charges).map((b) => ({ ...b, charges: r2(b.charges), refunded: r2(b.refunded) })),
         })),
+      ...(sel
+        ? {
+            selected: {
+              brands: [...want],
+              charges: cur(sel.charges),
+              refunded: cur(sel.refunded),
+              transactions: has ? sel.transactions : null,
+              prevCharges: prev(sel.prevCharges),
+              changePct: has && hasPrev ? r2(div(sel.charges - sel.prevCharges, sel.prevCharges) * 100) : null,
+              byDay: [...sel.byDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, charges]) => ({ date, weekday: weekdayOf(date), charges: r2(charges) })),
+            },
+          }
+        : {}),
     });
   }
   return {
@@ -432,6 +472,7 @@ export async function paymentsSummary(locationIds, from, to) {
     comparedWith: { from: pFrom, to: addDays(from, -1) },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges include service (tips); shares are of the payments inside the Z',
     ...(reason ? { missing: reason } : {}),
+    ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
     locations: out,
   };
 }
