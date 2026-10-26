@@ -136,7 +136,7 @@ export const CALCS = {
   cards_vs_bank: {
     params: '{ companyKeys?, from, to }',
     about:
-      'week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company\'s restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only',
+      'card sales in Beecomm vs the card companies\' payouts in the bank, the way they pay: per Sunday–Saturday week VISA + MASTERCARD vs Max\'s payout the next Wednesday (fee ≈ 1.6%), and per month AMEX vs American Express\'s payouts in the next month; with the difference in %. Chain admin only',
     run: async (a, p) => {
       const cos = await bankCompanies(a, p);
       const all = await listLocations(a);

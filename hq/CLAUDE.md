@@ -72,7 +72,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Weeks run Sunday–Saturday, always** (owner, 2026-10-27). "Last week" = the previous Sunday–Saturday week, "this
   week" = Sunday up to today; only "the last 7 days" is rolling (PLAN prompt, Dates). Code uses `getUTCDay() === 0`.
 - Weekly / monthly tables: `group: "week" | "month"` on `payments_summary` and `bank_summary`; `cards_vs_bank` = Beecomm
-  credit cards per Sun–Sat week vs the card companies' bank payouts of the following week (2026-10-27). The planner
+  VISA + MC per Sun–Sat week vs Max's payout the next Wednesday (002… = VISA, 007… = MC, fee ≈ 1.6%), and AMEX per month
+  vs American Express's payouts the next month (README → Weekly and monthly sums; 2026-10-27). The planner
   must use one grouped calc, never one calc per week.
 - Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
   (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole

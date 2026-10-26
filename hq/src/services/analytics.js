@@ -398,12 +398,13 @@ function periodRows(map, from, to, locations = 1) {
       total: r2(g.total),
       creditCards: r2(g.creditCards),
       membersClub: r2(g.membersClub),
+      brands: Object.fromEntries(Object.entries(g.brands).map(([k, v]) => [k, r2(v)])),
     }));
 }
 
 export async function paymentsSummary(locationIds, from, to, brands = null, group = null) {
   const by = GROUPS.includes(group) ? group : null;
-  const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0 });
+  const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0, brands: {} });
   const allPeriods = new Map();
   const len = daysBetween(from, to) + 1;
   const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
@@ -435,7 +436,10 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
           m.set(pp.key, g);
           g.days.add(m === periods ? r.date : `${loc}|${r.date}`);
           if (r.brand == null && r.inZ) g.total += r.charges;
-          if (r.type === CREDIT_TYPE && r.brand != null) g[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'] += r.charges;
+          if (r.type === CREDIT_TYPE && r.brand != null) {
+            g[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'] += r.charges;
+            g.brands[brandKey(r.brand)] = (g.brands[brandKey(r.brand)] || 0) + r.charges;
+          }
         }
       }
       if (r.type === CREDIT_TYPE && r.brand != null) {

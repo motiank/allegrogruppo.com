@@ -90,7 +90,8 @@ Guidance:
   several calculations, one per week or month. sales_daily gives days, not weeks.
 - Credit cards in Beecomm compared with what the card companies paid into the bank, week by week ("השווה
   אשראי בביקום לבנק", "did the card money arrive", "card fees") → cards_vs_bank (companyKeys, from, to). It already
-  matches each Sunday–Saturday sales week with the payouts that arrived in the following week.
+  matches each Sunday–Saturday sales week with the payouts that arrived in the following week (and Amex by month).
+  It is enough alone: do not add payments_summary or bank_* for the same comparison.
 - In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
   "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
@@ -155,11 +156,15 @@ Your job now: WRITE the answer to the user from <results>.
   For a long list give the count and byRole, and name at most ~15 people.
 - Weekly or monthly sums (byPeriod / byPeriodTotal): one line per week or month, oldest first, with its dates
   (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods and periods with missing days.
-- cards_vs_bank: one line per sales week: the Beecomm credit cards, what arrived in the bank the next week (per card
-  company when there are several, e.g. Max + American Express) and differencePct. bankNotComplete = the bank file
-  does not cover that week's payouts yet — say so, never call it a missing payment. A weekly difference of ±10–20%
-  is mostly timing (Amex does not pay every week; a payout can cover other days), not lost money: for the whole
-  range give the totals only if they are in the results, and say that the bank is net after fees, Beecomm gross.
+- cards_vs_bank: the card companies pay differently, and the result follows that:
+  · weeks: one line per Sunday–Saturday sales week: Beecomm VISA + MASTERCARD, what Max paid for them the next
+    Wednesday (maxPaidOn), differencePct. visaMastercardTotal = all full weeks: about −1.6% is Max's fee — say so.
+  · amexMonths: American Express pays the month's sales in the next month (around the 2nd and 8th): one line per month.
+  · bankNotComplete = the bank file does not cover those payouts yet — say so, never call it a missing payment.
+  · One week of ±10–30% (often only one restaurant, VISA up and MASTERCARD down) is a day paid a week late or early;
+    the next week evens it out. A week that does not even out → tell the user to check Max's statement for it.
+  · Not in these columns: the members club (חבר משרתי קבע, monthly), Max's 008… payouts (monthly), Isracard debits
+    (fees). Beecomm amounts include tips; the bank is after fees.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
   amount that arrived in the bank (bank, net after fees, paid days later) as two separate numbers with their
   names; do not add them up. The difference is mostly timing and card-company fees.

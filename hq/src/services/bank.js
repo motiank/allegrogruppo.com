@@ -146,62 +146,94 @@ const CARD_COMPANIES = [
 ];
 const cardCompanyOf = (r) => CARD_COMPANIES.find((c) => c.re.test(`${r.action || ''}`))?.name ?? null;
 
+// Max pays VISA (merchant numbers 002…) and MASTERCARD (007…) every Wednesday for the Sunday–Saturday week
+// before, about 1.6% under Beecomm (its fee); its 008… numbers pay once a month (28th) for something else.
+// American Express pays about twice a month (2nd and 8th) for the month before. Checked on Pasta Lina, Jun–Oct 2026.
+const maxNumber = (r) => (r.details || '').match(/מזהה (\d{3})/)?.[1] ?? null;
+
 /**
- * Week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS, the company's
- * locations) next to what the card companies paid into the company's bank account in the FOLLOWING week (they pay
- * a sales week in the next week — Max on Wednesday, Amex on Thursday or Friday). The difference is fees, timing and
- * missing days; it is not a sum the model should make itself.
+ * The card sales in Beecomm next to the card companies' payouts in the bank, the way they really pay:
+ *   weeks: VISA + MASTERCARD of each Sunday–Saturday week vs Max's payout in the following week (fee ≈ 1.6%);
+ *   amexMonths: AMEX of each month vs American Express's payouts in the next month.
  */
 export async function cardsVsBank(companies, locationsOf, from, to) {
   const start = periodOf(from, 'week').from;
   const end = periodOf(to, 'week').to;
+  const mStart = `${start.slice(0, 7)}-01`;
+  const mEnd = periodOf(end, 'month').to;
   const out = [];
   let reason = null;
   for (const co of companies) {
     const locs = locationsOf(co.key);
     const pay = locs.length ? await paymentsSummary(locs, start, end, null, 'week') : null;
-    const bank = await sourceBank(co.key, addDays(start, 7), addDays(end, 7), { group: 'none', side: 'credit' });
+    const payM = locs.length ? await paymentsSummary(locs, mStart, mEnd, null, 'month') : null;
+    const bank = await sourceBank(co.key, addDays(start, 7), periodOf(addDays(mEnd, 1), 'month').to, { group: 'none', side: 'credit' });
     if (!bank.available) reason = bank.reason;
-    const weeks = new Map();
-    for (const w of pay?.byPeriodTotal || []) weeks.set(w.from, { salesWeek: { from: w.from, to: w.to }, beecommCreditCards: w.creditCards, beecommMembersClub: w.membersClub, beecommDaysWithData: w.daysWithData, bank: {} });
-    let lastBankDate = null;
-    for (const r of bank.available ? bank.rows : []) {
-      // how far the bank file goes (any credit), to tell a week not paid yet from a week the file does not cover
-      lastBankDate = !lastBankDate || r.date > lastBankDate ? r.date : lastBankDate;
-      const c = cardCompanyOf(r);
-      if (!c || r.credit == null) continue;
-      const salesWeek = addDays(periodOf(r.date, 'week').from, -7);
-      const w = weeks.get(salesWeek);
-      if (!w) continue;
-      const b = w.bank[c] || { amount: 0, payments: 0, dates: new Set() };
-      b.amount += r.credit;
-      b.payments++;
-      b.dates.add(r.date);
-      w.bank[c] = b;
-    }
-    const rows = [...weeks.values()]
-      .sort((a, b) => (a.salesWeek.from < b.salesWeek.from ? -1 : 1))
-      .map((w) => {
-        const companiesPaid = Object.entries(w.bank).map(([company, b]) => ({ company, amount: r2(b.amount), payments: b.payments, dates: [...b.dates].sort() }));
-        const bankTotal = companiesPaid.reduce((a, b) => a + b.amount, 0);
-        const payWeek = { from: addDays(w.salesWeek.from, 7), to: addDays(w.salesWeek.to, 7) };
-        const notYet = !lastBankDate || lastBankDate < payWeek.to;
-        return {
-          ...w,
-          bank: undefined,
-          bankWeek: payWeek,
-          bankCardCompanies: r2(bankTotal),
-          bankByCompany: companiesPaid,
-          ...(notYet ? { bankNotComplete: true } : {}),
-          differencePct: w.beecommCreditCards && !notYet ? r2(((bankTotal - w.beecommCreditCards) / w.beecommCreditCards) * 100) : null,
-        };
-      });
-    out.push({ company: co.label, companyKey: co.key, locations: locs, available: bank.available, lastBankDate, weeks: rows });
+    const rows = bank.available ? bank.rows.filter((r) => r.credit != null) : [];
+    const lastBankDate = rows.reduce((m, r) => (!m || r.date > m ? r.date : m), null);
+    const brand = (p, k) => p.brands?.[k] || 0;
+
+    const weeks = (pay?.byPeriodTotal || []).map((w) => {
+      const payWeek = { from: addDays(w.from, 7), to: addDays(w.to, 7) };
+      const max = rows.filter((r) => /מקס/.test(r.action) && maxNumber(r) !== '008' && r.date >= payWeek.from && r.date <= payWeek.to);
+      const visa = brand(w, 'VISA');
+      const mc = brand(w, 'MASTERCARD');
+      const bankVisa = max.filter((r) => maxNumber(r) === '002').reduce((a, r) => a + r.credit, 0);
+      const bankMc = max.filter((r) => maxNumber(r) === '007').reduce((a, r) => a + r.credit, 0);
+      const notYet = !lastBankDate || lastBankDate < payWeek.to;
+      const diff = (b, x) => (x && !notYet ? r2(((b - x) / x) * 100) : null);
+      return {
+        salesWeek: { from: w.from, to: w.to },
+        beecommDaysWithData: w.daysWithData,
+        beecommVisa: r2(visa),
+        beecommMastercard: r2(mc),
+        bankWeek: payWeek,
+        maxPaidOn: [...new Set(max.map((r) => r.date))].sort(),
+        bankMaxVisa: r2(bankVisa),
+        bankMaxMastercard: r2(bankMc),
+        differencePct: diff(bankVisa + bankMc, visa + mc),
+        ...(notYet ? { bankNotComplete: true } : {}),
+      };
+    });
+
+    const amexMonths = (payM?.byPeriodTotal || []).map((m) => {
+      const next = periodOf(addDays(m.to, 1), 'month');
+      const amex = rows.filter((r) => /אמריקן/.test(r.action) && r.date >= next.from && r.date <= next.to);
+      const paid = amex.reduce((a, r) => a + r.credit, 0);
+      const notYet = !lastBankDate || lastBankDate < addDays(next.from, 9);
+      return {
+        salesMonth: m.from.slice(0, 7),
+        beecommAmex: r2(brand(m, 'AMEX')),
+        bankMonth: next.key,
+        amexPayouts: amex.map((r) => ({ date: r.date, amount: r2(r.credit) })),
+        bankAmex: r2(paid),
+        differencePct: brand(m, 'AMEX') && !notYet ? r2(((paid - brand(m, 'AMEX')) / brand(m, 'AMEX')) * 100) : null,
+        ...(notYet ? { bankNotComplete: true } : {}),
+      };
+    });
+
+    const full = weeks.filter((w) => !w.bankNotComplete);
+    const sumB = full.reduce((a, w) => a + w.beecommVisa + w.beecommMastercard, 0);
+    const sumK = full.reduce((a, w) => a + w.bankMaxVisa + w.bankMaxMastercard, 0);
+    out.push({
+      company: co.label,
+      companyKey: co.key,
+      locations: locs,
+      available: bank.available,
+      lastBankDate,
+      visaMastercardTotal: { weeks: full.length, beecomm: r2(sumB), bankMax: r2(sumK), differencePct: sumB ? r2(((sumK - sumB) / sumB) * 100) : null },
+      weeks,
+      amexMonths,
+      ...(brand(pay?.byPeriodTotal?.reduce((a, w) => ({ brands: { DINERS: (a.brands.DINERS || 0) + brand(w, 'DINERS') } }), { brands: {} }) || {}, 'DINERS')
+        ? { dinersNote: 'Diners sales are in Beecomm, but no Diners payer is known in the bank: not compared' }
+        : {}),
+    });
   }
   return {
     period: { from: start, to: end },
-    source: 'Beecomm payments (/beecomm/payments/stored, credit cards = VISA + MASTERCARD + AMEX + DINERS) and the bank file (/bank/transactions/stored, credits of the card companies)',
-    note: 'each Sunday–Saturday sales week is matched with the card company payments that arrived in the bank in the next week; Beecomm is gross with tips, the bank is net after the card company fees; bankNotComplete = the bank file does not cover that pay week yet; the members club is not in either column',
+    source: 'Beecomm payments (/beecomm/payments/stored) and the bank file (/bank/transactions/stored)',
+    note:
+      'weeks: VISA (Max merchant numbers 002…) and MASTERCARD (007…) of each Sunday–Saturday week vs what Max paid in the next week (on Wednesday); over many weeks the bank is ≈1.6% under Beecomm = the Max fee. One week can be ±10–30% for one restaurant when a day is paid a week late or early — the next week evens it out. amexMonths: American Express pays about twice a month (2nd, 8th) for the month before, so it is compared by month. Max 008… payouts (monthly, 28th), Isracard debits (fees) and the members club (חבר משרתי קבע, monthly) are not in these columns. Missing Beecomm days (beecommDaysWithData < 7 per restaurant) make the bank look higher.',
     ...(reason ? { missing: reason } : {}),
     companies: out,
   };

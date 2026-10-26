@@ -125,9 +125,14 @@ and `creditCardsTotal` / `membersClubTotal`.
 
 **Weekly and monthly sums.** The model never adds numbers itself, so a table per week or month comes from one
 calculation with `group: "week"` (Sunday–Saturday) or `"month"`: `payments_summary` (`byPeriod`, `byPeriodTotal`) and
-`bank_summary` (`byPeriod`). **`cards_vs_bank`** puts each Sunday–Saturday sales week (Beecomm credit cards) next to
-what the card companies paid into the bank in the FOLLOWING week (per company; in the data Max pays on Wednesday,
-American Express on Thursday or Friday, not every week). `bankNotComplete` = the bank file does not cover that week yet.
+`bank_summary` (`byPeriod`). **`cards_vs_bank`** follows how the card companies really pay (checked on Pasta Lina, Jun–Oct 2026):
+- **Max** pays **VISA** (merchant numbers `002…`) and **MASTERCARD** (`007…`) every **Wednesday** for the Sunday–Saturday
+  week before. Over 19 weeks the bank was **1.6% under** Beecomm = Max's fee. One week can be ±10–30% for one restaurant
+  (a day paid a week late or early); the next week evens it out. Max's `008…` numbers pay once a month (28th), something else.
+- **American Express** pays about twice a month (2nd and 8th) for the month before → compared **by month** (1.5–4.8% under).
+- Not compared: the members club (חבר משרתי קבע / מועדון חבר, monthly, ~65–75% of Beecomm's club card), Isracard debits
+  (fees, many small ones and a bigger one around the 2nd), Diners (no payer seen in the bank).
+- `bankNotComplete` = the bank file does not cover those payouts yet.
 
 **Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
 question decide, and the **menu area sets the default** (owner, 2026-10-26; rules in `runner/hq-analyst.js`,
