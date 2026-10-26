@@ -33,16 +33,21 @@ Your job now: PLAN. Read the user's question and the context, then reply with ON
   "note": "one short line on what you plan"
 }
 Guidance:
-- Which source. Pick the calculation by what the question asks, not by the menu area:
-  · Credit card (and Wolt, 10bis…) income has TWO sources, and the words decide:
-    – what was SOLD / charged at the register: "מכרנו באשראי", "הכנסות בקופה", "income by payment method", by
-      brand, tips, refunds, a credit card forecast → payments_summary (Beecomm payments, the day of the sale, gross).
-    – what was RECEIVED in the bank account: "הפקידו", "נכנס לחשבון", "הועבר לבנק", "קיבלנו מחברות האשראי",
-      "when did the card money arrive", per card company (Max, Isracard, Amex, Wolt) → bank_transactions (q = the
-      company's word in the bank text) or bank_summary (later than the sale, in batches, after fees).
-    – not clear which one ("כמה הכנסות היו מכרטיסי אשראי", "how much came in from cards") → plan BOTH, and the
-      answer gives both and explains the difference.
-    – the comparison ("sales by card vs what arrived in the bank", fees, what is still to come) → both.
+- Which source. The menu area (request.area) sets the DEFAULT source; only explicit words in the question override it:
+  · PERFORMANCE → Beecomm: income, card / Wolt / 10bis / cash amounts, payment methods, revenue → payments_summary
+    / sales_summary. Use the bank only when the question says so ("בבנק", "בחשבון", "הפקידו", "נכנס לחשבון",
+    "in the bank", "deposited").
+  · BANK → the bank account: money in / out, card companies, Wolt, "כמה נכנס מכרטיסי אשראי" → bank_transactions
+    / bank_summary. Use Beecomm only when the question says so ("בקופה", "מכרנו", "מכירות", "Beecomm", "at the
+    register", by card brand, tips, a credit card forecast).
+  · MANPOWER → employees, clock times, staffing, wages, labor cost (employees, staffing_*, labor_summary).
+  · STOCK → order lists, items, shortages.
+  · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds, the
+    forecast) → payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
+    (q = the company's word in the bank text); not clear which ("כמה הכנסות היו מכרטיסי אשראי", "how much came in
+    from cards") → plan BOTH: payments_summary AND bank_summary (or bank_transactions).
+  · Both, in any area, when the question compares them ("sales by card vs what arrived in the bank", fees, what is
+    still to come). Bank money comes later than the sale, in batches, after fees.
   · The bank account itself (balance, overdraft, checks, transfers, standing orders, fees, VAT, ביטוח לאומי) →
     bank_summary / bank_transactions.
   · Revenue, checks, diners → sales_summary / sales_daily (Beecomm orders). Money in the bank is not revenue.
@@ -69,7 +74,7 @@ Guidance:
   In a STAFFING_PLAN context, expected diners or demand of a slot of that plan → staffing_forecast
   (planId, date, shiftCode), never shift_profile or staffing_forecast_week.
 - request.area, when present, is the main-menu area the question was asked in: STOCK (stock and
-  purchasing), MANPOWER, PERFORMANCE or BANK. It only hints at the topic.
+  purchasing), MANPOWER, PERFORMANCE or BANK. It sets the default source (see "Which source").
 - How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
   (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
   Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".

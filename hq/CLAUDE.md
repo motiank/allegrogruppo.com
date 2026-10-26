@@ -67,7 +67,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   is stored in reverse letter order by the bank file (the WRITE prompt reads it the right way).
 - **Data map** (README → "Data map"): table → admin endpoint → AI calc. Card / Wolt income has two sources and the
   question's words decide (owner, 2026-10-26): sold at the register = Beecomm payments (`payments_summary`); received
-  in the account = the bank; unclear or a comparison = both, given apart. Rules: PLAN prompt "Which source".
+  in the account = the bank. The menu area sets the default: PERFORMANCE → Beecomm, BANK → the bank (explicit words
+  override); no area and unclear, or a comparison → both, given apart. Rules: PLAN prompt "Which source".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
   role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
   minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. Users with payroll access only

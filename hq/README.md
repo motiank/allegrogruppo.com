@@ -119,13 +119,20 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
 **Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
-question decide (rules in `runner/hq-analyst.js`, "Which source"):
-- **sold / charged at the register** (by brand, tips, refunds, the card forecast) = **Beecomm payments**
-  (`payments_summary`): the day of the sale, gross.
-- **received in the bank account** (deposited by Max / Isracard / Amex / Wolt, when the money arrived) = **the bank**
-  (`bank_transactions` / `bank_summary`): days later, in batches, after fees.
-- **not clear which**, or a comparison → **both**; the answer gives the two numbers apart and explains the difference
-  (timing and fees), never their sum.
+question decide, and the **menu area sets the default** (owner, 2026-10-26; rules in `runner/hq-analyst.js`,
+"Which source"):
+- **Performance** area → Beecomm by default; the bank only when the question says "in the bank / the account / deposited".
+- **Bank** area → the bank by default; Beecomm only when the question says "at the register / sold / sales", a card
+  brand, tips or the card forecast.
+- **Manpower** → employees, clock times, payroll. **Stock** → order lists and items.
+- No area (a page's chat):
+  - **sold / charged at the register** (by brand, tips, refunds, the card forecast) = **Beecomm payments**
+    (`payments_summary`): the day of the sale, gross.
+  - **received in the bank account** (deposited by Max / Isracard / Amex / Wolt, when the money arrived) = **the bank**
+    (`bank_transactions` / `bank_summary`): days later, in batches, after fees.
+  - **not clear which** → **both**.
+- **A comparison** (card sales vs what arrived in the bank) → both, in any area. The answer gives the two numbers
+  apart and explains the difference (timing and fees), never their sum.
 - **Revenue** = `sales_summary` (Beecomm orders). Money in the bank is not revenue.
 - **Wages** (the rate per person or role) = `employees`; **labor cost** in money over a period = `labor_summary`.
 
