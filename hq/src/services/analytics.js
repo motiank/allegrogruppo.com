@@ -362,14 +362,14 @@ const brandKey = (b) => {
 };
 
 // Owner, 2026-10-26: in Beecomm, "credit card" = only these brands of the credit type (אשראי); every other brand
-// of that type (PRIVATE LABEL BRAND - חבר, Diners, Mishloha…) is the "members club" (מועדון חברים).
-export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX'];
+// of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the "members club" (מועדון חברים).
+export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS'];
 const CREDIT_TYPE = 1;
 const isCreditCard = (brand) => CREDIT_CARD_BRANDS.includes(brandKey(brand));
 const newGroup = () => ({ charges: 0, refunded: 0, transactions: 0, prevCharges: 0, brands: new Set(), byDay: new Map() });
 
 /**
- * brands (optional, e.g. ['VISA', 'MASTERCARD', 'AMEX']): also sum only these card brands — per location
+ * brands (optional, e.g. ['VISA', 'MASTERCARD', 'AMEX', 'DINERS']): also sum only these card brands — per location
  * `selected` with a day-by-day list, and `selectedTotal` over all the locations.
  */
 export async function paymentsSummary(locationIds, from, to, brands = null) {
@@ -467,7 +467,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
       totalCharges: cur(total),
       prevTotalCharges: prev(prevTotal),
       totalService: cur(list.filter((t) => t.inZ).reduce((a, t) => a + t.service, 0)),
-      // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX, the rest = members club
+      // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX + DINERS, the rest = members club
       creditCards: groupOut(groups.creditCards, len <= 62),
       membersClub: groupOut(groups.membersClub, len <= 62),
       types: list
@@ -507,7 +507,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges include service (tips); shares are of the payments inside the Z',
-    note: 'creditCards = VISA + MASTERCARD + AMEX of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Diners…); the type אשראי = both',
+    note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Mishloha…); the type אשראי = both',
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
     membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },

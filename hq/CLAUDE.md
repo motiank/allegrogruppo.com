@@ -59,7 +59,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - Payments (calc `payments_summary`, 2026-10-26): the Beecomm payments report (דוח תשלומים) per type and card brand,
   from the admin's `/beecomm/payments/stored` (table `bcom_payments_daily`, created on production 2026-10-26,
   backfilled from 2026-01-01, daily job `scripts/server/analoader/bcom_payments.js`). Days not loaded are missing, not 0.
-  `brands` (VISA/MASTERCARD/AMEX) = the owner's weekly credit card forecast: the previous Sunday–Saturday week.
+  `brands` (VISA/MASTERCARD/AMEX/DINERS) = the owner's weekly credit card forecast: the previous Sunday–Saturday week.
 - Bank (main-menu area BANK = context AREA 4, calcs `bank_summary` / `bank_transactions`, `src/services/bank.js`,
   2026-10-26): **chain admin only** (menu, route and calcs). Data = the bank files uploaded on the admin Upload page
   (`bank_transactions`), read from `/bank/transactions/stored`. An account belongs to a **company**
@@ -69,7 +69,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   question's words decide (owner, 2026-10-26): sold at the register = Beecomm payments (`payments_summary`); received
   in the account = the bank. The menu area sets the default: PERFORMANCE → Beecomm, BANK → the bank (explicit words
   override); no area and unclear, or a comparison → both, given apart. Rules: PLAN prompt "Which source".
-- Beecomm "credit card" = VISA + MASTERCARD + AMEX only; every other brand of the credit type = "members club"
+- Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
   (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole
   אשראי type "credit card".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per

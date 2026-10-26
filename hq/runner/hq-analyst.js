@@ -78,13 +78,13 @@ Guidance:
 - How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
   (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
   Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".
-- In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD and AMEX only (payments_summary →
-  creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Diners, Mishloha…) is the
+- In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
+  creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
   "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
 - Expected credit card income this week ("צפי הכנסות השבוע מכרטיסי אשראי", "how much will come in by card this
   week") → payments_summary for the previous full week, Sunday to Saturday (the last Saturday before today and the
-  6 days before it — not "the 7 days ending yesterday"), with brands ["VISA", "MASTERCARD", "AMEX"] only (no club
-  card / private label, Diners or other brands unless asked). The previous week is the forecast for this week.
+  6 days before it — not "the 7 days ending yesterday"), with brands ["VISA", "MASTERCARD", "AMEX", "DINERS"] only (no club
+  card / private label or other brands unless asked). The previous week is the forecast for this week.
 - The bank account (money in / out, the balance, overdraft, deposits from Wolt or the card companies, checks,
   transfers, VAT, ביטוח לאומי, "בנק", "יתרה", "תנועות בחשבון") → bank_summary (from, to) for totals, balance and
   the biggest sources/uses; bank_transactions (from, to, q, side, order) for single transactions or one party
@@ -124,15 +124,15 @@ Your job now: WRITE the answer to the user from <results>.
   evening (summary), then the shifts with the biggest differences (mostOver, mostUnder): date, shift,
   diners, people vs needed. "Needed" is by the branch's own usual diners per person in learnedFrom — say
   so. Name missing days (missingDays). If staffData is not "ok", say the clock times are missing.
-- Credit card in Beecomm = creditCards (VISA + Mastercard + Amex), never the whole credit type (אשראי). Give the
+- Credit card in Beecomm = creditCards (VISA + Mastercard + Amex + Diners), never the whole credit type (אשראי). Give the
   members club (membersClub) as its own line when the user asks about it, or about all payment types. Several
   restaurants: creditCardsTotal / membersClubTotal.
 - Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only
   when asked. The amounts include service (tips) — say so. Name the period it is compared with.
 - Credit card forecast (payments_summary with brands): the forecast for this week = selected.charges of the
   previous Sunday–Saturday week (selectedTotal for several restaurants). Name the week's dates and the brands
-  (VISA, Mastercard, Amex). Give the day-by-day amounts (selected.byDay) as the expected amount per weekday.
-  Say that other brands (club card, Diners) are not included.
+  (VISA, Mastercard, Amex, Diners). Give the day-by-day amounts (selected.byDay) as the expected amount per weekday.
+  Say that the members club (club card) is not included.
 - Bank (bank_summary, bank_transactions): amounts in ₪ from the uploaded bank file — say up to which date it has
   data (lastDataDate). A negative balance is an overdraft (מינוס): say so plainly. Some Hebrew names in the
   details have their letters in reverse order (הננער היו'ג = ג'ויה רעננה, א"ת היו'ג = ג'ויה ת"א, הניפ שאר =

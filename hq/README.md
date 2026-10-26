@@ -118,8 +118,8 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
-**Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD and AMEX** of
-the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר, Diners, Mishloha…) is the
+**Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** of
+the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
 **members club** (מועדון חברים). `payments_summary` always returns both: `creditCards` / `membersClub` per location
 and `creditCardsTotal` / `membersClubTotal`.
 
