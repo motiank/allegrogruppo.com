@@ -65,9 +65,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   (`bank_transactions`), read from `/bank/transactions/stored`. An account belongs to a **company**
   (`shared/restaurants.json` `bank_accounts`; owner: Hapoalim 12-584-136663 = פסטה לינה). Some Hebrew in `details`
   is stored in reverse letter order by the bank file (the WRITE prompt reads it the right way).
-- **Data map** (README → "Data map"): table → admin endpoint → AI calc. One topic, one source: credit card / payment
-  method income = Beecomm payments (`payments_summary`), never the bank, also in the BANK area; the bank only for the
-  account itself (balance, deposits, transfers). Rules: PLAN prompt "Which source" (owner, 2026-10-26).
+- **Data map** (README → "Data map"): table → admin endpoint → AI calc. Card / Wolt income has two sources and the
+  question's words decide (owner, 2026-10-26): sold at the register = Beecomm payments (`payments_summary`); received
+  in the account = the bank; unclear or a comparison = both, given apart. Rules: PLAN prompt "Which source".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
   role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
   minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. Users with payroll access only

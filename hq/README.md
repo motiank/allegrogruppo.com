@@ -118,14 +118,14 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
-**One topic, one source.** Some money shows up in two places, and the AI must use the right one (rules in
-`runner/hq-analyst.js`, "Which source"):
-- **Credit card income** (how much we sold / earned by card, by brand, a card forecast) = **Beecomm payments**
-  (`payments_summary`) — the day of the sale, by brand. **Not** the bank: the card companies pay later, in batches,
-  after fees. The bank is used only when the question is about the bank account ("how much did Max deposit in the
-  bank", "when did the card money arrive").
-- The same for **Wolt / 10bis**: what was sold through them = `payments_summary`; what they transferred to the
-  account = `bank_transactions` (q = WOLT).
+**Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
+question decide (rules in `runner/hq-analyst.js`, "Which source"):
+- **sold / charged at the register** (by brand, tips, refunds, the card forecast) = **Beecomm payments**
+  (`payments_summary`): the day of the sale, gross.
+- **received in the bank account** (deposited by Max / Isracard / Amex / Wolt, when the money arrived) = **the bank**
+  (`bank_transactions` / `bank_summary`): days later, in batches, after fees.
+- **not clear which**, or a comparison → **both**; the answer gives the two numbers apart and explains the difference
+  (timing and fees), never their sum.
 - **Revenue** = `sales_summary` (Beecomm orders). Money in the bank is not revenue.
 - **Wages** (the rate per person or role) = `employees`; **labor cost** in money over a period = `labor_summary`.
 

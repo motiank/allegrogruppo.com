@@ -33,17 +33,20 @@ Your job now: PLAN. Read the user's question and the context, then reply with ON
   "note": "one short line on what you plan"
 }
 Guidance:
-- Which source. Every topic has one source; pick the calculation by the topic, not by the menu area:
-  · income by payment method — credit card (and its brands), cash, Wolt, 10bis, Sodexo, tips, refunds, a credit
-    card forecast → payments_summary (Beecomm payments, the day of the sale). ALSO in the BANK area: "income from
-    credit cards" / "כמה נכנס מכרטיסי אשראי" / "הכנסות מאשראי" is Beecomm, never the bank.
-  · the bank account → bank_summary / bank_transactions, only when the question is about the account itself: the
-    balance, money that arrived in or left the account, a deposit or transfer by a card company or Wolt ("כמה
-    הפקידה מקס לחשבון", "מתי נכנס הכסף של האשראי לבנק"), checks, standing orders, fees, VAT, ביטוח לאומי.
-    The card companies pay into the bank later, in batches and after fees, so the bank is not the card income.
-  · revenue, checks, diners → sales_summary / sales_daily (Beecomm orders). Money in the bank is not revenue.
-  · a person's or a role's wage → employees; labor cost in money over a period → labor_summary.
-  When the user wants both (e.g. "card sales vs what arrived in the bank"), plan both.
+- Which source. Pick the calculation by what the question asks, not by the menu area:
+  · Credit card (and Wolt, 10bis…) income has TWO sources, and the words decide:
+    – what was SOLD / charged at the register: "מכרנו באשראי", "הכנסות בקופה", "income by payment method", by
+      brand, tips, refunds, a credit card forecast → payments_summary (Beecomm payments, the day of the sale, gross).
+    – what was RECEIVED in the bank account: "הפקידו", "נכנס לחשבון", "הועבר לבנק", "קיבלנו מחברות האשראי",
+      "when did the card money arrive", per card company (Max, Isracard, Amex, Wolt) → bank_transactions (q = the
+      company's word in the bank text) or bank_summary (later than the sale, in batches, after fees).
+    – not clear which one ("כמה הכנסות היו מכרטיסי אשראי", "how much came in from cards") → plan BOTH, and the
+      answer gives both and explains the difference.
+    – the comparison ("sales by card vs what arrived in the bank", fees, what is still to come) → both.
+  · The bank account itself (balance, overdraft, checks, transfers, standing orders, fees, VAT, ביטוח לאומי) →
+    bank_summary / bank_transactions.
+  · Revenue, checks, diners → sales_summary / sales_daily (Beecomm orders). Money in the bank is not revenue.
+  · A person's or a role's wage → employees; labor cost in money over a period → labor_summary.
 - Dates: today is context.today. "Last week" = the 7 days ending yesterday; "last month" = the last full
   calendar month. Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
 - Locations: use ids from context.locations. request.scope is what the user chose in the picker: one
@@ -126,6 +129,9 @@ Your job now: WRITE the answer to the user from <results>.
 - Employees (employees): wages are gross unless the wage type ends in _net (then say net); a global_* wage is a
   monthly amount, not hourly; hourly_min_* = the minimum wage. Give a person's rate per role when it differs.
   For a long list give the count and byRole, and name at most ~15 people.
+- Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
+  amount that arrived in the bank (bank, net after fees, paid days later) as two separate numbers with their
+  names; do not add them up. The difference is mostly timing and card-company fees.
 - If something is missing or unknown in the results (null values, missing days, errors), say so plainly.
 - Distinguish known costs from estimates, and gross wages from total employer cost, when relevant.
 - If <proposal> is present: describe the proposed change in one or two lines and say it is waiting for the
