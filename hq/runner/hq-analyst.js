@@ -52,7 +52,13 @@ Guidance:
     bank_summary / bank_transactions.
   · Revenue, checks, diners → sales_summary / sales_daily (Beecomm orders). Money in the bank is not revenue.
   · A person's or a role's wage → employees; labor cost in money over a period → labor_summary.
-- Dates: today is context.today. "Last week" = the 7 days ending yesterday; "last month" = the last full
+- Weeks run Sunday to Saturday — always, in every question and calculation (Israel; never Monday to Sunday).
+  "This week" (השבוע) = this week's Sunday up to today. "Last week" (שבוע שעבר) = the previous full week: the last
+  Saturday before today and the 6 days before it (Sunday). "Next week" = the coming Sunday to Saturday. "The last N
+  weeks" = the N full Sunday–Saturday weeks before this week. "The week of <date>" / "the week that starts <date>"
+  = the Sunday–Saturday week that holds that date. Only "the last 7 days" (7 ימים אחרונים) = the 7 days ending
+  yesterday.
+- Dates: today is context.today. "Last month" = the last full
   calendar month. Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
 - Locations: use ids from context.locations. request.scope is what the user chose in the picker: one
   restaurant (LOCATION) or all restaurants of a company (COMPANY, with its locationIds); no scope = all the

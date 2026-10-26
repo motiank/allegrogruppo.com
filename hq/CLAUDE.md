@@ -69,6 +69,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   question's words decide (owner, 2026-10-26): sold at the register = Beecomm payments (`payments_summary`); received
   in the account = the bank. The menu area sets the default: PERFORMANCE → Beecomm, BANK → the bank (explicit words
   override); no area and unclear, or a comparison → both, given apart. Rules: PLAN prompt "Which source".
+- **Weeks run Sunday–Saturday, always** (owner, 2026-10-27). "Last week" = the previous Sunday–Saturday week, "this
+  week" = Sunday up to today; only "the last 7 days" is rolling (PLAN prompt, Dates). Code uses `getUTCDay() === 0`.
 - Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
   (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole
   אשראי type "credit card".
