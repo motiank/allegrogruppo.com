@@ -130,6 +130,7 @@ export const parseBankHapoalim = (ws) => {
   const text = (row, k) => (c[k] ? norm(cellText(row.getCell(c[k]).value)) || null : null);
   const num = (row, k) => (c[k] ? cellNum(row.getCell(c[k]).value) : null);
   const rows = [];
+  const seen = new Map(); // key fields → how many rows with them so far
   for (let r = hRow + 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const tx_date = dateOf(row.getCell(c.date).value);
@@ -147,10 +148,14 @@ export const parseBankHapoalim = (ws) => {
       balance: num(row, "balance"),
       note: text(row, "note"),
     };
-    out.row_key = crypto
-      .createHash("sha256")
-      .update(JSON.stringify([out.account, out.tx_date, out.action_code, out.action, out.details, out.reference, out.bundle, out.debit, out.credit, out.balance]))
-      .digest("hex");
+    // The key that stops a row from being stored twice (files of overlapping periods). Not the balance: it
+    // is a running total, and a later export can list the same day's rows in another order (a file taken
+    // during the day, then a full one), so the balances change. Rows with the same fields (two real equal
+    // transactions) get their number in the file: 1st, 2nd, …
+    const fields = JSON.stringify([out.account, out.tx_date, out.action_code, out.action, out.details, out.reference, out.bundle, out.debit, out.credit]);
+    const n = (seen.get(fields) || 0) + 1;
+    seen.set(fields, n);
+    out.row_key = crypto.createHash("sha256").update(`${fields}#${n}`).digest("hex");
     rows.push(out);
   }
   const dates = rows.map((x) => x.tx_date).sort();

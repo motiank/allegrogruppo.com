@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
   `credit` DECIMAL(14,2) DEFAULT NULL COMMENT 'זכות',
   `balance` DECIMAL(14,2) DEFAULT NULL COMMENT 'יתרה',
   `note` VARCHAR(255) DEFAULT NULL,
-  `row_key` CHAR(64) NOT NULL COMMENT 'sha256 of the row fields (skips rows already stored)',
+  `row_key` CHAR(64) NOT NULL COMMENT 'sha256 of the row fields without the balance + the number among equal rows in the file (skips rows already stored)',
   `upload_id` INT UNSIGNED DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
