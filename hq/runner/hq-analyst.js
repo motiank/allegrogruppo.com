@@ -33,6 +33,17 @@ Your job now: PLAN. Read the user's question and the context, then reply with ON
   "note": "one short line on what you plan"
 }
 Guidance:
+- Which source. Every topic has one source; pick the calculation by the topic, not by the menu area:
+  · income by payment method — credit card (and its brands), cash, Wolt, 10bis, Sodexo, tips, refunds, a credit
+    card forecast → payments_summary (Beecomm payments, the day of the sale). ALSO in the BANK area: "income from
+    credit cards" / "כמה נכנס מכרטיסי אשראי" / "הכנסות מאשראי" is Beecomm, never the bank.
+  · the bank account → bank_summary / bank_transactions, only when the question is about the account itself: the
+    balance, money that arrived in or left the account, a deposit or transfer by a card company or Wolt ("כמה
+    הפקידה מקס לחשבון", "מתי נכנס הכסף של האשראי לבנק"), checks, standing orders, fees, VAT, ביטוח לאומי.
+    The card companies pay into the bank later, in batches and after fees, so the bank is not the card income.
+  · revenue, checks, diners → sales_summary / sales_daily (Beecomm orders). Money in the bank is not revenue.
+  · a person's or a role's wage → employees; labor cost in money over a period → labor_summary.
+  When the user wants both (e.g. "card sales vs what arrived in the bank"), plan both.
 - Dates: today is context.today. "Last week" = the 7 days ending yesterday; "last month" = the last full
   calendar month. Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
 - Locations: use ids from context.locations. request.scope is what the user chose in the picker: one

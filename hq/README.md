@@ -101,6 +101,34 @@ reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) 
 `/status` tells "not loaded yet" apart from "missing" (missing sales days are counted only up to Allegro's last
 loaded day). Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.
 
+### Data map — table → admin API → AI calculation
+
+Every number the AI gives comes from one AI calculation (`src/services/ai.js` CALCS), which reads one admin endpoint
+(`src/services/source.js`), which reads one table in the `allegro` DB. Joya stores none of these (only its own `joya_*`).
+
+| Topic | Table (allegro DB) | Filled by | Admin endpoint | AI calculation(s) |
+|---|---|---|---|---|
+| Sales: revenue, checks, diners, shifts | `bcom_orders` | Beecomm API, daily job | `/beecomm/orders/stored` | `sales_summary`, `sales_daily`, `sales_by_shift`, `sales_anomalies`, `shift_profile`, `shift_demand_recent` |
+| Dishes sold | `bcom_items_daily` | Beecomm API, daily job | `/beecomm/items/stored` | `sales_by_dish` |
+| **Income by payment method** (credit card + brand, cash, Wolt, 10bis, Sodexo…), tips, refunds | `bcom_payments_daily` | Beecomm payments report, daily job | `/beecomm/payments/stored` | `payments_summary` |
+| Z reports, daily cash summary | `bcom_z_reports`, `bcom_cash` | Beecomm | `/beecomm/z-reports/stored`, `/beecomm/daily` | (data quality, labor %) |
+| **Bank account**: money in/out, balance, deposits, checks, transfers | `bank_transactions` | bank file on the Upload page | `/bank/transactions/stored` | `bank_summary`, `bank_transactions` |
+| Employees, roles, wages | `employees` | admin Employees page | `/employees` | `employees` |
+| Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
+| Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
+| Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
+
+**One topic, one source.** Some money shows up in two places, and the AI must use the right one (rules in
+`runner/hq-analyst.js`, "Which source"):
+- **Credit card income** (how much we sold / earned by card, by brand, a card forecast) = **Beecomm payments**
+  (`payments_summary`) — the day of the sale, by brand. **Not** the bank: the card companies pay later, in batches,
+  after fees. The bank is used only when the question is about the bank account ("how much did Max deposit in the
+  bank", "when did the card money arrive").
+- The same for **Wolt / 10bis**: what was sold through them = `payments_summary`; what they transferred to the
+  account = `bank_transactions` (q = WOLT).
+- **Revenue** = `sales_summary` (Beecomm orders). Money in the bank is not revenue.
+- **Wages** (the rate per person or role) = `employees`; **labor cost** in money over a period = `labor_summary`.
+
 The staffing plan is exported as a **CSV for Tabit**. Nothing is sent to a supplier, Tabit, Instagram or Google.
 
 ## Permissions
