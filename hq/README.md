@@ -112,7 +112,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Dishes sold | `bcom_items_daily` | Beecomm API, daily job | `/beecomm/items/stored` | `sales_by_dish` |
 | **Income by payment method** (credit card + brand, cash, Wolt, 10bis, Sodexo…), tips, refunds | `bcom_payments_daily` | Beecomm payments report, daily job | `/beecomm/payments/stored` | `payments_summary` |
 | Z reports, daily cash summary | `bcom_z_reports`, `bcom_cash` | Beecomm | `/beecomm/z-reports/stored`, `/beecomm/daily` | (data quality, labor %) |
-| **Bank account**: money in/out, balance, deposits, checks, transfers | `bank_transactions` | bank file on the Upload page | `/bank/transactions/stored` | `bank_summary`, `bank_transactions` |
+| **Bank account**: money in/out, balance, deposits, checks, transfers | `bank_transactions` | bank file on the Upload page | `/bank/transactions/stored` | `bank_summary`, `bank_transactions`, `cards_vs_bank` (with Beecomm payments) |
 | Employees, roles, wages | `employees` | admin Employees page | `/employees` | `employees` |
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
@@ -122,6 +122,12 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
 **members club** (מועדון חברים). `payments_summary` always returns both: `creditCards` / `membersClub` per location
 and `creditCardsTotal` / `membersClubTotal`.
+
+**Weekly and monthly sums.** The model never adds numbers itself, so a table per week or month comes from one
+calculation with `group: "week"` (Sunday–Saturday) or `"month"`: `payments_summary` (`byPeriod`, `byPeriodTotal`) and
+`bank_summary` (`byPeriod`). **`cards_vs_bank`** puts each Sunday–Saturday sales week (Beecomm credit cards) next to
+what the card companies paid into the bank in the FOLLOWING week (per company; in the data Max pays on Wednesday,
+American Express on Thursday or Friday, not every week). `bankNotComplete` = the bank file does not cover that week yet.
 
 **Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
 question decide, and the **menu area sets the default** (owner, 2026-10-26; rules in `runner/hq-analyst.js`,

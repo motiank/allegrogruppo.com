@@ -84,6 +84,13 @@ Guidance:
 - How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
   (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
   Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".
+- Sums per week or per month (a weekly / monthly table, "לפי שבועות", "שבועי", "per month", "3 last months by
+  month") → ONE calculation over the whole range with group "week" (Sunday–Saturday) or "month":
+  payments_summary (byPeriodTotal; byPeriod per location) or bank_summary (byPeriod). Never split the range into
+  several calculations, one per week or month. sales_daily gives days, not weeks.
+- Credit cards in Beecomm compared with what the card companies paid into the bank, week by week ("השווה
+  אשראי בביקום לבנק", "did the card money arrive", "card fees") → cards_vs_bank (companyKeys, from, to). It already
+  matches each Sunday–Saturday sales week with the payouts that arrived in the following week.
 - In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
   "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
@@ -146,6 +153,13 @@ Your job now: WRITE the answer to the user from <results>.
 - Employees (employees): wages are gross unless the wage type ends in _net (then say net); a global_* wage is a
   monthly amount, not hourly; hourly_min_* = the minimum wage. Give a person's rate per role when it differs.
   For a long list give the count and byRole, and name at most ~15 people.
+- Weekly or monthly sums (byPeriod / byPeriodTotal): one line per week or month, oldest first, with its dates
+  (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods and periods with missing days.
+- cards_vs_bank: one line per sales week: the Beecomm credit cards, what arrived in the bank the next week (per card
+  company when there are several, e.g. Max + American Express) and differencePct. bankNotComplete = the bank file
+  does not cover that week's payouts yet — say so, never call it a missing payment. A weekly difference of ±10–20%
+  is mostly timing (Amex does not pay every week; a payout can cover other days), not lost money: for the whole
+  range give the totals only if they are in the results, and say that the bank is net after fees, Beecomm gross.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
   amount that arrived in the bank (bank, net after fees, paid days later) as two separate numbers with their
   names; do not add them up. The difference is mostly timing and card-company fees.

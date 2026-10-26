@@ -122,16 +122,28 @@ export const CALCS = {
   sales_daily: { params: '{ locationIds?, from, to }', about: 'day by day revenue, checks, diners; missing days marked', run: (a, p) => analytics.salesDaily(locs(a, p), ...range(p)) },
   sales_by_shift: { params: '{ locationIds?, from, to }', about: 'revenue, checks, diners per shift', run: (a, p) => analytics.salesByShift(locs(a, p), ...range(p)) },
   payments_summary: {
-    params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX", "DINERS"] }',
+    params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX", "DINERS"], group?: "week" | "month" }',
     about:
-      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)',
-    run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands),
+      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
+    run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands, p.group),
   },
   bank_summary: {
-    params: '{ companyKeys?: string[], from, to }',
+    params: '{ companyKeys?: string[], from, to, group?: "week" | "month" }',
     about:
-      "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only",
-    run: async (a, p) => bank.bankSummary(await bankCompanies(a, p), ...range(p)),
+      "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only",
+    run: async (a, p) => bank.bankSummary(await bankCompanies(a, p), ...range(p), p.group),
+  },
+  cards_vs_bank: {
+    params: '{ companyKeys?, from, to }',
+    about:
+      'week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company\'s restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only',
+    run: async (a, p) => {
+      const cos = await bankCompanies(a, p);
+      const all = await listLocations(a);
+      const scope = new Set(locs(a, {}));
+      const of = (key) => all.filter((l) => l.company?.key === key && (p.companyKeys || p.companyKey || scope.has(String(l.id)))).map((l) => String(l.id)).filter((id) => canLocation(a, id));
+      return bank.cardsVsBank(cos, of, ...range(p));
+    },
   },
   bank_transactions: {
     params: '{ companyKeys?, from, to, q?: "text in the action or details, e.g. WOLT, מקס, ביטוח לאומי", side?: "credit" | "debit", order?: "amount" | "date", limit? }',

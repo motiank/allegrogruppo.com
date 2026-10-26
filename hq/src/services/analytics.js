@@ -361,6 +361,18 @@ const brandKey = (b) => {
   return BRAND_ALIAS[k] || k;
 };
 
+// A period of a date for weekly / monthly sums. Weeks run Sunday to Saturday (owner, 2026-10-27).
+export function periodOf(date, group) {
+  if (group === 'month') {
+    const [y, m] = date.slice(0, 7).split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { key: date.slice(0, 7), from: `${date.slice(0, 7)}-01`, to: `${date.slice(0, 7)}-${String(last).padStart(2, '0')}` };
+  }
+  const from = addDays(date, -weekdayOf(date));
+  return { key: from, from, to: addDays(from, 6) };
+}
+export const GROUPS = ['week', 'month'];
+
 // Owner, 2026-10-26: in Beecomm, "credit card" = only these brands of the credit type (אשראי); every other brand
 // of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the "members club" (מועדון חברים).
 export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS'];
@@ -372,7 +384,27 @@ const newGroup = () => ({ charges: 0, refunded: 0, transactions: 0, prevCharges:
  * brands (optional, e.g. ['VISA', 'MASTERCARD', 'AMEX', 'DINERS']): also sum only these card brands — per location
  * `selected` with a day-by-day list, and `selectedTotal` over all the locations.
  */
-export async function paymentsSummary(locationIds, from, to, brands = null) {
+// rows of weekly / monthly sums, oldest first; partial = the period is cut by from / to; daysWithData counts
+// location-days for the total over several locations
+function periodRows(map, from, to, locations = 1) {
+  return [...map.values()]
+    .sort((a, b) => (a.from < b.from ? -1 : 1))
+    .map((g) => ({
+      from: g.from,
+      to: g.to,
+      ...(g.from < from || g.to > to ? { partial: true } : {}),
+      daysWithData: g.days.size,
+      ...(locations > 1 ? { locations } : {}),
+      total: r2(g.total),
+      creditCards: r2(g.creditCards),
+      membersClub: r2(g.membersClub),
+    }));
+}
+
+export async function paymentsSummary(locationIds, from, to, brands = null, group = null) {
+  const by = GROUPS.includes(group) ? group : null;
+  const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0 });
+  const allPeriods = new Map();
   const len = daysBetween(from, to) + 1;
   const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
   let selTotal = want ? { charges: 0, prevCharges: 0, transactions: 0 } : null;
@@ -392,9 +424,20 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
     const prevDays = new Set();
     const sel = want ? { charges: 0, refunded: 0, transactions: 0, prevCharges: 0, byDay: new Map() } : null;
     const groups = { creditCards: newGroup(), membersClub: newGroup() };
+    const periods = new Map();
     for (const r of src.rows) {
       const cur = r.date >= from;
       (cur ? days : prevDays).add(r.date);
+      if (by && cur) {
+        const pp = periodOf(r.date, by);
+        for (const m of [periods, allPeriods]) {
+          const g = m.get(pp.key) || newPeriod(pp);
+          m.set(pp.key, g);
+          g.days.add(m === periods ? r.date : `${loc}|${r.date}`);
+          if (r.brand == null && r.inZ) g.total += r.charges;
+          if (r.type === CREDIT_TYPE && r.brand != null) g[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'] += r.charges;
+        }
+      }
       if (r.type === CREDIT_TYPE && r.brand != null) {
         const g = groups[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'];
         g.brands.add(r.brand);
@@ -468,8 +511,9 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
       prevTotalCharges: prev(prevTotal),
       totalService: cur(list.filter((t) => t.inZ).reduce((a, t) => a + t.service, 0)),
       // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX + DINERS, the rest = members club
-      creditCards: groupOut(groups.creditCards, len <= 62),
-      membersClub: groupOut(groups.membersClub, len <= 62),
+      creditCards: groupOut(groups.creditCards, len <= 62 && !by),
+      membersClub: groupOut(groups.membersClub, len <= 62 && !by),
+      ...(by ? { byPeriod: periodRows(periods, from, to) } : {}),
       types: list
         .sort((a, b) => b.charges - a.charges || b.prevCharges - a.prevCharges)
         .map((t) => ({
@@ -511,6 +555,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null) {
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
     membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },
+    ...(by ? { group: by, byPeriodTotal: periodRows(allPeriods, from, to, locationIds.length) } : {}),
     ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
     locations: out,
   };

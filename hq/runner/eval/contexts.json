@@ -145,13 +145,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"] }",
-     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
     },
     {
      "name": "bank_summary",
-     "params": "{ companyKeys?: string[], from, to }",
-     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company's restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only"
     },
     {
      "name": "bank_transactions",
@@ -415,13 +420,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"] }",
-     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
     },
     {
      "name": "bank_summary",
-     "params": "{ companyKeys?: string[], from, to }",
-     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company's restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only"
     },
     {
      "name": "bank_transactions",
@@ -846,13 +856,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"] }",
-     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
     },
     {
      "name": "bank_summary",
-     "params": "{ companyKeys?: string[], from, to }",
-     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company's restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only"
     },
     {
      "name": "bank_transactions",
@@ -2075,13 +2090,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"] }",
-     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
     },
     {
      "name": "bank_summary",
-     "params": "{ companyKeys?: string[], from, to }",
-     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company's restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only"
     },
     {
      "name": "bank_transactions",
@@ -2359,13 +2379,18 @@
     },
     {
      "name": "payments_summary",
-     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"] }",
-     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal)"
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
     },
     {
      "name": "bank_summary",
-     "params": "{ companyKeys?: string[], from, to }",
-     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; vs the same-length period before. Chain admin only"
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS) of the company's restaurants next to what the card companies (Max, Amex, Isracard, Cal) paid into its bank account in the following week, per card company, with the difference in %. Chain admin only"
     },
     {
      "name": "bank_transactions",

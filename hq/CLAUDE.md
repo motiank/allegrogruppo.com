@@ -71,6 +71,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   override); no area and unclear, or a comparison → both, given apart. Rules: PLAN prompt "Which source".
 - **Weeks run Sunday–Saturday, always** (owner, 2026-10-27). "Last week" = the previous Sunday–Saturday week, "this
   week" = Sunday up to today; only "the last 7 days" is rolling (PLAN prompt, Dates). Code uses `getUTCDay() === 0`.
+- Weekly / monthly tables: `group: "week" | "month"` on `payments_summary` and `bank_summary`; `cards_vs_bank` = Beecomm
+  credit cards per Sun–Sat week vs the card companies' bank payouts of the following week (2026-10-27). The planner
+  must use one grouped calc, never one calc per week.
 - Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
   (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole
   אשראי type "credit card".

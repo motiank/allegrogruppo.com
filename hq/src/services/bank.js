@@ -3,6 +3,7 @@
 // (source.bank), never stored here. Chain admin only (see ai.js).
 import { bank as sourceBank } from './source.js';
 import { addDays } from '../lib/recommend.js';
+import { periodOf, GROUPS, paymentsSummary } from './analytics.js';
 
 const r2 = (x) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 100) / 100);
 const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
@@ -12,12 +13,28 @@ const OPENING_LOOKBACK_DAYS = 45;
 const BY_DAY_MAX = 62;
 const SOURCE = 'bank files uploaded in Allegro (/bank/transactions/stored); as fresh as the last upload';
 
+// weekly (Sunday–Saturday) or monthly money in / out and the balance at the end, from the day rows
+function byPeriod(days, by, from, to) {
+  const m = new Map();
+  for (const r of days) {
+    const pp = periodOf(r.date, by);
+    const g = m.get(pp.key) || { from: pp.from, to: pp.to, ...(pp.from < from || pp.to > to ? { partial: true } : {}), daysWithData: 0, moneyIn: 0, moneyOut: 0, closingBalance: null };
+    g.daysWithData++;
+    g.moneyIn += r.credit || 0;
+    g.moneyOut += r.debit || 0;
+    if (r.closingBalance != null) g.closingBalance = r.closingBalance;
+    m.set(pp.key, g);
+  }
+  return [...m.values()].map((g) => ({ ...g, moneyIn: r2(g.moneyIn), moneyOut: r2(g.moneyOut), net: r2(g.moneyIn - g.moneyOut) }));
+}
+
 /**
  * Money in and out of each company's bank account(s) in a period, vs the same-length period before: totals, the
  * balance at the start and the end, the lowest balance, the biggest sources and uses (action + details), and day by
  * day for periods up to 62 days.
  */
-export async function bankSummary(companies, from, to) {
+export async function bankSummary(companies, from, to, group = null) {
+  const by = GROUPS.includes(group) ? group : null;
   const len = daysBetween(from, to) + 1;
   const pFrom = addDays(from, -len);
   const out = [];
@@ -62,7 +79,8 @@ export async function bankSummary(companies, from, to) {
         lowestBalance: low ? { date: low.date, balance: low.closingBalance } : null,
         topIn: top('credit'),
         topOut: top('debit'),
-        ...(len <= BY_DAY_MAX ? { byDay: cur.map((r) => ({ date: r.date, moneyIn: r.credit, moneyOut: r.debit, closingBalance: r.closingBalance })) } : {}),
+        ...(by ? { byPeriod: byPeriod(cur, by, from, to) } : {}),
+        ...(len <= BY_DAY_MAX && !by ? { byDay: cur.map((r) => ({ date: r.date, moneyIn: r.credit, moneyOut: r.debit, closingBalance: r.closingBalance })) } : {}),
       };
     });
     out.push({ company: co.label, companyKey: co.key, available: true, accounts });
@@ -112,6 +130,78 @@ export async function bankTransactions(companies, from, to, { q = null, side = n
     period: { from, to },
     filter: { q: q || null, side: side || 'all', order: order === 'date' ? 'date' : 'amount' },
     source: SOURCE,
+    ...(reason ? { missing: reason } : {}),
+    companies: out,
+  };
+}
+
+// Card company payouts in the bank text (action). The members club (חבר משרתי קבע) is not a card company.
+const CARD_COMPANIES = [
+  { name: 'Max', re: /מקס/ },
+  { name: 'Isracard', re: /ישראכרט/ },
+  { name: 'American Express', re: /אמריקן אקספרס|אמריקן/ },
+  { name: 'Cal', re: /כאל|כרטיסי אשראי לישראל/ },
+  { name: 'Diners', re: /דיינרס/ },
+  { name: 'Leumi Card', re: /לאומי קארד/ },
+];
+const cardCompanyOf = (r) => CARD_COMPANIES.find((c) => c.re.test(`${r.action || ''}`))?.name ?? null;
+
+/**
+ * Week by week (Sunday–Saturday): the credit cards in Beecomm (VISA + MASTERCARD + AMEX + DINERS, the company's
+ * locations) next to what the card companies paid into the company's bank account in the FOLLOWING week (they pay
+ * a sales week in the next week — Max on Wednesday, Amex on Thursday or Friday). The difference is fees, timing and
+ * missing days; it is not a sum the model should make itself.
+ */
+export async function cardsVsBank(companies, locationsOf, from, to) {
+  const start = periodOf(from, 'week').from;
+  const end = periodOf(to, 'week').to;
+  const out = [];
+  let reason = null;
+  for (const co of companies) {
+    const locs = locationsOf(co.key);
+    const pay = locs.length ? await paymentsSummary(locs, start, end, null, 'week') : null;
+    const bank = await sourceBank(co.key, addDays(start, 7), addDays(end, 7), { group: 'none', side: 'credit' });
+    if (!bank.available) reason = bank.reason;
+    const weeks = new Map();
+    for (const w of pay?.byPeriodTotal || []) weeks.set(w.from, { salesWeek: { from: w.from, to: w.to }, beecommCreditCards: w.creditCards, beecommMembersClub: w.membersClub, beecommDaysWithData: w.daysWithData, bank: {} });
+    let lastBankDate = null;
+    for (const r of bank.available ? bank.rows : []) {
+      // how far the bank file goes (any credit), to tell a week not paid yet from a week the file does not cover
+      lastBankDate = !lastBankDate || r.date > lastBankDate ? r.date : lastBankDate;
+      const c = cardCompanyOf(r);
+      if (!c || r.credit == null) continue;
+      const salesWeek = addDays(periodOf(r.date, 'week').from, -7);
+      const w = weeks.get(salesWeek);
+      if (!w) continue;
+      const b = w.bank[c] || { amount: 0, payments: 0, dates: new Set() };
+      b.amount += r.credit;
+      b.payments++;
+      b.dates.add(r.date);
+      w.bank[c] = b;
+    }
+    const rows = [...weeks.values()]
+      .sort((a, b) => (a.salesWeek.from < b.salesWeek.from ? -1 : 1))
+      .map((w) => {
+        const companiesPaid = Object.entries(w.bank).map(([company, b]) => ({ company, amount: r2(b.amount), payments: b.payments, dates: [...b.dates].sort() }));
+        const bankTotal = companiesPaid.reduce((a, b) => a + b.amount, 0);
+        const payWeek = { from: addDays(w.salesWeek.from, 7), to: addDays(w.salesWeek.to, 7) };
+        const notYet = !lastBankDate || lastBankDate < payWeek.to;
+        return {
+          ...w,
+          bank: undefined,
+          bankWeek: payWeek,
+          bankCardCompanies: r2(bankTotal),
+          bankByCompany: companiesPaid,
+          ...(notYet ? { bankNotComplete: true } : {}),
+          differencePct: w.beecommCreditCards && !notYet ? r2(((bankTotal - w.beecommCreditCards) / w.beecommCreditCards) * 100) : null,
+        };
+      });
+    out.push({ company: co.label, companyKey: co.key, locations: locs, available: bank.available, lastBankDate, weeks: rows });
+  }
+  return {
+    period: { from: start, to: end },
+    source: 'Beecomm payments (/beecomm/payments/stored, credit cards = VISA + MASTERCARD + AMEX + DINERS) and the bank file (/bank/transactions/stored, credits of the card companies)',
+    note: 'each Sunday–Saturday sales week is matched with the card company payments that arrived in the bank in the next week; Beecomm is gross with tips, the bank is net after the card company fees; bankNotComplete = the bank file does not cover that pay week yet; the members club is not in either column',
     ...(reason ? { missing: reason } : {}),
     companies: out,
   };
