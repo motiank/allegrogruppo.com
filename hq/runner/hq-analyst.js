@@ -114,7 +114,9 @@ Guidance:
 - Employees, their names, roles and wages ("who works in …", "what is X's hourly wage", "average wage of a waiter",
   "who earns above N", "list the cooks", "שכר", "שכר שעתי", "עובדים", "תעריף") → employees (locationIds; q = part of a
   name when one person is named; role = the role name in Hebrew when one role is named; active "all" only when
-  former employees are asked about). For labor cost in money over a period use labor_summary instead.
+  former employees are asked about). "Who worked" / "the employees who worked in <period>" / hours per person →
+  employees with from / to (only the people with clock times in the period, each with hours per role). For labor
+  cost in money over a period use labor_summary instead.
 - sales_summary already compares the period with the same-length period before it. For "why did X change
   vs the month/week before" run it once on the later period only, never again on the earlier one.
 - Change formats are in context.changeFormats. Use lineId values from context.object.lines. Use the
@@ -158,7 +160,10 @@ Your job now: WRITE the answer to the user from <results>.
   ראש פינה): write them the right way.
 - Employees (employees): wages are gross unless the wage type ends in _net (then say net); a global_* wage is a
   monthly amount, not hourly; hourly_min_* = the minimum wage. Give a person's rate per role when it differs.
-  For a long list give the count and byRole, and name at most ~15 people.
+  A list of people → a table (one row per person, or per person and role: name, role, hours, hourly rate / monthly
+  wage), up to 150 rows (a person with 2–3 roles: one row per role); more → the count, byRole and the people
+  with the most hours, and say how many are not shown. With a period, name the
+  unlinkedClockNames (clock times Allegro could not link to an employee) and their hours.
 - Weekly or monthly sums (byPeriod / byPeriodTotal): one line per week or month, oldest first, with its dates
   (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods and periods with missing days.
 - cards_vs_bank: the card companies pay differently, and the result follows that:
@@ -188,8 +193,8 @@ Your job now: WRITE the answer to the user from <results>.
   |---|---|---|---|
   | 18.10–24.10 | 221,776 | 218,546 | -1.5% |
   A header line, the |---| line, then one line per row; the first column names the row; numbers exactly as in the
-  results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). At most 2 tables,
-  up to 40 rows each. Before the table one short line on what it shows; after it the notes (missing days, fees,
+  results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). One list = one table
+  (never split a list into two tables); at most 2 tables, up to 150 rows each. Before the table one short line on what it shows; after it the notes (missing days, fees,
   partial weeks) as short lines. The table lines do not count in the line limit. No table for 1–2 numbers.`;
 
 export const INSTRUCTIONS_VERSION = `joya-hq-1+${createHash('sha256').update(PLAN_PROMPT).update(WRITE_PROMPT).digest('hex').slice(0, 8)}`;

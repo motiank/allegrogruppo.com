@@ -245,8 +245,8 @@
     },
     {
      "name": "employees",
-     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
-     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -525,8 +525,8 @@
     },
     {
      "name": "employees",
-     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
-     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -966,8 +966,8 @@
     },
     {
      "name": "employees",
-     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
-     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -2205,8 +2205,8 @@
     },
     {
      "name": "employees",
-     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
-     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only"
     },
     {
      "name": "payroll_issues",
@@ -2499,8 +2499,8 @@
     },
     {
      "name": "employees",
-     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), limit? }",
-     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only"
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only"
     },
     {
      "name": "payroll_issues",

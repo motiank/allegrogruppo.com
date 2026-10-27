@@ -83,7 +83,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   אשראי type "credit card".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
   role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
-  minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. Users with payroll access only
+  minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. With `from`/`to`: only the people
+  with Tabit clock times in the period (Allegro links a clock row to `employees` by clock id → roster phone → name),
+  hours per role, and the clock names it could not link (`unlinkedClockNames`). Users with payroll access only
   (admin and restMngr, their own locations). No national ids or phones.
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
 - Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove

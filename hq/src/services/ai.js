@@ -46,8 +46,40 @@ async function employeeList(access, p) {
   const want = p.active === 'all' ? null : p.active === false || p.active === 'false' ? false : true;
   const text = p.q ? String(p.q).trim().toLowerCase() : null;
   const role = p.role ? String(p.role).trim() : null;
+  // with a period: the clock times (Tabit via Allegro /shifts/raw, linked to the employee by Allegro) per person
+  const period = p.from && p.to ? range(p) : null;
+  const worked = new Map();
+  const unlinked = new Map();
+  let missingClockOut = 0;
+  if (period) {
+    for (const loc of ids) {
+      for (const r of await source.rawShifts(loc, ...period)) {
+        if (!r.clockIn || !r.clockOut) {
+          missingClockOut++;
+          continue;
+        }
+        const h = (Date.parse(r.clockOut.replace(' ', 'T')) - Date.parse(r.clockIn.replace(' ', 'T'))) / 3.6e6;
+        if (!(h > 0)) continue;
+        if (r.employeeId == null) {
+          const u = unlinked.get(r.employeeName) || { name: r.employeeName, hours: 0, days: new Set() };
+          u.hours += h;
+          u.days.add(r.date);
+          unlinked.set(r.employeeName, u);
+          continue;
+        }
+        const w = worked.get(String(r.employeeId)) || { hours: 0, days: new Set(), byRole: new Map() };
+        w.hours += h;
+        w.days.add(r.date);
+        const role = r.roleName || '—';
+        w.byRole.set(role, (w.byRole.get(role) || 0) + h);
+        worked.set(String(r.employeeId), w);
+      }
+    }
+  }
+  const workedOnly = period && p.workedOnly !== false;
   const rows = (await source.employees(ids)).filter(
     (e) =>
+      (!workedOnly || worked.has(String(e.id))) &&
       (want == null || e.active === want) &&
       (!text || String(e.name || '').toLowerCase().includes(text)) &&
       (!role || e.roles.some((r) => r.role.includes(role)) || e.roleNames.some((r) => r.includes(role))),
@@ -85,7 +117,32 @@ async function employeeList(access, p) {
       wage: e.wage,
       hourlyRate: e.hourlyRate,
       roles: e.roles,
+      ...(period ? workedOut(worked.get(String(e.id)), e) : {}),
     })),
+    ...(period
+      ? {
+          period: { from: period[0], to: period[1] },
+          workedOnly: !!workedOnly,
+          clockSource: 'Tabit clock times via Allegro (/shifts/raw), linked to the employee by Allegro (clock id → phone → name); raw clock hours, before the payroll rules',
+          unlinkedClockNames: [...unlinked.values()].map((u) => ({ name: u.name, hours: Math.round(u.hours * 100) / 100, days: u.days.size })),
+          missingClockOut,
+        }
+      : {}),
+  };
+}
+// hours and days worked in the period, per role of the clock rows, with the wage of that role
+function workedOut(w, e) {
+  if (!w) return { hoursWorked: 0, daysWorked: 0, workedByRole: [] };
+  const r2 = (x) => Math.round(x * 100) / 100;
+  return {
+    hoursWorked: r2(w.hours),
+    daysWorked: w.days.size,
+    workedByRole: [...w.byRole.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([role, h]) => {
+        const rr = e.roles.find((x) => x.role === role);
+        return { role, hours: r2(h), hourlyRate: rr ? rr.hourlyRate : e.hourlyRate, wageType: rr?.wageType ?? e.wageType };
+      }),
   };
 }
 // Bank data is per company and for the chain admin only. companyKeys (keys or names) → those companies; else the
@@ -224,9 +281,9 @@ export const CALCS = {
   shortages: { params: '{ locationIds?, days? }', about: 'reported shortages', run: async (a, p) => ({ source: 'joya_shortages', shortages: await repl.listShortages(a, { locationIds: locs(a, p), days: p.days || 30 }) }) },
   data_quality: { params: '{ locationIds? }', about: 'missing, stale and unmapped data per location', run: (a, p) => quality.report(a, locs(a, p)) },
   employees: {
-    params: '{ locationIds?, q?: "part of a name", role?: "role name, e.g. מלצר", active?: true | false | "all" (default true), limit? }',
+    params: '{ locationIds?, q?: "part of a name", role?: "role name, e.g. מלצר", active?: true | false | "all" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }',
     about:
-      'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. Users with payroll access only',
+      'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only',
     run: (a, p) => employeeList(a, p),
   },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },

@@ -139,6 +139,8 @@
       "expect": { "calcs": ["payments_summary"], "params": { "payments_summary": { "group": "week" } }, "maxCalcs": 1 } },
     { "key": "g-bank-monthly", "kind": "GENERAL", "lang": "he", "question": "כמה כסף נכנס ויצא בבנק בכל חודש בשלושת החודשים האחרונים?",
       "expect": { "calcs": ["bank_summary"], "params": { "bank_summary": { "group": "month" } }, "maxCalcs": 1 } },
+    { "key": "a-emp-worked", "kind": "AREA", "lang": "he", "question": "הצג בטבלה את העובדים הפעילים שעבדו בחודש האחרון בתל אביב, את התפקידים שלהם ואת השכר השעתי",
+      "expect": { "calcs": ["employees"], "params": { "employees": { "from": "2026-09-01", "to": "2026-09-30" } }, "location": ["demo-tlv"] } },
     { "key": "g-card-income-en", "kind": "GENERAL", "lang": "en", "question": "How much did we sell by credit card this month?",
       "expect": { "calcs": ["payments_summary"], "range": { "from": "2026-10-01", "to": "2026-10-21" } } },
     { "key": "g-emp-wage", "kind": "GENERAL", "lang": "he", "question": "מה השכר השעתי של דנה?",
