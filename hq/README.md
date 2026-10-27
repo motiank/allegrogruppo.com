@@ -270,6 +270,12 @@ history. While the user types, the chat box suggests questions of that area (str
 the user's own past questions. The detailed pages keep their routes but are not in the menu; Settings is at the
 bottom of the menu for a chain admin.
 
+**Tables in answers (2026-10-27).** When an answer has several rows of the same numbers (weeks, days, restaurants,
+employees…), the writer puts them in a pipe table (`| a | b |` + `|---|---|`; rules in `runner/hq-analyst.js`). The chat
+shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table a **Download Excel** link:
+`GET /api/joya/ai/requests/:id/tables/:n.xlsx` (`src/services/answerExcel.js`, exceljs from the repo root; only the
+asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader for both sides: `lib/answerTables.js`.
+
 ## Other functions
 
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**

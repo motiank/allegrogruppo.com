@@ -5,6 +5,7 @@ import { applyMapping, parseNumber, parseDate, parseDateTime, suggestMapping } f
 import { shiftDemand, forecastUnit } from '../src/lib/demand.js';
 import { computeSlot, learnedAdjustments, validateRule } from '../src/lib/staffingRules.js';
 import { recommend, convert } from '../src/lib/recommend.js';
+import { splitAnswer, cellNumber } from '../lib/answerTables.js';
 import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
 
 let n = 0;
@@ -339,6 +340,19 @@ t('actual: diners per person per past shift, needed by the learned ratio, and a 
   assert.equal(last.allRolesPeople, 6);
   const w = a.summary.find((x) => x.role === 'מלצר');
   assert.deepEqual([w.shifts, w.avgPeople, w.perPerson, w.minPerPerson, w.maxPerPerson, w.shiftsOver, w.shiftsUnder], [2, 4, 30, 24, 40, 1, 0]);
+});
+
+t('answer tables: a pipe table becomes a table block between the text; numbers are read for Excel', () => {
+  const b = splitAnswer('שלום\n\n| שבוע | אשראי | שינוי |\n|---|---:|---|\n| 18.10–24.10 | 221,776 ₪ | -3.6% |\n| 11.10–17.10 | **256,062** |\n\nסוף\n| not | a table |');
+  assert.deepEqual(b.map((x) => x.type), ['text', 'table', 'text']);
+  assert.deepEqual(b[1].header, ['שבוע', 'אשראי', 'שינוי']);
+  assert.deepEqual(b[1].rows, [['18.10–24.10', '221,776 ₪', '-3.6%'], ['11.10–17.10', '256,062', '']]); // ** removed, short row filled
+  assert.equal(b[2].text, 'סוף\n| not | a table |'); // no separator line → text
+  assert.deepEqual(cellNumber('221,776 ₪'), { value: 221776, percent: false, money: true });
+  assert.deepEqual(cellNumber('-3.6%'), { value: -3.6, percent: true, money: false });
+  assert.equal(cellNumber('(1,200)').value, -1200);
+  assert.equal(cellNumber('18.10–24.10'), null);
+  assert.equal(cellNumber('1,23'), null);
 });
 
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);

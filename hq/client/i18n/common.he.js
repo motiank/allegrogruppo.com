@@ -61,6 +61,7 @@ export default {
   'joya.nav.stock': 'מלאי ורכש',
   'joya.nav.manpower': 'כח אדם',
   'joya.nav.performance': 'ביצועים',
+  'joya.ask.downloadExcel': 'הורדה לאקסל',
   'joya.ask.suggestions': 'הצעות לשאלה',
   'joya.area.askTitle': 'מה תרצו לדעת?',
   'joya.area.placeholder': 'כתבו שאלה…',

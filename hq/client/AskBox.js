@@ -10,12 +10,24 @@ import { api, qs } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
+import { splitAnswer, cellNumber } from '../lib/answerTables.js';
 
 const useStyles = createUseStyles((theme) => ({
   box: { border: `1px solid ${theme.border}`, borderRadius: 10, padding: '0.7rem 0.85rem', background: theme.surface, marginBottom: '0.7rem' },
   head: { fontSize: '0.88rem', fontWeight: 650, marginBottom: '0.45rem' },
   q: { fontSize: '0.84rem', fontWeight: 600, marginTop: '0.6rem' },
   a: { fontSize: '0.86rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginTop: '0.25rem' },
+  tableWrap: { overflowX: 'auto', margin: '0.5rem 0 0.2rem', border: `1px solid ${theme.border}`, borderRadius: 8 },
+  table: {
+    borderCollapse: 'collapse',
+    width: '100%',
+    fontSize: '0.8rem',
+    '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', whiteSpace: 'nowrap' },
+    '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
+    '& tr:last-child td': { borderBottom: 0 },
+    '& td.num': { textAlign: 'end', fontVariantNumeric: 'tabular-nums' },
+  },
+  excel: { fontSize: '0.74rem', color: theme.primary, textDecoration: 'none', display: 'inline-block', marginBottom: '0.35rem', '&:hover': { textDecoration: 'underline' } },
   meta: { fontSize: '0.7rem', color: theme.textSecondary, marginTop: '0.15rem' },
   warn: { fontSize: '0.75rem', color: '#d29922', marginTop: '0.3rem' },
   prop: { border: `1px dashed ${theme.primary}`, borderRadius: 8, padding: '0.5rem 0.6rem', marginTop: '0.45rem', fontSize: '0.8rem' },
@@ -95,6 +107,47 @@ function ProposalPreview({ p, classes }) {
   );
 }
 
+/** The answer text with its tables (see lib/answerTables.js) as table components, each with an Excel download. */
+function AnswerBody({ r, classes }) {
+  const { t } = useT();
+  const blocks = useMemo(() => splitAnswer(r.answer), [r.answer]);
+  return blocks.map((b, i) =>
+    b.type === 'text' ? (
+      <div key={i} className={classes.a} dir="auto">
+        {b.text}
+      </div>
+    ) : (
+      <div key={i}>
+        <div className={classes.tableWrap}>
+          <table className={classes.table} dir="auto">
+            <thead>
+              <tr>
+                {b.header.map((h, k) => (
+                  <th key={k}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {b.rows.map((row, j) => (
+                <tr key={j}>
+                  {row.map((c, k) => (
+                    <td key={k} className={cellNumber(c) ? 'num' : undefined}>
+                      {cellNumber(c) ? <Term>{c}</Term> : c}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <a className={classes.excel} href={`/api/joya/ai/requests/${r.id}/tables/${b.index}.xlsx`} download>
+          ⬇ {t('joya.ask.downloadExcel')}
+        </a>
+      </div>
+    ),
+  );
+}
+
 /** The answer to one question: the text, how it was calculated, and a proposed change. head = show the question and time. */
 export function Answer({ r, onChanged, head = true }) {
   const theme = useTheme();
@@ -131,9 +184,7 @@ export function Answer({ r, onChanged, head = true }) {
       {r.status === 'FAILED' && <ErrorBox error={{ message: `${t('joya.ask.failed')} ${r.error ? `(${r.error})` : ''}` }} />}
       {r.status === 'ANSWERED' && (
         <>
-          <div className={classes.a} dir="auto">
-            {r.answer}
-          </div>
+          <AnswerBody r={r} classes={classes} />
           {unverified.length ? (
             <div className={classes.warn}>
               ⚠ {t('joya.ask.unverified')} <Term>{unverified.join(', ')}</Term>

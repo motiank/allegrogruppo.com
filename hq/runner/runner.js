@@ -46,7 +46,7 @@ export function writePrompt(ctx, computed, plan) {
   if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note }), '</proposal>');
   if (computed.proposalError) parts.push('<proposal_error>', JSON.stringify(computed.proposalError), '</proposal_error>');
   if (plan.note) parts.push(`planner note: ${plan.note}`);
-  parts.push('Write the answer now (plain text).');
+  parts.push('Write the answer now (plain text, with a table only as the rules say).');
   return parts.join('\n');
 }
 

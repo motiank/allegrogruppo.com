@@ -215,6 +215,16 @@ export async function cardsVsBank(companies, locationsOf, from, to) {
     const full = weeks.filter((w) => !w.bankNotComplete);
     const sumB = full.reduce((a, w) => a + w.beecommVisa + w.beecommMastercard, 0);
     const sumK = full.reduce((a, w) => a + w.bankMaxVisa + w.bankMaxMastercard, 0);
+    // an unusual week (more than 8 points from the usual difference): does it even out with the weeks around it?
+    const usual = sumB ? ((sumK - sumB) / sumB) * 100 : null;
+    full.forEach((w, i) => {
+      if (usual == null || w.differencePct == null || Math.abs(w.differencePct - usual) <= 8) return;
+      const near = full.slice(Math.max(i - 1, 0), i + 2);
+      const b = near.reduce((a, x) => a + x.beecommVisa + x.beecommMastercard, 0);
+      const k = near.reduce((a, x) => a + x.bankMaxVisa + x.bankMaxMastercard, 0);
+      const together = b ? ((k - b) / b) * 100 : null;
+      w.unusual = { withWeeksAroundPct: r2(together), ...(together != null && Math.abs(together - usual) > 2.5 ? { checkWithMax: true, gap: r2(k - b * (1 + usual / 100)) } : { evensOut: true }) };
+    });
     out.push({
       company: co.label,
       companyKey: co.key,

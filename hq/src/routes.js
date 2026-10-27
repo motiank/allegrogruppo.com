@@ -21,6 +21,7 @@ import * as payroll from './services/payroll.js';
 import * as quality from './services/quality.js';
 import * as work from './services/work.js';
 import * as ai from './services/ai.js';
+import { answerTableXlsx } from './services/answerExcel.js';
 import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
@@ -212,6 +213,15 @@ r.get('/joya/ai/requests', h(async (req) => ({ requests: await ai.listRequests(r
 r.get('/joya/ai/requests/:id', h(async (req) => ({ request: await ai.getRequest(req.joya, id(req)) })));
 r.post('/joya/ai/requests/:id/apply', h(async (req) => ai.applyProposal(req.joya, id(req))));
 r.delete('/joya/ai/requests/:id', h(async (req) => (await ai.deleteRequest(req.joya, id(req)), { ok: true })));
+r.get(
+  '/joya/ai/requests/:id/tables/:n.xlsx',
+  h(async (req, res) => {
+    const { fileName, buffer } = await answerTableXlsx(req.joya, id(req), Number(req.params.n));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(Buffer.from(buffer));
+  }),
+);
 r.post('/joya/ai/requests/:id/discard', h(async (req) => ({ request: await ai.discardProposal(req.joya, id(req)) })));
 
 export default r;

@@ -60,6 +60,7 @@ export default {
   'joya.nav.stock': 'Stock and purchasing',
   'joya.nav.manpower': 'Manpower',
   'joya.nav.performance': 'Performance',
+  'joya.ask.downloadExcel': 'Download Excel',
   'joya.ask.suggestions': 'Suggested questions',
   'joya.area.askTitle': 'What would you like to know?',
   'joya.area.placeholder': 'Ask a question…',

@@ -61,7 +61,8 @@ Guidance:
   = the Sunday–Saturday week that holds that date. Only "the last 7 days" (7 ימים אחרונים) = the 7 days ending
   yesterday.
 - Dates: today is context.today. "Last month" = the last full
-  calendar month. Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
+  calendar month. A month or a date without a year = the latest one up to today (in October 2026, "September" =
+  2026-09, "15.10" = 2026-10-15; a coming week or day only when the question looks forward). Use YYYY-MM-DD. Weekday numbers: 0 = Sunday … 6 = Saturday.
 - Locations: use ids from context.locations. request.scope is what the user chose in the picker: one
   restaurant (LOCATION) or all restaurants of a company (COMPANY, with its locationIds); no scope = all the
   user's locations. With no restaurant or company named in the question, use request.scope.locationIds (for a
@@ -165,8 +166,9 @@ Your job now: WRITE the answer to the user from <results>.
     Wednesday (maxPaidOn), differencePct. visaMastercardTotal = all full weeks: about −1.6% is Max's fee — say so.
   · amexMonths: American Express pays the month's sales in the next month (around the 2nd and 8th): one line per month.
   · bankNotComplete = the bank file does not cover those payouts yet — say so, never call it a missing payment.
-  · One week of ±10–30% (often only one restaurant, VISA up and MASTERCARD down) is a day paid a week late or early;
-    the next week evens it out. A week that does not even out → tell the user to check Max's statement for it.
+  · unusual weeks: unusual.evensOut = a day paid a week late or early, the weeks around it even it out; unusual.
+    checkWithMax = it does NOT even out (gap = about how much is missing (−) or extra (+)): tell the user to check
+    Max's statement for that week. Never say a week evens out unless unusual.evensOut says so.
   · Not in these columns: the members club (חבר משרתי קבע, monthly), Max's 008… payouts (monthly), Isracard debits
     (fees). Beecomm amounts include tips; the bank is after fees.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
@@ -178,7 +180,17 @@ Your job now: WRITE the answer to the user from <results>.
   user's approval ("Apply" / "החלה"). If <proposal_error> is present: explain why the change cannot be
   made (e.g. it goes under a mandatory minimum) and what the user can do.
 - For a reply draft to a customer: say that a draft is ready for review; do not repeat it in full.
-- Plain text only, no markdown tables. At most ~12 lines (a week forecast: up to ~20).`;
+- Plain text; no other markdown (no **bold**, no # headings). At most ~12 lines of text (a week forecast: up to ~20).
+- Tables: when the answer has several rows of the same numbers (weeks, months, days, restaurants, employees, payment
+  types, card companies — 3 rows or more, or a comparison of 2+ columns), put them in ONE table, exactly like this
+  (the chat shows it as a table with an Excel download):
+  | שבוע | אשראי בביקום | שולם בבנק | הפרש |
+  |---|---|---|---|
+  | 18.10–24.10 | 221,776 | 218,546 | -1.5% |
+  A header line, the |---| line, then one line per row; the first column names the row; numbers exactly as in the
+  results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). At most 2 tables,
+  up to 40 rows each. Before the table one short line on what it shows; after it the notes (missing days, fees,
+  partial weeks) as short lines. The table lines do not count in the line limit. No table for 1–2 numbers.`;
 
 export const INSTRUCTIONS_VERSION = `joya-hq-1+${createHash('sha256').update(PLAN_PROMPT).update(WRITE_PROMPT).digest('hex').slice(0, 8)}`;
 
