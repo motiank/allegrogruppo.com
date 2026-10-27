@@ -181,7 +181,7 @@
     {
      "name": "labor_summary",
      "params": "{ locationIds?, from, to }",
-     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
     },
     {
      "name": "planned_vs_actual_hours",
@@ -461,7 +461,7 @@
     {
      "name": "labor_summary",
      "params": "{ locationIds?, from, to }",
-     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
     },
     {
      "name": "planned_vs_actual_hours",
@@ -902,7 +902,7 @@
     {
      "name": "labor_summary",
      "params": "{ locationIds?, from, to }",
-     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
     },
     {
      "name": "planned_vs_actual_hours",
@@ -2141,7 +2141,7 @@
     {
      "name": "labor_summary",
      "params": "{ locationIds?, from, to }",
-     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
     },
     {
      "name": "planned_vs_actual_hours",
@@ -2435,7 +2435,7 @@
     {
      "name": "labor_summary",
      "params": "{ locationIds?, from, to }",
-     "about": "worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales"
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
     },
     {
      "name": "planned_vs_actual_hours",

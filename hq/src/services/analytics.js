@@ -2,13 +2,13 @@
 // missing, so a page (or the AI answer) can say where a number came from. The data comes
 // from the Allegro API (./source.js); nothing here is stored.
 // A day with no POS rows is MISSING, never a day with zero sales.
-import { q, ymd, inList, getSettings } from '../db.js';
+import { q, ymd, inList } from '../db.js';
 import { addDays, daysBetween } from '../lib/recommend.js';
 import { median } from '../lib/demand.js';
 import { effectiveAttendance } from './attendance.js';
 import { listShifts } from './master.js';
 import { shiftWindow } from '../lib/demand.js';
-import { checks as sourceChecks, dishSales, laborDaily, employees, monthsBetween, payments as sourcePayments } from './source.js';
+import { checks as sourceChecks, dishSales, laborDaily, laborDailyEmployees, monthsBetween, payments as sourcePayments } from './source.js';
 
 const SALES_SOURCE = 'Beecomm via Allegro (/beecomm/orders/stored)';
 
@@ -222,21 +222,18 @@ export async function anomalies(locationIds, from, to) {
 }
 
 /**
- * Labor for a period. Hours come from the raw clock rows (with corrections). Money only with
- * payroll access:
- *   known     Allegro /labor/daily: the payslip gross of the saved payroll months, spread over the
- *             days worked (Allegro's own estimate for employees without a payslip is counted, and said)
- *   estimate  clocked hours × the employee's hourly wage (gross); employer cost = gross × the
- *             `labor.employerCostFactorEstimate` setting. Rows with no wage are counted, not guessed.
- * Allegro has no employer cost, so `known` is gross only.
+ * Labor for a period. Hours come from the raw clock rows (with corrections). Money (payroll access only) comes
+ * from the Allegro admin (/labor/daily), computed there with the payroll business logic — never here:
+ *   laborCost     the admin's labor cost (the Shifts page formula): weighted hours (100% + 125% × 1.25 + 150% × 1.5,
+ *                 after the break rule) × the role's wage; tip + completion for tip roles; monthly salary ÷ days
+ *   payslipGross  the payslip (tlush) gross: wages + travel + bonus, spread over the days worked
+ * A month without a saved payroll is built by the admin from the Tabit reports like a new payroll (not saved).
+ * Hours with no wage in the admin (person not in employees, or a role without a wage) add nothing: they are
+ * counted and named, never priced here. Employer cost (pension, social security) is not in Allegro.
  */
 export async function laborSummary(access, locationIds, from, to) {
-  const lab = await getSettings('labor');
-  const factor = lab.employerCostFactorEstimate ?? 1.25;
   const sales = await salesSummary(locationIds, from, to);
   const att = (await effectiveAttendance(locationIds, from, to)).filter((a) => !a.excluded);
-  const wages = new Map();
-  if (access.payroll && att.length) for (const e of await employees(locationIds)) wages.set(e.id, e.hourlyWage);
   const months = monthsBetween(from, to);
 
   const locations = [];
@@ -245,59 +242,57 @@ export async function laborSummary(access, locationIds, from, to) {
     const hours = rows.reduce((s, a) => s + (a.hours ?? 0), 0);
     const missingHours = rows.filter((a) => a.hours == null).length;
     const s = sales.locations.find((x) => x.locationId === loc).current;
-    const payDays = (await laborDaily(loc, from, to)).filter((d) => d.coverage?.employees > 0);
     const res = {
       locationId: loc,
       hours: r2(hours),
       attendanceRows: rows.length,
       rowsMissingHours: missingHours,
-      payrollHours: payDays.length ? r2(payDays.reduce((x, d) => x + Number(d.hours?.total ?? 0), 0)) : null,
-      payrollDays: payDays.length,
       revenue: s.revenue,
-      salesDaysMissing: s.daysMissing,
+      daysWithoutSales: s.daysMissing,
       salesPerLaborHour: rows.length && !missingHours ? r2(div(s.revenue, hours)) : null,
     };
     if (access.payroll) {
-      let gross = 0;
-      let noWage = 0;
-      for (const a of rows) {
-        const w = a.employeeId ? wages.get(a.employeeId) : null;
-        if (w == null || a.hours == null) noWage++;
-        else gross += a.hours * w;
-      }
-      res.estimate = rows.length
-        ? {
-            grossWage: r2(gross),
-            employerCost: r2(gross * factor),
-            employerCostFactor: factor,
-            rowsWithoutWageOrHours: noWage,
-            laborPctOfSales: noWage === 0 && s.revenue ? r2(((gross * factor) / s.revenue) * 100) : null,
-            // with sales days missing the percentage is too high (sales understated): say so
-            salesComplete: s.daysMissing === 0,
-            isEstimate: true,
+      const { days, meta } = await laborDaily(loc, from, to);
+      const paid = days.filter((d) => d.coverage?.employees > 0);
+      const t = meta.totals || {};
+      if (paid.length) {
+        const sum = (f) => r2(paid.reduce((x, d) => x + (Number(f(d)) || 0), 0));
+        const unpricedHours = sum((d) => d.coverage.unpricedHours);
+        let withoutWage = [];
+        if (unpricedHours > 0) {
+          const per = new Map();
+          for (const e of await laborDailyEmployees(loc, from, to)) {
+            if (!(e.unpricedHours > 0)) continue;
+            const p = per.get(e.name) || { name: e.name, inEmployees: e.employeeId != null, hoursWithoutWage: 0 };
+            p.hoursWithoutWage += e.unpricedHours;
+            per.set(e.name, p);
           }
-        : null;
-      if (payDays.length) {
-        const g = payDays.reduce((x, d) => x + Number(d.gross?.total ?? 0), 0);
-        const payDates = new Set(payDays.map((d) => d.date));
-        const daily = await dailyTotals([loc], from, to);
-        const payRevenue = daily.filter((d) => payDates.has(d.date)).reduce((x, d) => x + (d.revenue ?? 0), 0);
-        res.known = {
-          months,
-          monthsWithPayroll: [...new Set(payDays.map((d) => d.date.slice(0, 7)))],
+          withoutWage = [...per.values()].map((p) => ({ ...p, hoursWithoutWage: r2(p.hoursWithoutWage) })).sort((a, b) => b.hoursWithoutWage - a.hoursWithoutWage);
+        }
+        const payrollHoursTotal = sum((d) => d.hours?.total);
+        const byMonth = new Map((meta.payrollMonths || []).map((m) => [m.month, m.payrollSource]));
+        res.cost = {
+          laborCost: t.adminCost ?? sum((d) => d.adminCost),
+          payslipGross: t.gross ?? sum((d) => d.gross?.total),
+          // ÷ the admin's daily revenue (Beecomm, before discounts) of the days with payroll rows
+          laborPct: { laborCost: t.laborPct?.adminCost ?? null, payslipGross: t.laborPct?.gross ?? null },
+          revenueOfPayrollDays: t.revenue ?? null,
           days: daysBetween(from, to) + 1,
-          daysWithPayroll: payDays.length,
-          grossWage: r2(g),
-          employeeDaysEstimated: payDays.reduce((x, d) => x + Number(d.coverage?.estimated ?? 0), 0),
-          unpricedHours: r2(payDays.reduce((x, d) => x + Number(d.coverage?.unpricedHours ?? 0), 0)),
-          employerCostExtra: null,
-          totalEmployerCost: null,
+          daysWithPayroll: paid.length,
+          payrollHours: { h100: sum((d) => d.hours?.h100), h125: sum((d) => d.hours?.h125), h150: sum((d) => d.hours?.h150), total: sum((d) => d.hours?.total) },
+          tip: sum((d) => d.tip),
+          completion: sum((d) => d.completion),
+          payrollMonths: months.map((m) => ({ month: m, payroll: byMonth.get(m) ?? 'none' })),
+          employeeDaysWithoutPayslip: sum((d) => d.coverage.estimated),
+          hoursWithoutWage: unpricedHours,
+          // share of the payroll hours with no wage; over 2% the cost and % are too low to be the real labor cost
+          hoursWithoutWagePct: payrollHoursTotal ? r2((unpricedHours / payrollHoursTotal) * 100) : null,
+          complete: unpricedHours <= payrollHoursTotal * 0.02,
+          peopleWithoutWage: withoutWage.slice(0, 20),
+          peopleWithoutWageCount: withoutWage.length,
           employerCostIncluded: false,
-          // gross ÷ the sales of the same days only (days without payroll would dilute it)
-          laborPctOfSales: payRevenue ? r2((g / payRevenue) * 100) : null,
-          salesComplete: s.daysMissing === 0,
         };
-      } else res.known = null;
+      } else res.cost = null;
     }
     locations.push(res);
   }
@@ -306,8 +301,7 @@ export async function laborSummary(access, locationIds, from, to) {
     sources: {
       hours: 'Tabit clock rows via Allegro (/shifts/raw) + joya_attendance_corrections',
       sales: SALES_SOURCE,
-      known: 'payslip gross via Allegro (/labor/daily)',
-      estimate: 'hours × hourly wage (Allegro /employees)',
+      cost: 'Allegro admin payroll rules and payslips (/labor/daily)',
     },
     payrollVisible: access.payroll,
     locations,

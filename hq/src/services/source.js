@@ -7,7 +7,8 @@
 //   employees      /employees               Joya's employee id IS Allegro's employeeId
 //   clock times    /shifts/raw              Tabit detailed report; an attendance id IS the raw shift id
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
-//   payroll        /payroll, /shifts/summary, /labor/daily
+//   payroll        /payroll, /shifts/summary
+//   labor cost     /labor/daily(/employees)  the admin's payroll rules and payslips (never computed here)
 //   freshness      /status
 //   bank           /bank/transactions/stored  per company (its bank accounts), from the uploaded bank files
 //
@@ -313,11 +314,20 @@ export async function shiftsSummary(locationId, period) {
   return (await get('/shifts/summary', { month: period, branch })).data || [];
 }
 
-/** Daily labor cost per location: hours after the rules, payslip gross, coverage. */
+/**
+ * The labor cost of one location over a period, as the Allegro admin computes it (/labor/daily): the payroll rules
+ * (hours after breaks in 100/125/150%, the role's wage, tip + completion for tip roles, monthly salaries) and the
+ * payslip (tlush). A month whose payroll is not saved yet is built by the admin from the Tabit reports like a new
+ * payroll. { data: days, meta: { totals, payrollMonths } }.
+ */
 export async function laborDaily(locationId, from, to) {
-  const branch = String(locationId);
-  const rows = await byMonth('/labor/daily', branch, from, to);
-  return rows.filter((r) => r.date >= from && r.date <= to);
+  const { data, meta } = await get('/labor/daily', { from, to, branch: String(locationId) });
+  return { days: data || [], meta: meta || {} };
+}
+
+/** The same per employee per worked day (who is in a day's cost, and whose hours have no wage). */
+export async function laborDailyEmployees(locationId, from, to) {
+  return (await get('/labor/daily/employees', { from, to, branch: String(locationId) })).data || [];
 }
 
 // ---------------------------------------------------------------- freshness

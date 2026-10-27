@@ -1,5 +1,5 @@
 // /labor — labor cost monitoring: sales, worked hours, sales per labor hour, and
-// (payroll access only) labor cost as known from payroll or estimated from hours × wage.
+// (payroll access only) the labor cost and payslip gross as the Allegro admin computes them (/labor/daily).
 import React, { useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api, qs } from '../api.js';
@@ -26,18 +26,6 @@ function presets(today) {
     d30: [addDays(y, -29), y],
     month: [lastPrev.slice(0, 8) + '01', lastPrev],
   };
-}
-
-function PctWithWarning({ pct, complete, missingDays }) {
-  const { t } = useT();
-  const theme = useTheme();
-  const c = useStyles(theme);
-  return (
-    <>
-      <Val v={pct} fmt={fmtPctPlain} />
-      {complete === false ? <div className={c.warn}>⚠ {t('joya.labor.salesIncomplete', { count: missingDays ?? 0 })}</div> : null}
-    </>
-  );
 }
 
 export default function Labor() {
@@ -78,7 +66,6 @@ export default function Labor() {
           <div className={c.intro}>
             <p>{t('joya.labor.howGross')}</p>
             <p>{t('joya.labor.howKnown')}</p>
-            <p>{t('joya.labor.howEstimate')}</p>
           </div>
         </Details>
       </Card>
@@ -92,7 +79,7 @@ export default function Labor() {
             <Row label={t('joya.labor.sales')}>
               <Val v={l.revenue} fmt={fmtILS} />
             </Row>
-            {l.salesDaysMissing ? <div className={c.warn}>⚠ {t('joya.labor.salesDaysMissing', { count: l.salesDaysMissing })}</div> : null}
+            {l.daysWithoutSales ? <div className={c.small}>{t('joya.labor.salesDaysMissing', { count: l.daysWithoutSales })}</div> : null}
             <Row label={t('joya.labor.hours')}>
               <Val v={l.attendanceRows ? l.hours : null} fmt={(v) => fmtNum(v, 1)} />
             </Row>
@@ -101,54 +88,45 @@ export default function Labor() {
               <Val v={l.salesPerLaborHour} fmt={fmtILS} />
             </Row>
 
-            {data.payrollVisible && l.estimate ? (
-              <div className={c.sub}>
-                <div className={c.subHead}>
-                  <span>{t('joya.labor.estimateTitle')}</span>
-                  <Badge tone="warn">{t('joya.estimate')}</Badge>
-                </div>
-                <Row label={t('joya.labor.gross')}>
-                  <Val v={l.estimate.grossWage} fmt={fmtILS} />
-                </Row>
-                <Row label={t('joya.labor.employerCostEst', { factor: l.estimate.employerCostFactor })}>
-                  <Val v={l.estimate.employerCost} fmt={fmtILS} />
-                </Row>
-                <Row label={t('joya.labor.laborPct')}>
-                  <PctWithWarning pct={l.estimate.laborPctOfSales} complete={l.estimate.salesComplete} missingDays={l.salesDaysMissing} />
-                </Row>
-                {l.estimate.rowsWithoutWageOrHours ? <div className={c.warn}>⚠ {t('joya.labor.rowsNoWage', { count: l.estimate.rowsWithoutWageOrHours })}</div> : null}
-              </div>
-            ) : null}
-
             {data.payrollVisible ? (
-              l.known ? (
+              l.cost ? (
                 <div className={c.sub}>
                   <div className={c.subHead}>
-                    <span>{t('joya.labor.knownTitle')}</span>
+                    <span>{t('joya.labor.costTitle')}</span>
                     <Badge tone="ok">{t('joya.labor.knownBadge')}</Badge>
                   </div>
                   <div className={c.small}>
-                    {t('joya.labor.months')} <Term>{l.known.months.join(', ')}</Term>
-                    {l.known.monthsWithPayroll.length < l.known.months.length ? (
-                      <>
-                        {' '}
-                        · {t('joya.labor.monthsWithPayroll')} <Term>{l.known.monthsWithPayroll.join(', ') || '—'}</Term>
-                      </>
-                    ) : null}
+                    {l.cost.payrollMonths.map((m) => (
+                      <span key={m.month}>
+                        <Term>{m.month}</Term> {t(`joya.labor.payroll.${m.payroll}`)}{' '}
+                      </span>
+                    ))}
                   </div>
-                  <Row label={t('joya.labor.gross')}>
-                    <Val v={l.known.grossWage} fmt={fmtILS} />
-                  </Row>
-                  <Row label={t('joya.labor.employerExtra')}>
-                    <Val v={l.known.employerCostIncluded ? l.known.employerCostExtra : null} fmt={fmtILS} />
-                  </Row>
-                  <Row label={t('joya.labor.totalEmployer')}>
-                    <Val v={l.known.employerCostIncluded ? l.known.totalEmployerCost : null} fmt={fmtILS} />
+                  <Row label={t('joya.labor.laborCost')}>
+                    <Val v={l.cost.laborCost} fmt={fmtILS} />
                   </Row>
                   <Row label={t('joya.labor.laborPct')}>
-                    <PctWithWarning pct={l.known.laborPctOfSales} complete={l.known.salesComplete} missingDays={l.salesDaysMissing} />
+                    <Val v={l.cost.laborPct.laborCost} fmt={fmtPctPlain} />
                   </Row>
-                  {!l.known.employerCostIncluded ? <div className={c.warn}>⚠ {t('joya.labor.noEmployerLines')}</div> : null}
+                  <Row label={t('joya.labor.payslipGross')}>
+                    <Val v={l.cost.payslipGross} fmt={fmtILS} />
+                  </Row>
+                  <Row label={t('joya.labor.payslipPct')}>
+                    <Val v={l.cost.laborPct.payslipGross} fmt={fmtPctPlain} />
+                  </Row>
+                  {l.cost.complete === false ? <div className={c.warn}>⚠ {t('joya.labor.incomplete', { pct: fmtNum(l.cost.hoursWithoutWagePct, 0) })}</div> : null}
+                  {l.cost.hoursWithoutWage > 0 ? (
+                    <div className={c.warn}>
+                      ⚠ {t('joya.labor.hoursWithoutWage', { hours: fmtNum(l.cost.hoursWithoutWage, 1), count: l.cost.peopleWithoutWageCount })}{' '}
+                      {l.cost.peopleWithoutWage.map((p) => (
+                        <span key={p.name}>
+                          <bdi dir="auto">{p.name}</bdi> (<Term>{fmtNum(p.hoursWithoutWage, 1)}</Term>
+                          {p.inEmployees ? '' : `, ${t('joya.labor.notInEmployees')}`}){' '}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className={c.warn}>⚠ {t('joya.labor.noEmployerLines')}</div>
                 </div>
               ) : (
                 <div className={c.small}>{t('joya.labor.noKnown')}</div>

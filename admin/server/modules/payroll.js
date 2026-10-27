@@ -886,6 +886,30 @@ async function extractResponse(rest, result) {
   };
 }
 
+// One branch-month's payroll as the Shifts page builds a new one from the stored Tabit Shift reports
+// (/extract-tabit, then the tlush of /tlush-preview), WITHOUT saving anything: [{ emp, tlush }] (emp = an
+// /extract-tabit allEmployees row; tlush null when the employee is not payable, e.g. no wage). null when the
+// month has no Tabit report. Used by the Local API's daily labor cost for months whose payroll is not saved.
+export async function tabitMonthPayroll(rest, month) {
+  const [rows] = await executeSql(
+    "SELECT app_id, report FROM tabit_shift_reports WHERE rest = :rest AND month = :month ORDER BY app_id",
+    { rest, month },
+  );
+  if (!rows || rows.length === 0) return null;
+  const reports = rows.map((r) => ({ app: r.app_id, report: JSON.parse(r.report) }));
+  const empByName = await loadEmpByName(rest);
+  const result = extractEmployeesFromTabitReports(reports, month, {
+    isHourlyMinRole: isHourlyMinRoleFor(empByName),
+  });
+  const { allEmployees } = await extractResponse(rest, result);
+  const { ctx, payrollSoft } = await loadExportCtx(rest, month);
+  const workMonth = Number(month.split("-")[1]);
+  return allEmployees
+    .map((emp) => classifyForExport(emp, ctx, payrollSoft, workMonth, null))
+    .filter((c) => !c.dummy)
+    .map((c) => ({ emp: c.emp, tlush: c.tlush }));
+}
+
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const TABIT_REPORTS_MISSING =
   "The table tabit_shift_reports does not exist yet (scripts/utils/create_tabit_shift_reports_table.sql). Upload the Excel files instead.";

@@ -3,6 +3,7 @@ import { createRequire } from "module";
 import { executeSql } from "../sources/dbpool.js";
 import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
+import { tabitMonthPayroll } from "./payroll.js";
 import {
   bcomGetOrders,
   bcomGetExceptions,
@@ -557,7 +558,10 @@ function allocate(amount, days) {
   return days.map((d) => (total > 0 ? (amount * d.weight) / total : amount / days.length));
 }
 
-// One row per employee per worked day in [from, to], from the saved payroll months.
+// One row per employee per worked day in [from, to]. A branch-month with a saved payroll uses it (its
+// tlush = the payslip); a month without one is built from the stored Tabit Shift reports exactly like a new
+// payroll on the Shifts page (/payroll/extract-tabit + the tlush of /payroll/tlush-preview), not saved —
+// payrollSource "saved" | "tabit".
 async function laborDays(branchIds, from, to, employeeId) {
   const params = { fromMonth: from.slice(0, 7), toMonth: to.slice(0, 7), employeeId };
   const [rows] = await executeSql(
@@ -571,107 +575,136 @@ async function laborDays(branchIds, from, to, employeeId) {
     params,
   );
   const out = [];
-  for (const r of rows || []) {
-    const w = unwrapPayroll(r.payroll_data);
-    const emp = {
-      roles: Object.fromEntries(normalizeRoles(parseJson(r.roles, [])).filter((x) => x && x.role).map((x) => [x.role, x])),
-      new_wage_type: r.new_wage_type || null,
-      wage: r.wage == null || r.wage === "" ? null : Number(r.wage),
-      hourly_wage: r.hourly_wage == null ? null : Number(r.hourly_wage),
-    };
-    const globalAmount = Number(r.global_amount) > 0 ? Number(r.global_amount) : null;
-    const breakdown = w.daily_breakdown && typeof w.daily_breakdown === "object" ? w.daily_breakdown : {};
-    const dailyHours = w.daily_hours && typeof w.daily_hours === "object" ? w.daily_hours : {};
+  for (const r of rows || []) employeeDays(r, unwrapPayroll(r.payroll_data), parseJson(r.tlush, null), "saved", from, to, out);
 
-    // Worked days of the month with their entries; older payrolls without a breakdown
-    // fall back to daily_hours, then work_dates (no per-role hours then).
-    let days = Object.keys(breakdown).sort().map((date) => ({ date, entries: breakdown[date] || [] }));
-    if (!days.length) {
-      const dates = Object.keys(dailyHours).length
-        ? Object.keys(dailyHours)
-        : Array.isArray(w.work_dates) ? w.work_dates : [];
-      days = dates.sort().map((date) => ({ date, entries: [], rawHours: Number(dailyHours[date]) || 0 }));
+  const saved = new Set((rows || []).map((r) => `${r.rest}|${r.month}`));
+  const tparams = { fromMonth: params.fromMonth, toMonth: params.toMonth };
+  const [tabitMonths] = await executeSql(
+    `SELECT rest, month, MAX(fetched_at) AS fetched_at FROM tabit_shift_reports
+      WHERE month BETWEEN :fromMonth AND :toMonth ${inBranches("rest", branchIds, tparams)}
+      GROUP BY rest, month`,
+    tparams,
+  ).catch((e) => (e.code === "ER_NO_SUCH_TABLE" ? [[]] : Promise.reject(e)));
+  for (const t of tabitMonths || []) {
+    if (saved.has(`${t.rest}|${t.month}`)) continue;
+    const list = await tabitMonthPayroll(t.rest, t.month);
+    if (!list) continue;
+    const [emps] = await executeSql(
+      `SELECT employee_id, name, roles, \`global\` AS global_amount, hourly_wage, new_wage_type, wage
+         FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL`,
+      { rest: t.rest },
+    );
+    const byName = new Map((emps || []).filter((e) => e.name).map((e) => [String(e.name).trim(), e]));
+    for (const { emp, tlush } of list) {
+      const e = byName.get(String(emp.name || "").trim()) || {};
+      if (employeeId && e.employee_id !== employeeId) continue;
+      const r = { ...e, rest: t.rest, month: t.month, employee_id: e.employee_id ?? null, name: emp.name, updated_at: t.fetched_at };
+      employeeDays(r, emp, tlush, "tabit", from, to, out);
     }
-    if (!days.length) continue;
-
-    // Per-day hours, hours × wage, and the admin page's own rule (tip + completion when present).
-    let monthlyAdmin = 0;
-    for (const d of days) {
-      d.h100 = d.h125 = d.h150 = d.tip = d.completion = d.wageCost = d.adminCost = 0;
-      d.unpricedHours = 0;
-      for (const e of d.entries) {
-        d.h100 += Number(e.h100) || 0;
-        d.h125 += Number(e.h125) || 0;
-        d.h150 += Number(e.h150) || 0;
-        const tip = Number(e.tip) || 0;
-        const completion = Number(e.completion) || 0;
-        d.tip += tip;
-        d.completion += completion;
-        const rate = hourlyRate(emp, e.role);
-        if (rate == null) d.unpricedHours += sumHours(e);
-        const cost = rate == null ? 0 : weighted(e) * rate;
-        d.wageCost += cost;
-        d.adminCost += tip || completion ? tip + completion : cost;
-      }
-      d.weight = d.entries.length ? weighted(d) : d.rawHours || 0;
-      monthlyAdmin += d.adminCost;
-    }
-    // Global (monthly salary) employees: the salary split evenly over worked days.
-    if (globalAmount != null) {
-      for (const d of days) d.wageCost = d.adminCost = globalAmount / days.length;
-    } else if (!days.some((d) => d.entries.length)) {
-      // No per-role hours at all: monthly hours × wage from payroll_data, spread by daily hours.
-      let monthly = 0;
-      for (const [role, v] of Object.entries(w.payroll_data || {})) {
-        const [h100 = 0, h125 = 0, h150 = 0] = (v && v.hours) || [];
-        const tip = Number(v && v.tip) || 0;
-        const completion = Number(v && v.completion) || 0;
-        const rate = hourlyRate(emp, role);
-        monthly += tip || completion ? tip + completion : rate == null ? 0 : weighted({ h100, h125, h150 }) * rate;
-      }
-      allocate(monthly, days).forEach((v, i) => (days[i].wageCost = days[i].adminCost = v));
-    }
-
-    // Payslip gross: the saved tlush, spread over the days by weighted hours.
-    const tlush = parseJson(r.tlush, null);
-    const pay = tlush ? tlushPay(tlush) : null;
-    const share = {};
-    if (pay) for (const k of Object.keys(pay)) share[k] = allocate(pay[k], days);
-
-    days.forEach((d, i) => {
-      if (d.date < from || d.date > to) return;
-      const gross = pay
-        ? {
-            source: "tlush",
-            wages: share.wages[i],
-            travel: share.travel[i],
-            bonus: share.bonus[i],
-            total: share.wages[i] + share.travel[i] + share.bonus[i],
-            netWages: share.netWages[i],
-            meals: share.meals[i],
-          }
-        : { source: "estimate", wages: d.wageCost, travel: 0, bonus: 0, total: d.wageCost, netWages: 0, meals: 0 };
-      out.push({
-        branch: r.rest,
-        month: r.month,
-        date: d.date,
-        employeeId: r.employee_id,
-        name: r.name,
-        globalSalary: globalAmount != null,
-        h100: d.h100,
-        h125: d.h125,
-        h150: d.h150,
-        tip: d.tip,
-        completion: d.completion,
-        unpricedHours: d.unpricedHours,
-        wageCost: d.wageCost,
-        adminCost: d.adminCost,
-        gross,
-        payrollUpdatedAt: r.updated_at,
-      });
-    });
   }
   return out;
+}
+
+// The days of one employee-month: per-day hours, hours × wage, the admin page's own rule (tip + completion
+// when present) and the payslip gross. r = the employee row (wages) + rest/month/name; w = the payroll JSON.
+function employeeDays(r, w, tlush, source, from, to, out) {
+  const emp = {
+    roles: Object.fromEntries(normalizeRoles(parseJson(r.roles, [])).filter((x) => x && x.role).map((x) => [x.role, x])),
+    new_wage_type: r.new_wage_type || null,
+    wage: r.wage == null || r.wage === "" ? null : Number(r.wage),
+    hourly_wage: r.hourly_wage == null ? null : Number(r.hourly_wage),
+  };
+  const globalAmount = Number(r.global_amount) > 0 ? Number(r.global_amount) : null;
+  const breakdown = w.daily_breakdown && typeof w.daily_breakdown === "object" ? w.daily_breakdown : {};
+  const dailyHours = w.daily_hours && typeof w.daily_hours === "object" ? w.daily_hours : {};
+
+  // Worked days of the month with their entries; older payrolls without a breakdown
+  // fall back to daily_hours, then work_dates (no per-role hours then).
+  let days = Object.keys(breakdown).sort().map((date) => ({ date, entries: breakdown[date] || [] }));
+  if (!days.length) {
+    const dates = Object.keys(dailyHours).length
+      ? Object.keys(dailyHours)
+      : Array.isArray(w.work_dates) ? w.work_dates : [];
+    days = dates.sort().map((date) => ({ date, entries: [], rawHours: Number(dailyHours[date]) || 0 }));
+  }
+  if (!days.length) return;
+
+  // Per-day hours, hours × wage, and the admin page's own rule (tip + completion when present).
+  let monthlyAdmin = 0;
+  for (const d of days) {
+    d.h100 = d.h125 = d.h150 = d.tip = d.completion = d.wageCost = d.adminCost = 0;
+    d.unpricedHours = 0;
+    for (const e of d.entries) {
+      d.h100 += Number(e.h100) || 0;
+      d.h125 += Number(e.h125) || 0;
+      d.h150 += Number(e.h150) || 0;
+      const tip = Number(e.tip) || 0;
+      const completion = Number(e.completion) || 0;
+      d.tip += tip;
+      d.completion += completion;
+      const rate = hourlyRate(emp, e.role);
+      if (rate == null) d.unpricedHours += sumHours(e);
+      const cost = rate == null ? 0 : weighted(e) * rate;
+      d.wageCost += cost;
+      d.adminCost += tip || completion ? tip + completion : cost;
+    }
+    d.weight = d.entries.length ? weighted(d) : d.rawHours || 0;
+    monthlyAdmin += d.adminCost;
+  }
+  // Global (monthly salary) employees: the salary split evenly over worked days.
+  if (globalAmount != null) {
+    for (const d of days) d.wageCost = d.adminCost = globalAmount / days.length;
+  } else if (!days.some((d) => d.entries.length)) {
+    // No per-role hours at all: monthly hours × wage from payroll_data, spread by daily hours.
+    let monthly = 0;
+    for (const [role, v] of Object.entries(w.payroll_data || {})) {
+      const [h100 = 0, h125 = 0, h150 = 0] = (v && v.hours) || [];
+      const tip = Number(v && v.tip) || 0;
+      const completion = Number(v && v.completion) || 0;
+      const rate = hourlyRate(emp, role);
+      monthly += tip || completion ? tip + completion : rate == null ? 0 : weighted({ h100, h125, h150 }) * rate;
+    }
+    allocate(monthly, days).forEach((v, i) => (days[i].wageCost = days[i].adminCost = v));
+  }
+
+  // Payslip gross: the saved tlush, spread over the days by weighted hours.
+  const pay = tlush ? tlushPay(tlush) : null;
+  const share = {};
+  if (pay) for (const k of Object.keys(pay)) share[k] = allocate(pay[k], days);
+
+  days.forEach((d, i) => {
+    if (d.date < from || d.date > to) return;
+    const gross = pay
+      ? {
+          source: "tlush",
+          wages: share.wages[i],
+          travel: share.travel[i],
+          bonus: share.bonus[i],
+          total: share.wages[i] + share.travel[i] + share.bonus[i],
+          netWages: share.netWages[i],
+          meals: share.meals[i],
+        }
+      : { source: "estimate", wages: d.wageCost, travel: 0, bonus: 0, total: d.wageCost, netWages: 0, meals: 0 };
+    out.push({
+      branch: r.rest,
+      month: r.month,
+      date: d.date,
+      employeeId: r.employee_id,
+      name: r.name,
+      globalSalary: globalAmount != null,
+      h100: d.h100,
+      h125: d.h125,
+      h150: d.h150,
+      tip: d.tip,
+      completion: d.completion,
+      unpricedHours: d.unpricedHours,
+      wageCost: d.wageCost,
+      adminCost: d.adminCost,
+      gross,
+      payrollUpdatedAt: r.updated_at,
+      payrollSource: source,
+    });
+  });
 }
 
 const hoursOut = (x) => ({
@@ -1171,8 +1204,9 @@ const Router = () => {
   // ── daily labor cost ──
 
   // Per branch per day: revenue, hours and labor cost, three ways:
-  //   gross       payslip gross from the saved tlush (spread by weighted hours); hours × current
-  //               wage for months without a tlush (counted in coverage.estimated)
+  //   gross       payslip gross from the tlush (spread by weighted hours); hours × current wage for
+  //               employee-months without a tlush (counted in coverage.estimated)
+  // Months without a saved payroll are built from the Tabit reports like a new payroll (coverage.fromTabit).
   //   adminCost   the admin Shifts page's formula (tip + completion, else hours × wage)
   //   storedCost  bcom_cash.labor_cost, the adminCost saved when the month was extracted
   get("/labor/daily", async (req) => {
@@ -1196,7 +1230,7 @@ const Router = () => {
           branch, date, revenue: null, storedCost: null,
           h100: 0, h125: 0, h150: 0, tip: 0, completion: 0, wageCost: 0, adminCost: 0, unpricedHours: 0,
           gross: { total: 0, wages: 0, travel: 0, bonus: 0, netWages: 0, meals: 0 },
-          employees: 0, estimated: 0, globalSalary: 0,
+          employees: 0, estimated: 0, globalSalary: 0, fromTabit: 0,
         });
       return days.get(key);
     };
@@ -1212,6 +1246,7 @@ const Router = () => {
       d.employees += 1;
       if (r.gross.source === "estimate") d.estimated += 1;
       if (r.globalSalary) d.globalSalary += 1;
+      if (r.payrollSource === "tabit") d.fromTabit += 1;
     }
     const data = [...days.values()]
       .sort((a, b) => a.branch.localeCompare(b.branch) || a.date.localeCompare(b.date))
@@ -1239,6 +1274,7 @@ const Router = () => {
           estimated: d.estimated,
           globalSalary: d.globalSalary,
           unpricedHours: round2(d.unpricedHours),
+          fromTabit: d.fromTabit,
         },
       }));
     // Totals over the days with payroll only, so branches without payroll in the admin don't
@@ -1259,7 +1295,10 @@ const Router = () => {
       adminCost: pctOf(totals.adminCost, revenue),
       storedCost: pctOf(totals.storedCost, revenue),
     };
-    return { data, meta: { from, to, branches: branchesMeta(branchIds), minHourlyWage: MIN_HOURLY_WAGE, totals } };
+    // Where each branch-month's payroll came from: saved, or built from the Tabit reports (not saved yet).
+    const months = {};
+    for (const r of rows) months[`${r.branch}|${r.month}`] = { branch: r.branch, month: r.month, payrollSource: r.payrollSource };
+    return { data, meta: { from, to, branches: branchesMeta(branchIds), minHourlyWage: MIN_HOURLY_WAGE, totals, payrollMonths: Object.values(months) } };
   });
 
   // The same, one row per employee per worked day, to see what a day's cost is made of.
@@ -1285,6 +1324,7 @@ const Router = () => {
         adminCost: round2(r.adminCost),
         unpricedHours: round2(r.unpricedHours),
         payrollUpdatedAt: r.payrollUpdatedAt,
+        payrollSource: r.payrollSource,
       }));
     return { data, meta: { from, to, branches: branchesMeta(branchIds), employeeId, minHourlyWage: MIN_HOURLY_WAGE } };
   });

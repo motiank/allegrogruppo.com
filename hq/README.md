@@ -282,10 +282,15 @@ asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader
 
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
 (ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
-Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **known** gross
-(Allegro `/labor/daily`: the payslip gross of saved payroll months, spread over the days worked; % of the sales of
-the same days — Allegro has no employer cost) and an **estimate** (clocked hours × hourly wage ×
-`employerCostFactorEstimate`), always labelled. Payroll checks (`payroll.js`): missing clock times, duplicates,
+Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **labor cost
+from the Allegro admin** (`/labor/daily`, owner 2026-10-27: "calculate with the business logic" — HQ never prices
+hours itself): `laborCost` = the admin's own labor cost (hours after the break rule at 100/125/150% × the role's wage,
+tip + completion for tip roles, monthly salary ÷ days) and `payslipGross` = the payslip (tlush) gross, each with its %
+of the admin's daily revenue. A month without a saved payroll is built by the admin from the Tabit reports exactly
+like a new payroll on the Shifts page (`tabitMonthPayroll` in `admin/server/modules/payroll.js`, nothing saved;
+`payrollMonths[].payroll` = saved | tabit | none). Hours with no wage in the admin are counted and named
+(`peopleWithoutWage`, `inEmployees`); over 2% of the hours (`complete: false`) the cost is not the real labor cost.
+No employer cost (Allegro has none); `employerCostFactorEstimate` is no longer used. Payroll checks (`payroll.js`): missing clock times, duplicates,
 overlaps, long shifts, Tabit names Allegro could not match, payroll hours (after the rules) above the clocked hours;
 each is accepted, dismissed or corrected with a required note.
 Final payroll approval stays in the payroll system. Data quality (`quality.js`): stale and missing data, unknown POS

@@ -167,6 +167,17 @@ Your job now: WRITE the answer to the user from <results>.
   wage), up to 150 rows (a person with 2–3 roles: one row per role); more → the count, byRole and the people
   with the most hours, and say how many are not shown. With a period, name the
   unlinkedClockNames (clock times Allegro could not link to an employee) and their hours.
+- Labor cost (labor_summary cost): the numbers are the Allegro admin's own, computed with its payroll rules — never
+  recompute, estimate or "correct" them. Give "עלות עבודה" = laborCost (the admin's labor cost: hours after breaks at
+  100/125/150% × the role's wage; tip + completion for tip roles; monthly salaries) and its % (laborPct.laborCost), and
+  "ברוטו בתלוש" = payslipGross (wages + travel + bonus) and its % (laborPct.payslipGross), as two separate numbers.
+  Say per month where the payroll came from (payrollMonths: saved = the saved payroll; tabit = built from the Tabit
+  reports, not saved yet, can still change; none = no payroll). hoursWithoutWage > 0 → the cost is too low by those
+  hours: say how many and name peopleWithoutWage (inEmployees false = not in the employees table; true = a role with
+  no wage) so they can be fixed in the admin Employees page.
+  complete false (hoursWithoutWagePct over 2%) → the cost and its % are NOT the real labor cost: say so first, with
+  hoursWithoutWagePct, and never present the % as the restaurant's labor %. Employer cost (pension, social security) is not included.
+  cost null = no payroll for the period: say so, give no labor cost.
 - Weekly or monthly sums (byPeriod / byPeriodTotal): one line per week or month, oldest first, with its dates
   (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods; days without sales are closed days, not missing.
 - cards_vs_bank: the card companies pay differently, and the result follows that:

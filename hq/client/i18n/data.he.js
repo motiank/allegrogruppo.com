@@ -109,7 +109,7 @@ export default {
   "joya.set.k.learnedAdjustWindow": "מספר תכניות אחרונות שנבדקות",
   "joya.set.h.learnedAdjustWindow": "כמה תכניות מאושרות אחרונות נבדקות.",
   "joya.set.k.employerCostFactorEstimate": "מקדם עלות מעסיק (הערכה)",
-  "joya.set.h.employerCostFactorEstimate": "כשאין נתוני שכר: עלות מעסיק = ברוטו × המקדם. מסומן תמיד כהערכה.",
+  "joya.set.h.employerCostFactorEstimate": "לא בשימוש יותר: עלות העבודה מגיעה מה-Admin של Allegro (כללי השכר שלו).",
   "joya.set.k.staleDays": "ימים עד \"לא עדכני\"",
   "joya.set.h.staleDays": "נתון שלא עודכן יותר ימים מזה מסומן כלא עדכני.",
   "joya.set.k.longShiftHours": "משמרת ארוכה (שעות)",

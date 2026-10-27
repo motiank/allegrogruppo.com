@@ -217,7 +217,7 @@ export const CALCS = {
   sales_anomalies: { params: '{ locationIds?, from, to }', about: 'days with unusual revenue vs the same weekday of the 8 weeks before, and missing days', run: (a, p) => analytics.anomalies(locs(a, p), ...range(p)) },
   labor_summary: {
     params: '{ locationIds?, from, to }',
-    about: 'worked hours, sales per labor hour; with payroll access also labor cost (known from payroll lines for whole months, else an estimate) and labor % of sales',
+    about: 'worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)',
     run: (a, p) => analytics.laborSummary(a, locs(a, p), ...range(p)),
   },
   planned_vs_actual_hours: { params: '{ locationIds?, from, to }', about: 'approved staffing plan hours vs worked hours per week', run: (a, p) => analytics.plannedVsActual(a, locs(a, p), ...range(p)) },

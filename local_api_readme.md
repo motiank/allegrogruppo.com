@@ -471,7 +471,7 @@ This is the **stored** figure only, and it has gaps (see below). For the restaur
 
 ## Daily labor cost
 
-The restaurant's daily labor cost, computed from what the admin manages: the saved payroll month (hours per employee per day per role, from the Tabit upload) and the employees' wages. Each day carries three figures, so they can be compared:
+The restaurant's daily labor cost, computed from what the admin manages: the payroll month (hours per employee per day per role) and the employees' wages. A branch-month with a **saved payroll** uses it. A month **without** one is built from the stored Tabit Shift reports (`tabit_shift_reports`) exactly like a new payroll on the Shifts page (`/payroll/extract-tabit`, then the tlush of `/payroll/tlush-preview`) — nothing is saved, and the numbers can still change until the payroll is saved. Each row says which (`payrollSource`: `saved` | `tabit`; `coverage.fromTabit` per day; `meta.payrollMonths` per branch-month). Each day carries three figures, so they can be compared:
 
 | Figure | What it is |
 |---|---|

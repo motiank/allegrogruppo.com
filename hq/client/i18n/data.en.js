@@ -109,7 +109,7 @@ export default {
   "joya.set.k.learnedAdjustWindow": "Recent plans checked",
   "joya.set.h.learnedAdjustWindow": "How many recent approved plans are checked.",
   "joya.set.k.employerCostFactorEstimate": "Employer cost factor (estimate)",
-  "joya.set.h.employerCostFactorEstimate": "With no payroll data: employer cost = gross × this factor. Always marked as an estimate.",
+  "joya.set.h.employerCostFactorEstimate": "Not used any more: the labor cost comes from the Allegro admin (its payroll rules).",
   "joya.set.k.staleDays": "Days until \"not up to date\"",
   "joya.set.h.staleDays": "Data not updated for more days than this is marked as not up to date.",
   "joya.set.k.longShiftHours": "Long shift (hours)",
