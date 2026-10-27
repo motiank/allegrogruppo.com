@@ -87,7 +87,6 @@ function Issue({ issue, c }) {
               </span>
             ))}
           </div>
-          <div className={c.warn}>{t('joya.data.missingNotZero')}</div>
         </>
       )}
       {issue.code === 'UNMATCHED_ITEM_CODES' && (

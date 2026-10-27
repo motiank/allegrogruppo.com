@@ -55,7 +55,8 @@ export async function report(access, locationIds) {
     const stale = (d) => d == null || daysBetween(d, today) > staleDays;
     const unavailable = (k) => st.sources?.[k]?.available === false;
 
-    // ---- sales checks: missing days are checked only up to what Allegro has loaded
+    // ---- sales checks: days without sales are checked only up to what Allegro has loaded; they are closed days (owner
+    // 2026-10-27: the data is the real work), so only a LOW note
     const checks = { lastDate: orders?.lastDate ?? null, rows: Number(orders?.rows || 0), demoRows: 0 };
     const recent = checks.rows ? await sourceChecks(loc, from28, yesterday) : [];
     const have = new Set(recent.map((c) => c.business_date));
@@ -68,7 +69,7 @@ export async function report(access, locationIds) {
     if (unavailable('beecommOrders')) issues.push({ code: 'SOURCE_NOT_LOADED', severity: 'HIGH', source: 'beecommOrders', reason: st.sources.beecommOrders.reason });
     else if (!checks.rows) issues.push({ code: 'NO_SALES_CHECKS', severity: 'HIGH' });
     else if (stale(checks.lastDate)) issues.push({ code: 'STALE_SALES', severity: 'MEDIUM', lastDate: checks.lastDate, days: daysBetween(checks.lastDate, today) });
-    if (missingDays.length) issues.push({ code: 'MISSING_SALES_DAYS', severity: 'MEDIUM', dates: missingDays.slice(-14), count: missingDays.length });
+    if (missingDays.length) issues.push({ code: 'MISSING_SALES_DAYS', severity: 'LOW', dates: missingDays.slice(-14), count: missingDays.length });
     const n = recent.length;
     const noDiners = recent.filter((c) => c.diners == null).length;
     const noClose = recent.filter((c) => c.closed_at == null).length;

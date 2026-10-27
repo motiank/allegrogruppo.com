@@ -25,7 +25,7 @@ export default {
   'joya.staff.nDays_other': 'from {count} days',
   'joya.staff.pastDates': 'Dates checked',
   'joya.staff.histLine': '{checks} checks · diners:',
-  'joya.staff.missingNotZero': 'A date with no data is marked missing and is not used.',
+  'joya.staff.missingNotZero': 'A date with no sales (the restaurant was closed) is not used for learning.',
 
   // ---- one plan
   'joya.staff.tabWeek': 'The week',

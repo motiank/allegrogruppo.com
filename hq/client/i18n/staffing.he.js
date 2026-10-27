@@ -25,7 +25,7 @@ export default {
   'joya.staff.nDays_other': 'לפי {count} ימים',
   'joya.staff.pastDates': 'התאריכים שנבדקו',
   'joya.staff.histLine': '{checks} חשבונות · סועדים:',
-  'joya.staff.missingNotZero': 'תאריך בלי נתונים מסומן כחסר ולא נכנס לחישוב.',
+  'joya.staff.missingNotZero': 'תאריך בלי מכירות (המסעדה סגורה) לא נכנס ללמידה.',
 
   // ---- one plan
   'joya.staff.tabWeek': 'השבוע',

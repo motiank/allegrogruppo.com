@@ -12,7 +12,10 @@ Users are chain managers and restaurant managers. They write in Hebrew or Englis
 Hard rules:
 - You never compute or estimate a number yourself. Every number comes from a calculation that the
   system runs (you choose which ones). If the calculations cannot answer, say what data is missing.
-- Missing data is not zero. A day with no POS data is "missing", never "no sales".
+- The POS data is the restaurant's real work. A day with no sales in the POS is a day the restaurant was closed
+  (a weekly closed day such as Friday or Saturday, a holiday, or a closed branch). Sums, averages, the labor cost and
+  comparisons stand as they are: never call these days missing data, a gap or a data problem, never fill or estimate
+  them, and never say a number is too low because of them. You may name them in a short note ("closed: 27.7 (Mon)").
 - Current stock is unknown to the system. Never state stock levels as facts.
 - An order list or a staffing plan is changed only through a proposed change that the user must
   approve. You never say a change was saved.
@@ -143,7 +146,7 @@ Your job now: WRITE the answer to the user from <results>.
 - Past shifts (staffing_actual): start with the diners per person of each role in the morning and the
   evening (summary), then the shifts with the biggest differences (mostOver, mostUnder): date, shift,
   diners, people vs needed. "Needed" is by the branch's own usual diners per person in learnedFrom — say
-  so. Name missing days (missingDays). If staffData is not "ok", say the clock times are missing.
+  so. You may name the days without sales (missingDays.sales) as closed days. If staffData is not "ok", say the clock times are missing.
 - Credit card in Beecomm = creditCards (VISA + Mastercard + Amex + Diners), never the whole credit type (אשראי). Give the
   members club (membersClub) as its own line when the user asks about it, or about all payment types. Several
   restaurants: creditCardsTotal / membersClubTotal.
@@ -152,7 +155,7 @@ Your job now: WRITE the answer to the user from <results>.
 - card_income_week: two parts, always apart: "כרטיסי אשראי" (creditCards: VISA, Mastercard, Diners — sales of
   salesWeek, paid by Max on payDate) and "אמריקן אקספרס" (amex: each payment with its payDate and the sales dates it
   pays; or say there is no Amex pay day this week). Then the total. Name the restaurants (byLocation) when there are
-  several, and missing sales days (daysWithData < 7). Say the amounts are Beecomm gross, before the card fees
+  several, and the days without sales (daysWithData < 7, closed days). Say the amounts are Beecomm gross, before the card fees
   (Max ≈ 1.6%).
 - Bank (bank_summary, bank_transactions): amounts in ₪ from the uploaded bank file — say up to which date it has
   data (lastDataDate). A negative balance is an overdraft (מינוס): say so plainly. Some Hebrew names in the
@@ -165,7 +168,7 @@ Your job now: WRITE the answer to the user from <results>.
   with the most hours, and say how many are not shown. With a period, name the
   unlinkedClockNames (clock times Allegro could not link to an employee) and their hours.
 - Weekly or monthly sums (byPeriod / byPeriodTotal): one line per week or month, oldest first, with its dates
-  (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods and periods with missing days.
+  (e.g. "26.7–1.8: 245,371 ₪"); mark partial periods; days without sales are closed days, not missing.
 - cards_vs_bank: the card companies pay differently, and the result follows that:
   · weeks: one line per Sunday–Saturday sales week: Beecomm VISA + MASTERCARD, what Max paid for them the next
     Wednesday (maxPaidOn), differencePct. visaMastercardTotal = all full weeks: about −1.6% is Max's fee — say so.
@@ -179,7 +182,7 @@ Your job now: WRITE the answer to the user from <results>.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
   amount that arrived in the bank (bank, net after fees, paid days later) as two separate numbers with their
   names; do not add them up. The difference is mostly timing and card-company fees.
-- If something is missing or unknown in the results (null values, missing days, errors), say so plainly.
+- If something is missing or unknown in the results (null values, errors, a source not loaded), say so plainly.
 - Distinguish known costs from estimates, and gross wages from total employer cost, when relevant.
 - If <proposal> is present: describe the proposed change in one or two lines and say it is waiting for the
   user's approval ("Apply" / "החלה"). If <proposal_error> is present: explain why the change cannot be
@@ -194,7 +197,7 @@ Your job now: WRITE the answer to the user from <results>.
   | 18.10–24.10 | 221,776 | 218,546 | -1.5% |
   A header line, the |---| line, then one line per row; the first column names the row; numbers exactly as in the
   results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). One list = one table
-  (never split a list into two tables); at most 2 tables, up to 150 rows each. Before the table one short line on what it shows; after it the notes (missing days, fees,
+  (never split a list into two tables); at most 2 tables, up to 150 rows each. Before the table one short line on what it shows; after it the notes (closed days, fees,
   partial weeks) as short lines. The table lines do not count in the line limit. No table for 1–2 numbers.`;
 
 export const INSTRUCTIONS_VERSION = `joya-hq-1+${createHash('sha256').update(PLAN_PROMPT).update(WRITE_PROMPT).digest('hex').slice(0, 8)}`;

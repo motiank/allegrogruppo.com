@@ -98,8 +98,10 @@ order history are entered in the app). "What the system learned" is computed whe
 `http://localhost:3021/local-api/v1`); the API answers **only on its own machine** (loopback, no proxy headers,
 `Host: localhost`), so joya-hq must run next to the Allegro admin or reach it through an SSH tunnel. When it cannot be
 reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) — nothing is shown from a copy.
-`/status` tells "not loaded yet" apart from "missing" (missing sales days are counted only up to Allegro's last
-loaded day). Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.
+`/status` tells "not loaded yet" apart from days without sales (counted only up to Allegro's last loaded day).
+**Days without sales are closed days** (owner 2026-10-27: the data is the real work — weekly closed days, holidays,
+closed branches): sums, averages and the labor cost stand as they are; the AI may name these days but never calls them
+missing data, and the data page shows them as a LOW note. Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.
 
 ### Data map — table → admin API → AI calculation
 
