@@ -564,3 +564,64 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
     locations: out,
   };
 }
+
+// American Express pays (owner, 2026-10-27): sales received on the 1st–15th → on the 2nd of the next month; the 16th
+// to the end of the month → on the 8th of the next month. A Saturday pay day moves to Sunday (seen in the bank: 9.8.2026).
+// Max pays VISA + MASTERCARD (and the rest of the credit cards) every Wednesday for the Sunday–Saturday week before.
+const AMEX_PAY_DAYS = [
+  { day: 2, half: 'first' },
+  { day: 8, half: 'second' },
+];
+const shiftSaturday = (d) => (weekdayOf(d) === 6 ? addDays(d, 1) : d);
+const monthAdd = (ym, n) => {
+  const [y, m] = ym.split('-').map(Number);
+  const x = new Date(Date.UTC(y, m - 1 + n, 1));
+  return x.toISOString().slice(0, 7);
+};
+
+/**
+ * The card money expected in one Sunday–Saturday week (default: this week), from Beecomm sales and the way the card
+ * companies pay: creditCards = VISA + MASTERCARD + DINERS of the week before (Max, on this week's Wednesday);
+ * amex = the American Express half-month(s) whose pay day (2nd / 8th) falls in this week, else nothing.
+ */
+export async function cardIncomeWeek(locationIds, weekStart, today) {
+  const from = periodOf(weekStart || today, 'week').from;
+  const to = addDays(from, 6);
+  const prevFrom = addDays(from, -7);
+  const prevTo = addDays(from, -1);
+  const cards = await paymentsSummary(locationIds, prevFrom, prevTo, ['VISA', 'MASTERCARD', 'DINERS']);
+  const amex = [];
+  for (const ym of [...new Set([from.slice(0, 7), to.slice(0, 7)])]) {
+    for (const p of AMEX_PAY_DAYS) {
+      const payDate = shiftSaturday(`${ym}-${String(p.day).padStart(2, '0')}`);
+      if (payDate < from || payDate > to) continue;
+      const sm = monthAdd(ym, -1);
+      const sFrom = p.half === 'first' ? `${sm}-01` : `${sm}-16`;
+      const sTo = p.half === 'first' ? `${sm}-15` : periodOf(`${sm}-01`, 'month').to;
+      const r = await paymentsSummary(locationIds, sFrom, sTo, ['AMEX']);
+      amex.push({
+        payDate,
+        salesFrom: sFrom,
+        salesTo: sTo,
+        amount: r.selectedTotal?.charges ?? null,
+        byLocation: r.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, daysWithData: l.daysWithData ?? 0, days: l.days ?? null })),
+      });
+    }
+  }
+  const cc = cards.selectedTotal?.charges ?? null;
+  const ax = amex.reduce((a, x) => a + (x.amount || 0), 0);
+  return {
+    week: { from, to },
+    source: 'Beecomm payments (/beecomm/payments/stored); expected bank payouts from the card companies\' pay rules, not the bank file',
+    note: 'creditCards = VISA + MASTERCARD + DINERS sold in the week before, paid by Max on this week\'s Wednesday (about 1.6% fee comes off); amex = American Express, paid by its own rule (sales of the 1st–15th on the 2nd of the next month, of the 16th–end on the 8th; a Saturday pay day moves to Sunday); amounts are Beecomm gross with tips, before fees',
+    creditCards: {
+      brands: ['VISA', 'MASTERCARD', 'DINERS'],
+      salesWeek: { from: prevFrom, to: prevTo },
+      payDate: addDays(from, 3),
+      amount: cc,
+      byLocation: cards.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, daysWithData: l.daysWithData ?? 0, byDay: l.selected?.byDay ?? [] })),
+    },
+    amex: { payments: amex, amount: amex.length ? r2(ax) : 0, ...(amex.length ? {} : { none: 'no American Express pay day (2nd / 8th) in this week' }) },
+    total: cc == null ? null : r2(cc + ax),
+  };
+}

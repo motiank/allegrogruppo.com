@@ -134,6 +134,11 @@ calculation with `group: "week"` (Sunday–Saturday) or `"month"`: `payments_sum
   (fees, many small ones and a bigger one around the 2nd), Diners (no payer seen in the bank).
 - `bankNotComplete` = the bank file does not cover those payouts yet.
 
+**`card_income_week`** = the card money expected in a Sunday–Saturday week (default this week), from Beecomm and the pay
+rules, in two parts: **credit cards** (VISA + MASTERCARD + DINERS of the week before, Max pays on Wednesday) and
+**American Express** (owner, 2026-10-27: sales received on the 1st–15th are paid on the **2nd** of the next month, the
+16th–end on the **8th**; a Saturday pay day moves to Sunday). Gross, before fees.
+
 **Money that has two sources.** Card (and Wolt / 10bis) income is in Beecomm AND in the bank; the words of the
 question decide, and the **menu area sets the default** (owner, 2026-10-26; rules in `runner/hq-analyst.js`,
 "Which source"):
@@ -142,7 +147,7 @@ question decide, and the **menu area sets the default** (owner, 2026-10-26; rule
   brand, tips or the card forecast.
 - **Manpower** → employees, clock times, payroll. **Stock** → order lists and items.
 - No area (a page's chat):
-  - **sold / charged at the register** (by brand, tips, refunds, the card forecast) = **Beecomm payments**
+  - **sold / charged at the register** (by brand, tips, refunds) = **Beecomm payments**
     (`payments_summary`): the day of the sale, gross.
   - **received in the bank account** (deposited by Max / Isracard / Amex / Wolt, when the money arrived) = **the bank**
     (`bank_transactions` / `bank_summary`): days later, in batches, after fees.

@@ -59,7 +59,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - Payments (calc `payments_summary`, 2026-10-26): the Beecomm payments report (דוח תשלומים) per type and card brand,
   from the admin's `/beecomm/payments/stored` (table `bcom_payments_daily`, created on production 2026-10-26,
   backfilled from 2026-01-01, daily job `scripts/server/analoader/bcom_payments.js`). Days not loaded are missing, not 0.
-  `brands` (VISA/MASTERCARD/AMEX/DINERS) = the owner's weekly credit card forecast: the previous Sunday–Saturday week.
+  The weekly card forecast is `card_income_week` (credit cards = last week's VISA/MC/DINERS paid Wednesday; AMEX apart:
+  1st–15th → the 2nd of the next month, 16th–end → the 8th; owner 2026-10-27).
 - Bank (main-menu area BANK = context AREA 4, calcs `bank_summary` / `bank_transactions`, `src/services/bank.js`,
   2026-10-26): **chain admin only** (menu, route and calcs). Data = the bank files uploaded on the admin Upload page
   (`bank_transactions`), read from `/bank/transactions/stored`. An account belongs to a **company**

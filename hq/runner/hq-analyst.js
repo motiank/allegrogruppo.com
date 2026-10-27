@@ -39,13 +39,15 @@ Guidance:
     "in the bank", "deposited").
   · BANK → the bank account: money in / out, card companies, Wolt, "כמה נכנס מכרטיסי אשראי" → bank_transactions
     / bank_summary. Use Beecomm only when the question says so ("בקופה", "מכרנו", "מכירות", "Beecomm", "at the
-    register", by card brand, tips, a credit card forecast).
+    register", by card brand, tips).
   · MANPOWER → employees, clock times, staffing, wages, labor cost (employees, staffing_*, labor_summary).
   · STOCK → order lists, items, shortages.
-  · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds, the
-    forecast) → payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
+  · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds) →
+    payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
     (q = the company's word in the bank text); not clear which ("כמה הכנסות היו מכרטיסי אשראי", "how much came in
     from cards") → plan BOTH: payments_summary AND bank_summary (or bank_transactions).
+  · The card money EXPECTED this week (or a coming / named week: "צפי", "ייכנס", "אמור להיכנס", "expected"), in
+    any area → card_income_week. What already arrived in the bank this week → the bank.
   · Both, in any area, when the question compares them ("sales by card vs what arrived in the bank", fees, what is
     still to come). Bank money comes later than the sale, in batches, after fees.
   · The bank account itself (balance, overdraft, checks, transfers, standing orders, fees, VAT, ביטוח לאומי) →
@@ -95,10 +97,11 @@ Guidance:
 - In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
   "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
-- Expected credit card income this week ("צפי הכנסות השבוע מכרטיסי אשראי", "how much will come in by card this
-  week") → payments_summary for the previous full week, Sunday to Saturday (the last Saturday before today and the
-  6 days before it — not "the 7 days ending yesterday"), with brands ["VISA", "MASTERCARD", "AMEX", "DINERS"] only (no club
-  card / private label or other brands unless asked). The previous week is the forecast for this week.
+- Card income expected THIS week (or a named week): "צפי הכנסות השבוע מכרטיסי אשראי", "כמה כסף ייכנס השבוע
+  מאשראי", "what card money comes in this week" → card_income_week (weekStart only for another week). It applies
+  the pay rules itself: Max pays VISA + MASTERCARD + DINERS of last week on Wednesday; American Express pays
+  sales of the 1st–15th on the 2nd of the next month and of the 16th–end on the 8th. Do not use payments_summary
+  for this.
 - The bank account (money in / out, the balance, overdraft, deposits from Wolt or the card companies, checks,
   transfers, VAT, ביטוח לאומי, "בנק", "יתרה", "תנועות בחשבון") → bank_summary (from, to) for totals, balance and
   the biggest sources/uses; bank_transactions (from, to, q, side, order) for single transactions or one party
@@ -143,10 +146,11 @@ Your job now: WRITE the answer to the user from <results>.
   restaurants: creditCardsTotal / membersClubTotal.
 - Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only
   when asked. The amounts include service (tips) — say so. Name the period it is compared with.
-- Credit card forecast (payments_summary with brands): the forecast for this week = selected.charges of the
-  previous Sunday–Saturday week (selectedTotal for several restaurants). Name the week's dates and the brands
-  (VISA, Mastercard, Amex, Diners). Give the day-by-day amounts (selected.byDay) as the expected amount per weekday.
-  Say that the members club (club card) is not included.
+- card_income_week: two parts, always apart: "כרטיסי אשראי" (creditCards: VISA, Mastercard, Diners — sales of
+  salesWeek, paid by Max on payDate) and "אמריקן אקספרס" (amex: each payment with its payDate and the sales dates it
+  pays; or say there is no Amex pay day this week). Then the total. Name the restaurants (byLocation) when there are
+  several, and missing sales days (daysWithData < 7). Say the amounts are Beecomm gross, before the card fees
+  (Max ≈ 1.6%).
 - Bank (bank_summary, bank_transactions): amounts in ₪ from the uploaded bank file — say up to which date it has
   data (lastDataDate). A negative balance is an overdraft (מינוס): say so plainly. Some Hebrew names in the
   details have their letters in reverse order (הננער היו'ג = ג'ויה רעננה, א"ת היו'ג = ג'ויה ת"א, הניפ שאר =

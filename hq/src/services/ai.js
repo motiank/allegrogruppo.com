@@ -133,6 +133,12 @@ export const CALCS = {
       "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only",
     run: async (a, p) => bank.bankSummary(await bankCompanies(a, p), ...range(p), p.group),
   },
+  card_income_week: {
+    params: '{ locationIds?, weekStart?: "YYYY-MM-DD" (any day of the week; default this week) }',
+    about:
+      'the card money expected to come in during a Sunday–Saturday week, from Beecomm and the card companies\' pay rules: creditCards (VISA + MASTERCARD + DINERS of the week before, paid by Max on Wednesday) and amex (American Express: sales of the 1st–15th paid on the 2nd of the next month, of the 16th–end on the 8th) apart, and the total',
+    run: (a, p) => analytics.cardIncomeWeek(locs(a, p), p.weekStart, todayLocal()),
+  },
   cards_vs_bank: {
     params: '{ companyKeys?, from, to }',
     about:
