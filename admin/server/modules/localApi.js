@@ -531,6 +531,13 @@ function hourlyRate(emp, role) {
   return Number(emp.hourly_wage) === -1 ? MIN_HOURLY_WAGE : Number(emp.hourly_wage);
 }
 
+// A tip-based role: its wage type (the role's, else the employee's) is hourly_min_* (minimum wage + tips).
+function isTipRole(emp, role) {
+  const roleEntry = emp && emp.roles[role];
+  const t = (roleEntry && roleEntry.new_wage_type) || (emp && emp.new_wage_type) || "";
+  return t.startsWith("hourly_min_");
+}
+
 // Monthly pay from a saved tlush, by kind. amount = quantity × wage per component.
 // Skipped: Shiklulit record types 3 (מפרעה מטיפים, a deduction) and 4 (attendance counts).
 // Net-paid wage lines (netGross "net") are kept apart: their gross is higher and only the
@@ -632,7 +639,7 @@ function employeeDays(r, w, tlush, source, from, to, out) {
   // Per-day hours, hours × wage, and the admin page's own rule (tip + completion when present).
   let monthlyAdmin = 0;
   for (const d of days) {
-    d.h100 = d.h125 = d.h150 = d.tip = d.completion = d.wageCost = d.adminCost = 0;
+    d.h100 = d.h125 = d.h150 = d.tip = d.completion = d.wageCost = d.adminCost = d.laborCost = 0;
     d.unpricedHours = 0;
     for (const e of d.entries) {
       d.h100 += Number(e.h100) || 0;
@@ -647,24 +654,30 @@ function employeeDays(r, w, tlush, source, from, to, out) {
       const cost = rate == null ? 0 : weighted(e) * rate;
       d.wageCost += cost;
       d.adminCost += tip || completion ? tip + completion : cost;
+      // Labor cost (owner 2026-10-28): a tip-based role costs only its completion (השלמה) — no wage line, no tip.
+      d.laborCost += isTipRole(emp, e.role) || tip || completion ? completion : cost;
     }
     d.weight = d.entries.length ? weighted(d) : d.rawHours || 0;
     monthlyAdmin += d.adminCost;
   }
   // Global (monthly salary) employees: the salary split evenly over worked days.
   if (globalAmount != null) {
-    for (const d of days) d.wageCost = d.adminCost = globalAmount / days.length;
+    for (const d of days) d.wageCost = d.adminCost = d.laborCost = globalAmount / days.length;
   } else if (!days.some((d) => d.entries.length)) {
     // No per-role hours at all: monthly hours × wage from payroll_data, spread by daily hours.
     let monthly = 0;
+    let monthlyLabor = 0;
     for (const [role, v] of Object.entries(w.payroll_data || {})) {
       const [h100 = 0, h125 = 0, h150 = 0] = (v && v.hours) || [];
       const tip = Number(v && v.tip) || 0;
       const completion = Number(v && v.completion) || 0;
       const rate = hourlyRate(emp, role);
-      monthly += tip || completion ? tip + completion : rate == null ? 0 : weighted({ h100, h125, h150 }) * rate;
+      const cost = rate == null ? 0 : weighted({ h100, h125, h150 }) * rate;
+      monthly += tip || completion ? tip + completion : cost;
+      monthlyLabor += isTipRole(emp, role) || tip || completion ? completion : cost;
     }
     allocate(monthly, days).forEach((v, i) => (days[i].wageCost = days[i].adminCost = v));
+    allocate(monthlyLabor, days).forEach((v, i) => (days[i].laborCost = v));
   }
 
   // Payslip gross: the saved tlush, spread over the days by weighted hours.
@@ -700,6 +713,7 @@ function employeeDays(r, w, tlush, source, from, to, out) {
       unpricedHours: d.unpricedHours,
       wageCost: d.wageCost,
       adminCost: d.adminCost,
+      laborCost: d.laborCost,
       gross,
       payrollUpdatedAt: r.updated_at,
       payrollSource: source,
@@ -1208,6 +1222,7 @@ const Router = () => {
   //               employee-months without a tlush (counted in coverage.estimated)
   // Months without a saved payroll are built from the Tabit reports like a new payroll (coverage.fromTabit).
   //   adminCost   the admin Shifts page's formula (tip + completion, else hours × wage)
+  //   laborCost   the restaurant's labor cost: hours × wage, but a tip-based role only its completion (השלמה)
   //   storedCost  bcom_cash.labor_cost, the adminCost saved when the month was extracted
   get("/labor/daily", async (req) => {
     const branchIds = await optionalBranches(req);
@@ -1228,7 +1243,7 @@ const Router = () => {
       if (!days.has(key))
         days.set(key, {
           branch, date, revenue: null, storedCost: null,
-          h100: 0, h125: 0, h150: 0, tip: 0, completion: 0, wageCost: 0, adminCost: 0, unpricedHours: 0,
+          h100: 0, h125: 0, h150: 0, tip: 0, completion: 0, wageCost: 0, adminCost: 0, laborCost: 0, unpricedHours: 0,
           gross: { total: 0, wages: 0, travel: 0, bonus: 0, netWages: 0, meals: 0 },
           employees: 0, estimated: 0, globalSalary: 0, fromTabit: 0,
         });
@@ -1241,7 +1256,7 @@ const Router = () => {
     }
     for (const r of rows) {
       const d = day(r.branch, r.date);
-      for (const k of ["h100", "h125", "h150", "tip", "completion", "wageCost", "adminCost", "unpricedHours"]) d[k] += r[k];
+      for (const k of ["h100", "h125", "h150", "tip", "completion", "wageCost", "adminCost", "laborCost", "unpricedHours"]) d[k] += r[k];
       for (const k of Object.keys(d.gross)) d.gross[k] += r.gross[k];
       d.employees += 1;
       if (r.gross.source === "estimate") d.estimated += 1;
@@ -1260,12 +1275,14 @@ const Router = () => {
         tip: round2(d.tip),
         completion: round2(d.completion),
         adminCost: round2(d.adminCost),
+        laborCost: round2(d.laborCost),
         storedCost: d.storedCost == null ? null : round2(d.storedCost),
         // No payroll rows for the day (payroll not managed in the admin, or not saved yet): no %.
         laborPct: d.employees
           ? {
               gross: pctOf(d.gross.total, d.revenue),
               adminCost: pctOf(d.adminCost, d.revenue),
+              laborCost: pctOf(d.laborCost, d.revenue),
               storedCost: pctOf(d.storedCost, d.revenue),
             }
           : null,
@@ -1286,6 +1303,7 @@ const Router = () => {
       revenue: round2(revenue),
       gross: round2(sum((d) => d.gross.total)),
       adminCost: round2(sum((d) => d.adminCost)),
+      laborCost: round2(sum((d) => d.laborCost)),
       storedCost: round2(sum((d) => d.storedCost)),
       days: covered.length,
       daysWithoutRevenue: covered.filter((d) => d.revenue == null).length,
@@ -1293,6 +1311,7 @@ const Router = () => {
     totals.laborPct = {
       gross: pctOf(totals.gross, revenue),
       adminCost: pctOf(totals.adminCost, revenue),
+      laborCost: pctOf(totals.laborCost, revenue),
       storedCost: pctOf(totals.storedCost, revenue),
     };
     // Where each branch-month's payroll came from: saved, or built from the Tabit reports (not saved yet).
@@ -1322,6 +1341,7 @@ const Router = () => {
         tip: round2(r.tip),
         completion: round2(r.completion),
         adminCost: round2(r.adminCost),
+        laborCost: round2(r.laborCost),
         unpricedHours: round2(r.unpricedHours),
         payrollUpdatedAt: r.payrollUpdatedAt,
         payrollSource: r.payrollSource,

@@ -168,8 +168,8 @@ Your job now: WRITE the answer to the user from <results>.
   with the most hours, and say how many are not shown. With a period, name the
   unlinkedClockNames (clock times Allegro could not link to an employee) and their hours.
 - Labor cost (labor_summary cost): the numbers are the Allegro admin's own, computed with its payroll rules — never
-  recompute, estimate or "correct" them. Give "עלות עבודה" = laborCost (the admin's labor cost: hours after breaks at
-  100/125/150% × the role's wage; tip + completion for tip roles; monthly salaries) and its % (laborPct.laborCost), and
+  recompute, estimate or "correct" them. Give "עלות עבודה" = laborCost (hours after breaks at 100/125/150% × the role's wage;
+  a tip-based role counts only its completion (השלמה), not its wage or tips; monthly salaries) and its % (laborPct.laborCost), and
   "ברוטו בתלוש" = payslipGross (wages + travel + bonus) and its % (laborPct.payslipGross), as two separate numbers.
   Say per month where the payroll came from (payrollMonths: saved = the saved payroll; tabit = built from the Tabit
   reports, not saved yet, can still change; none = no payroll). hoursWithoutWage > 0 → the cost is too low by those

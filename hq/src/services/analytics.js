@@ -224,8 +224,9 @@ export async function anomalies(locationIds, from, to) {
 /**
  * Labor for a period. Hours come from the raw clock rows (with corrections). Money (payroll access only) comes
  * from the Allegro admin (/labor/daily), computed there with the payroll business logic — never here:
- *   laborCost     the admin's labor cost (the Shifts page formula): weighted hours (100% + 125% × 1.25 + 150% × 1.5,
- *                 after the break rule) × the role's wage; tip + completion for tip roles; monthly salary ÷ days
+ *   laborCost     the restaurant's labor cost (owner 2026-10-28): weighted hours (100% + 125% × 1.25 + 150% × 1.5,
+ *                 after the break rule) × the role's wage; a tip-based role (minimum wage + tips) only its completion
+ *                 (השלמה), no wage line and no tip; monthly salary ÷ days
  *   payslipGross  the payslip (tlush) gross: wages + travel + bonus, spread over the days worked
  * A month without a saved payroll is built by the admin from the Tabit reports like a new payroll (not saved).
  * Hours with no wage in the admin (person not in employees, or a role without a wage) add nothing: they are
@@ -272,10 +273,10 @@ export async function laborSummary(access, locationIds, from, to) {
         const payrollHoursTotal = sum((d) => d.hours?.total);
         const byMonth = new Map((meta.payrollMonths || []).map((m) => [m.month, m.payrollSource]));
         res.cost = {
-          laborCost: t.adminCost ?? sum((d) => d.adminCost),
+          laborCost: t.laborCost ?? sum((d) => d.laborCost),
           payslipGross: t.gross ?? sum((d) => d.gross?.total),
           // ÷ the admin's daily revenue (Beecomm, before discounts) of the days with payroll rows
-          laborPct: { laborCost: t.laborPct?.adminCost ?? null, payslipGross: t.laborPct?.gross ?? null },
+          laborPct: { laborCost: t.laborPct?.laborCost ?? null, payslipGross: t.laborPct?.gross ?? null },
           revenueOfPayrollDays: t.revenue ?? null,
           days: daysBetween(from, to) + 1,
           daysWithPayroll: paid.length,

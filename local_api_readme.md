@@ -477,6 +477,7 @@ The restaurant's daily labor cost, computed from what the admin manages: the pay
 |---|---|
 | `gross` | **Payslip gross.** The employee's saved tlush for the month (wage lines + travel + bonus), spread over the days they worked in proportion to weighted hours (100% + 125% × 1.25 + 150% × 1.5). For an employee-month without a tlush (`source: "estimate"`), hours × current wage instead. This is the number to use as "total daily gross". |
 | `adminCost` | The admin Shifts page's own daily formula: per role entry, tip + completion when there is any, otherwise weighted hours × wage. Monthly-salary employees: salary ÷ days worked. |
+| `laborCost` | **The restaurant's labor cost** (owner 2026-10-28): weighted hours × wage, but a **tip-based role** (wage type `hourly_min_*`, of the role or else the employee, or an entry with tip/completion) counts **only its completion (השלמה)** — no wage line and no tip. Monthly-salary employees: salary ÷ days worked. Also in `laborPct` and `meta.totals`. |
 | `storedCost` | `bcom_cash.labor_cost`: the `adminCost` the Shifts page saved when the month was extracted. A snapshot; `null` on days it never saved. |
 
 Wages are resolved like the Shifts page: the role's wage type, then the employee's, then the legacy `hourly_wage` (−1 = minimum). Minimum wage is `MIN_HOURLY_WAGE` (env, default 35.4), returned in `meta.minHourlyWage`. Wages are the **current** ones in `employees`, so `wageCost`/`adminCost` for an old month change if a wage was edited since; the tlush-based `gross` doesn't.

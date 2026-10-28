@@ -178,7 +178,7 @@ export default {
   'joya.labor.lastMonth': 'Last month',
   'joya.labor.howTitle': 'How is this calculated?',
   'joya.labor.howGross': 'Gross wage is what the employee earns before deductions. Total employer cost also includes what the employer pays on top of the gross (pension, national insurance and more) — it is higher.',
-  'joya.labor.howKnown': 'The labor cost comes from the Allegro admin and uses its payroll rules: hours after the break rule at 100% / 125% / 150% × the role\'s wage, tip + completion for tip roles, and monthly salaries. "Payslip gross" = wages + travel + bonus from the payslip. A month without a saved payroll is built by the admin from the Tabit reports, like a new payroll (not saved, it can still change). Hours with no wage in the admin are not priced: they are listed.',
+  'joya.labor.howKnown': 'The labor cost comes from the Allegro admin and uses its payroll rules: hours after the break rule at 100% / 125% / 150% × the role\'s wage, only the completion (השלמה) for tip-based roles (no wage line, no tip), and monthly salaries. "Payslip gross" = wages + travel + bonus from the payslip. A month without a saved payroll is built by the admin from the Tabit reports, like a new payroll (not saved, it can still change). Hours with no wage in the admin are not priced: they are listed.',
   'joya.labor.noPayroll': 'Wages and labor cost need payroll access.',
   'joya.labor.sales': 'Sales',
   'joya.labor.salesDaysMissing_one': '1 day without sales in the period (closed)',
