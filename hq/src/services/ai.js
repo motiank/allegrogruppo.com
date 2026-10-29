@@ -85,6 +85,12 @@ async function employeeList(access, p) {
       (!role || e.roles.some((r) => r.role.includes(role)) || e.roleNames.some((r) => r.includes(role))),
   );
   const max = Math.min(Math.max(Number(p.limit) || 150, 1), 300);
+  // owner's rule (2026-10-29): a new employee = worked in the period and has no employee number in the payroll software
+  // (Micpal) = has not handed in form 101 yet. A location where no one has a number is not linked (e.g. no ID numbers in
+  // the admin): there nobody is called new.
+  const all = period ? await source.employees(ids) : [];
+  const linkedLocs = new Set(all.filter((e) => e.hasPayrollNumber).map((e) => e.locationId));
+  const isNew = (e) => (linkedLocs.has(e.locationId) ? worked.has(String(e.id)) && !e.hasPayrollNumber : null);
   const byRole = new Map();
   for (const e of rows)
     for (const r of e.roles) {
@@ -117,7 +123,8 @@ async function employeeList(access, p) {
       wage: e.wage,
       hourlyRate: e.hourlyRate,
       roles: e.roles,
-      ...(period ? workedOut(worked.get(String(e.id)), e) : {}),
+      hasPayrollNumber: e.hasPayrollNumber,
+      ...(period ? { ...workedOut(worked.get(String(e.id)), e), newEmployee: isNew(e) } : {}),
     })),
     ...(period
       ? {
@@ -126,6 +133,13 @@ async function employeeList(access, p) {
           clockSource: 'Tabit clock times via Allegro (/shifts/raw), linked to the employee by Allegro (clock id → phone → name); raw clock hours, before the payroll rules',
           unlinkedClockNames: [...unlinked.values()].map((u) => ({ name: u.name, hours: Math.round(u.hours * 100) / 100, days: u.days.size })),
           missingClockOut,
+          // a clock name with no employee record has no number either → new too
+          newEmployees: {
+            rule: 'worked in the period and has no employee number in Micpal (form 101 not handed in yet)',
+            count: rows.filter((e) => isNew(e)).length + unlinked.size,
+            names: [...rows.filter((e) => isNew(e)).map((e) => e.name), ...[...unlinked.keys()].map((n) => `${n} (not in the employees list)`)],
+            notLinkedLocations: ids.filter((id) => !linkedLocs.has(String(id))).map((id) => names.get(String(id)) ?? id),
+          },
         }
       : {}),
   };
@@ -283,7 +297,7 @@ export const CALCS = {
   employees: {
     params: '{ locationIds?, q?: "part of a name", role?: "role name, e.g. מלצר", active?: true | false | "all" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }',
     about:
-      'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee. Users with payroll access only',
+      'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee, and newEmployees (worked in the period with no Micpal employee number = no form 101 yet). Users with payroll access only',
     run: (a, p) => employeeList(a, p),
   },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },

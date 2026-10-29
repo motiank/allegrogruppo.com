@@ -292,6 +292,8 @@ export async function employees(locationIds) {
         .map((x) => ({ role: cleanRole(x.role), wageType: x.new_wage_type ?? null, wage: wageOf(x.new_wage_type, x.wage), hourlyRate: rateOf(e, x) })),
       contractor: !!e.contractor,
       active: !!e.active,
+      // has an employee number in the payroll software (Micpal / Shiklulit) = form 101 is in; the number itself stays out
+      hasPayrollNumber: e.employeeNumber != null && String(e.employeeNumber).trim() !== '',
     });
   }
   return out.sort((a, b) => Number(b.active) - Number(a.active) || String(a.name).localeCompare(String(b.name)));

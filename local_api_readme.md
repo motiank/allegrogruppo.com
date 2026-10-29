@@ -244,7 +244,7 @@ Employees, sorted by branch and name. Without `branch`, all branches.
 | Field | Meaning |
 |---|---|
 | `idNumber` | National ID (ת.ז). This is the key that matches employees across systems. |
-| `employeeNumber` | Number in the payroll software (`mic_nmbr`), often empty. The authoritative number is in `payroll.tlush.employeeNumber`. |
+| `employeeNumber` | Employee number in the payroll software (Micpal / Shiklulit): `payroll_soft_ix.keyName`, linked by the ID number (else `mic_nmbr`; the "9999" dummy counts as none). `null` = the employee has no form 101 in the payroll software yet. **A new employee** = worked in the month and has no `employeeNumber` (owner's rule, 2026-10-29). |
 | `wageType` | Employee-level wage type: `global_net`, `global_gross`, `hourly_net`, `hourly_gross`, `hourly_min_net`, `hourly_min_gross`. `hourly_min_*` = tip-based (minimum wage + top-up). |
 | `wage` | Wage for `wageType` (monthly for `global_*`, hourly otherwise). |
 | `hourlyWage` | Legacy hourly field. `-1` means "not set / use minimum wage". |

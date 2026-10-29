@@ -258,13 +258,13 @@ const dayCol = (col, as) => `DATE_FORMAT(${col}, '%Y-%m-%d') AS ${as}`;
 
 // ── employees ────────────────────────────────────────────────────────────
 
-const toEmployee = (r) => ({
+const toEmployee = (r, payrollNumbers) => ({
   employeeId: r.employee_id,
   branch: r.rest,
   company: r.company,
   name: r.name,
   idNumber: r.ID_nmbr,
-  employeeNumber: r.mic_nmbr,
+  employeeNumber: payrollNumberOf(r, payrollNumbers),
   phone: r.phone,
   active: !!r.active,
   contractor: !!r.contractor,
@@ -278,6 +278,19 @@ const toEmployee = (r) => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
+
+// The payroll-software employee number (מס עובד in Micpal / Shiklulit): payroll_soft_ix.keyName, linked by ID_nmbr
+// like the payroll export does (employees.mic_nmbr is mostly empty). Loaded apart, not joined: the two ID_nmbr
+// columns use different collations. The "9999" dummy is no number. An employee without one has no form 101 in the
+// payroll software yet = a new employee (owner 2026-10-29).
+async function loadPayrollNumbers() {
+  const [rows] = await executeSql("SELECT keyName, ID_nmbr FROM payroll_soft_ix WHERE ID_nmbr IS NOT NULL", {});
+  const m = new Map();
+  for (const k of rows || []) if (k.ID_nmbr != null && String(k.keyName ?? "").trim() !== "9999") m.set(String(k.ID_nmbr).trim(), k.keyName);
+  return m;
+}
+const payrollNumberOf = (r, numbers) =>
+  (r.ID_nmbr != null && numbers?.get(String(r.ID_nmbr).trim())) || (r.mic_nmbr && String(r.mic_nmbr).trim()) || null;
 
 const EMPLOYEE_COLUMNS = `employee_id, rest, company, name, ID_nmbr, mic_nmbr, phone,
   active, contractor, duplicate, new_wage_type, wage, hourly_wage, travel,
@@ -940,8 +953,9 @@ const Router = () => {
         ORDER BY rest, name`,
       params,
     );
+    const numbers = await loadPayrollNumbers();
     return {
-      data: rows.map(toEmployee),
+      data: rows.map((r) => toEmployee(r, numbers)),
       meta: { branches: branchesMeta(branchIds), active, updatedSince, asOf },
     };
   });
@@ -955,7 +969,7 @@ const Router = () => {
       { id },
     );
     if (!rows.length) throw new ApiError(404, "not_found", `employee ${id} not found`);
-    return { data: toEmployee(rows[0]) };
+    return { data: toEmployee(rows[0], await loadPayrollNumbers()) };
   });
 
   // ── shifts ──
