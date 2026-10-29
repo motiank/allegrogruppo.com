@@ -87,10 +87,10 @@ async function employeeList(access, p) {
   const max = Math.min(Math.max(Number(p.limit) || 150, 1), 300);
   // owner's rule (2026-10-29): a new employee = worked in the period and has no employee number in the payroll software
   // (Micpal) = has not handed in form 101 yet. A location where no one has a number is not linked (e.g. no ID numbers in
-  // the admin): there nobody is called new.
+  // the admin): there nobody is called new. A contractor (קבלן, not in the payroll) is never new (owner 2026-10-29).
   const all = period ? await source.employees(ids) : [];
   const linkedLocs = new Set(all.filter((e) => e.hasPayrollNumber).map((e) => e.locationId));
-  const isNew = (e) => (linkedLocs.has(e.locationId) ? worked.has(String(e.id)) && !e.hasPayrollNumber : null);
+  const isNew = (e) => (e.contractor ? false : linkedLocs.has(e.locationId) ? worked.has(String(e.id)) && !e.hasPayrollNumber : null);
   const byRole = new Map();
   for (const e of rows)
     for (const r of e.roles) {
@@ -135,7 +135,7 @@ async function employeeList(access, p) {
           missingClockOut,
           // a clock name with no employee record has no number either → new too
           newEmployees: {
-            rule: 'worked in the period and has no employee number in Micpal (form 101 not handed in yet)',
+            rule: 'worked in the period, is not a contractor (קבלן) and has no employee number in Micpal (form 101 not handed in yet)',
             count: rows.filter((e) => isNew(e)).length + unlinked.size,
             names: [...rows.filter((e) => isNew(e)).map((e) => e.name), ...[...unlinked.keys()].map((n) => `${n} (not in the employees list)`)],
             notLinkedLocations: ids.filter((id) => !linkedLocs.has(String(id))).map((id) => names.get(String(id)) ?? id),

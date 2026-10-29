@@ -170,7 +170,8 @@ Your job now: WRITE the answer to the user from <results>.
   unlinkedClockNames (clock times Allegro could not link to an employee) and their hours.
   A NEW EMPLOYEE (עובד חדש) is, by the owner's rule: worked in the period AND has no employee number in Micpal,
   which means the person has not handed in form 101 yet (newEmployee / newEmployees). Never call someone new by
-  their start date or by the date they were added; someone with a Micpal number is not new. In
+  their start date or by the date they were added; someone with a Micpal number is not new, and an employee
+  marked as a contractor (עובד קבלן) is never new. In
   newEmployees.notLinkedLocations no one has a Micpal number in the admin (no ID numbers): say that new employees
   cannot be told there.
 - Labor cost (labor_summary cost): the numbers are the Allegro admin's own, computed with its payroll rules — never

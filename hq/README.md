@@ -103,7 +103,7 @@ reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) 
 closed branches): sums, averages and the labor cost stand as they are; the AI may name these days but never calls them
 missing data, and the data page shows them as a LOW note.
 **A new employee** (owner 2026-10-29) = worked in the period and has no employee number in Micpal (= has not handed in
-form 101 yet); the `employees` calculation with from/to marks them (`newEmployee`, `newEmployees`). The number comes
+form 101 yet); employees marked as a contractor (עובד קבלן) are never new; the `employees` calculation with from/to marks them (`newEmployee`, `newEmployees`). The number comes
 from the admin's `payroll_soft_ix` (linked by ID number); HQ gets only `hasPayrollNumber`. Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.
 
 ### Data map — table → admin API → AI calculation
