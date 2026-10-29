@@ -12,8 +12,8 @@ import users from "../sources/users.js";
 import { nameKey } from "../uploads/workbook.js";
 import { recognizeFile, applyPermissions, KINDS } from "../uploads/recognize.js";
 import crypto from "crypto";
-import { importTabitDetailed, importBankHapoalim, saveTabitDetailed, saveTabitShiftReports } from "../uploads/importers.js";
-import { TabitShiftClient, tabitShiftConfig, reportToParsed, mergeParsed, nextMonth } from "../uploads/tabitShift.js";
+import { importTabitDetailed, importBankHapoalim, saveTabitDetailed, saveTabitShiftReports, saveTabitRota } from "../uploads/importers.js";
+import { TabitShiftClient, tabitShiftConfig, reportToParsed, mergeParsed, nextMonth, rotaToRows, weekSunday } from "../uploads/tabitShift.js";
 import { Router as r404 } from "./r404.js";
 
 const require = createRequire(import.meta.url);
@@ -221,6 +221,41 @@ export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryR
     await client.logout();
   }
   if (!dryRun) ctxCache = null;
+  return results;
+};
+
+/**
+ * Tabit Shift work plan (Rota page) → tabit_rota, for the week that starts on weekStart (a Sunday; default: this
+ * week) × branch; a fetch replaces that week of the branch. dryRun: reads and counts, writes nothing.
+ */
+export const fetchTabitRota = async ({ weekStart = weekSunday(), dryRun = false, rests = null } = {}) => {
+  if (new Date(`${weekStart}T12:00:00Z`).getUTCDay() !== 0) throw new Error(`${weekStart} is not a Sunday`);
+  const branches = rests ? TABIT_SHIFT_BRANCHES.filter((b) => rests.includes(b.rest)) : TABIT_SHIFT_BRANCHES;
+  const client = new TabitShiftClient(tabitShiftConfig());
+  await client.login(tabitShiftConfig());
+  const results = [];
+  try {
+    for (const b of branches) {
+      const base = { weekStart, rest: b.rest, branch: b.name, apps: b.apps };
+      try {
+        const rows = [];
+        const published = [];
+        for (const app of b.apps) {
+          await client.switchApp(app);
+          const plan = await client.rota(weekStart);
+          published.push(...plan.rotas.map((r) => ({ app, published: !!r.is_published })));
+          rows.push(...rotaToRows(plan, { rest: b.rest, app, weekStart, employees: await client.employees() }));
+        }
+        const counts = { slots: rows.length, withEmployee: rows.filter((r) => r.employee_name).length, published };
+        if (dryRun) results.push({ ...base, status: "DRY_RUN", result: counts });
+        else results.push({ ...base, status: "OK", result: { ...counts, ...(await saveTabitRota(rows, { rest: b.rest, weekStart })) } });
+      } catch (e) {
+        results.push({ ...base, status: "FAILED", error: e.message });
+      }
+    }
+  } finally {
+    await client.logout();
+  }
   return results;
 };
 

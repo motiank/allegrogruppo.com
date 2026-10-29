@@ -94,6 +94,16 @@ export const saveTabitShiftReports = async (reports, { rest, month, uploadId }) 
   return reports.length;
 };
 
+// A week's work plan of one branch (all its Tabit apps) → tabit_rota: replaces the branch's rows of that week.
+export const saveTabitRota = async (rows, { rest, weekStart }) =>
+  inTransaction(async (conn) => {
+    const [del] = await conn.execute("DELETE FROM tabit_rota WHERE rest = :rest AND week_start = :weekStart", { rest, weekStart });
+    const cols = ["rest", "week_start", "app_id", "rota_id", "published", "cell_id", "work_date", "shift_name", "role_name", "slot_order",
+      "employee_name", "tabit_employee_id", "clock_id", "planned_start", "planned_end", "manual_start", "manual_end", "notes"];
+    const inserted = rows.length ? await bulk(conn, `INSERT INTO tabit_rota (${cols.join(", ")}) VALUES ?`, rows.map((r) => cols.map((c) => r[c] ?? null))) : 0;
+    return { replacedOldRows: del.affectedRows || 0, slots: inserted };
+  });
+
 // Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped.
 export const importBankHapoalim = async (buffer, { uploadId }) => {
   const wb = await loadWorkbook(buffer);

@@ -101,6 +101,21 @@ export class TabitShiftClient {
     return Array.isArray(data) ? data : data?.results || [];
   }
 
+  /** The work plan (Rota page) of the week that starts on `sunday` ('YYYY-MM-DD') of the current app:
+   *  { rotas: [{ id, date, is_published, is_deleted }], cells: [slot], shifts: [{ id, name }], roles: [{ id, name }] }. */
+  async rota(sunday) {
+    const opt = { referer: "/app/week" };
+    const list = (v) => (Array.isArray(v) ? v : v?.results || (v ? [v] : []));
+    const rotas = list(await this.json(`/api/rotas/?date=${sunday}`, opt)).filter((r) => !r.is_deleted);
+    const cells = rotas.length ? list(await this.json(`/api/cells/?rota__in=${rotas.map((r) => r.id).join(",")}`, opt)) : [];
+    return {
+      rotas,
+      cells: cells.filter((c) => !c.is_deleted),
+      shifts: list(await this.json("/api/shifts/", opt)),
+      roles: list(await this.json("/api/roles/", opt)),
+    };
+  }
+
   async logout() {
     await this.call("/api/auth/logout/", { method: "POST" }).catch(() => {});
   }
@@ -233,3 +248,42 @@ export const employeesToRoster = (list) =>
       };
     })
     .filter((r) => r.username || r.phone || r.clock_id);
+
+/**
+ * A week's plan of one app (TabitShiftClient.rota) → tabit_rota rows. Names from the app's shifts, roles and
+ * employee list (clock id); times as restaurant wall clock, like tabit_shifts.
+ */
+export const rotaToRows = ({ rotas, cells, shifts, roles }, { rest, app, weekStart, employees = [] }) => {
+  const rotaById = new Map(rotas.map((r) => [r.id, r]));
+  const shiftName = new Map(shifts.map((x) => [x.id, x.name]));
+  const roleName = new Map(roles.map((x) => [x.id, x.name]));
+  const clockOf = new Map(employees.map((e) => [e.id, e.user?.clock_id != null ? String(e.user.clock_id) : null]));
+  return cells.map((c) => ({
+    rest,
+    week_start: weekStart,
+    app_id: Number(app),
+    rota_id: c.rota,
+    published: rotaById.get(c.rota)?.is_published ? 1 : 0,
+    cell_id: c.id,
+    work_date: c.date,
+    shift_name: shiftName.get(c.shift) ?? null,
+    role_name: roleName.get(c.role) ?? null,
+    slot_order: c.order ?? null,
+    employee_name: c.employee ? `${c.first_name || ""} ${c.last_name || ""}`.trim() || null : null,
+    tabit_employee_id: c.employee ?? null,
+    clock_id: c.employee ? clockOf.get(c.employee) ?? null : null,
+    planned_start: localTime(c.planned_start_full),
+    planned_end: localTime(c.planned_end_full),
+    manual_start: localTime(c.manual_start_full),
+    manual_end: localTime(c.manual_end_full),
+    notes: String(c.notes || "").trim().slice(0, 255) || null,
+  }));
+};
+
+/** The Sunday ('YYYY-MM-DD') of the week of `d`, in Israel. */
+export const weekSunday = (d = new Date()) => {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const t = new Date(`${day}T12:00:00Z`);
+  t.setUTCDate(t.getUTCDate() - t.getUTCDay());
+  return t.toISOString().slice(0, 10);
+};
