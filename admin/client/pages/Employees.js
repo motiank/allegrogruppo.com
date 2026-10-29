@@ -478,6 +478,19 @@ const Employees = () => {
   const [selectedManualEmp, setSelectedManualEmp] = useState(null);
   const [manualSearch, setManualSearch] = useState("");
   const [manualSelectedKeyName, setManualSelectedKeyName] = useState(null);
+  // Sync shows only the employees who worked this month (in Tabit) unless "Show all" is checked.
+  // workedIds null = not known (the request failed) → everyone is shown.
+  const [workedIds, setWorkedIds] = useState(null);
+  const [workedMonth, setWorkedMonth] = useState(null);
+  const [syncShowAll, setSyncShowAll] = useState(false);
+  const isShownInSync = useCallback(
+    (e) => syncShowAll || !workedIds || workedIds.has(e.employee_id),
+    [syncShowAll, workedIds],
+  );
+  const visibleMatchRows = useMemo(
+    () => matchRows.filter((r) => isShownInSync(r.emp)),
+    [matchRows, isShownInSync],
+  );
 
   const manualUnmatched = useMemo(
     () =>
@@ -486,9 +499,10 @@ const Employees = () => {
           e.active !== false &&
           e.duplicate == null &&
           !e.contractor &&
-          !(e.ID_nmbr && String(e.ID_nmbr).trim()),
+          !(e.ID_nmbr && String(e.ID_nmbr).trim()) &&
+          isShownInSync(e),
       ),
-    [employees],
+    [employees, isShownInSync],
   );
 
   const manualResults = useMemo(() => {
@@ -508,12 +522,27 @@ const Employees = () => {
     setSelectedManualEmp(null);
     setManualSearch("");
     setManualSelectedKeyName(null);
+    setSyncShowAll(false);
     try {
-      const res = await axios.post(
-        "/admin/payroll/micpal/list",
-        { rest: selectedRestaurant },
-        { withCredentials: true },
-      );
+      const [res, worked] = await Promise.all([
+        axios.post(
+          "/admin/payroll/micpal/list",
+          { rest: selectedRestaurant },
+          { withCredentials: true },
+        ),
+        axios
+          .post(
+            "/admin/payroll/employees/worked-month",
+            { rest: selectedRestaurant },
+            { withCredentials: true },
+          )
+          .catch(() => null),
+      ]);
+      const workedSet = worked?.data?.employeeIds
+        ? new Set(worked.data.employeeIds)
+        : null;
+      setWorkedIds(workedSet);
+      setWorkedMonth(worked?.data?.month || null);
       const micpal = res.data?.rows || [];
       setMicpalList(micpal);
       const index = buildMicpalNameIndex(micpal);
@@ -542,8 +571,9 @@ const Employees = () => {
       const sel = {};
       for (const row of perfect) sel[row.emp.employee_id] = true;
       setMatchSelected(sel);
-      // No perfect matches → drop straight into the manual tool.
-      if (perfect.length === 0) setMatchMode("manual");
+      // No perfect matches (among the people shown) → drop straight into the manual tool.
+      if (!perfect.some((r) => !workedSet || workedSet.has(r.emp.employee_id)))
+        setMatchMode("manual");
     } catch (err) {
       setMatchError(
         err.response?.data?.error || err.message || "Failed to load micpal",
@@ -611,15 +641,15 @@ const Employees = () => {
   };
 
   const toggleMatchSelectAll = () => {
-    const allOn = matchRows.every((r) => matchSelected[r.emp.employee_id]);
-    const next = {};
-    for (const r of matchRows) next[r.emp.employee_id] = !allOn;
+    const allOn = visibleMatchRows.every((r) => matchSelected[r.emp.employee_id]);
+    const next = { ...matchSelected };
+    for (const r of visibleMatchRows) next[r.emp.employee_id] = !allOn;
     setMatchSelected(next);
   };
 
   const handleMatchUpdate = async () => {
     if (matchUpdating) return;
-    const updates = matchRows
+    const updates = visibleMatchRows
       .filter((r) => matchSelected[r.emp.employee_id])
       .map((r) => ({
         employee_id: r.emp.employee_id,
@@ -654,7 +684,7 @@ const Employees = () => {
       // switch to the manual-match tool so the user can keep going.
       setMatchRows((prev) => {
         const next = prev.filter((r) => !applied.has(r.emp.employee_id));
-        if (next.length === 0) setMatchMode("manual");
+        if (!next.some((r) => isShownInSync(r.emp))) setMatchMode("manual");
         return next;
       });
     } catch (err) {
@@ -1409,9 +1439,32 @@ const Employees = () => {
                 </div>
               )}
 
+              {!matchLoading && (
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "0.9rem",
+                    color: theme.textSecondary,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={syncShowAll}
+                    onChange={(ev) => setSyncShowAll(ev.target.checked)}
+                  />
+                  Show all employees
+                  {!syncShowAll &&
+                    (workedIds
+                      ? ` (now: only who worked in ${workedMonth || "this month"} in Tabit)`
+                      : " (could not load who worked this month — showing all)")}
+                </label>
+              )}
+
               {!matchLoading && matchMode === "perfect" && (
                 <>
-                  {matchRows.length === 0 && !matchError && (
+                  {visibleMatchRows.length === 0 && !matchError && (
                     <div
                       style={{
                         padding: "12px",
@@ -1422,7 +1475,7 @@ const Employees = () => {
                       No perfect matches found among employees missing ID.
                     </div>
                   )}
-                  {matchRows.length > 0 && (
+                  {visibleMatchRows.length > 0 && (
                     <div style={{ ...styles.modalList, maxHeight: "60vh" }}>
                       <table style={{ ...styles.table, borderRadius: 0 }}>
                         <thead>
@@ -1430,7 +1483,7 @@ const Employees = () => {
                             <th style={styles.th}>
                               <input
                                 type="checkbox"
-                                checked={matchRows.every(
+                                checked={visibleMatchRows.every(
                                   (r) => matchSelected[r.emp.employee_id],
                                 )}
                                 onChange={toggleMatchSelectAll}
@@ -1443,7 +1496,7 @@ const Employees = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {matchRows.map(({ emp, match }) => (
+                          {visibleMatchRows.map(({ emp, match }) => (
                             <tr key={emp.employee_id}>
                               <td style={styles.td}>
                                 <input
@@ -1719,7 +1772,7 @@ const Employees = () => {
                     ...styles.primaryButton,
                     opacity:
                       matchUpdating ||
-                      matchRows.every((r) => !matchSelected[r.emp.employee_id])
+                      visibleMatchRows.every((r) => !matchSelected[r.emp.employee_id])
                         ? 0.6
                         : 1,
                     cursor: matchUpdating ? "wait" : "pointer",
@@ -1727,7 +1780,7 @@ const Employees = () => {
                   onClick={handleMatchUpdate}
                   disabled={
                     matchUpdating ||
-                    matchRows.every((r) => !matchSelected[r.emp.employee_id])
+                    visibleMatchRows.every((r) => !matchSelected[r.emp.employee_id])
                   }
                 >
                   {matchUpdating ? "Updating…" : "Update"}

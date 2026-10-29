@@ -1368,6 +1368,34 @@ const Router = () => {
     }
   });
 
+  // The employees of a branch who worked in a month (default: this month in Israel) = appear in the Tabit clock
+  // times (tabit_shifts), linked to employees like the Local Data API does (clock id → phone → name). Used by the
+  // Employees page Sync dialog to show only the people who work now.
+  router.post("/employees/worked-month", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      const month = /^\d{4}-\d{2}$/.test(String(req.body?.month || ""))
+        ? String(req.body.month)
+        : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(new Date());
+      const { employeeResolver } = await import("./localApi.js");
+      const resolve = await employeeResolver([rest]);
+      const [rows] = await executeSql(
+        "SELECT DISTINCT employee_name, clock_id FROM tabit_shifts WHERE rest = :rest AND month = :month",
+        { rest, month },
+      );
+      const ids = new Set();
+      for (const r of rows || []) {
+        const { employeeId } = resolve(rest, r.employee_name, r.clock_id);
+        if (employeeId != null) ids.add(employeeId);
+      }
+      res.json({ month, employeeIds: [...ids], tabitNames: (rows || []).length });
+    } catch (err) {
+      console.error("payroll/employees/worked-month error:", err);
+      res.status(500).json({ error: err.message || "worked-month failed" });
+    }
+  });
+
   router.post("/employees/duplicate-with", async (req, res) => {
     try {
       const id = Number(req.body?.employee_id);
