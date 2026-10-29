@@ -674,6 +674,148 @@ const mergeIncomingRoster = (rowsLists) => {
   return merged;
 };
 
+// The phones of a branch's roster rows → employees.phone, matched like /employees/attach-phones (ID number, then
+// the name in four orders); only active rows. A phone another employee of the branch has already fails on the
+// UNIQUE (rest, phone) key and is reported in errors (often the same person twice — see the Sync dialog).
+async function attachRosterPhones(rest, rows) {
+  const [empRows] = await executeSql(
+    "SELECT employee_id, name, ID_nmbr, phone FROM employees WHERE rest = :rest AND active = 1 AND duplicate IS NULL",
+    { rest },
+  );
+  const byId = new Map();
+  const byName = new Map();
+  const phoneOf = new Map();
+  for (const r of empRows || []) {
+    if (r.ID_nmbr) byId.set(String(r.ID_nmbr).trim(), r.employee_id);
+    if (r.name) byName.set(normName(r.name), r.employee_id);
+    phoneOf.set(r.employee_id, r.phone || null);
+  }
+  const out = { updated: 0, unchanged: 0, unmatched: 0, skipped: 0, unmatchedNames: [], errors: [] };
+  for (const row of rows) {
+    if (!row.active || !row.phone) {
+      out.skipped += 1;
+      continue;
+    }
+    const first = row.first_name_raw || "";
+    const fam = row.family_name_raw || "";
+    let id = row.id_nmbr ? byId.get(String(row.id_nmbr).trim()) : null;
+    for (const c of [`${first} ${fam}`, `${fam} ${first}`, first, fam]) {
+      if (id) break;
+      const key = normName(c);
+      if (key && byName.has(key)) id = byName.get(key);
+    }
+    if (!id) {
+      out.unmatched += 1;
+      out.unmatchedNames.push(`${first} ${fam}`.trim());
+      continue;
+    }
+    if (phoneOf.get(id) === row.phone) {
+      out.unchanged += 1;
+      continue;
+    }
+    try {
+      await executeSql("UPDATE employees SET phone = :phone WHERE employee_id = :id", { id, phone: row.phone });
+      out.updated += 1;
+    } catch (e) {
+      out.errors.push({ employee_id: id, name: `${first} ${fam}`.trim(), issue: e.message });
+    }
+  }
+  return out;
+}
+
+/**
+ * The Shift loader without the Excel file, for the daily job: the Tabit Shift employee list (/api/employees/ of
+ * every app of each branch) → shift_employees, like Employees → Shift loader: new people are inserted, a changed
+ * name is updated; a CONFLICT (a key changed, or several matches) is NOT applied — it waits for a person in the
+ * Shift loader and is reported. Then the phones → employees.phone (attachRosterPhones). Only active people.
+ * dryRun: counts only.
+ */
+export async function syncTabitShiftEmployees({ dryRun = false, rests = null } = {}) {
+  const { TabitShiftClient, tabitShiftConfig, employeesToRoster } = await import("../uploads/tabitShift.js");
+  const branches = (RESTAURANTS.restaurants || [])
+    .flatMap((g) => (g.branches || []).filter((b) => (b.tabit_shift || []).length))
+    .filter((b) => !rests || rests.includes(b.id));
+  const client = new TabitShiftClient(tabitShiftConfig());
+  await client.login(tabitShiftConfig());
+  const results = [];
+  try {
+    for (const b of branches) {
+      const base = { rest: b.id, branch: b.name, apps: b.tabit_shift };
+      try {
+        const company = companyIdForBranch(b.id);
+        if (!company) throw new Error("no company for the branch");
+        const lists = [];
+        for (const app of b.tabit_shift) {
+          await client.switchApp(app);
+          // only the active people (the "employees-active" export): the API also returns everyone who ever left
+          // or was deleted, and Tabit gives their clock ids to new people → false conflicts and old names
+          lists.push(employeesToRoster(await client.employees()).filter((r) => r.active));
+        }
+        const rows = mergeIncomingRoster(lists);
+        const [existing] = await executeSql("SELECT * FROM shift_employees WHERE company = :company", { company });
+        const { news, updates, unchanged, conflicts } = categorizeRoster(rows, existing || []);
+        const result = {
+          tabitEmployees: rows.length,
+          inserted: 0,
+          updated: 0,
+          unchanged,
+          conflicts: conflicts.map((c) => ({
+            name: [c.incoming.first_name, c.incoming.family_name].filter(Boolean).join(" "),
+            keys: [...new Set(c.matches.flatMap((m) => m.differingKeys))],
+            matches: c.matches.length,
+          })),
+          errors: [],
+        };
+        if (dryRun) {
+          results.push({ ...base, status: "DRY_RUN", result: { ...result, inserted: news.length, updated: updates.length } });
+          continue;
+        }
+        const params = (row) => ({
+          company,
+          rest: b.id,
+          username: row.username || null,
+          first_name: row.first_name || null,
+          family_name: row.family_name || null,
+          clock_id: row.clock_id != null ? String(row.clock_id) : null,
+          phone: row.phone != null ? String(row.phone) : null,
+        });
+        for (const row of news) {
+          try {
+            await executeSql(
+              `INSERT INTO shift_employees (company, rest, username, first_name, family_name, clock_id, phone)
+               VALUES (:company, :rest, :username, :first_name, :family_name, :clock_id, :phone)`,
+              params(row),
+            );
+            result.inserted += 1;
+          } catch (e) {
+            result.errors.push({ name: row.first_name, issue: e.message });
+          }
+        }
+        for (const u of updates) {
+          try {
+            await executeSql(
+              `UPDATE shift_employees SET rest = :rest, username = :username, first_name = :first_name,
+                 family_name = :family_name, clock_id = :clock_id, phone = :phone
+               WHERE id = :id AND company = :company`,
+              { ...params(u.incoming), id: u.id },
+            );
+            result.updated += 1;
+          } catch (e) {
+            result.errors.push({ id: u.id, issue: e.message });
+          }
+        }
+        result.phones = await attachRosterPhones(b.id, rows);
+        results.push({ ...base, status: result.errors.length || result.phones.errors.length ? "PARTIAL" : "OK", result });
+      } catch (e) {
+        results.push({ ...base, status: "FAILED", error: e.message });
+      }
+    }
+  } finally {
+    await client.logout();
+  }
+  return results;
+}
+
 async function fetchExistingKeys(rest) {
   if (!rest) return new Set();
   const [rows] = await executeSql(

@@ -7,6 +7,7 @@ import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { fetchTabitShift } from "./modules/files.js";
+import { syncTabitShiftEmployees } from "./modules/payroll.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -151,7 +152,8 @@ app.listen(PORT, () => {
 
   console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
 
-  // Tabit Shift attendance → tabit_shifts, daily after the business day ends (06:00). Only where
+  // Tabit Shift attendance → tabit_shifts, then the employee list → shift_employees, daily after the business
+  // day ends (06:00). Only where
   // TABIT_SHIFT_AUTO=1 (the production server), so a dev admin on the same DB does not run it too.
   if (process.env.TABIT_SHIFT_AUTO === "1") {
     cron.schedule(
@@ -162,6 +164,17 @@ app.listen(PORT, () => {
           for (const r of results) console.log(`[Cron] Tabit Shift ${r.month} ${r.branch}: ${r.status} ${r.error || JSON.stringify(r.result)}`);
         } catch (e) {
           console.error(`[Cron] Tabit Shift error: ${e.message}`);
+        }
+        // the employee list → shift_employees + phones (the Shift loader without the Excel file)
+        try {
+          for (const r of await syncTabitShiftEmployees()) {
+            const x = r.result || {};
+            console.log(
+              `[Cron] Tabit Shift employees ${r.branch}: ${r.status} ${r.error || `inserted ${x.inserted}, updated ${x.updated}, unchanged ${x.unchanged}, conflicts ${x.conflicts?.length} (${(x.conflicts || []).map((c) => c.name).join(", ")}), phones ${JSON.stringify({ ...x.phones, unmatchedNames: undefined })}`}`,
+            );
+          }
+        } catch (e) {
+          console.error(`[Cron] Tabit Shift employees error: ${e.message}`);
         }
       },
       { scheduled: true, timezone: "Asia/Jerusalem" },

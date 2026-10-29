@@ -61,6 +61,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `payroll-summary/payroll_summary.js`) → step 3. "Update from Tabit" (step 4) reads the month from Tabit again
   (`refresh`) and keeps the saved מפרעה (`keepSaved`; one person = the saved rows with one ID number). "New payroll
   from Excel files…" still goes to the step 2 upload. Test: `node scripts/test_payroll_tabit.js`.
+- **Tabit Shift employee list** (2026-10-29): the same 06:30 job also reads `/api/employees/` of each Tabit app
+  (`syncTabitShiftEmployees` in `payroll.js`) = the Shift loader without the Excel file: only ACTIVE people (the API
+  also returns everyone who left, and Tabit reuses their clock ids); new → `shift_employees`, changed name → update,
+  a CONFLICT is not applied (it waits for the Shift loader) and is logged; then the phones → `employees.phone`.
+  By hand: `node scripts/tabit_shift_fetch.js --employees [--apply]`.
 - **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
   (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
   equal rows in the file; `UNIQUE` + `INSERT IGNORE`. Test: `node scripts/test_bank_hapoalim.js`.

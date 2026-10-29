@@ -94,6 +94,13 @@ export class TabitShiftClient {
     return this.json(`/api/report/?${qs}`);
   }
 
+  /** The employee list of the current app (the web app's Employees page; the same as its "רשימת עובדים" export):
+   *  [{ id, user: { username, first_name, last_name, phone_number, clock_id, is_active, is_deleted }, roles, … }]. */
+  async employees() {
+    const data = await this.json("/api/employees/", { referer: "/app/employees" });
+    return Array.isArray(data) ? data : data?.results || [];
+  }
+
   async logout() {
     await this.call("/api/auth/logout/", { method: "POST" }).catch(() => {});
   }
@@ -199,3 +206,30 @@ export const mergeParsed = (list) => {
   }
   return { month: list[0]?.month ?? null, employees: [...byName.values()], skipped: list.flatMap((p) => p.skipped) };
 };
+
+/**
+ * The /api/employees/ list → the rows parseEmployeeRosterXlsx (payroll.js) reads from the "רשימת עובדים" Excel
+ * export: { username, first_name, family_name, clock_id, phone, first_name_raw, family_name_raw, id_nmbr, active }.
+ * Names are cleaned like the Excel ones (Tabit's leading "*" and the " - role" suffix of the family name);
+ * active = "פעיל" in the export (active and not deleted).
+ */
+export const employeesToRoster = (list) =>
+  (list || [])
+    .map((e) => {
+      const u = e.user || {};
+      const firstRaw = String(u.first_name ?? "").trim();
+      const familyRaw = String(u.last_name ?? "").trim();
+      const cut = familyRaw.indexOf(" - ");
+      return {
+        username: String(u.username ?? "").trim() || null,
+        first_name: firstRaw.replace(/^\*+\s*/, "") || null,
+        family_name: (cut === -1 ? familyRaw : familyRaw.slice(0, cut).trim()) || null,
+        clock_id: u.clock_id != null && u.clock_id !== "" ? String(u.clock_id) : null,
+        phone: String(u.phone_number ?? "").replace(/[^\d+]/g, "") || null,
+        first_name_raw: firstRaw || null,
+        family_name_raw: familyRaw || null,
+        id_nmbr: null,
+        active: !!u.is_active && !u.is_deleted,
+      };
+    })
+    .filter((r) => r.username || r.phone || r.clock_id);
