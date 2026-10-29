@@ -6,7 +6,8 @@ import cron from "node-cron";
 import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { fetchTabitShift } from "./modules/files.js";
+import { fetchTabitShift, fetchTabitRota } from "./modules/files.js";
+import { weekSunday } from "./uploads/tabitShift.js";
 import { syncTabitShiftEmployees } from "./modules/payroll.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -152,8 +153,8 @@ app.listen(PORT, () => {
 
   console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
 
-  // Tabit Shift attendance → tabit_shifts, then the employee list → shift_employees, daily after the business
-  // day ends (06:00). Only where
+  // Tabit Shift attendance → tabit_shifts, the employee list → shift_employees and the work plan of this and
+  // next week → tabit_rota, daily after the business day ends (06:00). Only where
   // TABIT_SHIFT_AUTO=1 (the production server), so a dev admin on the same DB does not run it too.
   if (process.env.TABIT_SHIFT_AUTO === "1") {
     cron.schedule(
@@ -175,6 +176,18 @@ app.listen(PORT, () => {
           }
         } catch (e) {
           console.error(`[Cron] Tabit Shift employees error: ${e.message}`);
+        }
+        // the work plan (Rota) of this week and next week → tabit_rota (plans change during the week)
+        const thisWeek = weekSunday();
+        const nextWeek = new Date(`${thisWeek}T12:00:00Z`);
+        nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+        for (const weekStart of [thisWeek, nextWeek.toISOString().slice(0, 10)]) {
+          try {
+            for (const r of await fetchTabitRota({ weekStart }))
+              console.log(`[Cron] Tabit Shift rota ${r.weekStart} ${r.branch}: ${r.status} ${r.error || JSON.stringify(r.result)}`);
+          } catch (e) {
+            console.error(`[Cron] Tabit Shift rota ${weekStart} error: ${e.message}`);
+          }
         }
       },
       { scheduled: true, timezone: "Asia/Jerusalem" },

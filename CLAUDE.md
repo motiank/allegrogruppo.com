@@ -69,7 +69,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
 - **Tabit Shift work plan** (סידור עבודה, the Rota page; 2026-10-29) → `tabit_rota` (one row per slot: date × shift ×
   role × employee, planned times, published; open slots have no employee; no usernames/phones). API: `/api/rotas/?date=
   <Sunday>` → `/api/cells/?rota__in=…` + `/api/shifts/`, `/api/roles/`; same login. A fetch replaces that week of the
-  branch. By hand only (not in the daily job yet): `node scripts/tabit_rota_fetch.js [--week YYYY-MM-DD] [--apply]`.
+  branch. The daily 06:30 job copies this week and next week; by hand: `node scripts/tabit_rota_fetch.js [--week
+  YYYY-MM-DD] [--apply]`.
   Table created on prod 2026-10-29 (`scripts/utils/create_tabit_rota_table.sql`); week 2026-10-25 loaded.
 - **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
   (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
