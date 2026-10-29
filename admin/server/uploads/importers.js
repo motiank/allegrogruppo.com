@@ -37,12 +37,19 @@ export const importTabitDetailed = async (buffer, { rest, uploadId }) =>
   saveTabitDetailed(parseTabitDetailed(await loadWorkbook(buffer)), { rest, uploadId });
 
 // The same for a report already read ({ month, employees, skipped }) — the Excel file or the Tabit Shift API.
-export const saveTabitDetailed = async (parsed, { rest, uploadId }) => {
+// wholeMonth (the Tabit Shift API: every app of the branch, the full month) replaces ALL the branch's rows of the
+// month, so a person renamed or removed in Tabit does not stay under the old name (אלה רוחב → אלה מרחב, 2026-10).
+// An empty report never clears the month.
+export const saveTabitDetailed = async (parsed, { rest, uploadId, wholeMonth = false }) => {
   if (!parsed.month) throw new Error("the month of the report was not found");
   const month = parsed.month;
   return inTransaction(async (conn) => {
     let replaced = 0;
     const rows = [];
+    if (wholeMonth && parsed.employees.length) {
+      const [del] = await conn.execute("DELETE FROM tabit_shifts WHERE rest = :rest AND month = :month", { rest, month });
+      replaced += del.affectedRows || 0;
+    }
     for (const e of parsed.employees) {
       const [del] = await conn.execute("DELETE FROM tabit_shifts WHERE rest = :rest AND month = :month AND employee_name = :name", {
         rest,

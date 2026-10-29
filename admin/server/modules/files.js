@@ -196,7 +196,7 @@ export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryR
           };
           const uploadId = await logUpload({ user: { email: by } }, r, "FAILED", { started: true }, { rest: b.rest });
           try {
-            const out = await saveTabitDetailed(parsed, { rest: b.rest, uploadId });
+            const out = await saveTabitDetailed(parsed, { rest: b.rest, uploadId, wholeMonth: true });
             // The full reports, for the payroll. A failure here (e.g. the table is not created yet) does not
             // undo the shifts import; it is reported and makes the status PARTIAL.
             try {
