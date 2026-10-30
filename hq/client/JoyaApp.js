@@ -24,7 +24,7 @@ import Data from './pages/Data.js';
 import Settings from './pages/Settings.js';
 import Menu from './pages/Menu.js';
 import Employees from './pages/Employees.js';
-import Area from './pages/Area.js';
+import Area, { AREAS } from './pages/Area.js';
 
 // The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
 // With one company its line means "all" ('').
@@ -38,11 +38,14 @@ function pick(j, v) {
 }
 
 const useStyles = createUseStyles((theme) => ({
-  bar: { position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.6rem', borderBottom: `1px solid ${theme.border}`, background: theme.surface },
+  // three columns: menu + brand | the section's name, in the middle | the picker
+  bar: { position: 'sticky', top: 0, zIndex: 20, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.6rem', borderBottom: `1px solid ${theme.border}`, background: theme.surface },
+  barStart: { display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 },
+  section: { margin: 0, fontSize: '0.98rem', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center' },
   iconBtn: { flexShrink: 0, background: 'none', border: `1px solid ${theme.border}`, borderRadius: 6, color: theme.text, padding: '0.3rem 0.6rem', fontSize: '1.05rem', lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit' },
   brand: { flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   brandSub: { fontWeight: 400, color: theme.textSecondary, fontSize: '0.75rem', marginInlineStart: '0.4rem', '@media (max-width: 480px)': { display: 'none' } },
-  pick: { display: 'flex', gap: '0.3rem', maxWidth: '60%', minWidth: 0 },
+  pick: { display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', minWidth: 0 },
   loc: { minWidth: 0, maxWidth: '100%', padding: '0.3rem 0.4rem', border: `1px solid ${theme.border}`, borderRadius: 6, background: theme.background, color: theme.text, fontSize: '0.8rem', fontFamily: 'inherit' },
   backdrop: { position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.35)' },
   drawer: { position: 'fixed', top: 0, bottom: 0, insetInlineStart: 0, zIndex: 31, width: 'min(300px, 86vw)', overflowY: 'auto', background: theme.surface, borderInlineEnd: `1px solid ${theme.border}`, padding: '0.5rem 0 1.5rem' },
@@ -96,19 +99,24 @@ function Shell() {
   }
   const me = j.me;
   const isAccountant = me.role === 'ACCOUNTANT';
+  // the section (a main-menu area) is named only here, in the middle of the top bar
+  const section = Object.keys(AREAS).find((a) => where.pathname === `/${a}` || where.pathname.startsWith(`/${a}/`)) || null;
   const go = (path) => navigate(path);
   const showDemo = j.anyDemo(j.scope);
 
   return (
     <div style={{ minHeight: '100vh', background: theme.background, color: theme.text }}>
       <div className={c.bar}>
-        <button className={c.iconBtn} onClick={() => setOpen(true)} aria-label={t('menu.open')} aria-expanded={open}>
-          ☰
-        </button>
-        <div className={c.brand}>
-          <bdi dir="ltr">Joya Headquarter</bdi>
-          <span className={c.brandSub}>{t(`joya.role.${me.role}`)}</span>
+        <div className={c.barStart}>
+          <button className={c.iconBtn} onClick={() => setOpen(true)} aria-label={t('menu.open')} aria-expanded={open}>
+            ☰
+          </button>
+          <div className={c.brand}>
+            <bdi dir="ltr">Joya Headquarter</bdi>
+            <span className={c.brandSub}>{t(`joya.role.${me.role}`)}</span>
+          </div>
         </div>
+        <h1 className={c.section}>{section ? t(`joya.area.${section}.title`) : ''}</h1>
         <div className={c.pick}>
           <select className={c.loc} value={pickValue(j)} onChange={(e) => pick(j, e.target.value)} aria-label={t('joya.location')}>
             {me.isAdmin && j.companies.length > 1 && <option value="">{t('joya.allCompanies')}</option>}

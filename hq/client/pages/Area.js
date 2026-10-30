@@ -21,8 +21,9 @@ export default function Area({ area }) {
   const j = useJoya();
   const a = AREAS[area];
   const suggestions = Array.from({ length: a.suggestions }, (_, i) => t(`joya.area.${area}.s${i + 1}`));
+  // the section's name is in the middle of the top bar (JoyaApp.js), not on the page
   return (
-    <Page title={t(`joya.area.${area}.title`)} sub={j.location ? j.location.name : j.companyKey != null ? j.companies.find((c) => c.key === j.companyKey)?.label || t('joya.noCompany') : t('joya.allLocations')}>
+    <Page>
       <ChatArea
         key={area}
         contextId={a.id}

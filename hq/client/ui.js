@@ -99,6 +99,7 @@ export function Page({ title, sub, back, actions, tabs, children }) {
   const { t } = useT();
   return (
     <div className={c.root}>
+      {title || back || actions || tabs ? (
       <header className={c.header}>
         {back ? (
           <button className={c.back} onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}>
@@ -114,6 +115,7 @@ export function Page({ title, sub, back, actions, tabs, children }) {
         </div>
         {tabs || null}
       </header>
+      ) : null}
       <main className={c.main}>{children}</main>
     </div>
   );
