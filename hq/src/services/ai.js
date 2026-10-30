@@ -20,6 +20,7 @@ import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
 import * as source from './source.js';
+import { attendanceReport } from './attendance.js';
 import { recentSameWeekday } from './demand.js';
 import { addDays } from '../lib/recommend.js';
 import { listRoles, listShifts, listLocations } from './master.js';
@@ -262,6 +263,15 @@ export const CALCS = {
     run: (a, p) => {
       const [from, to] = range(p);
       return shiftModel.actualStaffing(a, String(p.locationId), { from, to, role: p.role, weeks: p.weeks });
+    },
+  },
+  attendance_report: {
+    params: '{ locationIds?, from, to }',
+    about:
+      'דיווחי נוכחות: the Tabit Shift clock report only, and its problems per location: open shifts (an entry without an exit, an exit without an entry; no exit today = still at work), no-shows (in the Tabit work plan that day but no clock times) and people who clocked in on a day they were not in the plan; each with the date, name, role and times',
+    run: async (a, p) => {
+      const names = new Map((await listLocations(a)).map((l) => [String(l.id), l.name]));
+      return attendanceReport(locs(a, p), ...range(p), todayLocal(), names);
     },
   },
   staffing_plan_lines: {

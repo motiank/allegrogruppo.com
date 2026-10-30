@@ -7,6 +7,7 @@
 //   employees      /employees               Joya's employee id IS Allegro's employeeId
 //   clock times    /shifts/raw              Tabit detailed report; an attendance id IS the raw shift id
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
+//   work plan      /shifts/plan             the Tabit Shift work plan (סידור עבודה): date × shift × role × employee
 //   payroll        /payroll, /shifts/summary
 //   labor cost     /labor/daily(/employees)  the admin's payroll rules and payslips (never computed here)
 //   freshness      /status
@@ -168,9 +169,42 @@ export async function rawShifts(locationId, from, to) {
       clockOut: r.clockOut ?? null,
       roleName: cleanRole(r.role),
       roleCode: await roleCodeOf(r.role),
+      loadedAt: r.loadedAt ?? null,
     });
   }
   return out;
+}
+
+/**
+ * The Tabit Shift work plan (סידור עבודה) of one location: one row per slot; an open slot has no employee.
+ * employeeId is linked by Allegro the same way as the clock rows. { available: false, reason } when Allegro has no plan
+ * table or no such endpoint yet.
+ */
+export async function workPlan(locationId, from, to) {
+  const branch = String(locationId);
+  try {
+    const rows = await byMonth('/shifts/plan', branch, from, to);
+    return {
+      available: true,
+      rows: rows
+        .filter((r) => r.date >= from && r.date <= to)
+        .map((r) => ({
+          date: r.date,
+          weekStart: r.weekStart,
+          published: !!r.published,
+          shift: r.shift ?? null,
+          roleName: cleanRole(r.role),
+          employeeId: r.employeeId ?? null,
+          employeeName: r.employeeName ?? null,
+          plannedStart: r.plannedStart ?? null,
+          plannedEnd: r.plannedEnd ?? null,
+        })),
+    };
+  } catch (e) {
+    if (e.code === 'NOT_SUPPORTED') return { available: false, reason: 'Allegro has no /shifts/plan endpoint yet' };
+    if (e.code === 'NOT_LOADED') return { available: false, reason: 'no Tabit work plan is loaded in Allegro' };
+    throw e;
+  }
 }
 
 /**

@@ -74,6 +74,7 @@ const TABLE_MIGRATIONS = {
   bcom_items_daily: "scripts/utils/create_bcom_items_table.sql",
   bcom_payments_daily: "scripts/utils/create_bcom_payments_table.sql",
   bank_transactions: "scripts/utils/create_file_upload_tables.sql",
+  tabit_rota: "scripts/utils/create_tabit_rota_table.sql",
 };
 
 const missingTable = (err) => {
@@ -502,6 +503,7 @@ const ENDPOINTS = [
   "GET /shifts/summary?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /shifts/raw?from=&to=|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /shifts/by-shift?from=&to=[&branch=a,b][&split=HH:MM][&minHours=]",
+  "GET /shifts/plan?from=&to=[&branch=a,b]",
   "GET /payroll/months?branch=",
   "GET /payroll?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /payroll/labor-cost?branch=&month=YYYY-MM",
@@ -1112,6 +1114,62 @@ const Router = () => {
         asOf,
         unmatched: data.filter((d) => !d.employeeId).length,
         missingClockOut: data.filter((d) => d.clockIn && !d.clockOut).length,
+      },
+    };
+  });
+
+  // The Tabit Shift work plan (סידור עבודה): one row per slot (date × shift × role × employee); an open slot
+  // has no employee. Linked to the employee the same way as /shifts/raw.
+  get("/shifts/plan", async (req) => {
+    const branchIds = await optionalBranches(req);
+    const range = requireDateRange(req, MAX_STORED_DAYS);
+    const asOf = new Date().toISOString();
+    const params = { ...range };
+    const [rows] = await executeSql(
+      `SELECT id, rest, ${dayCol("week_start", "week_start")}, app_id, published, ${dayCol("work_date", "work_date")},
+              shift_name, role_name, slot_order, employee_name, clock_id,
+              ${localCol("planned_start", "planned_start")}, ${localCol("planned_end", "planned_end")},
+              ${localCol("manual_start", "manual_start")}, ${localCol("manual_end", "manual_end")}, notes, fetched_at
+         FROM tabit_rota
+        WHERE work_date BETWEEN :from AND :to
+          ${inBranches("rest", branchIds, params)}
+        ORDER BY rest, work_date, planned_start, shift_name, role_name, slot_order`,
+      params,
+    );
+    const resolve = await employeeResolver(branchIds);
+    const data = rows.map((r) => {
+      const who = r.employee_name ? resolve(r.rest, r.employee_name, r.clock_id) : { employeeId: null, matchedBy: null };
+      return {
+        id: r.id,
+        branch: r.rest,
+        weekStart: r.week_start,
+        appId: r.app_id,
+        published: !!r.published,
+        date: r.work_date,
+        shift: r.shift_name,
+        role: r.role_name,
+        slot: r.slot_order,
+        employeeId: who.employeeId,
+        matchedBy: who.matchedBy,
+        employeeName: r.employee_name,
+        clockId: r.clock_id,
+        plannedStart: r.manual_start || r.planned_start,
+        plannedEnd: r.manual_end || r.planned_end,
+        notes: r.notes,
+        fetchedAt: r.fetched_at,
+      };
+    });
+    return {
+      data,
+      meta: {
+        branches: branchesMeta(branchIds),
+        ...range,
+        asOf,
+        weeks: [...new Set(data.map((d) => `${d.branch}|${d.weekStart}`))].map((k) => {
+          const [branch, weekStart] = k.split("|");
+          return { branch, weekStart, published: data.some((d) => d.branch === branch && d.weekStart === weekStart && d.published) };
+        }),
+        openSlots: data.filter((d) => !d.employeeName).length,
       },
     };
   });

@@ -102,6 +102,12 @@ reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) 
 **Days without sales are closed days** (owner 2026-10-27: the data is the real work — weekly closed days, holidays,
 closed branches): sums, averages and the labor cost stand as they are; the AI may name these days but never calls them
 missing data, and the data page shows them as a LOW note.
+**Attendance reports** (דיווחי נוכחות, owner 2026-10-30) = the Tabit Shift clock report only (`attendance_report`
+calculation, `attendanceReport` in `src/services/attendance.js`). Its problems: open shifts (an entry without an exit,
+an exit without an entry), no-shows (in the Tabit work plan that day, no clock times) and people who clocked in on a day
+they were not in the plan. The plan comes from Allegro `/shifts/plan`; a day that was not over when the report was read
+is not checked.
+
 **A new employee** (owner 2026-10-29) = worked in the period and has no employee number in Micpal (= has not handed in
 form 101 yet); employees marked as a contractor (עובד קבלן) are never new; the `employees` calculation with from/to marks them (`newEmployee`, `newEmployees`). The number comes
 from the admin's `payroll_soft_ix` (linked by ID number); HQ gets only `hasPayrollNumber`. Settings → Connections checks the API; Settings → Locations (read-only) → "Read Allegro again now" clears the cache.

@@ -82,6 +82,10 @@ Guidance:
   "evaluate the staffing of …" → staffing_actual (locationId, from, to; role = the role name in Hebrew,
   e.g. "מלצר", only when one role is named). A past period → staffing_actual; a coming week →
   staffing_forecast_week. With no single location, run it for each location in scope (up to the limit).
+- Attendance reports — "דיווחי נוכחות", "נוכחות", "שעון נוכחות", "בעיות בנוכחות", "attendance", "clock reports", "who forgot
+  to clock out", "who did not come", "who came without being in the plan" → attendance_report (locationIds, from, to;
+  no period named → the current month up to today). It is about the Tabit Shift clock report ONLY: never add sales,
+  staffing, labor cost or employees calculations to it unless the question asks for them.
 - "What does an average shift look like" / "how many diners on Sunday morning" → shift_profile.
   In a STAFFING_PLAN context, expected diners or demand of a slot of that plan → staffing_forecast
   (planId, date, shiftCode), never shift_profile or staffing_forecast_week.
@@ -148,6 +152,17 @@ Your job now: WRITE the answer to the user from <results>.
   evening (summary), then the shifts with the biggest differences (mostOver, mostUnder): date, shift,
   diners, people vs needed. "Needed" is by the branch's own usual diners per person in learnedFrom — say
   so. You may name the days without sales (missingDays.sales) as closed days. If staffData is not "ok", say the clock times are missing.
+- Attendance reports (attendance_report, דיווחי נוכחות): only the Tabit Shift clock report; the problems in it, in this
+  order, per restaurant:
+  1. open shifts: missingExit (entry without exit) and missingEntry (exit without entry) — date, name, role, the time
+     that exists. stillAtWorkToday is not a problem (today's shift is not over): at most one short line.
+  2. no-shows (noShow): in the work plan (סידור עבודה) that day but no clock times — date, name, planned shift/role.
+  3. not in the plan (notInPlan): clock times on a day the person was not in the plan — date, name, role, times.
+  Put each list with 3 rows or more in a table (several restaurants: one table with a restaurant column). No problems
+  → say so. Say which days the plan was compared (comparedDays); plan.available false or notCompared → say there is no
+  work plan to compare for that period (the plan is copied from Tabit Shift from the week of 25.10.2026). A day
+  with published false had a plan that was not published yet — say so. plannedDaysWithoutClockRows = planned days with
+  no clock times at all (a closed day, or the report is missing) — name them, do not list everyone as no-show.
 - Credit card in Beecomm = creditCards (VISA + Mastercard + Amex + Diners), never the whole credit type (אשראי). Give the
   members club (membersClub) as its own line when the user asks about it, or about all payment types. Several
   restaurants: creditCardsTotal / membersClubTotal.
@@ -215,7 +230,7 @@ Your job now: WRITE the answer to the user from <results>.
   | 18.10–24.10 | 221,776 | 218,546 | -1.5% |
   A header line, the |---| line, then one line per row; the first column names the row; numbers exactly as in the
   results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). One list = one table
-  (never split a list into two tables); at most 2 tables, up to 150 rows each. Before the table one short line on what it shows; after it the notes (closed days, fees,
+  (never split a list into two tables); at most 2 tables (an attendance report: up to 3, one per kind of problem), up to 150 rows each. Before the table one short line on what it shows; after it the notes (closed days, fees,
   partial weeks) as short lines. The table lines do not count in the line limit. No table for 1–2 numbers.`;
 
 export const INSTRUCTIONS_VERSION = `joya-hq-1+${createHash('sha256').update(PLAN_PROMPT).update(WRITE_PROMPT).digest('hex').slice(0, 8)}`;

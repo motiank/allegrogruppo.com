@@ -120,6 +120,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /shifts/summary?month=\|updatedSince=[&branch=][&employeeId=]` | Monthly hours/tips per employee and role | `payroll` |
 | `GET /shifts/raw?from=&to=\|updatedSince=[&branch=][&employeeId=]` | Raw clock-in/out times from Tabit | `tabit_shifts` ¹ |
 | `GET /shifts/by-shift?from=&to=[&branch=][&split=][&minHours=]` | People and clock hours per branch/date/shift/role | `tabit_shifts` ¹ |
+| `GET /shifts/plan?from=&to=[&branch=]` | The Tabit Shift work plan (סידור עבודה): one row per slot | `tabit_rota` |
 | `GET /payroll/months?branch=` | Months that have saved payroll | `payroll` |
 | `GET /payroll?month=\|updatedSince=[&branch=][&employeeId=]` | Saved payroll + payslip components (tlush) | `payroll` |
 | `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. the stored labor cost | `bcom_cash` |
@@ -359,6 +360,14 @@ One row per clock-in/out pair from the Tabit detailed report (`tabit_shifts`), s
 Rows nobody matches safely keep `employeeId: null`, and the API never guesses between two people. Tested on Raanana: 108 people matched by clock id and all 113 employees by base name, with no wrong matches. People in the Tabit list who aren't in `employees` (mostly former staff) stay unmatched.
 
 `meta.unmatched` = rows without an `employeeId`. `meta.missingClockOut` = rows with a clock-in and no clock-out.
+
+### `GET /shifts/plan?from=&to=[&branch=id1,id2]`
+
+The work plan (סידור עבודה) copied from Tabit Shift (`tabit_rota`, the daily 06:30 job copies this week and next week).
+One row per slot: `date`, `weekStart`, `published`, `shift` (Tabit's shift name), `role`, `slot`, `employeeName`,
+`clockId`, `employeeId` / `matchedBy` (linked like `/shifts/raw`), `plannedStart` / `plannedEnd` (local time; the
+manager's manual times when set), `notes`, `fetchedAt`. An open slot has no employee. `from` and `to` are required.
+`meta.weeks` = the weeks found per branch and whether they were published; `meta.openSlots` = slots with no one.
 
 ### `GET /shifts/by-shift?from=&to=[&branch=id1,id2][&split=HH:MM][&minHours=]`
 
