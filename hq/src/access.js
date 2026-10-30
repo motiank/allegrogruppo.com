@@ -77,7 +77,7 @@ export function requireJoya(req, res, next) {
 
 // The accountant sees only the accounting area: its chat and what the page needs to show it.
 // Matched on the full path (baseUrl + path): mounted with r.use('/joya', …), req.path alone has no /joya.
-const ACCOUNTANT_ROUTES = [/\/joya\/me$/, /\/joya\/locations$/, /\/joya\/ai\/(ask|requests)(\/|$)/];
+const ACCOUNTANT_ROUTES = [/\/joya\/me$/, /\/joya\/locations$/, /\/joya\/ai\/(ask|requests)(\/|$)/, /\/joya\/files\/(recognize|import)$/];
 export function limitAccountant(req, res, next) {
   const path = `${req.baseUrl || ''}${req.path}`;
   if (req.joya?.role !== 'ACCOUNTANT' || ACCOUNTANT_ROUTES.some((re) => re.test(path))) return next();

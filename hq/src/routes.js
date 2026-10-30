@@ -9,7 +9,8 @@
  * 502 UPSTREAM (the Allegro API failed or cannot be reached), 503 NOT_LOADED (an Allegro table is missing).
  * Source data (sales, employees, clock times, payroll) is read from the Allegro API — see services/source.js.
  */
-import { Router } from 'express';
+import express, { Router } from 'express';
+import { createRequire } from 'module';
 import { requireJoya, limitAccountant, requireAdmin, requirePayroll, scopeLocations, canLocation } from './access.js';
 import { requireMachineKey } from './auth/machineKey.js';
 import { q, parseJson, todayLocal } from './db.js';
@@ -25,7 +26,9 @@ import { answerTableXlsx } from './services/answerExcel.js';
 import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
-import { clearCache as clearAllegroCache, get as allegroGet, apiBase } from '../lib/allegro.js';
+import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
+
+const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
 const r = Router();
 const STATUS = { BAD_REQUEST: 400, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, MANDATORY_MIN: 422, UPSTREAM: 502, NOT_LOADED: 503 };
@@ -206,6 +209,38 @@ r.get(
     return { entries: visible.map((x) => ({ id: x.id, by: x.username, action: x.action, at: x.created_at, detail: parseJson(x.detail_json) })) };
   }),
 );
+
+// ---------------------------------------------------------------- files dropped in the chat
+// The same recognize / import as the Allegro admin's Upload files page (Allegro /files/*); the data goes to the Allegro
+// tables, Joya keeps nothing. Rights: the chain admin = every file; a manager = the files of their branches, no bank
+// files; the accountant = only the bank files of their companies' accounts (shared/restaurants.json bank_accounts).
+async function fileRights(a) {
+  if (a.isAdmin) return { 'X-Joya-User': a.username, 'X-Joya-Admin': '1' };
+  const out = { 'X-Joya-User': a.username, 'X-Joya-Branches': a.role === 'ACCOUNTANT' ? '' : a.locationIds.join(',') };
+  if (a.role === 'ACCOUNTANT') {
+    const companies = new Set((await master.listLocations(a)).map((l) => l.company?.key).filter(Boolean));
+    out['X-Joya-Bank-Accounts'] = (RESTAURANTS.restaurants || [])
+      .filter((g) => companies.has(g.key))
+      .flatMap((g) => (g.bank_accounts || []).map((b) => b.account))
+      .join(',');
+  }
+  return out;
+}
+for (const step of ['recognize', 'import']) {
+  r.post(
+    `/joya/files/${step}`,
+    express.raw({ type: 'multipart/form-data', limit: '60mb' }),
+    h(async (req) => {
+      if (!Buffer.isBuffer(req.body) || !req.body.length) throw Object.assign(new Error('no files'), { code: 'BAD_REQUEST' });
+      const data = await postFiles(`/files/${step}`, req.body, req.get('content-type'), await fileRights(req.joya));
+      if (step === 'import') {
+        clearAllegroCache(); // the new rows are seen at once
+        logger.info(`[joya] ${req.joya.username} imported ${JSON.stringify((data || []).map((x) => ({ name: x.name, kind: x.kind, status: x.status })))}`);
+      }
+      return { files: data || [] };
+    }),
+  );
+}
 
 // ---------------------------------------------------------------- AI (user side)
 r.post('/joya/ai/ask', h(async (req) => ({ request: await ai.ask(req.joya, req.body || {}) })));

@@ -204,8 +204,10 @@ export const recognizeFile = async (file, ctx, { allowed = null, isAdmin = false
 };
 
 // After recognition: apply the user's permissions to the answer.
-export const applyPermissions = (r, { allowed, isAdmin }) => {
+// bankAccounts (Joya's accountant): the bank accounts of the user's companies; a bank file of one of them is allowed.
+export const applyPermissions = (r, { allowed, isAdmin, bankAccounts = null }) => {
   if (r.adminOnly && !isAdmin) {
+    if (bankAccounts && r.account && bankAccounts.has(r.account)) return r;
     return { ...r, importable: false, reason: "Only an admin can import bank files." };
   }
   if (!allowed) return r;

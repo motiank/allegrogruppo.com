@@ -102,6 +102,12 @@ reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) 
 **Days without sales are closed days** (owner 2026-10-27: the data is the real work — weekly closed days, holidays,
 closed branches): sums, averages and the labor cost stand as they are; the AI may name these days but never calls them
 missing data, and the data page shows them as a LOW note.
+**Files in the chat** (owner 2026-10-31): a file dropped on a chat area (or picked with 📎) is read by the Allegro
+admin's Upload files code (Allegro `POST /files/recognize`), the card shows what it is, and "Import" writes it to the
+Allegro tables (`POST /files/import`, `client/FileDrop.js`, routes `/joya/files/*`). Joya keeps nothing. Rights: the
+chain admin = every file; a manager = the Tabit reports of their branches, no bank files; the accountant = only the
+bank files of their companies' accounts. Employee lists and Micpal / Shiklulit files link to the admin page.
+
 **The shifts themselves** (owner 2026-10-30): the `clock_rows` calculation lists every clock row of the Tabit report
 (date, name, role, morning/evening, in, out, hours) for a person, a date or a shift. `employees` gives only totals.
 

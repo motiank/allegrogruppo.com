@@ -1,7 +1,8 @@
 // The chat of a main-menu area (pages/Area.js). Before the first question the ask field is in the
 // middle of the page; after it, every question is a box (the question, a line, the answer, × to delete)
 // and the ask field stays fixed at the bottom of the screen. The field opens a list of suggestions: the
-// area's fixed questions when it is empty, the ones that fit the typed words while typing.
+// area's fixed questions when it is empty, the ones that fit the typed words while typing. Files dropped on the page
+// (or picked with the paperclip) are read with the Allegro admin's upload code and imported on "Import" (FileDrop.js).
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api, qs } from './api.js';
@@ -9,6 +10,7 @@ import { useT, Term } from './i18n/index.js';
 import { ErrorBox, fmtWhen } from './ui.js';
 import { Answer, matchSuggestions } from './AskBox.js';
 import { useJoya } from './context.js';
+import { useWindowDrop, DropOverlay, useUploads, UploadCard } from './FileDrop.js';
 
 const useStyles = createUseStyles((theme) => ({
   start: { minHeight: 'calc(100vh - 190px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 680, margin: '0 auto', width: '100%' },
@@ -107,6 +109,18 @@ const useStyles = createUseStyles((theme) => ({
     '&:first-child': { borderTop: 0 },
   },
   active: { background: 'rgba(127,127,127,0.16)' },
+  attach: {
+    flex: 'none',
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    border: `1px solid ${theme.border}`,
+    background: theme.surface,
+    color: theme.textSecondary,
+    fontSize: '1.15rem',
+    cursor: 'pointer',
+    '&:hover': { color: theme.text },
+  },
 }));
 
 /** The arrow of the send button. It points to where the text runs: left in Hebrew, right in English. */
@@ -118,12 +132,13 @@ function SendIcon({ rtl }) {
   );
 }
 
-function Composer({ classes, docked, suggestions, pool, busy, onSend }) {
+function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles }) {
   const { t, isRtl } = useT();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const field = useRef(null);
+  const picker = useRef(null);
   const typed = text.trim();
   const list = useMemo(() => (typed ? matchSuggestions(text, pool) : suggestions), [typed, text, pool, suggestions]);
   const show = open && list.length > 0;
@@ -167,6 +182,24 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend }) {
   return (
     <div className={classes.composer}>
       <div className={classes.row}>
+        {onFiles ? (
+          <>
+            <button type="button" className={classes.attach} onClick={() => picker.current?.click()} aria-label={t('joya.files.attach')} title={t('joya.files.attach')}>
+              📎
+            </button>
+            <input
+              ref={picker}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = [...(e.target.files || [])];
+                e.target.value = '';
+                if (files.length) onFiles(files);
+              }}
+            />
+          </>
+        ) : null}
         <textarea
           ref={field}
           className={classes.field}
@@ -257,6 +290,11 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const timer = useRef(null);
   const scrollDown = useRef(false);
   const contextKind = 'AREA';
+  const { uploads, add: addFiles, run: importFiles, remove: removeUpload } = useUploads();
+  const dragging = useWindowDrop((files) => {
+    scrollDown.current = true;
+    addFiles(files);
+  });
 
   const load = () =>
     api(`/ai/requests${qs({ contextKind, contextId, limit })}`)
@@ -282,7 +320,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     scrollDown.current = false;
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items?.length, items?.[0]?.status]);
+  }, [items?.length, items?.[0]?.status, uploads.length]);
 
   const pool = useMemo(() => [...new Set([...suggestions, ...(items || []).map((r) => r.question)])], [suggestions, items]);
 
@@ -313,11 +351,13 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   };
 
   if (items == null) return <ErrorBox error={err} />;
-  const composer = <Composer classes={classes} docked={items.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} />;
+  const composer = <Composer classes={classes} docked={items.length + uploads.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} onFiles={addFiles} />;
+  const overlay = dragging ? <DropOverlay /> : null;
 
-  if (!items.length)
+  if (!items.length && !uploads.length)
     return (
       <div className={classes.start}>
+        {overlay}
         <h2 className={classes.startTitle}>{title}</h2>
         {intro ? <p className={classes.intro}>{intro}</p> : null}
         {composer}
@@ -328,9 +368,13 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
 
   return (
     <>
+      {overlay}
       <div className={classes.list}>
         {[...items].reverse().map((r) => (
           <Card key={r.id} r={r} classes={classes} onDelete={() => remove(r.id)} onChanged={() => load()} />
+        ))}
+        {uploads.map((u) => (
+          <UploadCard key={u.key} u={u} onImport={(rests) => importFiles(u, rests)} onRemove={() => removeUpload(u.key)} />
         ))}
         <ErrorBox error={err} />
       </div>

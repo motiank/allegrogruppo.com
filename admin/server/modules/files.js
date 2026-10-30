@@ -30,7 +30,7 @@ const fixName = (n) => {
   const utf = Buffer.from(s, "latin1").toString("utf8");
   return /[\u0080-\u00ff]/.test(s) && !utf.includes("\ufffd") ? utf : s;
 };
-const parseFiles = (req, res, next) =>
+export const parseFiles = (req, res, next) =>
   parseFilesRaw(req, res, (err) => {
     for (const f of req.files || []) f.originalname = fixName(f.originalname);
     next(err);
@@ -261,6 +261,81 @@ export const fetchTabitRota = async ({ weekStart = weekSunday(), dryRun = false,
   return results;
 };
 
+/**
+ * What each uploaded file is and what an import would do (no writes). perms = { isAdmin, allowed: Set|null,
+ * bankAccounts?: Set } (see recognize.js applyPermissions). Used by the Upload page and the Local Data API (Joya chat).
+ */
+export const recognizeUploads = async (files, perms) => {
+  const ctx = await loadContext();
+  const out = [];
+  for (const f of files) {
+    let r;
+    try {
+      r = applyPermissions(await recognizeFile(f, ctx, perms), perms);
+    } catch (e) {
+      console.error(`files/recognize ${f.originalname}:`, e);
+      r = { name: f.originalname, size: f.buffer.length, recognized: false, importable: false, reason: `Error while reading the file: ${e.message}` };
+    }
+    out.push(r);
+  }
+  const prev = await previousUploads(out.map((r) => r.hash).filter(Boolean));
+  for (const r of out) {
+    const p = prev.get(r.hash);
+    if (p) r.previous = { at: p.at, times: Number(p.times) };
+  }
+  return out;
+};
+
+/** Imports the approved files this module handles. plan: one { hash, rest? } per file, in the same order. */
+export const importUploads = async (files, plan, perms, userEmail) => {
+  const ctx = await loadContext();
+  const req = { user: { email: userEmail } };
+  const results = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const step = plan[i] || {};
+    const r = applyPermissions(await recognizeFile(f, ctx, perms), perms);
+    const fail = (error) => results.push({ name: f.originalname, kind: r.kind, status: "FAILED", error });
+    if (step.hash && step.hash !== r.hash) {
+      fail("the file changed after it was checked — check it again");
+      continue;
+    }
+    if (!r.importable || r.handler !== "server") {
+      fail(r.reason || "this file is not imported here");
+      continue;
+    }
+    let rest = r.rest;
+    if (r.kind === "TABIT_DETAILED") {
+      rest = String(step.rest || "").trim();
+      if (!BRANCH_IDS.has(rest)) {
+        fail("choose the branch of this report");
+        continue;
+      }
+      if (perms.allowed && !perms.allowed.has(rest)) {
+        fail("you are not allowed to use this branch");
+        continue;
+      }
+    }
+    let uploadId = null;
+    try {
+      uploadId = await logUpload(req, r, "FAILED", { started: true }, { rest });
+      let out;
+      if (r.kind === "TABIT_DETAILED") out = await importTabitDetailed(f.buffer, { rest, uploadId });
+      else if (r.kind === "BANK_HAPOALIM") out = await importBankHapoalim(f.buffer, { uploadId });
+      else throw new Error(`no importer for ${r.kind}`);
+      const status = (out.skippedBranches || []).length || (out.skippedSheets || []).length ? "PARTIAL" : "OK";
+      await setUploadResult(uploadId, status, out);
+      results.push({ name: f.originalname, kind: r.kind, rest, status, result: out });
+    } catch (e) {
+      console.error(`files/import ${f.originalname}:`, e);
+      if (uploadId) await setUploadResult(uploadId, "FAILED", { error: e.message }).catch(() => {});
+      fail(e.message || "import failed");
+    }
+  }
+  ctxCache = null;
+  return results;
+};
+
 export const Router = function ({ restricted = false } = {}) {
   const router = express.Router();
 
@@ -268,27 +343,9 @@ export const Router = function ({ restricted = false } = {}) {
     parseFiles(req, res, async (uploadErr) => {
       if (uploadErr) return res.status(400).json({ error: uploadErr.message || "upload failed" });
       try {
-        const perms = await permissionsOf(req, restricted);
-        const ctx = await loadContext();
         const files = (req.files || []).filter((f) => f && f.buffer);
         if (!files.length) return res.status(400).json({ error: "no files" });
-        const out = [];
-        for (const f of files) {
-          let r;
-          try {
-            r = applyPermissions(await recognizeFile(f, ctx, perms), perms);
-          } catch (e) {
-            console.error(`files/recognize ${f.originalname}:`, e);
-            r = { name: f.originalname, size: f.buffer.length, recognized: false, importable: false, reason: `Error while reading the file: ${e.message}` };
-          }
-          out.push(r);
-        }
-        const prev = await previousUploads(out.map((r) => r.hash).filter(Boolean));
-        for (const r of out) {
-          const p = prev.get(r.hash);
-          if (p) r.previous = { at: p.at, times: Number(p.times) };
-        }
-        res.json({ files: out });
+        res.json({ files: await recognizeUploads(files, await permissionsOf(req, restricted)) });
       } catch (err) {
         console.error("files/recognize error:", err);
         res.status(500).json({ error: err.message || "recognize failed" });
@@ -301,8 +358,6 @@ export const Router = function ({ restricted = false } = {}) {
     parseFiles(req, res, async (uploadErr) => {
       if (uploadErr) return res.status(400).json({ error: uploadErr.message || "upload failed" });
       try {
-        const perms = await permissionsOf(req, restricted);
-        const ctx = await loadContext();
         let plan;
         try {
           plan = JSON.parse(String(req.body?.plan || "[]"));
@@ -311,51 +366,7 @@ export const Router = function ({ restricted = false } = {}) {
         }
         const files = (req.files || []).filter((f) => f && f.buffer);
         if (!files.length || plan.length !== files.length) return res.status(400).json({ error: "files and plan do not match" });
-
-        const results = [];
-        for (let i = 0; i < files.length; i++) {
-          const f = files[i];
-          const step = plan[i] || {};
-          const r = applyPermissions(await recognizeFile(f, ctx, perms), perms);
-          const fail = (error) => results.push({ name: f.originalname, kind: r.kind, status: "FAILED", error });
-          if (step.hash && step.hash !== r.hash) {
-            fail("the file changed after it was checked — check it again");
-            continue;
-          }
-          if (!r.importable || r.handler !== "server") {
-            fail(r.reason || "this file is not imported here");
-            continue;
-          }
-          let rest = r.rest;
-          if (r.kind === "TABIT_DETAILED") {
-            rest = String(step.rest || "").trim();
-            if (!BRANCH_IDS.has(rest)) {
-              fail("choose the branch of this report");
-              continue;
-            }
-            if (perms.allowed && !perms.allowed.has(rest)) {
-              fail("you are not allowed to use this branch");
-              continue;
-            }
-          }
-          let uploadId = null;
-          try {
-            uploadId = await logUpload(req, r, "FAILED", { started: true }, { rest });
-            let out;
-            if (r.kind === "TABIT_DETAILED") out = await importTabitDetailed(f.buffer, { rest, uploadId });
-            else if (r.kind === "BANK_HAPOALIM") out = await importBankHapoalim(f.buffer, { uploadId });
-            else throw new Error(`no importer for ${r.kind}`);
-            const status = (out.skippedBranches || []).length || (out.skippedSheets || []).length ? "PARTIAL" : "OK";
-            await setUploadResult(uploadId, status, out);
-            results.push({ name: f.originalname, kind: r.kind, rest, status, result: out });
-          } catch (e) {
-            console.error(`files/import ${f.originalname}:`, e);
-            if (uploadId) await setUploadResult(uploadId, "FAILED", { error: e.message }).catch(() => {});
-            fail(e.message || "import failed");
-          }
-        }
-        ctxCache = null;
-        res.json({ results });
+        res.json({ results: await importUploads(files, plan, await permissionsOf(req, restricted), req.user?.email || null) });
       } catch (err) {
         console.error("files/import error:", err);
         res.status(500).json({ error: err.message || "import failed" });

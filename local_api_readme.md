@@ -121,6 +121,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /shifts/raw?from=&to=\|updatedSince=[&branch=][&employeeId=]` | Raw clock-in/out times from Tabit | `tabit_shifts` ¹ |
 | `GET /shifts/by-shift?from=&to=[&branch=][&split=][&minHours=]` | People and clock hours per branch/date/shift/role | `tabit_shifts` ¹ |
 | `GET /shifts/plan?from=&to=[&branch=]` | The Tabit Shift work plan (סידור עבודה): one row per slot | `tabit_rota` |
+| `POST /files/recognize` / `POST /files/import` | Files dropped in the Joya chat: the Upload files page's recognize and import | `file_uploads` + the file's table |
 | `GET /payroll/months?branch=` | Months that have saved payroll | `payroll` |
 | `GET /payroll?month=\|updatedSince=[&branch=][&employeeId=]` | Saved payroll + payslip components (tlush) | `payroll` |
 | `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. the stored labor cost | `bcom_cash` |
@@ -360,6 +361,16 @@ One row per clock-in/out pair from the Tabit detailed report (`tabit_shifts`), s
 Rows nobody matches safely keep `employeeId: null`, and the API never guesses between two people. Tested on Raanana: 108 people matched by clock id and all 113 employees by base name, with no wrong matches. People in the Tabit list who aren't in `employees` (mostly former staff) stay unmatched.
 
 `meta.unmatched` = rows without an `employeeId`. `meta.missingClockOut` = rows with a clock-in and no clock-out.
+
+### `POST /files/recognize` and `POST /files/import` (multipart)
+
+The only writing routes: the files dropped in the Joya HQ chat go through the same code as the admin's Upload files page
+(`recognizeUploads` / `importUploads` in `admin/server/modules/files.js`). Body: `files` (one or more), and for import
+`plan` = JSON, one `{ hash, rest? }` per file (the hash from recognize; `rest` = the branch of a Tabit report).
+Joya sends the user's rights in headers: `X-Joya-User` (e-mail, stored in `file_uploads.user_email`), `X-Joya-Admin: 1`,
+`X-Joya-Branches` (branch ids or `*`), `X-Joya-Bank-Accounts` (bank accounts the user may import). Only the kinds with
+the `server` handler are imported (Tabit detailed report, Bank Hapoalim); the others (employee list, Micpal /
+Shiklulit index) stay on the Upload files page. → `{ data: [...] }`: per file what it is, or the import result.
 
 ### `GET /shifts/plan?from=&to=[&branch=id1,id2]`
 

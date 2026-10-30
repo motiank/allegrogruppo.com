@@ -1,6 +1,7 @@
 // Client of the Allegro admin Local Data API — the only source of Joya's source data
 // (branches, Beecomm sales and dish sales, employees, Tabit clock times, payroll, labor cost).
-// See ~/dvlp/allegrogruppo.com/local_api_readme.md. Read-only; loopback only on the Allegro side.
+// See ~/dvlp/allegrogruppo.com/local_api_readme.md. Read-only, except the files dropped in the chat (postFiles);
+// loopback only on the Allegro side.
 //
 // Nothing is stored: answers are kept in memory for ALLEGRO_CACHE_MS (default 5 min) so a page
 // that asks the same thing twice does not call twice. A restart forgets everything.
@@ -58,6 +59,22 @@ export function get(path, params = {}) {
   if (cache.size >= MAX_ENTRIES) cache.delete(cache.keys().next().value);
   cache.set(url, { at: Date.now(), promise });
   return promise;
+}
+
+/**
+ * Files dropped in the chat → Allegro /files/recognize or /files/import: the multipart body as the browser sent it,
+ * with the user's rights in X-Joya-* headers. → the `data` of the answer.
+ */
+export async function postFiles(path, body, contentType, headers = {}) {
+  let res;
+  try {
+    res = await fetch(`${base()}${path}`, { method: 'POST', body, headers: { 'Content-Type': contentType, ...headers }, signal: AbortSignal.timeout(Math.max(timeout(), 180_000)) });
+  } catch (e) {
+    throw upstream(`not reachable (${e.cause?.code || e.name})`);
+  }
+  const out = await res.json().catch(() => null);
+  if (!res.ok) throw upstream(`${res.status} ${out?.error?.message || res.statusText}`, res.status === 404 ? 'NOT_SUPPORTED' : res.status === 400 ? 'BAD_REQUEST' : 'UPSTREAM');
+  return out?.data;
 }
 
 /** Forget every cached answer (after a change in Allegro the user wants to see now). */

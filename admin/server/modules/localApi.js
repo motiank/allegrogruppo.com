@@ -4,6 +4,7 @@ import { executeSql } from "../sources/dbpool.js";
 import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
 import { tabitMonthPayroll } from "./payroll.js";
+import { parseFiles, recognizeUploads, importUploads } from "./files.js";
 import {
   bcomGetOrders,
   bcomGetExceptions,
@@ -504,6 +505,8 @@ const ENDPOINTS = [
   "GET /shifts/raw?from=&to=|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /shifts/by-shift?from=&to=[&branch=a,b][&split=HH:MM][&minHours=]",
   "GET /shifts/plan?from=&to=[&branch=a,b]",
+  "POST /files/recognize (multipart files[]; X-Joya-* rights headers)",
+  "POST /files/import (multipart files[] + plan; X-Joya-* rights headers)",
   "GET /payroll/months?branch=",
   "GET /payroll?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /payroll/labor-cost?branch=&month=YYYY-MM",
@@ -794,6 +797,47 @@ const Router = () => {
           .json({ error: { code: "internal_error", message: err.message } });
       }
     });
+
+  // Files dropped in the Joya HQ chat: the same recognize / import as the Upload files page (files.js). The caller
+  // (Joya, on this machine) sends the user's rights in headers: X-Joya-User (e-mail), X-Joya-Admin: 1,
+  // X-Joya-Branches (ids, comma separated, or *), X-Joya-Bank-Accounts (accounts the user may import).
+  const filePerms = (req) => {
+    const list = (h) => String(req.get(h) || "").split(",").map((x) => x.trim()).filter(Boolean);
+    const isAdmin = req.get("X-Joya-Admin") === "1";
+    const branches = list("X-Joya-Branches");
+    const accounts = list("X-Joya-Bank-Accounts");
+    return {
+      isAdmin,
+      allowed: isAdmin || branches.includes("*") ? null : new Set(branches),
+      ...(accounts.length ? { bankAccounts: new Set(accounts) } : {}),
+    };
+  };
+  const filesRoute = (path, run) =>
+    router.post(path, (req, res) =>
+      parseFiles(req, res, async (uploadErr) => {
+        if (uploadErr) return res.status(400).json({ error: { code: "bad_request", message: uploadErr.message || "upload failed" } });
+        try {
+          const files = (req.files || []).filter((f) => f && f.buffer);
+          if (!files.length) return res.status(400).json({ error: { code: "bad_request", message: "no files" } });
+          res.json({ data: await run(req, files, filePerms(req)) });
+        } catch (err) {
+          if (err instanceof ApiError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
+          console.error(`local-api ${req.path} error:`, err);
+          res.status(500).json({ error: { code: "internal_error", message: err.message } });
+        }
+      }),
+    );
+  filesRoute("/files/recognize", (req, files, perms) => recognizeUploads(files, perms));
+  filesRoute("/files/import", (req, files, perms) => {
+    let plan;
+    try {
+      plan = JSON.parse(String(req.body?.plan || "[]"));
+    } catch {
+      throw badRequest("bad plan");
+    }
+    if (!Array.isArray(plan) || plan.length !== files.length) throw badRequest("files and plan do not match");
+    return importUploads(files, plan, perms, String(req.get("X-Joya-User") || "") || null);
+  });
 
   get("/", async () => ({ data: ENDPOINTS, meta: { version: "v1" } }));
 
