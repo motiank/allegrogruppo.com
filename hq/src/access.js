@@ -3,6 +3,8 @@
 // Login: the Allegro admin users (src/auth/session.js). Joya access comes from the Allegro user:
 //   role admin        → CHAIN_ADMIN: every location, settings, rules, users; payroll
 //   role restMngr     → LOCATION_MANAGER of the user's `restaurants` (Allegro branch ids, "*" = all); payroll
+//   role accountant   → ACCOUNTANT of the user's `restaurants`: only the accounting area (הנהלת חשבונות) and its
+//                       calculations (sales, payments, the bank of those companies); no payroll (owner 2026-10-31)
 //   any other role    → no access
 // Users and their rights live only in the admin's users.json (owner, 2026-10-24): no Joya table or file
 // of users. payroll = wages, payroll lines, labor cost in money, payroll checks.
@@ -29,8 +31,14 @@ export function accessFor(user, known) {
     const all = user.restaurants.includes('*');
     ids = known.filter((id) => all || user.restaurants.includes(id));
     payroll = true;
+  } else if (user.role === 'accountant') {
+    role = 'ACCOUNTANT';
+    const all = user.restaurants.includes('*');
+    ids = known.filter((id) => all || user.restaurants.includes(id));
+    payroll = false;
   } else return null;
-  return { username: user.username, role, isAdmin: role === 'CHAIN_ADMIN', locationIds: ids, payroll };
+  const isAdmin = role === 'CHAIN_ADMIN';
+  return { username: user.username, role, isAdmin, locationIds: ids, payroll, accounting: isAdmin || role === 'ACCOUNTANT' };
 }
 
 export async function loadAccess(username) {
@@ -65,6 +73,15 @@ export function requireJoya(req, res, next) {
       next();
     })
     .catch(next);
+}
+
+// The accountant sees only the accounting area: its chat and what the page needs to show it.
+// Matched on the full path (baseUrl + path): mounted with r.use('/joya', …), req.path alone has no /joya.
+const ACCOUNTANT_ROUTES = [/\/joya\/me$/, /\/joya\/locations$/, /\/joya\/ai\/(ask|requests)(\/|$)/];
+export function limitAccountant(req, res, next) {
+  const path = `${req.baseUrl || ''}${req.path}`;
+  if (req.joya?.role !== 'ACCOUNTANT' || ACCOUNTANT_ROUTES.some((re) => re.test(path))) return next();
+  res.status(403).json({ error: 'the accountant sees the accounting area only', code: 'FORBIDDEN' });
 }
 
 export function requireAdmin(req, res, next) {

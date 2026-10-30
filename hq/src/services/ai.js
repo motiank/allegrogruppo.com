@@ -163,7 +163,7 @@ function workedOut(w, e) {
 // Bank data is per company and for the chain admin only. companyKeys (keys or names) → those companies; else the
 // companies of the locations in scope (the picker choice, see locs).
 async function bankCompanies(access, p) {
-  if (!access.isAdmin) throw err('FORBIDDEN', 'bank data is for the chain admin only');
+  if (!access.accounting) throw err('FORBIDDEN', 'bank data is for the chain admin and the accountant only');
   const all = await listLocations(access);
   const known = new Map();
   for (const l of all) if (l.company?.key) known.set(l.company.key, { key: l.company.key, label: l.company.label ?? l.company.key });
@@ -349,12 +349,18 @@ const shape = (r) => ({
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING' };
+// the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
+// uploaded Excel file — owner 2026-10-31)
+const ACCOUNTANT_CALCS = new Set(['cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
+const mayRun = (access, name) => access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name);
 
 async function contextAllowed(access, kind, id) {
   if (kind === 'AREA') {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
     if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
+    if (AREAS[id] === 'ACCOUNTING' && !access.accounting) throw err('FORBIDDEN', 'the accounting area is for the chain admin and the accountant only');
+    if (access.role === 'ACCOUNTANT' && AREAS[id] !== 'ACCOUNTING') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
     return null;
   }
   if (kind === 'ORDER_LIST') return repl.getList(access, id);
@@ -374,6 +380,7 @@ export async function ask(access, { question, locationId = null, companyKey = nu
     if (!(await listLocations(access)).some((l) => (l.company?.key ?? '') === key)) throw err('FORBIDDEN', 'no access to the requested company');
     meta = { scope: { companyKey: key } };
   }
+  if (access.role === 'ACCOUNTANT' && contextKind !== 'AREA') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
   if (contextKind !== 'GENERAL') await contextAllowed(access, contextKind, contextId);
   const id = (
     await q(`INSERT INTO joya_ai_requests (username, location_id, context_kind, context_id, question, lang, meta_json) VALUES (:u, :l, :k, :c, :qq, :lang, :m)`, {
@@ -520,7 +527,7 @@ export async function buildContext(access, r) {
     locations: locations.map((l) => ({ id: l.id, name: l.name, company: l.company?.label ?? null, companyKey: l.company?.key ?? null, active: l.active, isDemo: l.isDemo })),
     shifts: shifts.map((s) => ({ locationId: s.locationId, code: s.code, name: s.name, days: s.days, start: s.start, end: s.end })),
     roles: roles.map((x) => ({ code: x.code, he: x.nameHe, en: x.nameEn })),
-    calculations: catalogue(),
+    calculations: catalogue().filter((c) => mayRun(access, c.name)),
     limits: { maxCalcs: MAX_CALCS },
     changeFormats: CHANGE_FORMATS,
     object,
@@ -559,6 +566,10 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null }) {
       continue;
     }
     const def = CALCS[c?.calc];
+    if (def && !mayRun(user, c.calc)) {
+      results.push({ calc: c.calc, params: c.params, error: 'not in the accounting area: the accountant may not run it' });
+      continue;
+    }
     if (!def) {
       results.push({ calc: c?.calc, params: c?.params, error: 'unknown calculation' });
       continue;

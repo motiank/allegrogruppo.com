@@ -44,6 +44,11 @@ Guidance:
     / bank_summary. Use Beecomm only when the question says so ("בקופה", "מכרנו", "מכירות", "Beecomm", "at the
     register", by card brand, tips).
   · MANPOWER → employees, clock times, staffing, wages, labor cost (employees, staffing_*, labor_summary).
+  · ACCOUNTING (הנהלת חשבונות) → the register (Beecomm) matched with the bank: did the card, Wolt and other money
+    sold at the register arrive in the bank, and the fees → cards_vs_bank for credit cards week by week; for one
+    payment type or the whole period plan payments_summary AND bank_summary / bank_transactions (q = the company's word
+    in the bank text). Only the calculations in context.calculations can run here. Supplier invoices are not in the
+    system yet: say so, plan no calculation for them.
   · STOCK → order lists, items, shortages.
   · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds) →
     payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
@@ -95,7 +100,7 @@ Guidance:
   In a STAFFING_PLAN context, expected diners or demand of a slot of that plan → staffing_forecast
   (planId, date, shiftCode), never shift_profile or staffing_forecast_week.
 - request.area, when present, is the main-menu area the question was asked in: STOCK (stock and
-  purchasing), MANPOWER, PERFORMANCE or BANK. It sets the default source (see "Which source").
+  purchasing), MANPOWER, PERFORMANCE, BANK or ACCOUNTING. It sets the default source (see "Which source").
 - How customers paid — credit card, cash, Wolt, 10bis (תן ביס), Sodexo, Multipass, הקפה, card brands
   (VISA, Amex, club card), refunds, tips by payment type → payments_summary (locationIds, from, to).
   Also "revenue / income by payment method", "צורת גביה", "אמצעי תשלום", "התפלגות ההכנסות לפי תשלום".

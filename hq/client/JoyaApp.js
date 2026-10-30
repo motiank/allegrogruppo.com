@@ -53,9 +53,11 @@ const useStyles = createUseStyles((theme) => ({
   bannerWrap: { maxWidth: 1100, margin: '0 auto', padding: '0.6rem 1rem 0' },
 }));
 
-// The main menu: the areas, each a chat (pages/Area.js); Bank only for the chain admin. The detailed pages
+// The main menu: the areas, each a chat (pages/Area.js); Bank only for the chain admin, Accounting for the chain admin
+// and the accountant (who sees nothing else). The detailed pages
 // (orders, staffing, payroll…) keep their routes, so links to them still work, but the menu does not list them.
-function navGroups(isAdmin) {
+function navGroups(isAdmin, isAccountant) {
+  if (isAccountant) return [{ key: 'joya.nav.main', items: [['/accounting', 'joya.nav.accounting']] }];
   return [
     {
       key: 'joya.nav.main',
@@ -63,7 +65,7 @@ function navGroups(isAdmin) {
         ['/stock', 'joya.nav.stock'],
         ['/people', 'joya.nav.manpower'],
         ['/performance', 'joya.nav.performance'],
-        ...(isAdmin ? [['/bank', 'joya.nav.bank']] : []),
+        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting']] : []),
       ],
     },
   ];
@@ -93,6 +95,7 @@ function Shell() {
     );
   }
   const me = j.me;
+  const isAccountant = me.role === 'ACCOUNTANT';
   const go = (path) => navigate(path);
   const showDemo = j.anyDemo(j.scope);
 
@@ -132,7 +135,7 @@ function Shell() {
       {open && <div className={c.backdrop} onClick={() => setOpen(false)} />}
       {open && (
         <nav className={c.drawer} dir={dir} aria-label={t('joya.nav.label')}>
-          {navGroups(me.isAdmin).map((g) => (
+          {navGroups(me.isAdmin, isAccountant).map((g) => (
             <div key={g.key}>
               <div className={c.group}>{t(g.key)}</div>
               {g.items.map(([path, key]) => (
@@ -170,12 +173,19 @@ function Shell() {
       )}
 
       <ShellDemoContext.Provider value={showDemo}>
+      {isAccountant ? (
+        <Routes>
+          <Route path="accounting" element={<Area area="accounting" />} />
+          <Route path="*" element={<Navigate to="/accounting" replace />} />
+        </Routes>
+      ) : (
       <Routes>
         <Route index element={<Navigate to="stock" replace />} />
         <Route path="stock" element={<Area area="stock" />} />
         <Route path="people" element={<Area area="people" />} />
         <Route path="performance" element={<Area area="performance" />} />
         <Route path="bank" element={me.isAdmin ? <Area area="bank" /> : <Navigate to="/" replace />} />
+        <Route path="accounting" element={me.isAdmin ? <Area area="accounting" /> : <Navigate to="/" replace />} />
         <Route path="overview" element={me.isAdmin ? <Overview /> : <Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="orders" element={<Orders />} />
@@ -195,6 +205,7 @@ function Shell() {
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      )}
       </ShellDemoContext.Provider>
     </div>
   );

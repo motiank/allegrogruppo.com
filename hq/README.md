@@ -160,6 +160,9 @@ question decide, and the **menu area sets the default** (owner, 2026-10-26; rule
 - **Bank** area → the bank by default; Beecomm only when the question says "at the register / sold / sales", a card
   brand, tips or the card forecast.
 - **Manpower** → employees, clock times, payroll. **Stock** → order lists and items.
+- **Accounting** (הנהלת חשבונות, owner 2026-10-31) → the register matched with the bank: card, Wolt and other money sold
+  at the register vs what arrived in the bank, and the fees (`cards_vs_bank`, `payments_summary` + `bank_*`). For
+  the chain admin and the accountant. Supplier invoices come later (a database + an Excel upload); nothing yet.
 - No area (a page's chat):
   - **sold / charged at the register** (by brand, tips, refunds) = **Beecomm payments**
     (`payments_summary`): the day of the sale, gross.
@@ -182,7 +185,10 @@ The staffing plan is exported as a **CSV for Tabit**. Nothing is sent to a suppl
   callers pass.
 - Joya access comes from the Allegro role: `admin` → `CHAIN_ADMIN` (all locations, settings, chain-wide and
   mandatory rules, users), `restMngr` → `LOCATION_MANAGER` of the user's `restaurants` (Allegro branch ids, `*` =
-  all); both with payroll access (wages, payroll lines, labor cost in money). Any other role: no access. Users
+  all); both with payroll access (wages, payroll lines, labor cost in money). `accountant` → `ACCOUNTANT` of the
+  user's `restaurants`: only the Accounting area — its chat (`/joya/me`, `/joya/locations`, `/joya/ai/ask|requests`;
+  every other route is 403, `limitAccountant`) and only its calculations (sales, payments, the bank of those
+  companies); no payroll. In the Allegro admin this role has no handler, so it sees no admin data. Any other role: no access. Users
   and rights are kept **only** in that JSON file (owner, 2026-10-24) — no Joya table or file of users. Every route checks the location it touches; lists are filtered to the user's locations; the AI
   calculations run with the asking user's access.
 - The top bar has one picker: each company, with its restaurants indented below it. Each location's company is the

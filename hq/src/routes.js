@@ -10,7 +10,7 @@
  * Source data (sales, employees, clock times, payroll) is read from the Allegro API — see services/source.js.
  */
 import { Router } from 'express';
-import { requireJoya, requireAdmin, requirePayroll, scopeLocations, canLocation } from './access.js';
+import { requireJoya, limitAccountant, requireAdmin, requirePayroll, scopeLocations, canLocation } from './access.js';
 import { requireMachineKey } from './auth/machineKey.js';
 import { q, parseJson, todayLocal } from './db.js';
 import * as master from './services/master.js';
@@ -64,7 +64,7 @@ r.get('/joya/ai/runner/:id/context', requireMachineKey, h(async (req) => ai.cont
 r.post('/joya/ai/runner/:id/compute', requireMachineKey, h(async (req) => ai.compute(id(req), req.body || {})));
 r.post('/joya/ai/runner/:id/answer', requireMachineKey, h(async (req) => (await ai.answer(id(req), req.body || {}), { ok: true })));
 
-r.use('/joya', requireJoya);
+r.use('/joya', requireJoya, limitAccountant);
 
 // ---------------------------------------------------------------- me, master data
 r.get(
