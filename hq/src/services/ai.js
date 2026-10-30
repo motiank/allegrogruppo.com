@@ -20,7 +20,7 @@ import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
 import * as source from './source.js';
-import { attendanceReport } from './attendance.js';
+import { attendanceReport, clockRows } from './attendance.js';
 import { recentSameWeekday } from './demand.js';
 import { addDays } from '../lib/recommend.js';
 import { listRoles, listShifts, listLocations } from './master.js';
@@ -263,6 +263,15 @@ export const CALCS = {
     run: (a, p) => {
       const [from, to] = range(p);
       return shiftModel.actualStaffing(a, String(p.locationId), { from, to, role: p.role, weeks: p.weeks });
+    },
+  },
+  clock_rows: {
+    params: '{ locationIds?, from, to, q?: "part of a name", role?: "role name, e.g. מלצר", shift?: "morning" | "evening" }',
+    about:
+      'the shifts themselves from the Tabit Shift clock report: one row per entry and exit (date, weekday, name, role, morning / evening, clock in, clock out, hours, open = a time is missing), up to 400 rows, plus a line per person (days, hours). For "the shifts of <person>" or "who worked on <date> (evening)"',
+    run: async (a, p) => {
+      const names = new Map((await listLocations(a)).map((l) => [String(l.id), l.name]));
+      return clockRows(locs(a, p), ...range(p), { q: p.q, role: p.role, shift: p.shift }, names);
     },
   },
   attendance_report: {

@@ -102,6 +102,9 @@ reached, the pages say so (data page: `ALLEGRO_UNREACHABLE`; routes answer 502) 
 **Days without sales are closed days** (owner 2026-10-27: the data is the real work — weekly closed days, holidays,
 closed branches): sums, averages and the labor cost stand as they are; the AI may name these days but never calls them
 missing data, and the data page shows them as a LOW note.
+**The shifts themselves** (owner 2026-10-30): the `clock_rows` calculation lists every clock row of the Tabit report
+(date, name, role, morning/evening, in, out, hours) for a person, a date or a shift. `employees` gives only totals.
+
 **Attendance reports** (דיווחי נוכחות, owner 2026-10-30) = the Tabit Shift clock report only (`attendance_report`
 calculation, `attendanceReport` in `src/services/attendance.js`). Its problems: open shifts (an entry without an exit,
 an exit without an entry), no-shows (in the Tabit work plan that day, no clock times) and people who clocked in on a day

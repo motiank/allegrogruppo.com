@@ -175,3 +175,75 @@ export async function attendanceReport(locationIds, from, to, today, names = new
     byLocation: out,
   };
 }
+
+// ---------------------------------------------------------------- clock rows (the shifts themselves)
+
+const MAX_ROWS = 400;
+const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const msOf = (s) => Date.parse(`${s.replace(' ', 'T')}Z`);
+
+/** The shifts of a clock row: morning before `split`, evening from it (on to the night); a shift counts with 1 h or more. */
+function shiftsOf(clockIn, clockOut, date, split = '17:00') {
+  if (!clockIn || !clockOut) return clockIn ? [clockIn.slice(11, 16) < split ? 'morning' : 'evening'] : clockOut ? [clockOut.slice(11, 16) <= split ? 'morning' : 'evening'] : [];
+  const a = msOf(clockIn);
+  const b = msOf(clockOut);
+  const s = msOf(`${date} ${split}:00`);
+  const out = [];
+  if (Math.min(b, s) - a >= 3600000) out.push('morning');
+  if (b - Math.max(a, s) >= 3600000) out.push('evening');
+  return out.length ? out : [clockIn.slice(11, 16) < split ? 'morning' : 'evening'];
+}
+
+/**
+ * Every clock row (entry and exit) of the Tabit Shift report, with the managers' corrections: per person or for a
+ * date / shift. q = part of the name; shift = morning | evening; role = part of the role name.
+ */
+export async function clockRows(locationIds, from, to, { q = null, employeeId = null, role = null, shift = null } = {}, names = new Map()) {
+  const text = q ? personName(q) : null;
+  const all = [];
+  for (const loc of locationIds) {
+    for (const a of await effectiveAttendance([loc], from, to)) {
+      if (a.excluded) continue;
+      if (employeeId != null && String(a.employeeId) !== String(employeeId)) continue;
+      if (text && !personName(a.employeeName).includes(text)) continue;
+      if (role && !String(a.roleName || '').includes(role)) continue;
+      const shifts = shiftsOf(a.clockIn, a.clockOut, a.date);
+      if (shift && !shifts.includes(shift)) continue;
+      all.push({
+        location: names.get(String(loc)) ?? String(loc),
+        date: a.date,
+        weekday: WEEKDAYS[new Date(`${a.date}T12:00:00Z`).getUTCDay()],
+        name: personName(a.employeeName),
+        linked: a.employeeId != null,
+        role: a.roleName,
+        shift: shifts.join('+') || null,
+        clockIn: a.clockIn ? a.clockIn.slice(11, 16) : null,
+        clockOut: a.clockOut ? (a.clockOut.slice(0, 10) > a.date ? `${a.clockOut.slice(11, 16)} (+1)` : a.clockOut.slice(11, 16)) : null,
+        hours: a.hours,
+        open: !a.clockIn || !a.clockOut,
+        corrected: a.corrected,
+      });
+    }
+  }
+  all.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : (x.clockIn || '').localeCompare(y.clockIn || '')));
+  const people = new Map();
+  for (const r of all) {
+    const k = `${r.location}|${r.name}`;
+    const p = people.get(k) || { location: r.location, name: r.name, rows: 0, days: new Set(), hours: 0, open: 0 };
+    p.rows++;
+    p.days.add(r.date);
+    p.hours += r.hours || 0;
+    if (r.open) p.open++;
+    people.set(k, p);
+  }
+  return {
+    source: "Tabit Shift clock report (Allegro /shifts/raw), with the managers' corrections; raw clock hours, before the payroll rules",
+    period: { from, to },
+    filter: { q, role, shift },
+    shiftRule: 'morning = before 17:00, evening = from 17:00 (and the night); a row counts in a shift with 1 hour or more in it',
+    count: all.length,
+    shown: Math.min(all.length, MAX_ROWS),
+    people: [...people.values()].map((p) => ({ location: p.location, name: p.name, rows: p.rows, days: p.days.size, hours: Math.round(p.hours * 100) / 100, openRows: p.open })),
+    rows: all.slice(0, MAX_ROWS),
+  };
+}

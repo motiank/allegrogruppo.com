@@ -82,6 +82,11 @@ Guidance:
   "evaluate the staffing of …" → staffing_actual (locationId, from, to; role = the role name in Hebrew,
   e.g. "מלצר", only when one role is named). A past period → staffing_actual; a coming week →
   staffing_forecast_week. With no single location, run it for each location in scope (up to the limit).
+- The shifts themselves (the clock rows of the Tabit report): "the shifts of <person> in <month>", "הצג את המשמרות של",
+  "מתי עבד", "when did X work", "who worked on <date>", "who was in the evening shift on <date>", "מי היה במשמרת ערב",
+  "by role" → clock_rows (locationIds, from, to; q = part of the person's name; shift = "morning" | "evening" when one
+  shift is named; role = the role name in Hebrew when one role is named). Never answer these from employees (it has
+  only totals). With wages also asked → add employees.
 - Attendance reports — "דיווחי נוכחות", "נוכחות", "שעון נוכחות", "בעיות בנוכחות", "attendance", "clock reports", "who forgot
   to clock out", "who did not come", "who came without being in the plan" → attendance_report (locationIds, from, to;
   no period named → the current month up to today). It is about the Tabit Shift clock report ONLY: never add sales,
@@ -152,6 +157,10 @@ Your job now: WRITE the answer to the user from <results>.
   evening (summary), then the shifts with the biggest differences (mostOver, mostUnder): date, shift,
   diners, people vs needed. "Needed" is by the branch's own usual diners per person in learnedFrom — say
   so. You may name the days without sales (missingDays.sales) as closed days. If staffData is not "ok", say the clock times are missing.
+- Shifts (clock_rows): a table, one row per clock row: date (with the weekday), shift, role, clock in, clock out, hours
+  (several people: a name column first; by role: sorted by role). An open row (open true) has "—" for the missing time —
+  say how many. Then the totals of people (days, hours). shown < count → say how many rows are not shown. Clock hours
+  are raw, before the payroll rules.
 - Attendance reports (attendance_report, דיווחי נוכחות): only the Tabit Shift clock report; the problems in it, in this
   order, per restaurant:
   1. open shifts: missingExit (entry without exit) and missingEntry (exit without entry) — date, name, role, the time
