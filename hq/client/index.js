@@ -15,3 +15,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </LangProvider>
   </ThemeProvider>,
 );
+
+// installable app (public/manifest.json): the browser offers "Install" only with a service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}

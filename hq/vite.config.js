@@ -15,7 +15,8 @@ export default defineConfig({
     react(),
   ],
   root: '.',
-  publicDir: false,
+  // public/ (manifest, service worker, icons) is copied as is to prod/
+  publicDir: 'public',
   optimizeDeps: { esbuildOptions: { loader: { '.js': 'jsx' } } },
   build: {
     outDir: 'prod',
