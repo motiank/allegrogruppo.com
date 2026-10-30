@@ -2,7 +2,8 @@
 //
 //   $ node scripts/tabit_rota_fetch.js                         dry run: this week, counts only
 //   $ node scripts/tabit_rota_fetch.js --week 2026-10-25        dry run of the week that starts on that Sunday
-//   $ node scripts/tabit_rota_fetch.js [--week …] --apply       writes tabit_rota (PRODUCTION DB)
+//   $ node scripts/tabit_rota_fetch.js [--week …] --apply       writes tabit_rota (PRODUCTION DB); days that passed keep
+//                                                                the plan already stored (add --replace-past to replace them)
 //
 // The same Tabit Shift login as tabit_shift_fetch.js (TABIT_SHIFT_* in the root .env). Table:
 // scripts/utils/create_tabit_rota_table.sql.
@@ -26,7 +27,7 @@ if (week !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(week || "")) {
 const apply = args.includes("--apply");
 
 try {
-  const results = await fetchTabitRota({ weekStart: week, dryRun: !apply });
+  const results = await fetchTabitRota({ weekStart: week, dryRun: !apply, keepPast: !args.includes("--replace-past") });
   for (const r of results) console.log(`${r.weekStart}  ${r.branch.padEnd(10)} app ${r.apps.join("+").padEnd(10)} ${r.status}  ${r.error || JSON.stringify(r.result)}`);
   if (!apply) console.log("dry run — nothing written (add --apply to write)");
   process.exitCode = results.some((r) => r.status === "FAILED") ? 1 : 0;

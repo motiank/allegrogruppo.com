@@ -226,9 +226,11 @@ export const fetchTabitShift = async ({ months = defaultTabitShiftMonths(), dryR
 
 /**
  * Tabit Shift work plan (Rota page) → tabit_rota, for the week that starts on weekStart (a Sunday; default: this
- * week) × branch; a fetch replaces that week of the branch. dryRun: reads and counts, writes nothing.
+ * week) × branch; a fetch replaces that week of the branch from today on — days that passed keep the plan stored
+ * before them (keepPast, default; false = replace the whole week). dryRun: reads and counts, writes nothing.
  */
-export const fetchTabitRota = async ({ weekStart = weekSunday(), dryRun = false, rests = null } = {}) => {
+export const fetchTabitRota = async ({ weekStart = weekSunday(), dryRun = false, rests = null, keepPast = true } = {}) => {
+  const keepBefore = keepPast ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date()) : null;
   if (new Date(`${weekStart}T12:00:00Z`).getUTCDay() !== 0) throw new Error(`${weekStart} is not a Sunday`);
   const branches = rests ? TABIT_SHIFT_BRANCHES.filter((b) => rests.includes(b.rest)) : TABIT_SHIFT_BRANCHES;
   const client = new TabitShiftClient(tabitShiftConfig());
@@ -248,7 +250,7 @@ export const fetchTabitRota = async ({ weekStart = weekSunday(), dryRun = false,
         }
         const counts = { slots: rows.length, withEmployee: rows.filter((r) => r.employee_name).length, published };
         if (dryRun) results.push({ ...base, status: "DRY_RUN", result: counts });
-        else results.push({ ...base, status: "OK", result: { ...counts, ...(await saveTabitRota(rows, { rest: b.rest, weekStart })) } });
+        else results.push({ ...base, status: "OK", result: { ...counts, ...(await saveTabitRota(rows, { rest: b.rest, weekStart, keepBefore })) } });
       } catch (e) {
         results.push({ ...base, status: "FAILED", error: e.message });
       }

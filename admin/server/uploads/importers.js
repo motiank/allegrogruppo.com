@@ -95,13 +95,28 @@ export const saveTabitShiftReports = async (reports, { rest, month, uploadId }) 
 };
 
 // A week's work plan of one branch (all its Tabit apps) → tabit_rota: replaces the branch's rows of that week.
-export const saveTabitRota = async (rows, { rest, weekStart }) =>
+// keepBefore (YYYY-MM-DD, Israel's today): days before it keep the plan already stored (the plan as it was before the
+// day, owner 2026-10-30 — Tabit's plan is edited after the day to match who came); a past day with nothing stored yet
+// for that Tabit app is still added. Without keepBefore the whole week is replaced.
+export const saveTabitRota = async (rows, { rest, weekStart, keepBefore = null }) =>
   inTransaction(async (conn) => {
-    const [del] = await conn.execute("DELETE FROM tabit_rota WHERE rest = :rest AND week_start = :weekStart", { rest, weekStart });
+    const kept = new Set();
+    if (keepBefore) {
+      const [old] = await conn.execute(
+        "SELECT DISTINCT app_id, DATE_FORMAT(work_date, '%Y-%m-%d') AS d FROM tabit_rota WHERE rest = :rest AND week_start = :weekStart AND work_date < :keepBefore",
+        { rest, weekStart, keepBefore },
+      );
+      for (const r of old) kept.add(`${r.app_id}|${r.d}`);
+    }
+    const [del] = await conn.execute(
+      `DELETE FROM tabit_rota WHERE rest = :rest AND week_start = :weekStart${keepBefore ? " AND work_date >= :keepBefore" : ""}`,
+      { rest, weekStart, keepBefore },
+    );
+    const write = rows.filter((r) => !kept.has(`${r.app_id}|${String(r.work_date).slice(0, 10)}`));
     const cols = ["rest", "week_start", "app_id", "rota_id", "published", "cell_id", "work_date", "shift_name", "role_name", "slot_order",
       "employee_name", "tabit_employee_id", "clock_id", "planned_start", "planned_end", "manual_start", "manual_end", "notes"];
-    const inserted = rows.length ? await bulk(conn, `INSERT INTO tabit_rota (${cols.join(", ")}) VALUES ?`, rows.map((r) => cols.map((c) => r[c] ?? null))) : 0;
-    return { replacedOldRows: del.affectedRows || 0, slots: inserted };
+    const inserted = write.length ? await bulk(conn, `INSERT INTO tabit_rota (${cols.join(", ")}) VALUES ?`, write.map((r) => cols.map((c) => r[c] ?? null))) : 0;
+    return { replacedOldRows: del.affectedRows || 0, slots: inserted, keptPastSlots: rows.length - write.length, ...(keepBefore ? { keptDaysBefore: keepBefore } : {}) };
   });
 
 // Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped.
