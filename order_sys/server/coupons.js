@@ -1,6 +1,15 @@
 import express from 'express';
 import { executeSql } from './sources/dbpool.js';
 import { getAccessToken, pushOrder } from './beecomm.js';
+import { areOrdersEnabled, getStatusMessage } from './orderState.js';
+
+// No coupon order while orders are closed (shutdown / pause / suspend) — same rule as the payment page.
+const ordersClosed = (req, res) => {
+  if (areOrdersEnabled()) return false;
+  const lang = String(req.body?.language || 'he').toLowerCase().slice(0, 2);
+  res.status(503).json({ action: 'unavailable', error: 'Orders are currently unavailable', statusMessage: getStatusMessage(lang), state: 'unavailable' });
+  return true;
+};
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -22,6 +31,7 @@ const router = express.Router();
  * Client should NOT place orders - only follow server instructions
  */
 router.post('/check', express.json(), async (req, res) => {
+  if (ordersClosed(req, res)) return;
   try {
     const { couponCode, orderId, orderData: requestOrderData } = req.body || {};
 
@@ -597,6 +607,7 @@ async function processCouponOrder(orderId, couponCode, coupon, requestOrderData)
  */
 router.post('/placeorder', express.json(), async (req, res) => {
   console.log('[coupons] Coupon placeorder received (legacy endpoint):', req.body);
+  if (ordersClosed(req, res)) return;
 
   try {
     const {

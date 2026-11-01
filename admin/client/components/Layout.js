@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useTheme } from '../context/ThemeContext';
-import OrderSystemDropdown from './OrderSystemDropdown';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -191,7 +190,7 @@ const Layout = ({ children }) => {
             <h1 style={styles.title}>{getCurrentPageTitle()}</h1>
           </div>
           <div style={styles.topBarRight}>
-            <OrderSystemDropdown />
+            {/* Order system shut down permanently (owner, 2026-11-02): no state polling. */}
             {!darkModeForced && (
               <button
                 onClick={toggleTheme}

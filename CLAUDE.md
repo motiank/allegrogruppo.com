@@ -76,6 +76,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
 - **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
   (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
   equal rows in the file; `UNIQUE` + `INSERT IGNORE`. Test: `node scripts/test_bank_hapoalim.js`.
+- **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
+  `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
+  11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";
+  card payments and coupon orders are refused (503). The admin top bar no longer shows/polls the order-system
+  dropdown (`admin/client/components/Layout.js`). To reopen: set it to false, put the dropdown back, build, restart
+  `allegro.service`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

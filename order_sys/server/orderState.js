@@ -12,6 +12,18 @@ export const ORDER_STATE = {
   SUSPEND: 'suspend'
 };
 
+// Permanent shutdown (owner's order, 2026-11-02): the site stays online but takes no orders —
+// no payments, no coupon orders. The state is fixed to SHUTDOWN: a restart, the 11:00–15:00 schedule
+// or the admin cannot reopen it. Only the owner can decide to reopen; then set this to false.
+export const PERMANENT_SHUTDOWN = true;
+
+const CLOSED_MESSAGES = {
+  he: { title: 'ההזמנות סגורות', message: 'ההזמנות באתר סגורות עד להודעה חדשה.' },
+  en: { title: 'Orders are closed', message: 'Online orders are closed until further notice.' },
+  ar: { title: 'الطلبات مغلقة', message: 'الطلبات عبر الموقع مغلقة حتى إشعار آخر.' },
+  ru: { title: 'Заказы закрыты', message: 'Онлайн-заказы закрыты до дальнейшего уведомления.' }
+};
+
 // In-memory state storage
 let currentState = {
   state: ORDER_STATE.ACTIVE,
@@ -194,6 +206,18 @@ export function verifyAuthToken(token) {
  * @returns {Object} Current state object with controlsEnabled field
  */
 export function getState() {
+  if (PERMANENT_SHUTDOWN) {
+    return {
+      state: ORDER_STATE.SHUTDOWN,
+      suspendedUntil: null,
+      lastUpdated: currentState.lastUpdated,
+      lastUpdatedBy: 'permanent-shutdown',
+      manuallySet: true,
+      permanent: true,
+      controlsEnabled: false,
+      activeHours: { start: START_TIME, end: END_TIME }
+    };
+  }
   // Check if pause state has expired
   if (currentState.state === ORDER_STATE.PAUSE && currentState.suspendedUntil) {
     const now = new Date();
@@ -342,6 +366,10 @@ function formatDuration(daysHoursMs) {
  * @returns {Object} Status message object with title and message
  */
 export function getStatusMessage(language = 'he') {
+  if (PERMANENT_SHUTDOWN) {
+    const m = CLOSED_MESSAGES[language] || CLOSED_MESSAGES.he;
+    return { title: m.title, message: `<pre>${m.message}</pre>`, subtitle: '' };
+  }
   const state = getState();
   
   const messages = {
@@ -587,6 +615,13 @@ export function updateState(newState, authToken, updatedBy = 'admin') {
     return {
       success: false,
       error: 'Unauthorized: Invalid authentication token'
+    };
+  }
+
+  if (PERMANENT_SHUTDOWN) {
+    return {
+      success: false,
+      error: 'The order system is shut down permanently (PERMANENT_SHUTDOWN in order_sys/server/orderState.js)'
     };
   }
 
