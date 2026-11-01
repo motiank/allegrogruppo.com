@@ -129,26 +129,33 @@ const Employees = () => {
   };
 
   const isActive = (emp) => emp.active !== false && emp.duplicate == null;
+  // קבלן (contractor): not paid through Micpal — no wage check, no Micpal
+  // number, no sync. Shown in their own filter, not in Active / Missing wages.
+  // Uses the saved flag, so ticking the box does not move the row until Update.
+  const isContractor = (emp) => isActive(emp) && emp.savedContractor;
   const isRemoved = (emp) => emp.active === false;
   const isDuplicate = (emp) => emp.duplicate != null;
   // "Has a wage" means there's a new_wage_type set AND either a wage value
   // (which can be -1 for hourly_min_*) or the type itself implies one.
   const hasResolvedWage = (emp) =>
     !!emp.new_wage_type && hasWageValue(emp.wage);
-  const matchesMissingFilter = (emp) => isActive(emp) && !hasResolvedWage(emp);
+  const matchesMissingFilter = (emp) =>
+    isActive(emp) && !emp.savedContractor && !hasResolvedWage(emp);
 
   const counts = useMemo(() => {
     let active = 0;
     let missing = 0;
     let removed = 0;
     let dup = 0;
+    let contractors = 0;
     for (const e of employees) {
-      if (isActive(e)) active += 1;
+      if (isActive(e) && !e.savedContractor) active += 1;
+      if (isContractor(e)) contractors += 1;
       if (matchesMissingFilter(e)) missing += 1;
       if (isRemoved(e)) removed += 1;
       if (isDuplicate(e)) dup += 1;
     }
-    return { active, missing, removed, duplicate: dup };
+    return { active, missing, contractors, removed, duplicate: dup };
   }, [employees]);
 
   // (Re)build the frozen "missing wages" set whenever:
@@ -178,7 +185,9 @@ const Employees = () => {
     const q = search.trim().toLowerCase();
     let result = indexed;
     if (viewFilter === "active") {
-      result = result.filter(({ emp }) => isActive(emp));
+      result = result.filter(({ emp }) => isActive(emp) && !emp.savedContractor);
+    } else if (viewFilter === "contractors") {
+      result = result.filter(({ emp }) => isContractor(emp));
     } else if (viewFilter === "missing") {
       // Use the frozen set when present so editing a wage doesn't make
       // the row disappear immediately.
@@ -250,6 +259,7 @@ const Employees = () => {
         travel: e.travel == null ? "" : String(e.travel),
         maxTravel: e.maxTravel == null ? "" : String(e.maxTravel),
         contractor: !!e.contractor,
+        savedContractor: !!e.contractor,
         active: e.active !== false,
         duplicate: e.duplicate == null ? null : Number(e.duplicate),
         // Roles arrive normalized from the server, but normalize again here so
@@ -478,7 +488,7 @@ const Employees = () => {
   const [selectedManualEmp, setSelectedManualEmp] = useState(null);
   const [manualSearch, setManualSearch] = useState("");
   const [manualSelectedKeyName, setManualSelectedKeyName] = useState(null);
-  // Sync shows only the employees who worked this month (in Tabit) unless "Show all" is checked.
+  // Sync shows only the employees who worked last month or this month (in Tabit) unless "Show all" is checked.
   // workedIds null = not known (the request failed) → everyone is shown.
   const [workedIds, setWorkedIds] = useState(null);
   const [workedMonth, setWorkedMonth] = useState(null);
@@ -492,6 +502,11 @@ const Employees = () => {
     [matchRows, isShownInSync],
   );
 
+  // Same rule as the export: an employee has a Micpal number (מס עובד) when
+  // their ID number is in the Micpal list. No ID number, or an ID number that
+  // Micpal doesn't know (typo, passport vs ID), both mean "no number".
+  const hasMicpalNumber = (e) => !!e.empNumber;
+
   const manualUnmatched = useMemo(
     () =>
       employees.filter(
@@ -499,7 +514,7 @@ const Employees = () => {
           e.active !== false &&
           e.duplicate == null &&
           !e.contractor &&
-          !(e.ID_nmbr && String(e.ID_nmbr).trim()) &&
+          !hasMicpalNumber(e) &&
           isShownInSync(e),
       ),
     [employees, isShownInSync],
@@ -538,7 +553,9 @@ const Employees = () => {
           )
           .catch(() => null),
       ]);
-      const workedSet = worked?.data?.employeeIds
+      // An empty list (no Tabit rows for those months yet) is treated as
+      // unknown, so the dialog does not hide everyone.
+      const workedSet = worked?.data?.employeeIds?.length
         ? new Set(worked.data.employeeIds)
         : null;
       setWorkedIds(workedSet);
@@ -548,13 +565,13 @@ const Employees = () => {
       const index = buildMicpalNameIndex(micpal);
 
       // Restrict to active, non-duplicate, non-contractor (קבלן) employees
-      // missing ID_nmbr.
+      // without a Micpal number (no ID_nmbr, or one Micpal doesn't know).
       const candidates = employees.filter(
         (e) =>
           e.active !== false &&
           e.duplicate == null &&
           !e.contractor &&
-          !(e.ID_nmbr && String(e.ID_nmbr).trim()),
+          !hasMicpalNumber(e),
       );
 
       const perfect = [];
@@ -616,7 +633,7 @@ const Employees = () => {
       setEmployees((prev) =>
         prev.map((e) =>
           e.employee_id === selectedManualEmp.employee_id
-            ? { ...e, ID_nmbr: chosen.ID_nmbr }
+            ? { ...e, ID_nmbr: chosen.ID_nmbr, empNumber: chosen.keyName }
             : e,
         ),
       );
@@ -654,6 +671,7 @@ const Employees = () => {
       .map((r) => ({
         employee_id: r.emp.employee_id,
         ID_nmbr: r.match.ID_nmbr,
+        keyName: r.match.keyName,
       }));
     if (updates.length === 0) return;
     setMatchUpdating(true);
@@ -669,16 +687,12 @@ const Employees = () => {
       // Reflect changes locally so the dialog and table show the new ID_nmbr.
       const applied = new Set(updates.map((u) => u.employee_id));
       setEmployees((prev) =>
-        prev.map((e) =>
-          applied.has(e.employee_id)
-            ? {
-                ...e,
-                ID_nmbr:
-                  updates.find((u) => u.employee_id === e.employee_id)
-                    ?.ID_nmbr || e.ID_nmbr,
-              }
-            : e,
-        ),
+        prev.map((e) => {
+          const u = updates.find((x) => x.employee_id === e.employee_id);
+          return u
+            ? { ...e, ID_nmbr: u.ID_nmbr || e.ID_nmbr, empNumber: u.keyName }
+            : e;
+        }),
       );
       // Drop updated rows from the dialog list; if nothing left to confirm,
       // switch to the manual-match tool so the user can keep going.
@@ -779,12 +793,17 @@ const Employees = () => {
       });
       setSaveResult(res.data);
       setDirty(false);
+      // The saved contractor flag now moves rows between Active and Contractors.
+      setEmployees((prev) =>
+        prev.map((e) => ({ ...e, savedContractor: !!e.contractor })),
+      );
       // Refresh the "missing wages" frozen set: rows that now have a wage
       // drop out, rows that became missing are added.
       if (viewFilter === "missing") {
         const ids = new Set();
         for (const e of employees) {
-          if (matchesMissingFilter(e)) ids.add(e.employee_id);
+          if (matchesMissingFilter({ ...e, savedContractor: !!e.contractor }))
+            ids.add(e.employee_id);
         }
         setMissingFrozenIds(ids);
       }
@@ -1309,6 +1328,9 @@ const Employees = () => {
                 <option value="missing">
                   Missing wages ({counts.missing})
                 </option>
+                <option value="contractors">
+                  Contractors — קבלן ({counts.contractors})
+                </option>
                 <option value="removed">
                   Removed employees ({counts.removed})
                 </option>
@@ -1331,7 +1353,9 @@ const Employees = () => {
                   <strong style={{ color: theme.text }}>{selectedLabel}</strong>
                   {viewFilter === "missing"
                     ? " — missing wages"
-                    : viewFilter === "removed"
+                    : viewFilter === "contractors"
+                      ? " — contractors"
+                      : viewFilter === "removed"
                       ? " — removed"
                       : viewFilter === "duplicate"
                         ? " — duplicates"
@@ -1457,8 +1481,8 @@ const Employees = () => {
                   Show all employees
                   {!syncShowAll &&
                     (workedIds
-                      ? ` (now: only who worked in ${workedMonth || "this month"} in Tabit)`
-                      : " (could not load who worked this month — showing all)")}
+                      ? ` (now: only who worked in ${workedMonth || "the last two months"} in Tabit)`
+                      : " (no Tabit work data for these months — showing all)")}
                 </label>
               )}
 
@@ -1514,7 +1538,15 @@ const Employees = () => {
                                   .join(" ") || "—"}
                               </td>
                               <td style={styles.td}>{emp.name || "—"}</td>
-                              <td style={styles.td}>{match.ID_nmbr || "—"}</td>
+                              <td style={styles.td}>
+                                {emp.ID_nmbr && String(emp.ID_nmbr).trim() !== String(match.ID_nmbr) ? (
+                                  <span title="The employee's ID number is not in Micpal — it will be replaced">
+                                    <s style={{ color: theme.textSecondary }}>{emp.ID_nmbr}</s> → {match.ID_nmbr}
+                                  </span>
+                                ) : (
+                                  match.ID_nmbr || "—"
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1617,6 +1649,14 @@ const Employees = () => {
                           >
                             <span style={{ flex: 1, minWidth: 0 }}>
                               {emp.name || "(no name)"}
+                              {emp.ID_nmbr && String(emp.ID_nmbr).trim() && (
+                                <span
+                                  title="This ID number is not in the Micpal list"
+                                  style={{ fontSize: "0.8rem", opacity: 0.75, marginInlineStart: "6px" }}
+                                >
+                                  (ID {emp.ID_nmbr} — not in Micpal)
+                                </span>
+                              )}
                             </span>
                             {waPhone ? (
                               <a

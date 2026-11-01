@@ -1517,14 +1517,22 @@ const Router = () => {
     try {
       const rest = String(req.body?.rest || "").trim();
       if (!rest) return res.status(400).json({ error: "missing rest" });
-      const month = /^\d{4}-\d{2}$/.test(String(req.body?.month || ""))
-        ? String(req.body.month)
-        : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(new Date());
+      // Default: the previous and the current month. Payroll is done early in
+      // the month for the month before, when the current month has few or no
+      // Tabit rows yet.
+      const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(new Date());
+      const [cy, cm] = current.split("-").map(Number);
+      const previous = cm === 1 ? `${cy - 1}-12` : `${cy}-${String(cm - 1).padStart(2, "0")}`;
+      const months = /^\d{4}-\d{2}$/.test(String(req.body?.month || ""))
+        ? [String(req.body.month)]
+        : [previous, current];
+      const month = months.join(" – ");
       const { employeeResolver } = await import("./localApi.js");
       const resolve = await employeeResolver([rest]);
+      const monthParams = Object.fromEntries(months.map((m, i) => [`m${i}`, m]));
       const [rows] = await executeSql(
-        "SELECT DISTINCT employee_name, clock_id FROM tabit_shifts WHERE rest = :rest AND month = :month",
-        { rest, month },
+        `SELECT DISTINCT employee_name, clock_id FROM tabit_shifts WHERE rest = :rest AND month IN (${months.map((_, i) => `:m${i}`).join(", ")})`,
+        { rest, ...monthParams },
       );
       const ids = new Set();
       for (const r of rows || []) {
