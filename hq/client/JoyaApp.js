@@ -43,6 +43,7 @@ const useStyles = createUseStyles((theme) => ({
   barStart: { display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 },
   section: { margin: 0, fontSize: '0.98rem', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center' },
   iconBtn: { flexShrink: 0, background: 'none', border: `1px solid ${theme.border}`, borderRadius: 6, color: theme.text, padding: '0.3rem 0.6rem', fontSize: '1.05rem', lineHeight: 1, cursor: 'pointer', fontFamily: 'inherit' },
+  logo: { flex: 'none', height: 26, width: 'auto', display: 'block' },
   brand: { flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   brandSub: { fontWeight: 400, color: theme.textSecondary, fontSize: '0.75rem', marginInlineStart: '0.4rem', '@media (max-width: 480px)': { display: 'none' } },
   pick: { display: 'flex', justifyContent: 'flex-end', gap: '0.3rem', minWidth: 0 },
@@ -111,6 +112,7 @@ function Shell() {
           <button className={c.iconBtn} onClick={() => setOpen(true)} aria-label={t('menu.open')} aria-expanded={open}>
             ☰
           </button>
+          <img className={c.logo} src="/logo.png" alt="" />
           <div className={c.brand}>
             <bdi dir="ltr">Joya Headquarter</bdi>
             <span className={c.brandSub}>{t(`joya.role.${me.role}`)}</span>

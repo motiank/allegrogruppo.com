@@ -20,6 +20,8 @@ const useStyles = createUseStyles((theme) => ({
     boxSizing: 'border-box',
   },
   titleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 1.5rem' },
+  brand: { display: 'flex', alignItems: 'center', gap: '0.6rem' },
+  logo: { height: 44, width: 'auto', display: 'block' },
   title: {
     margin: 0,
     fontSize: '1.25rem',
@@ -105,9 +107,12 @@ function Login({ onLoginSuccess }) {
     <div className={classes.container}>
       <form className={classes.form} onSubmit={handleSubmit}>
         <div className={classes.titleRow}>
-          <h1 className={classes.title}>
-            <bdi dir="ltr">{t('login.title')}</bdi>
-          </h1>
+          <div className={classes.brand}>
+            <img className={classes.logo} src="/logo.png" alt="" />
+            <h1 className={classes.title}>
+              <bdi dir="ltr">{t('login.title')}</bdi>
+            </h1>
+          </div>
           <LangSelect />
         </div>
         {error && <div className={classes.error}>{error}</div>}
