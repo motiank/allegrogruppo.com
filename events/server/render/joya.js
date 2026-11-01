@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
+import { gtmHeadSnippet } from "./analytics.js";
 import { BRANCHES } from "../data/branches.js";
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,6 @@ export const renderJoyaPage = ({
   <link rel="stylesheet" href="/css/joya.css" />
 </head>
 <body>
-  ${gtmBodySnippet()}
   <!-- Header -->
   <header class="site-header" id="top">
     <div class="container header-inner">

@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
+import { gtmHeadSnippet } from "./analytics.js";
 
 // ---------------------------------------------------------------------------
 // Server-side templates for the events landing-page service.
@@ -53,7 +53,6 @@ const layout = ({ title, lang = "he", head = "", body }) => {
   ${head}
 </head>
 <body>
-  ${gtmBodySnippet()}
   ${body}
   <footer class="site-footer">
     <p>&copy; ${new Date().getFullYear()} Allegro Gruppo</p>

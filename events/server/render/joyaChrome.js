@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { gtmHeadSnippet, gtmBodySnippet } from "./analytics.js";
+import { gtmHeadSnippet } from "./analytics.js";
 
 // Shared chrome (document shell + header + footer) for Joya-branded pages,
 // so /joya and the /joya/branches/* pages look identical and stay in sync.
@@ -85,7 +85,6 @@ export const joyaDoc = ({
   <link rel="stylesheet" href="/css/joya.css" />
 </head>
 <body>
-${gtmBodySnippet()}
 ${body}
 </body>
 </html>`;

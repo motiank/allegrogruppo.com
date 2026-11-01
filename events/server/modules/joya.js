@@ -3,7 +3,7 @@ import { renderJoyaPage } from "../render/joya.js";
 import { renderBranchPage, renderBranchesIndex } from "../render/branch.js";
 import { BRANCH_BY_SLUG } from "../data/branches.js";
 import { baseUrlFor, escapeHtml } from "../render/html.js";
-import { gtmHeadSnippet, gtmBodySnippet } from "../render/analytics.js";
+import { gtmHeadSnippet } from "../render/analytics.js";
 import { executeSql } from "../sources/dbpool.js";
 import {
   TRACKING_PARAMS,
@@ -22,7 +22,6 @@ ${gtmHeadSnippet()}
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@700;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/joya.css" />
 </head><body>
-${gtmBodySnippet()}
 <section class="section" style="text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1rem">
   <img src="/images/joya/logo-dark.png" alt="Joya" style="height:64px" />
   <p class="section-eyebrow">בקרוב</p>
