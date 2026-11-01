@@ -122,7 +122,7 @@ const WageDialog = ({ title, value, onSave, onClose, allowClear = false }) => {
             autoFocus
           >
             <option value="">-- choose --</option>
-            {WAGE_TYPE_OPTIONS.map((o) => (
+            {WAGE_TYPE_OPTIONS.filter((o) => !o.legacy || o.value === newWageType).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

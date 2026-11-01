@@ -17,8 +17,11 @@ export const WAGE_TYPE_OPTIONS = [
   { value: "global_net", label: "Global · Net" },
   { value: "hourly_gross", label: "Hourly · Gross" },
   { value: "hourly_net", label: "Hourly · Net" },
-  { value: "hourly_min_gross", label: "Hourly min · Gross" },
-  { value: "hourly_min_net", label: "Hourly min · Net" },
+  // Minimum wage per hour + a bonus up to the employee's wage (paid from tips).
+  { value: "hourly_min_gross", label: "Tip based" },
+  // Removed from the list (owner, 2026-11-02; its employees moved to Tip based). Still a valid value so
+  // old saved data reads; the wage dialog offers it only to a row that still has it.
+  { value: "hourly_min_net", label: "Hourly min · Net (old)", legacy: true },
 ];
 
 export const WAGE_TYPE_VALUES = WAGE_TYPE_OPTIONS.map((o) => o.value);
