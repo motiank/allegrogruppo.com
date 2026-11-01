@@ -148,6 +148,20 @@
     { "key": "g-emp-role-avg", "kind": "GENERAL", "lang": "he", "question": "מה השכר הממוצע של מלצר?",
       "expect": { "calcs": ["employees"], "params": { "employees": { "role": "מלצר" } } } },
     { "key": "a-emp-list", "kind": "AREA", "lang": "en", "question": "List the cooks and their wages",
+      "expect": { "calcs": ["employees"] } },
+    { "key": "r-add-area", "kind": "AREA", "lang": "he", "question": "מעכשיו, בכל טבלת עובדים תמיין לפי מספר השעות, מהגבוה לנמוך",
+      "expect": { "rule": { "op": "add", "area": "MANPOWER" }, "maxCalcs": 0 } },
+    { "key": "r-add-all", "kind": "GENERAL", "lang": "he", "question": "כלל חדש לכל התחומים: תמיד לכתוב סכומים בלי אגורות",
+      "expect": { "rule": { "op": "add", "area": null }, "maxCalcs": 0 } },
+    { "key": "r-add-en", "kind": "AREA", "lang": "en", "question": "From now on, never count trainees as waiters",
+      "expect": { "rule": { "op": "add", "area": "MANPOWER" }, "maxCalcs": 0 } },
+    { "key": "r-remove", "kind": "AREA", "lang": "he", "question": "תבטל את הכלל על המיון לפי שעות", "teamRules": [{ "id": 4, "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך", "area": "MANPOWER" }, { "id": 5, "text": "סכומים בלי אגורות", "area": null }],
+      "expect": { "rule": { "op": "remove", "id": 4 }, "maxCalcs": 0 } },
+    { "key": "r-edit", "kind": "AREA", "lang": "he", "question": "תשנה את כלל 5: סכומים מעוגלים לשקל", "teamRules": [{ "id": 4, "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך", "area": "MANPOWER" }, { "id": 5, "text": "סכומים בלי אגורות", "area": null }],
+      "expect": { "rule": { "op": "edit", "id": 5 }, "maxCalcs": 0 } },
+    { "key": "r-list", "kind": "AREA", "lang": "he", "question": "מה הכללים של הצוות?", "teamRules": [{ "id": 4, "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך", "area": "MANPOWER" }, { "id": 5, "text": "סכומים בלי אגורות", "area": null }],
+      "expect": { "calcs": ["team_rules"] } },
+    { "key": "r-once", "kind": "AREA", "lang": "he", "question": "הפעם תציג את העובדים שעבדו בחודש שעבר ממוינים לפי שם",
       "expect": { "calcs": ["employees"] } }
   ]
 }

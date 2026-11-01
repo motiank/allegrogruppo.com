@@ -9,7 +9,7 @@
 //   4. the runner writes the answer from those results only; numbers in the answer that
 //      are not in the results are listed in meta.unverifiedNumbers and shown as a warning
 //   5. a proposed change is shown as a diff and saved only when the user taps Apply
-import { q, one, err, audit, parseJson, todayLocal } from '../db.js';
+import { q, one, err, audit, parseJson, todayLocal, getConfig, updateConfig } from '../db.js';
 import { assertLocation, canLocation, loadAccess } from '../access.js';
 import * as analytics from './analytics.js';
 import * as quality from './quality.js';
@@ -320,6 +320,7 @@ export const CALCS = {
     run: (a, p) => employeeList(a, p),
   },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },
+  team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
   pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };
 
@@ -352,8 +353,71 @@ const shape = (r) => ({
 export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
-const ACCOUNTANT_CALCS = new Set(['cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
+const ACCOUNTANT_CALCS = new Set(['team_rules', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 const mayRun = (access, name) => access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name);
+
+// ---------------------------------------------------------------- team rules
+// Lasting rules for the AI team, given in the chat by the chain admin ("from now on…", "כלל חדש: …"). The planner
+// proposes the rule (proposal TEAM_RULE), it is saved only on Apply, and every later request of its area gets it
+// (context.teamRules → the runner puts it in <team_rules>). A JSON document in joya_settings: [{ id, text, area, by, at }].
+const TEAM_RULES = 'teamRules';
+const MAX_RULES = 60;
+const MAX_RULE_CHARS = 600;
+const RULE_AREAS = new Set(Object.values(AREAS));
+
+/** The rules for an area: those of the area and those for all areas (area null). No area given = all the rules. */
+export async function teamRules(area = null) {
+  const all = await getConfig(TEAM_RULES, []);
+  return (Array.isArray(all) ? all : []).filter((r) => !area || !r.area || r.area === area).map((r) => ({ id: r.id, text: r.text, area: r.area ?? null, by: r.by ?? null, at: r.at ?? null }));
+}
+
+/** The planner's rule change → a checked proposal. Only the chain admin may change the team's rules. */
+async function checkRule(access, rule, requestArea) {
+  if (!access.isAdmin) throw err('FORBIDDEN', 'only the chain admin can add or change the team rules');
+  const op = rule?.op;
+  if (!['add', 'edit', 'remove'].includes(op)) throw err('BAD_REQUEST', 'unknown rule change');
+  const all = await teamRules();
+  const area = rule.area === undefined ? requestArea ?? null : rule.area || null;
+  if (area && !RULE_AREAS.has(area)) throw err('BAD_REQUEST', `unknown area ${area}`);
+  const text = String(rule.text ?? '').trim();
+  if (op !== 'remove' && !text) throw err('BAD_REQUEST', 'the rule has no text');
+  if (text.length > MAX_RULE_CHARS) throw err('BAD_REQUEST', `a rule may have at most ${MAX_RULE_CHARS} characters`);
+  if (op === 'add') {
+    if (all.length >= MAX_RULES) throw err('CONFLICT', `there are already ${MAX_RULES} rules: remove one first`);
+    return { type: 'TEAM_RULE', op, rule: { text, area } };
+  }
+  const before = all.find((r) => Number(r.id) === Number(rule.id));
+  if (!before) throw err('NOT_FOUND', `there is no rule ${rule.id}`);
+  if (op === 'remove') return { type: 'TEAM_RULE', op, rule: before, before };
+  return { type: 'TEAM_RULE', op, rule: { id: before.id, text, area: rule.area === undefined ? before.area : area }, before };
+}
+
+/** The rule list after one approved change (pure): { rules, saved }. */
+export function changeRules(list, p, by, at = new Date().toISOString()) {
+  const rules = Array.isArray(list) ? list : [];
+  if (p.op === 'add') {
+    if (rules.length >= MAX_RULES) throw err('CONFLICT', `there are already ${MAX_RULES} rules: remove one first`);
+    const saved = { id: rules.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1, text: p.rule.text, area: p.rule.area ?? null, by, at };
+    return { rules: [...rules, saved], saved };
+  }
+  const i = rules.findIndex((r) => Number(r.id) === Number(p.rule.id));
+  if (i < 0) throw err('CONFLICT', `rule ${p.rule.id} was already removed`);
+  if (p.op === 'remove') return { rules: rules.filter((_, k) => k !== i), saved: null };
+  const saved = { ...rules[i], text: p.rule.text, area: p.rule.area ?? null, by, at };
+  return { rules: rules.map((r, k) => (k === i ? saved : r)), saved };
+}
+
+async function applyRule(access, p) {
+  if (!access.isAdmin) throw err('FORBIDDEN', 'only the chain admin can add or change the team rules');
+  let saved = null;
+  await updateConfig(TEAM_RULES, [], access.username, (list) => {
+    const out = changeRules(list, p, access.username);
+    saved = out.saved;
+    return out.rules;
+  });
+  await audit(access.username, 'TEAM_RULE_CHANGED', 'team_rule', saved?.id ?? p.rule.id, null, { op: p.op, text: (saved ?? p.rule).text?.slice(0, 300), area: (saved ?? p.rule).area ?? null });
+  return { op: p.op, rule: saved ?? p.rule };
+}
 
 async function contextAllowed(access, kind, id) {
   if (kind === 'AREA') {
@@ -420,6 +484,7 @@ export async function applyProposal(access, id) {
   let result;
   if (p.type === 'ORDER_OPS') result = await repl.applyOps(access, p.listId, p.ops, { via: 'CHAT' });
   else if (p.type === 'STAFFING_OPS') result = await staffing.applyOps(access, p.planId, p.ops, { via: 'CHAT' });
+  else if (p.type === 'TEAM_RULE') result = await applyRule(access, p);
   else throw err('BAD_REQUEST', 'unknown proposal');
   await q(`UPDATE joya_ai_requests SET proposal_status='APPLIED' WHERE id=:id`, { id });
   await audit(access.username, 'AI_PROPOSAL_APPLIED', 'ai_request', id, r.locationId, { type: p.type });
@@ -528,6 +593,8 @@ export async function buildContext(access, r) {
     shifts: shifts.map((s) => ({ locationId: s.locationId, code: s.code, name: s.name, days: s.days, start: s.start, end: s.end })),
     roles: roles.map((x) => ({ code: x.code, he: x.nameHe, en: x.nameEn })),
     calculations: catalogue().filter((c) => mayRun(access, c.name)),
+    // the team's lasting rules for this area (the runner gives them to the model as instructions, apart from the data)
+    teamRules: (await teamRules(r.context_kind === 'AREA' ? AREAS[r.context_id] : null)).map((x) => ({ id: x.id, text: x.text, area: x.area })),
     limits: { maxCalcs: MAX_CALCS },
     changeFormats: CHANGE_FORMATS,
     object,
@@ -553,7 +620,7 @@ export const CHANGE_FORMATS = {
  * Run the model's plan: calculations with the user's access, and validation of the
  * proposed change. Errors are returned per calculation (the model can explain them).
  */
-export async function compute(id, { calcs = [], ops = null, whatIf = null }) {
+export async function compute(id, { calcs = [], ops = null, whatIf = null, rule = null }) {
   const { r, access: user } = await requestAccess(id);
   const scope = await scopeOf(user, r);
   const access = scope?.locationIds.length ? { ...user, scopeIds: scope.locationIds } : user;
@@ -583,7 +650,9 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null }) {
   let proposal = null;
   let proposalError = null;
   try {
-    if (r.context_kind === 'ORDER_LIST' && Array.isArray(ops) && ops.length) {
+    if (rule && typeof rule === 'object') {
+      proposal = await checkRule(user, rule, r.context_kind === 'AREA' ? AREAS[r.context_id] : null);
+    } else if (r.context_kind === 'ORDER_LIST' && Array.isArray(ops) && ops.length) {
       const checked = await repl.checkOps(access, r.context_id, ops);
       proposal = { type: 'ORDER_OPS', listId: r.context_id, ops: checked.map(toOrderOp), preview: checked };
     } else if (r.context_kind === 'STAFFING_PLAN' && Array.isArray(whatIf) && whatIf.length) {

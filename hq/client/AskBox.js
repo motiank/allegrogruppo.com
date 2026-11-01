@@ -78,6 +78,24 @@ function ProposalPreview({ p, classes }) {
   const { t } = useT();
   const { roleName } = useJoya();
   if (!p) return null;
+  if (p.type === 'TEAM_RULE') {
+    const area = (a) => t(`joya.ask.rule.area.${a || 'ALL'}`);
+    return (
+      <>
+        <div className={classes.propLine}>
+          {t(`joya.ask.rule.${p.op}`)} <Term>{area(p.rule?.area)}</Term>
+        </div>
+        {p.before && p.op === 'edit' ? (
+          <div className={classes.meta} dir="auto">
+            {t('joya.ask.rule.before')} {p.before.text}
+          </div>
+        ) : null}
+        <div className={classes.propLine} dir="auto" style={p.op === 'remove' ? { textDecoration: 'line-through' } : null}>
+          {p.rule?.text}
+        </div>
+      </>
+    );
+  }
   const lines = p.preview || [];
   return (
     <>

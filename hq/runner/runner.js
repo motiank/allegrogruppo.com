@@ -21,11 +21,23 @@ export function parseJsonObject(text) {
   return JSON.parse(s.slice(a, b + 1));
 }
 
+/**
+ * The team rules the chain admin approved in the chat — instructions, so they go in their own block and not inside
+ * <context> (which is data only). Empty when there are none.
+ */
+export function rulesBlock(ctx) {
+  const rules = Array.isArray(ctx.teamRules) ? ctx.teamRules : [];
+  if (!rules.length) return [];
+  return ['<team_rules>', ...rules.map((r) => `${r.id}. [${r.area || 'ALL'}] ${r.text}`), '</team_rules>'];
+}
+
 export function planPrompt(ctx) {
+  const { teamRules, ...data } = ctx;
   return [
     'Plan the answer to this request. Reply with the JSON object only.',
+    ...rulesBlock(ctx),
     '<context>',
-    JSON.stringify(ctx),
+    JSON.stringify(data),
     '</context>',
   ].join('\n');
 }
@@ -33,6 +45,7 @@ export function planPrompt(ctx) {
 export function writePrompt(ctx, computed, plan) {
   const parts = [
     `request.lang = ${ctx.request.lang}`,
+    ...rulesBlock(ctx),
     '<request>',
     JSON.stringify({ question: ctx.request.question, contextKind: ctx.request.contextKind, today: ctx.today }),
     '</request>',
@@ -43,7 +56,7 @@ export function writePrompt(ctx, computed, plan) {
     JSON.stringify(trimResults(computed.results || [])),
     '</results>',
   ];
-  if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note }), '</proposal>');
+  if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, op: computed.proposal.op, rule: computed.proposal.rule, before: computed.proposal.before, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note }), '</proposal>');
   if (computed.proposalError) parts.push('<proposal_error>', JSON.stringify(computed.proposalError), '</proposal_error>');
   if (plan.note) parts.push(`planner note: ${plan.note}`);
   parts.push('Write the answer now (plain text, with a table only as the rules say).');
@@ -58,6 +71,7 @@ export function cleanPlan(plan) {
     ops: Array.isArray(p.ops) ? p.ops : null,
     whatIf: Array.isArray(p.whatIf) ? p.whatIf : null,
     draft: typeof p.draft === 'string' ? p.draft : null,
+    rule: p.rule && typeof p.rule === 'object' && !Array.isArray(p.rule) ? p.rule : null,
     note: typeof p.note === 'string' ? p.note : null,
   };
 }
@@ -88,14 +102,14 @@ export async function handle({ id, hub, planner, writer, log = console, instruct
       raw = parseJsonObject(p.text);
     }
     const plan = cleanPlan(raw);
-    const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft });
+    const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule });
     const w = await writer.call(writePrompt(ctx, computed, plan));
     cost += w.costUsd ?? 0;
     const answer = String(w.text || '').trim();
     const unverified = unverifiedNumbers(answer, computed.results, computed.proposal, ctx.request.question, ctx.today, ctx.object, ctx.shifts, ctx.locations);
     await hub.post(`/joya/ai/runner/${id}/answer`, {
       answer,
-      meta: { durationMs: Date.now() - started, model: w.model ?? null, instructionsVersion, costUsd: cost, calcs: plan.calcs.map((c) => c.calc), unverifiedNumbers: unverified, plannerNote: plan.note },
+      meta: { durationMs: Date.now() - started, model: w.model ?? null, instructionsVersion, costUsd: cost, calcs: plan.calcs.map((c) => c.calc), teamRules: (ctx.teamRules || []).map((r) => r.id), unverifiedNumbers: unverified, plannerNote: plan.note },
     });
     log.info?.(`[joya] #${id} answered in ${Date.now() - started} ms (${plan.calcs.length} calcs${computed.proposal ? ', proposal' : ''}${unverified.length ? `, ${unverified.length} unverified numbers` : ''})`);
     return { answered: true, unverified };

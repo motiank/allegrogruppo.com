@@ -76,6 +76,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   VISA + MC per Sun–Sat week vs Max's payout the next Wednesday (002… = VISA, 007… = MC, fee ≈ 1.6%), and AMEX per month
   vs American Express's payouts the next month (README → Weekly and monthly sums; 2026-10-27). The planner
   must use one grouped calc, never one calc per week.
+- **Team rules from the chat** (2026-11-01, owner: "instruct the chat for new rules to add to the team"): the chain
+  admin writes a lasting rule in any chat → proposal `TEAM_RULE` → Apply → `joya_settings` 'teamRules' → given to the
+  model in `<team_rules>` for every later request of that area (README → Asking in words). No new table.
 - Answers may hold pipe tables → table component + Excel download per table (`lib/answerTables.js`,
   `/ai/requests/:id/tables/:n.xlsx`, owner 2026-10-27). Keep the table format in the WRITE prompt and the reader in sync.
 - Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"

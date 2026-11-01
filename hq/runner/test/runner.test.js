@@ -91,6 +91,27 @@ await t('the prompt version and the cost of every model call are stored', async 
   assert.equal(Math.round(meta.costUsd * 100), 4);
 });
 
+await t('team rules go to both prompts as their own block, not inside <context>; a rule change goes to compute', async () => {
+  const hub = fakeHub({ proposal: { type: 'TEAM_RULE', op: 'add', rule: { text: 'מלצר חדש = פחות מחודש', area: 'MANPOWER' } } });
+  const get = hub.get;
+  hub.get = async (p) => ({ ...(await get(p)), teamRules: [{ id: 3, text: 'שבוע מתחיל ביום ראשון', area: null }] });
+  const planner = model('{"calcs":[],"rule":{"op":"add","text":"מלצר חדש = פחות מחודש","area":"MANPOWER"}}');
+  const writer = model('כלל חדש ממתין לאישור.');
+  await handle({ id: 7, hub, planner, writer, log: {} });
+  for (const prompt of [planner.calls[0], writer.calls[0]]) assert.ok(prompt.includes('<team_rules>\n3. [ALL] שבוע מתחיל ביום ראשון\n</team_rules>'));
+  assert.ok(!planner.calls[0].split('<context>')[1].includes('teamRules'));
+  assert.ok(writer.calls[0].includes('"type":"TEAM_RULE"'));
+  assert.deepEqual(hub.calls.find((c) => c[1].endsWith('/compute'))[2].rule, { op: 'add', text: 'מלצר חדש = פחות מחודש', area: 'MANPOWER' });
+  assert.deepEqual(hub.calls.find((c) => c[1].endsWith('/answer'))[2].meta.teamRules, [3]);
+});
+await t('no team rules → no block; a bad rule value is dropped', async () => {
+  const hub = fakeHub();
+  const planner = model('{"calcs":[],"rule":["x"]}');
+  await handle({ id: 7, hub, planner, writer: model('ok'), log: {} });
+  assert.ok(!planner.calls[0].includes('<team_rules>'));
+  assert.equal(hub.calls.find((c) => c[1].endsWith('/compute'))[2].rule, null);
+});
+
 console.log('number check');
 await t('rounded, thousands and percentages match; invented ones do not', () => {
   const r = { a: 48210.46, b: 0.123, c: 812, d: '2026-10-05', e: 12345 };

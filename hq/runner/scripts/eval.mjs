@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import { TriageModel } from '../model.js';
 import { PLAN_PROMPT, INSTRUCTIONS_VERSION } from '../hq-analyst.js';
 import { planPrompt, parseJsonObject, cleanPlan } from '../runner.js';
+import { catalogue } from '../../src/services/ai.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split('=')[1] ?? d;
@@ -74,6 +75,10 @@ function grade(f, plan) {
   if (!!e.whatIf !== hasWhatIf) fails.push(e.whatIf ? 'whatIf missing' : `unexpected whatIf ${JSON.stringify(plan.whatIf)}`);
   const hasDraft = !!plan.draft?.trim();
   if (!!e.draft !== hasDraft) fails.push(e.draft ? 'draft missing' : 'unexpected draft');
+  // rule: a partial team-rule change that must match; absent = no rule change
+  if (e.rule) {
+    if (!partial(plan.rule, e.rule)) fails.push(`rule ${JSON.stringify(plan.rule)} ≠ ${JSON.stringify(e.rule)}`);
+  } else if (plan.rule) fails.push(`unexpected rule ${JSON.stringify(plan.rule)}`);
   return fails;
 }
 
@@ -81,9 +86,13 @@ function contextFor(f) {
   const base = contexts[f.kind];
   if (!base) throw new Error(`no context of kind ${f.kind} in eval/contexts.json`);
   const ctx = structuredClone(base);
+  // the calculations as the code has them now (the saved contexts can be older than the newest calculations)
+  ctx.calculations = catalogue();
   Object.assign(ctx.request, { question: f.question, lang: f.lang || 'he' });
   // f.request: fields to set on the request, e.g. the picker scope
   if (f.request) Object.assign(ctx.request, f.request);
+  // f.teamRules: the team rules this question is asked with
+  if (f.teamRules) ctx.teamRules = f.teamRules;
   if (f.inquiryContent && ctx.object?.inquiry) ctx.object.inquiry.content = f.inquiryContent;
   return ctx;
 }

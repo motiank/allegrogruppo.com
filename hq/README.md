@@ -302,6 +302,16 @@ shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table
 `GET /api/joya/ai/requests/:id/tables/:n.xlsx` (`src/services/answerExcel.js`, exceljs from the repo root; only the
 asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader for both sides: `lib/answerTables.js`.
 
+**Team rules (2026-11-01).** The chain admin teaches the AI team in the chat: "מעכשיו …", "כלל חדש: …", "from now
+on …" → the planner returns `rule: { op: add | edit | remove, text, area, id? }`, the hub checks it (`ai.js`
+`checkRule`: chain admin only, at most 60 rules of 600 characters) and shows it as a proposal (`TEAM_RULE`); it is
+saved only on **Apply** (`joya_settings` 'teamRules' = `[{ id, text, area, by, at }]`, audit `TEAM_RULE_CHANGED`).
+`area` = one of `AREAS` (the area the rule was given in, by default) or null = all areas. Every later request gets the
+rules of its area (`context.teamRules`; a page chat with no area gets all of them); the runner puts them in a
+`<team_rules>` block of the PLAN and WRITE prompts, apart from `<context>` (which stays data only), and stores their
+ids in `meta.teamRules`. A rule never overrides the hard rules (no computed numbers, no saved changes, nothing sent).
+"Show the rules" → calc `team_rules`. Eval: fixtures `r-*`.
+
 ## Other functions
 
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
