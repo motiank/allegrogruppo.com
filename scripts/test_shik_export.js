@@ -508,24 +508,30 @@ assert.deepEqual(
 );
 const tMic = buildTlush(hourlyRow, "mic", { workMonth });
 const micRows = tlushToMicRows(tMic);
-// Three gross rates: the two with most hours get a row each (same employee
-// number, travel only on the first); the third is excluded for manual payment.
-assert.equal(micRows.length, 2, "two kept rates → two Micpal rows");
+// Three gross rates: each gets a row (same employee number, travel only on
+// the first, most hours first).
+assert.equal(micRows.length, 3, "three kept rates → three Micpal rows");
 assert.deepEqual(
   micRows.map((r) => [r.keyName, r.hourlyWage, r.hours100, r.hours125, r.hours150, r.net]),
   [
     [hourlyRow.keyName, 40, 50, 6, 2, ""], // מלצר + ראנר
     [hourlyRow.keyName, 50, 20, 3, 1, ""], // בר
+    [hourlyRow.keyName, 35.4, 20, "", "", ""], // מתלמד
   ],
   "tlush mic rows split by real rate",
 );
 assert.equal(micRows[0].travel, hourlyRow.travel, "travel on the first row");
 assert.equal(micRows[1].travel, "", "travel not repeated on the second row");
-assert.deepEqual(
-  tMic.excludedRateGroups.map((g) => [g.rate, g.hours]),
-  [[35.4, 20]],
-  "3rd rate (מתלמד) excluded",
+assert.equal(micRows[2].travel, "", "travel not repeated on the third row");
+assert.deepEqual(tMic.excludedRateGroups, [], "3 rates fit — nothing excluded");
+// A 4th rate is still left out for manual payment.
+const tMic4 = buildTlush(
+  { ...hourlyRow, roleBreakdown: [...hourlyRow.roleBreakdown, { role: "שוטף", rate: 45, h100: 5, h125: 0, h150: 0, isNet: false, isHourlyMin: false }] },
+  "mic",
+  { workMonth },
 );
+assert.equal(tlushToMicRows(tMic4).length, 3, "4 rates → still 3 Micpal rows");
+assert.deepEqual(tMic4.excludedRateGroups.map((g) => [g.rate, g.hours]), [[45, 5]], "4th rate (fewest hours) excluded");
 console.log("✓ tlush round-trip assertions passed");
 
 const xl = new ShikImportXL({ year: "2026", month: String(workMonth) });

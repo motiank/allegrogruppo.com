@@ -3431,9 +3431,11 @@ const Router = () => {
 
     let grandNetTotal = 0;
     let grandGrossTotal = 0;
+    let employeeCount = 0;
     for (const e of employees) {
       const comps = Array.isArray(e.components) ? e.components : [];
       if (comps.length === 0) continue;
+      employeeCount++;
       let netTotal = 0;
       let grossTotal = 0;
       const excludedHours = (e.excludedRateGroups || []).reduce(
@@ -3451,9 +3453,9 @@ const Router = () => {
           // block — blank on the rest, matching the on-screen table. A ⚠
           // suffix flags employees with a genuine second rate (exported as a
           // real second Micpal row, same employee number — see
-          // buildMicRows); a second ⚠ flags hours excluded entirely (a 3rd+
-          // rate — more than the 2 slots Micpal's row format supports) that
-          // still need to be paid manually.
+          // buildMicRows); a second ⚠ flags hours excluded entirely (a 4th+
+          // rate — more than the 3 rates the export supports) that still
+          // need to be paid manually.
           name:
             ci === 0
               ? (e.name || "") +
@@ -3486,6 +3488,8 @@ const Router = () => {
     }
 
     // Grand totals across all employees, at the very bottom of the sheet.
+    // The first total line shows the number of employees in the name column.
+    const countName = `${employeeCount} עובדים`;
     const hasAnyNet = employees.some((e) =>
       (e.components || []).some((c) => c.netGross === "net"),
     );
@@ -3494,11 +3498,12 @@ const Router = () => {
     );
     if (hasAnyNet) {
       markNetRow(
-        ws.addRow({ label: 'סה"כ נטו כללי', payment: grandNetTotal }),
+        ws.addRow({ name: countName, label: 'סה"כ נטו כללי', payment: grandNetTotal }),
       );
     }
     if (hasAnyGross) {
       ws.addRow({
+        name: hasAnyNet ? "" : countName,
         label: 'סה"כ ברוטו כללי',
         payment: grandGrossTotal,
       }).font = { bold: true };

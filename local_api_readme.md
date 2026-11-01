@@ -471,7 +471,7 @@ The saved payroll for each employee (with `branch` and `month` on each row). The
 | `tlush.components[]` | Payslip lines: `code` (payroll-software component code), `label`, `wage` (rate), `quantity`, `netGross`. The line amount is `wage × quantity`. |
 | `tlush.hourlyMinGross` | Gross of the tip-based (hourly-min) roles at their real effective rate. |
 | `tlush.mixedRates` | `true` if the employee had several hourly rates that Micpal merges into one. |
-| `tlush.excludedRateGroups` | Rate groups beyond the two supported slots. They're left out of the export and need manual handling. |
+| `tlush.excludedRateGroups` | Rate groups beyond the three supported slots. They're left out of the export and need manual handling. |
 
 > **Don't sum `components` into a "salary" without care.** Some lines are benefits-in-kind that are taxed but not paid in cash, e.g. `שווי ארוחות` (meal worth). The payroll software computes the actual gross and net. The calculation rules are in `payroll_calc_rules.md`.
 

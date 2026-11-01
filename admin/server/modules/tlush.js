@@ -5,14 +5,14 @@
 // Shape (per employee):
 //   { payrollSoft, employeeNumber, ID_nmbr, name,
 //     components: [ { recordType?, code, label, quantity, wage } ],
-//     micRows? }           // 1-2 wide Micpal rows, present only for payrollSoft "mic"
+//     micRows? }           // 1+ wide Micpal rows, present only for payrollSoft "mic"
 //
 // - Shiklulit: `components` ARE the long-format rows (one per component); the
 //   export rebuilds the rows from them 1:1 (tlushToShikRows).
 // - Micpal: `components` is a friendly breakdown for display; the export uses the
 //   stored `micRows` verbatim (tlushToMicRows, flatMapped) so the file round-trips
-//   exactly. 2 rows (same employee number — Micpal sums them) when the employee
-//   has a genuine second rate; see buildMicRows.
+//   exactly. One row per real rate, up to 3 (same employee number — Micpal sums
+//   them); see buildMicRows.
 
 import {
   buildShikRowsForEmployee,
@@ -116,21 +116,22 @@ function groupByRate(entries) {
 // "hourly_net" counts as net (hourly_min_net does not — matches
 // NET_WAGE_KINDS/componentNetGross below; everything non-wage-rate — travel,
 // bonus, meals, מפרעה — is always gross regardless). Within EACH of the
-// net/gross buckets, group by real rate and keep at most 2 (the real Micpal
-// row format only has room for 2 rate slots per row) — any further distinct
+// net/gross buckets, group by real rate and keep at most MAX_RATES (each kept
+// rate becomes its own Micpal row with the same מס עובד) — any further distinct
 // rate in a bucket is excluded and returned in `excludedRateGroups` for the
 // caller to report (not paid through the automated export — needs manual
 // handling). Shared by both the readable תלוש breakdown and the actual
 // Micpal row builder (buildMicRows) so the two always show/pay the exact
 // same numbers.
+const MAX_RATES = 3;
 function splitRoleBreakdown(roleBreakdown) {
   const netGroups = groupByRate(roleBreakdown.filter((r) => r.isNet));
   const grossGroups = groupByRate(roleBreakdown.filter((r) => !r.isNet));
-  const netKept = netGroups.slice(0, 2).map((g) => ({ ...g, isNet: true }));
-  const grossKept = grossGroups.slice(0, 2).map((g) => ({ ...g, isNet: false }));
+  const netKept = netGroups.slice(0, MAX_RATES).map((g) => ({ ...g, isNet: true }));
+  const grossKept = grossGroups.slice(0, MAX_RATES).map((g) => ({ ...g, isNet: false }));
   const excludedRateGroups = [
-    ...netGroups.slice(2).map((g) => ({ ...g, isNet: true })),
-    ...grossGroups.slice(2).map((g) => ({ ...g, isNet: false })),
+    ...netGroups.slice(MAX_RATES).map((g) => ({ ...g, isNet: true })),
+    ...grossGroups.slice(MAX_RATES).map((g) => ({ ...g, isNet: false })),
   ].map((g) => ({
     rate: g.rate,
     h100: g.h100,
@@ -175,10 +176,10 @@ const decomposeMicComponents = (row) => {
   // the actual Micpal row builder, buildMicRows below — so this breakdown and
   // the real export always show/pay the exact same rates, never a blended
   // number). Within each net/gross bucket, the group with the most hours
-  // keeps the "שכר יסוד שעתי" labels/codes; the next-most becomes the "extra"
-  // group ("שכר נוסף שעתי" / "שעות נ. X%", code 31 like Shiklulit's "other
+  // keeps the "שכר יסוד שעתי" labels/codes; the others become "extra"
+  // groups ("שכר נוסף שעתי" / "שעות נ. X%", code 31 like Shiklulit's "other
   // rate" convention). mixedRates flags when this employee needs more than
-  // one row. A 3rd+ distinct rate within a bucket is excluded from both this
+  // one row. A 4th+ distinct rate within a bucket is excluded from both this
   // breakdown and the real export, returned as `excludedRateGroups` so the
   // caller can report it (needs manual handling).
   let mixedRates = false;
@@ -253,12 +254,12 @@ const MIC_ROW_SHARED_ONLY_FIELDS = [
 ];
 
 // Build the actual Micpal row(s) for one employee — real, unblended rates
-// only. Up to 4 rows are emitted (see splitRoleBreakdown: net/gross × up to
-// 2 rates each), all carrying the SAME מס עובד/keyName; Micpal sums rows
+// only. Up to 6 rows are emitted (see splitRoleBreakdown: net/gross × up to
+// 3 rates each), all carrying the SAME מס עובד/keyName; Micpal sums rows
 // sharing an employee number, so a genuine second rate — or a net/gross
 // split, which can never share Micpal's single נטו flag per row — becomes a
 // genuine extra row instead of a synthetic blended rate or a wrongly-flagged
-// net/gross mix. A 3rd+ distinct rate within a bucket is excluded here too
+// net/gross mix. A 4th+ distinct rate within a bucket is excluded here too
 // (not exported at all — needs manual handling, reported via the tlush's own
 // excludedRateGroups since it's computed from the same grouping).
 //
@@ -351,11 +352,11 @@ export function buildTlush(row, payrollSoft, { workMonth } = {}) {
     // split, so this is informational rather than a "won't be reflected"
     // warning.
     mixedRates,
-    // Rate groups beyond the 2 supported slots (base + one other) — excluded
+    // Rate groups beyond the 3 supported slots (base + two others) — excluded
     // from both `comps` and the real Micpal export, reported here so the
     // caller can flag them for manual handling.
     excludedRateGroups,
-    // 1 or 2 rows (same מס עובד on both when 2) — see buildMicRows.
+    // 1 row per kept rate (same מס עובד on all) — see buildMicRows.
     micRows: buildMicRows(row),
   };
 }
@@ -372,7 +373,7 @@ export function tlushToShikRows(tlush, workMonth) {
   }));
 }
 
-// tlush → Micpal wide row(s) (consumed by MicpImportXL.generate). 1 or 2 rows
+// tlush → Micpal wide row(s) (consumed by MicpImportXL.generate). 1 or more rows
 // per employee (see buildMicRows) — callers should flatMap, not map.
 export function tlushToMicRows(tlush) {
   return tlush.micRows || [];

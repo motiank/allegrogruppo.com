@@ -3430,7 +3430,7 @@ const Shifts = () => {
     }
 
     // Employees with rate groups excluded from pay because they have more
-    // than the 2 rate slots this payroll's תלוש supports (base + one other).
+    // than the 3 rate slots this payroll's תלוש supports (base + two others).
     // Computed from the full (unfiltered/unsorted) employee list so the
     // warning stays visible regardless of the on-screen search/sort.
     const excludedRateWarnings = (tlushData?.employees || []).filter(
@@ -3515,7 +3515,7 @@ const Shifts = () => {
           <div style={{ ...styles.errorBox, marginBottom: "12px" }}>
             <div style={{ fontWeight: 600, marginBottom: "6px" }}>
               ⚠️ {excludedRateWarnings.length} employee
-              {excludedRateWarnings.length === 1 ? "" : "s"} with more than 2
+              {excludedRateWarnings.length === 1 ? "" : "s"} with more than 3
               rate types — extra hours excluded from תלוש, pay manually
             </div>
             <div
@@ -3607,7 +3607,7 @@ const Shifts = () => {
                             <span>{e.name}</span>
                             {e.mixedRates && (
                               <span
-                                title="עובד זה עבד בשני תעריפים שונים. קובץ ה-Micpal בפועל מייצא שתי שורות עם אותו מס' עובד, כל אחת בתעריף האמיתי שלה."
+                                title="עובד זה עבד ביותר מתעריף אחד. קובץ ה-Micpal בפועל מייצא שורה לכל תעריף (עד שלוש) עם אותו מס' עובד, כל אחת בתעריף האמיתי שלה."
                                 style={{ color: "#e65100", cursor: "help" }}
                               >
                                 ⚠
@@ -3616,7 +3616,7 @@ const Shifts = () => {
                             {e.excludedRateGroups &&
                               e.excludedRateGroups.length > 0 && (
                                 <span
-                                  title={`עובד זה עבד ביותר משני תעריפים. השעות הבאות אינן כלולות בתלוש ויש לשלמן בנפרד: ${e.excludedRateGroups
+                                  title={`עובד זה עבד ביותר משלושה תעריפים. השעות הבאות אינן כלולות בתלוש ויש לשלמן בנפרד: ${e.excludedRateGroups
                                     .map(
                                       (g) =>
                                         `${fmtNum(g.hours)}h @ ₪${fmtNum(g.rate)}`,
@@ -4252,7 +4252,7 @@ const Shifts = () => {
             payrollResult.excludedRates.length > 0 && (
               <div style={{ marginTop: "8px", color: "#b26a00" }}>
                 <strong>
-                  ⚠️ יותר משני תעריפים לעובד — שעות לא כלולות בקובץ מיקפל, יש
+                  ⚠️ יותר משלושה תעריפים לעובד — שעות לא כלולות בקובץ מיקפל, יש
                   לשלם בנפרד ({payrollResult.excludedRates.length}):
                 </strong>
                 <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
