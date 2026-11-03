@@ -96,3 +96,35 @@ export function formatWage(entry) {
   const w = entry.wage;
   return w !== "" && w != null ? `${w} · ${label}` : label;
 }
+
+// Tip-based pay (hourly_min_*: minimum wage + a bonus from tips) is for these roles only (owner, 2026-11-03).
+export const TIP_ROLES = ["מלצר", "בר", "ראנר"];
+export const isTipRole = (role) => TIP_ROLES.includes(String(role || "").trim());
+export const isTipWageType = (t) => !!t && String(t).startsWith("hourly_min_");
+// Roles that can be paid either way (בלת"מ — an unplanned shift): never "wrong wage type".
+export const ANY_WAGE_TYPE_ROLES = ['בלת"מ'];
+
+// A role "has its own wage" when its entry gives the pay without the employee's wage: a tip-based or global
+// type, or an hourly type with an amount. Otherwise the payroll uses the employee's wage for it.
+const hasOwnRoleWage = (r) => {
+  const t = r && r.new_wage_type;
+  if (!t) return false;
+  if (isTipWageType(t) || t.startsWith("global_")) return true;
+  return r.wage !== "" && r.wage != null && Number.isFinite(Number(r.wage));
+};
+
+// The roles of an employee that use the employee's wage while it is the wrong kind for them: a tip role with a
+// default that is not tip based, or another role (e.g. מוקדן) with a tip-based default. Not checked: no
+// default wage (that is "missing wage"), a global default (the pay is the global amount, not per hour) and the
+// ANY_WAGE_TYPE_ROLES.
+// emp: { new_wage_type, roles: [{ role, new_wage_type, wage }] }. Returns [{ role, tipRole }].
+export function wrongWageTypeRoles(emp) {
+  const def = emp && emp.new_wage_type;
+  if (!def || def.startsWith("global_")) return [];
+  const defTip = isTipWageType(def);
+  return (Array.isArray(emp.roles) ? emp.roles : [])
+    .filter((r) => r && String(r.role || "").trim() && !hasOwnRoleWage(r))
+    .filter((r) => !ANY_WAGE_TYPE_ROLES.includes(String(r.role).trim()))
+    .filter((r) => isTipRole(r.role) !== defTip)
+    .map((r) => ({ role: String(r.role).trim(), tipRole: isTipRole(r.role) }));
+}

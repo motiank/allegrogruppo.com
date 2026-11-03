@@ -17,7 +17,7 @@ import useCurrentUser from "../hooks/useCurrentUser";
 import WageDialog from "../components/WageDialog";
 import EmployeeWageTable from "../components/EmployeeWageTable";
 import ShiftEmployeeLoader from "../components/ShiftEmployeeLoader";
-import { normalizeRoles } from "../../../shared/wage.js";
+import { normalizeRoles, wrongWageTypeRoles, TIP_ROLES } from "../../../shared/wage.js";
 
 const Employees = () => {
   const { theme } = useTheme();
@@ -76,9 +76,10 @@ const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [viewFilter, setViewFilter] = useState("active");
-  // Frozen set of employee_ids currently visible under the "missing wages"
-  // filter. Recomputed only when the user changes the filter, reloads, or
-  // clicks Update — so editing a wage doesn't make the row vanish.
+  // Frozen set of employee_ids currently visible under the "missing wages" or
+  // "wrong wage type" filter. Recomputed only when the user changes the
+  // filter, reloads, or clicks Update — so editing a wage doesn't make the
+  // row vanish.
   const [missingFrozenIds, setMissingFrozenIds] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,6 +142,11 @@ const Employees = () => {
     !!emp.new_wage_type && hasWageValue(emp.wage);
   const matchesMissingFilter = (emp) =>
     isActive(emp) && !emp.savedContractor && !hasResolvedWage(emp);
+  // A role without its own wage uses the employee's wage, and that wage is
+  // the wrong kind for it (tip based for a non-tip role, or the opposite).
+  const matchesWrongTypeFilter = (emp) =>
+    isActive(emp) && !emp.savedContractor && wrongWageTypeRoles(emp).length > 0;
+  const FROZEN_FILTERS = { missing: matchesMissingFilter, wrongType: matchesWrongTypeFilter };
 
   const counts = useMemo(() => {
     let active = 0;
@@ -148,14 +154,16 @@ const Employees = () => {
     let removed = 0;
     let dup = 0;
     let contractors = 0;
+    let wrongType = 0;
     for (const e of employees) {
+      if (matchesWrongTypeFilter(e)) wrongType += 1;
       if (isActive(e) && !e.savedContractor) active += 1;
       if (isContractor(e)) contractors += 1;
       if (matchesMissingFilter(e)) missing += 1;
       if (isRemoved(e)) removed += 1;
       if (isDuplicate(e)) dup += 1;
     }
-    return { active, missing, contractors, removed, duplicate: dup };
+    return { active, missing, wrongType, contractors, removed, duplicate: dup };
   }, [employees]);
 
   // (Re)build the frozen "missing wages" set whenever:
@@ -164,17 +172,18 @@ const Employees = () => {
   // The set is *not* rebuilt on every edit, so a row stays visible while the
   // user types wages — only handleUpdate refreshes it after a successful save.
   useEffect(() => {
-    if (viewFilter !== "missing") {
+    const matches = FROZEN_FILTERS[viewFilter];
+    if (!matches) {
       if (missingFrozenIds !== null) setMissingFrozenIds(null);
       return;
     }
-    if (missingFrozenIds == null) {
-      const ids = new Set();
-      for (const e of employees) {
-        if (matchesMissingFilter(e)) ids.add(e.employee_id);
-      }
-      setMissingFrozenIds(ids);
+    // Always rebuilt here: switching between the two frozen filters needs
+    // the other set.
+    const ids = new Set();
+    for (const e of employees) {
+      if (matches(e)) ids.add(e.employee_id);
     }
+    setMissingFrozenIds(ids);
     // intentionally not depending on `employees` — we don't want edits to
     // shrink the frozen set.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +197,7 @@ const Employees = () => {
       result = result.filter(({ emp }) => isActive(emp) && !emp.savedContractor);
     } else if (viewFilter === "contractors") {
       result = result.filter(({ emp }) => isContractor(emp));
-    } else if (viewFilter === "missing") {
+    } else if (FROZEN_FILTERS[viewFilter]) {
       // Use the frozen set when present so editing a wage doesn't make
       // the row disappear immediately.
       if (missingFrozenIds) {
@@ -196,7 +205,7 @@ const Employees = () => {
           missingFrozenIds.has(emp.employee_id),
         );
       } else {
-        result = result.filter(({ emp }) => matchesMissingFilter(emp));
+        result = result.filter(({ emp }) => FROZEN_FILTERS[viewFilter](emp));
       }
     } else if (viewFilter === "removed") {
       result = result.filter(({ emp }) => isRemoved(emp));
@@ -799,10 +808,10 @@ const Employees = () => {
       );
       // Refresh the "missing wages" frozen set: rows that now have a wage
       // drop out, rows that became missing are added.
-      if (viewFilter === "missing") {
+      if (FROZEN_FILTERS[viewFilter]) {
         const ids = new Set();
         for (const e of employees) {
-          if (matchesMissingFilter({ ...e, savedContractor: !!e.contractor }))
+          if (FROZEN_FILTERS[viewFilter]({ ...e, savedContractor: !!e.contractor }))
             ids.add(e.employee_id);
         }
         setMissingFrozenIds(ids);
@@ -1328,6 +1337,9 @@ const Employees = () => {
                 <option value="missing">
                   Missing wages ({counts.missing})
                 </option>
+                <option value="wrongType">
+                  Wrong wage type ({counts.wrongType})
+                </option>
                 <option value="contractors">
                   Contractors — קבלן ({counts.contractors})
                 </option>
@@ -1353,6 +1365,8 @@ const Employees = () => {
                   <strong style={{ color: theme.text }}>{selectedLabel}</strong>
                   {viewFilter === "missing"
                     ? " — missing wages"
+                    : viewFilter === "wrongType"
+                      ? " — wrong wage type"
                     : viewFilter === "contractors"
                       ? " — contractors"
                       : viewFilter === "removed"
@@ -1371,6 +1385,40 @@ const Employees = () => {
                 </>
               )}
             </div>
+            {viewFilter === "wrongType" && filteredEmployees.length > 0 && (
+              <div
+                style={{
+                  ...styles.summary,
+                  marginTop: "-4px",
+                  fontSize: "0.85rem",
+                  color: theme.textSecondary,
+                }}
+              >
+                <div>
+                  A role without its own wage gets the employee&apos;s wage. Tip
+                  based is only for {TIP_ROLES.join(", ")}. Set the role&apos;s
+                  own wage, or change the employee&apos;s wage.
+                </div>
+                <ul style={{ margin: "4px 0 0", paddingInlineStart: "20px" }}>
+                  {filteredEmployees.map(({ emp }) => {
+                    const wrong = wrongWageTypeRoles(emp);
+                    if (wrong.length === 0) return null;
+                    return (
+                      <li key={emp.employee_id}>
+                        <strong style={{ color: theme.text }}>{emp.name}</strong>:{" "}
+                        {wrong
+                          .map((w) =>
+                            w.tipRole
+                              ? `${w.role} gets a wage that is not tip based`
+                              : `${w.role} gets the tip-based wage`,
+                          )
+                          .join("; ")}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             <EmployeeWageTable
               rows={filteredEmployees.map(({ emp, origIdx }) => ({
                 emp,
