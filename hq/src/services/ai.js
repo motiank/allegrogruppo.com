@@ -199,6 +199,15 @@ export const CALCS = {
       'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
     run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands, p.group),
   },
+  vat_report: {
+    params: '{ locationIds?, from, to }  (whole months: from = the 1st, to = the last day or today)',
+    about:
+      'the monthly VAT report (דוח מע"מ): per month, per restaurant, per company and in total — the income from Beecomm (all payments in the Z, without tips), the payments of חבר and מולטיפס and the 20% deducted from them, the income for VAT (income − deduction), the VAT inside it (18/118) and the income before VAT; daysWithData per restaurant and month',
+    run: async (a, p) => {
+      const info = new Map((await listLocations(a)).map((l) => [String(l.id), { name: l.name, company: l.company?.label ?? null, active: l.active }]));
+      return analytics.vatReport(locs(a, p), ...range(p), info);
+    },
+  },
   bank_summary: {
     params: '{ companyKeys?: string[], from, to, group?: "week" | "month" }',
     about:
@@ -353,7 +362,7 @@ const shape = (r) => ({
 export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
-const ACCOUNTANT_CALCS = new Set(['team_rules', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
+const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 const mayRun = (access, name) => access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name);
 
 // ---------------------------------------------------------------- team rules

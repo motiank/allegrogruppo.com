@@ -162,6 +162,10 @@
     { "key": "r-list", "kind": "AREA", "lang": "he", "question": "מה הכללים של הצוות?", "teamRules": [{ "id": 4, "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך", "area": "MANPOWER" }, { "id": 5, "text": "סכומים בלי אגורות", "area": null }],
       "expect": { "calcs": ["team_rules"] } },
     { "key": "r-once", "kind": "AREA", "lang": "he", "question": "הפעם תציג את העובדים שעבדו בחודש שעבר ממוינים לפי שם",
-      "expect": { "calcs": ["employees"] } }
+      "expect": { "calcs": ["employees"] } },
+    { "key": "v-vat-lastmonth", "kind": "AREA", "lang": "he", "question": "תכין לי דוח מע\"מ לחודש שעבר",
+      "expect": { "calcs": ["vat_report"], "range": { "from": "2026-09-01", "to": "2026-09-30" }, "maxCalcs": 1 } },
+    { "key": "v-vat-en", "kind": "GENERAL", "lang": "en", "question": "What is the income for VAT in August?",
+      "expect": { "calcs": ["vat_report"], "range": { "from": "2026-08-01", "to": "2026-08-31" }, "maxCalcs": 1 } }
   ]
 }

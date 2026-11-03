@@ -125,6 +125,9 @@ Guidance:
 - In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
   "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
+- VAT ("דוח מע"מ", "מע"מ", "הכנסות למע"מ", "VAT report"), in any area → vat_report, whole months: "this month" = the
+  1st up to today, "last month" = the whole month before, a named month = that month, "the last 3 months" = 3 whole
+  months before this one. Never payments_summary for VAT (the 20% deduction and the tips are only in vat_report).
 - Card income expected THIS week (or a named week): "צפי הכנסות השבוע מכרטיסי אשראי", "כמה כסף ייכנס השבוע
   מאשראי", "what card money comes in this week" → card_income_week (weekStart only for another week). It applies
   the pay rules itself: Max pays VISA + MASTERCARD + DINERS of last week on Wednesday; American Express pays
@@ -248,6 +251,13 @@ Your job now: WRITE the answer to the user from <results>.
     Max's statement for that week. Never say a week evens out unless unusual.evensOut says so.
   · Not in these columns: the members club (חבר משרתי קבע, monthly), Max's 008… payouts (monthly), Isracard debits
     (fees). Beecomm amounts include tips; the bank is after fees.
+- VAT report (vat_report, owner's rule — say it in one line): income = all Beecomm payments in the Z without tips;
+  20% of the חבר and מולטיפס payments is deducted; income for VAT = income − deduction; VAT 18% inside it (vat).
+  One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, חבר, מולטיפס, ניכוי 20%,
+  הכנסה למע"מ, מע"מ 18%, לפני מע"מ — from companies[].months (several months: one row per company and month, or per
+  month for one company); then the total row. Restaurants of a company only when asked (locations[].months). Note a
+  partial month (partial) and an OPEN restaurant (active true) with no data in a month — a missing report; a closed
+  restaurant (active false) with no months is not named.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the
   amount that arrived in the bank (bank, net after fees, paid days later) as two separate numbers with their
   names; do not add them up. The difference is mostly timing and card-company fees.
