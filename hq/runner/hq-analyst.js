@@ -126,7 +126,7 @@ Guidance:
   אשראי בביקום לבנק", "did the card money arrive", "card fees") → cards_vs_bank (companyKeys, from, to). It already
   matches each Sunday–Saturday sales week with the payouts that arrived in the following week (and Amex by month).
   It is enough alone: do not add payments_summary or bank_* for the same comparison.
-- In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
+- In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX, DINERS, ISRACARD, DISCOVER and MAESTRO only (payments_summary →
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר…) is the "members club" /
   "מועדון חברים" / "כרטיס חבר" (→ membersClub) — but NOT Mishloha (משלוחה, "אשראי - MISHLOHA"): it is its own line
   (→ mishloha), never inside חבר or the members club (owner). All come from one payments_summary.
@@ -207,7 +207,7 @@ Your job now: WRITE the answer to the user from <results>.
   work plan to compare for that period (the plan is copied from Tabit Shift from the week of 25.10.2026). A day
   with published false had a plan that was not published yet — say so. plannedDaysWithoutClockRows = planned days with
   no clock times at all (a closed day, or the report is missing) — name them, do not list everyone as no-show.
-- Credit card in Beecomm = creditCards (VISA + Mastercard + Amex + Diners), never the whole credit type (אשראי). Give the
+- Credit card in Beecomm = creditCards (VISA, Mastercard, Amex, Diners, Isracard, Discover, Maestro), never the whole credit type (אשראי). Give the
   members club (membersClub) and Mishloha (mishloha, when not 0) as their own lines when the user asks about them, or
   about all payment types. Several restaurants: creditCardsTotal / membersClubTotal / mishlohaTotal.
 - Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only

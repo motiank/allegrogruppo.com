@@ -93,7 +93,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   model in `<team_rules>` for every later request of that area (README → Asking in words). No new table.
 - Answers may hold pipe tables → table component + Excel download per table (`lib/answerTables.js`,
   `/ai/requests/:id/tables/:n.xlsx`, owner 2026-10-27). Keep the table format in the WRITE prompt and the reader in sync.
-- Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
+- Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS (+ ISRACARD, DISCOVER, MAESTRO, owner 2026-11-03) only; every other brand of the credit type = "members club"
   (owner, 2026-10-26) — except Mishloha ("אשראי - MISHLOHA"), its own group `mishloha` (owner, 2026-11-03: "it is
   not the same" as חבר). `payments_summary` returns `creditCards` / `membersClub` / `mishloha` (+ `…Total`); never call
   the whole אשראי type "credit card".

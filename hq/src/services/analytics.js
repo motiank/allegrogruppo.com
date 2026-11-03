@@ -370,8 +370,9 @@ export const GROUPS = ['week', 'month'];
 
 // Owner, 2026-10-26: in Beecomm, "credit card" = only these brands of the credit type (אשראי); every other brand
 // of that type (PRIVATE LABEL BRAND - חבר…) is the "members club" (מועדון חברים) — except Mishloha ("אשראי - MISHLOHA",
-// online orders paid by card), its own group: "it is not the same" as חבר (owner, 2026-11-03).
-export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS'];
+// online orders paid by card), its own group: "it is not the same" as חבר (owner, 2026-11-03). ISRACARD, DISCOVER and
+// MAESTRO are credit cards too (owner, 2026-11-03).
+export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS', 'ISRACARD', 'DISCOVER', 'MAESTRO'];
 const CREDIT_TYPE = 1;
 const isCreditCard = (brand) => CREDIT_CARD_BRANDS.includes(brandKey(brand));
 const isMishloha = (brand) => /mishloha|משלוחה/i.test(String(brand || ''));
@@ -521,7 +522,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       totalCharges: cur(total),
       prevTotalCharges: prev(prevTotal),
       totalService: cur(list.filter((t) => t.inZ).reduce((a, t) => a + t.service, 0)),
-      // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX + DINERS, the rest = members club
+      // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX + DINERS + ISRACARD + DISCOVER + MAESTRO, the rest = members club
       creditCards: groupOut(groups.creditCards, len <= 62 && !by),
       membersClub: groupOut(groups.membersClub, len <= 62 && !by),
       mishloha: groupOut(groups.mishloha, len <= 62 && !by),
@@ -564,7 +565,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges = paid − refunded (Beecomm "סה״כ"); totalCharges (the Z total) = income WITHOUT tips — the card rows include the card tips, but the workers got them in cash from the register, so the cash row is lower by them (can be negative); service / totalService = the tips, apart, never subtracted from a total; shares are of the payments inside the Z',
-    note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר…) except Mishloha; mishloha = "אשראי - MISHLOHA" (online orders paid by card), its own line, NOT the members club (owner, 2026-11-03); the type אשראי = all three',
+    note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS + ISRACARD + DISCOVER + MAESTRO of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר…) except Mishloha; mishloha = "אשראי - MISHLOHA" (online orders paid by card), its own line, NOT the members club (owner, 2026-11-03); the type אשראי = all three',
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
     membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },

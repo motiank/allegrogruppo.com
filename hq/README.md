@@ -138,7 +138,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
-**Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** of
+**Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** (and ISRACARD, DISCOVER, MAESTRO — owner, 2026-11-03) of
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
 **members club** (מועדון חברים), except **Mishloha** ("אשראי - MISHLOHA", online orders paid by card): its own group
 (owner, 2026-11-03). `payments_summary` always returns all three: `creditCards` / `membersClub` / `mishloha` per
