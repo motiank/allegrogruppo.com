@@ -94,8 +94,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - Answers may hold pipe tables → table component + Excel download per table (`lib/answerTables.js`,
   `/ai/requests/:id/tables/:n.xlsx`, owner 2026-10-27). Keep the table format in the WRITE prompt and the reader in sync.
 - Beecomm "credit card" = VISA + MASTERCARD + AMEX + DINERS only; every other brand of the credit type = "members club"
-  (owner, 2026-10-26). `payments_summary` returns `creditCards` / `membersClub` (+ `…Total`); never call the whole
-  אשראי type "credit card".
+  (owner, 2026-10-26) — except Mishloha ("אשראי - MISHLOHA"), its own group `mishloha` (owner, 2026-11-03: "it is
+  not the same" as חבר). `payments_summary` returns `creditCards` / `membersClub` / `mishloha` (+ `…Total`); never call
+  the whole אשראי type "credit card".
 - Employees and wages (calc `employees`, 2026-10-26): names, location, roles, wage type, wage and the hourly rate per
   role (same chain as the admin Shifts page: role wage → employee wage → legacy `hourly_wage`; `hourly_min_*` / -1 = the
   minimum wage, `MIN_HOURLY_WAGE` or 35.4), read live from the admin's `/employees`. With `from`/`to`: only the people

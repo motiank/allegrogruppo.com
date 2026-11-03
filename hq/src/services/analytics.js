@@ -369,10 +369,14 @@ export function periodOf(date, group) {
 export const GROUPS = ['week', 'month'];
 
 // Owner, 2026-10-26: in Beecomm, "credit card" = only these brands of the credit type (אשראי); every other brand
-// of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the "members club" (מועדון חברים).
+// of that type (PRIVATE LABEL BRAND - חבר…) is the "members club" (מועדון חברים) — except Mishloha ("אשראי - MISHLOHA",
+// online orders paid by card), its own group: "it is not the same" as חבר (owner, 2026-11-03).
 export const CREDIT_CARD_BRANDS = ['VISA', 'MASTERCARD', 'AMEX', 'DINERS'];
 const CREDIT_TYPE = 1;
 const isCreditCard = (brand) => CREDIT_CARD_BRANDS.includes(brandKey(brand));
+const isMishloha = (brand) => /mishloha|משלוחה/i.test(String(brand || ''));
+const CARD_GROUPS = ['creditCards', 'membersClub', 'mishloha'];
+const groupOf = (brand) => (isCreditCard(brand) ? 'creditCards' : isMishloha(brand) ? 'mishloha' : 'membersClub');
 const newGroup = () => ({ charges: 0, refunded: 0, transactions: 0, prevCharges: 0, brands: new Set(), byDay: new Map() });
 
 /**
@@ -393,6 +397,7 @@ function periodRows(map, from, to, locations = 1) {
       total: r2(g.total),
       creditCards: r2(g.creditCards),
       membersClub: r2(g.membersClub),
+      mishloha: r2(g.mishloha),
       brands: Object.fromEntries(Object.entries(g.brands).map(([k, v]) => [k, r2(v)])),
     }));
 }
@@ -403,12 +408,12 @@ function periodRows(map, from, to, locations = 1) {
 // sales, for all branches. So never subtract service again from a total; service / totalService = the tips, apart.
 export async function paymentsSummary(locationIds, from, to, brands = null, group = null) {
   const by = GROUPS.includes(group) ? group : null;
-  const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0, brands: {} });
+  const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0, mishloha: 0, brands: {} });
   const allPeriods = new Map();
   const len = daysBetween(from, to) + 1;
   const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
   let selTotal = want ? { charges: 0, service: 0, prevCharges: 0, transactions: 0 } : null;
-  const groupTotals = { creditCards: { charges: 0, prevCharges: 0 }, membersClub: { charges: 0, prevCharges: 0 } };
+  const groupTotals = Object.fromEntries(CARD_GROUPS.map((k) => [k, { charges: 0, prevCharges: 0 }]));
   const pFrom = addDays(from, -len);
   const out = [];
   let reason = null;
@@ -424,7 +429,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
     const days = new Set();
     const prevDays = new Set();
     const sel = want ? { charges: 0, refunded: 0, transactions: 0, service: 0, prevCharges: 0, byDay: new Map() } : null;
-    const groups = { creditCards: newGroup(), membersClub: newGroup() };
+    const groups = Object.fromEntries(CARD_GROUPS.map((k) => [k, newGroup()]));
     const periods = new Map();
     for (const r of src.rows) {
       const cur = r.date >= from;
@@ -437,13 +442,13 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
           g.days.add(m === periods ? r.date : `${loc}|${r.date}`);
           if (r.brand == null && r.inZ) g.total += r.charges;
           if (r.type === CREDIT_TYPE && r.brand != null) {
-            g[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'] += r.charges;
+            g[groupOf(r.brand)] += r.charges;
             g.brands[brandKey(r.brand)] = (g.brands[brandKey(r.brand)] || 0) + r.charges;
           }
         }
       }
       if (r.type === CREDIT_TYPE && r.brand != null) {
-        const g = groups[isCreditCard(r.brand) ? 'creditCards' : 'membersClub'];
+        const g = groups[groupOf(r.brand)];
         g.brands.add(r.brand);
         if (cur) {
           g.charges += r.charges;
@@ -503,7 +508,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       changePct: has && hasPrev ? r2(div(g.charges - g.prevCharges, g.prevCharges) * 100) : null,
       ...(withDays ? { byDay: [...g.byDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, charges]) => ({ date, weekday: weekdayOf(date), charges: r2(charges) })) } : {}),
     });
-    for (const k of ['creditCards', 'membersClub']) {
+    for (const k of CARD_GROUPS) {
       if (has) groupTotals[k].charges += groups[k].charges;
       if (hasPrev) groupTotals[k].prevCharges += groups[k].prevCharges;
     }
@@ -519,6 +524,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       // the credit type (אשראי) split the owner's way: credit cards = VISA + MASTERCARD + AMEX + DINERS, the rest = members club
       creditCards: groupOut(groups.creditCards, len <= 62 && !by),
       membersClub: groupOut(groups.membersClub, len <= 62 && !by),
+      mishloha: groupOut(groups.mishloha, len <= 62 && !by),
       ...(by ? { byPeriod: periodRows(periods, from, to) } : {}),
       types: list
         .sort((a, b) => b.charges - a.charges || b.prevCharges - a.prevCharges)
@@ -558,10 +564,11 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges = paid − refunded (Beecomm "סה״כ"); totalCharges (the Z total) = income WITHOUT tips — the card rows include the card tips, but the workers got them in cash from the register, so the cash row is lower by them (can be negative); service / totalService = the tips, apart, never subtracted from a total; shares are of the payments inside the Z',
-    note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Mishloha…); the type אשראי = both',
+    note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר…) except Mishloha; mishloha = "אשראי - MISHLOHA" (online orders paid by card), its own line, NOT the members club (owner, 2026-11-03); the type אשראי = all three',
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
     membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },
+    mishlohaTotal: { charges: r2(groupTotals.mishloha.charges), prevCharges: r2(groupTotals.mishloha.prevCharges) },
     ...(by ? { group: by, byPeriodTotal: periodRows(allPeriods, from, to, locationIds.length) } : {}),
     ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), service: r2(selTotal.service), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
     locations: out,

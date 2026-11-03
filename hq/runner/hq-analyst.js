@@ -127,8 +127,9 @@ Guidance:
   matches each Sunday–Saturday sales week with the payouts that arrived in the following week (and Amex by month).
   It is enough alone: do not add payments_summary or bank_* for the same comparison.
 - In Beecomm, "credit card" / "כרטיסי אשראי" / "אשראי" = VISA, MASTERCARD, AMEX and DINERS only (payments_summary →
-  creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
-  "members club" / "מועדון חברים" / "כרטיס חבר" (→ membersClub). Both come from one payments_summary.
+  creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר…) is the "members club" /
+  "מועדון חברים" / "כרטיס חבר" (→ membersClub) — but NOT Mishloha (משלוחה, "אשראי - MISHLOHA"): it is its own line
+  (→ mishloha), never inside חבר or the members club (owner). All come from one payments_summary.
 - VAT ("דוח מע"מ", "מע"מ", "הכנסות למע"מ", "VAT report"), in any area → vat_report, whole months: "this month" = the
   1st up to today, "last month" = the whole month before, a named month = that month, "the last 3 months" = 3 whole
   months before this one. Never payments_summary for VAT (the 20% deduction and the tips are only in vat_report).
@@ -207,8 +208,8 @@ Your job now: WRITE the answer to the user from <results>.
   with published false had a plan that was not published yet — say so. plannedDaysWithoutClockRows = planned days with
   no clock times at all (a closed day, or the report is missing) — name them, do not list everyone as no-show.
 - Credit card in Beecomm = creditCards (VISA + Mastercard + Amex + Diners), never the whole credit type (אשראי). Give the
-  members club (membersClub) as its own line when the user asks about it, or about all payment types. Several
-  restaurants: creditCardsTotal / membersClubTotal.
+  members club (membersClub) and Mishloha (mishloha, when not 0) as their own lines when the user asks about them, or
+  about all payment types. Several restaurants: creditCardsTotal / membersClubTotal / mishlohaTotal.
 - Payments (payments_summary): per payment type the amount and its share, biggest first; card brands only
   when asked. The amounts are Beecomm's "סה״כ" per type (paid − refunded), so they match Beecomm's payments report.
   Their total (totalCharges) is the income WITHOUT tips. The card rows include the card tips, and the cash row is lower

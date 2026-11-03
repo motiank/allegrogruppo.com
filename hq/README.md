@@ -139,9 +139,10 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
 
 **Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** of
-the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר, Mishloha…) is the
-**members club** (מועדון חברים). `payments_summary` always returns both: `creditCards` / `membersClub` per location
-and `creditCardsTotal` / `membersClubTotal`.
+the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
+**members club** (מועדון חברים), except **Mishloha** ("אשראי - MISHLOHA", online orders paid by card): its own group
+(owner, 2026-11-03). `payments_summary` always returns all three: `creditCards` / `membersClub` / `mishloha` per
+location and `creditCardsTotal` / `membersClubTotal` / `mishlohaTotal`.
 
 **Weekly and monthly sums.** The model never adds numbers itself, so a table per week or month comes from one
 calculation with `group: "week"` (Sunday–Saturday) or `"month"`: `payments_summary` (`byPeriod`, `byPeriodTotal`) and
