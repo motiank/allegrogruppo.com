@@ -76,6 +76,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   VISA + MC per Sun–Sat week vs Max's payout the next Wednesday (002… = VISA, 007… = MC, fee ≈ 1.6%), and AMEX per month
   vs American Express's payouts the next month (README → Weekly and monthly sums; 2026-10-27). The planner
   must use one grouped calc, never one calc per week.
+- **Tips are not income** (owner 2026-11-03, a GLOBAL rule — keep): every Beecomm income amount is without tips.
+  Sales / dishes already were (`netTotal − serviceAmount`); `paymentsSummary` now subtracts `service` by default
+  (tips apart in `service` / `totalService`), `card_income_week` gives `tips` apart; only `cards_vs_bank` uses
+  `{ withTips: true }`, to match the bank (the card companies pay the tips too). Hard rule in the prompts.
 - **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר + מולטיפס
   deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system

@@ -397,13 +397,16 @@ function periodRows(map, from, to, locations = 1) {
     }));
 }
 
-export async function paymentsSummary(locationIds, from, to, brands = null, group = null) {
+// Owner, 2026-11-03 (a global rule): tips are not income. Every Beecomm amount here is WITHOUT tips (charges −
+// service); the tips are given apart (service, totalService). withTips: true only for matching the bank (cards_vs_bank),
+// where the card companies pay the tips too.
+export async function paymentsSummary(locationIds, from, to, brands = null, group = null, { withTips = false } = {}) {
   const by = GROUPS.includes(group) ? group : null;
   const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0, brands: {} });
   const allPeriods = new Map();
   const len = daysBetween(from, to) + 1;
   const want = Array.isArray(brands) && brands.length ? new Set(brands.map(brandKey)) : null;
-  let selTotal = want ? { charges: 0, prevCharges: 0, transactions: 0 } : null;
+  let selTotal = want ? { charges: 0, service: 0, prevCharges: 0, transactions: 0 } : null;
   const groupTotals = { creditCards: { charges: 0, prevCharges: 0 }, membersClub: { charges: 0, prevCharges: 0 } };
   const pFrom = addDays(from, -len);
   const out = [];
@@ -415,10 +418,11 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       out.push({ locationId: loc, available: false });
       continue;
     }
+    if (!withTips) src.rows = src.rows.map((r) => ({ ...r, charges: r.charges - r.service }));
     const types = new Map();
     const days = new Set();
     const prevDays = new Set();
-    const sel = want ? { charges: 0, refunded: 0, transactions: 0, prevCharges: 0, byDay: new Map() } : null;
+    const sel = want ? { charges: 0, refunded: 0, transactions: 0, service: 0, prevCharges: 0, byDay: new Map() } : null;
     const groups = { creditCards: newGroup(), membersClub: newGroup() };
     const periods = new Map();
     for (const r of src.rows) {
@@ -450,6 +454,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       if (sel && r.brand != null && want.has(brandKey(r.brand))) {
         if (cur) {
           sel.charges += r.charges;
+          sel.service += r.service;
           sel.refunded += r.refunded;
           sel.transactions += r.transactions;
           sel.byDay.set(r.date, (sel.byDay.get(r.date) || 0) + r.charges);
@@ -483,6 +488,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
     const prevTotal = list.filter((t) => t.inZ).reduce((a, t) => a + t.prevCharges, 0);
     if (sel && has) {
       selTotal.charges += sel.charges;
+      selTotal.service += sel.service;
       selTotal.transactions += sel.transactions;
     }
     if (sel && hasPrev) selTotal.prevCharges += sel.prevCharges;
@@ -536,6 +542,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
             selected: {
               brands: [...want],
               charges: cur(sel.charges),
+              service: cur(sel.service),
               refunded: cur(sel.refunded),
               transactions: has ? sel.transactions : null,
               prevCharges: prev(sel.prevCharges),
@@ -549,13 +556,14 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
   return {
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
-    source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges include service (tips); shares are of the payments inside the Z',
+    source: `Beecomm payments report via Allegro (/beecomm/payments/stored); ${withTips ? 'charges INCLUDE service (tips)' : 'charges = income WITHOUT tips (charges − service); the tips are service / totalService'}; shares are of the payments inside the Z`,
+    withTips,
     note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Mishloha…); the type אשראי = both',
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
     membersClubTotal: { charges: r2(groupTotals.membersClub.charges), prevCharges: r2(groupTotals.membersClub.prevCharges) },
     ...(by ? { group: by, byPeriodTotal: periodRows(allPeriods, from, to, locationIds.length) } : {}),
-    ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
+    ...(selTotal ? { selectedTotal: { brands: [...want], charges: r2(selTotal.charges), service: r2(selTotal.service), prevCharges: r2(selTotal.prevCharges), transactions: selTotal.transactions } } : {}),
     locations: out,
   };
 }
@@ -599,25 +607,29 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
         salesFrom: sFrom,
         salesTo: sTo,
         amount: r.selectedTotal?.charges ?? null,
-        byLocation: r.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, daysWithData: l.daysWithData ?? 0, days: l.days ?? null })),
+        tips: r.selectedTotal?.service ?? null,
+        byLocation: r.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, days: l.days ?? null })),
       });
     }
   }
   const cc = cards.selectedTotal?.charges ?? null;
   const ax = amex.reduce((a, x) => a + (x.amount || 0), 0);
+  const axTips = amex.reduce((a, x) => a + (x.tips || 0), 0);
   return {
     week: { from, to },
     source: 'Beecomm payments (/beecomm/payments/stored); expected bank payouts from the card companies\' pay rules, not the bank file',
-    note: 'creditCards = VISA + MASTERCARD + DINERS sold in the week before, paid by Max on this week\'s Wednesday (about 1.6% fee comes off); amex = American Express, paid by its own rule (sales of the 1st–15th on the 2nd of the next month, of the 16th–end on the 8th; a Saturday pay day moves to Sunday); amounts are Beecomm gross with tips, before fees',
+    note: 'creditCards = VISA + MASTERCARD + DINERS sold in the week before, paid by Max on this week\'s Wednesday (about 1.6% fee comes off); amex = American Express, paid by its own rule (sales of the 1st–15th on the 2nd of the next month, of the 16th–end on the 8th; a Saturday pay day moves to Sunday); amount = income WITHOUT tips (tips are not income — owner); tips = the tips paid by card in those sales, which the card company pays into the bank too (they go to the workers); before fees',
     creditCards: {
       brands: ['VISA', 'MASTERCARD', 'DINERS'],
       salesWeek: { from: prevFrom, to: prevTo },
       payDate: addDays(from, 3),
       amount: cc,
-      byLocation: cards.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, daysWithData: l.daysWithData ?? 0, byDay: l.selected?.byDay ?? [] })),
+      tips: cards.selectedTotal?.service ?? null,
+      byLocation: cards.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, byDay: l.selected?.byDay ?? [] })),
     },
-    amex: { payments: amex, amount: amex.length ? r2(ax) : 0, ...(amex.length ? {} : { none: 'no American Express pay day (2nd / 8th) in this week' }) },
+    amex: { payments: amex, amount: amex.length ? r2(ax) : 0, tips: amex.length ? r2(axTips) : 0, ...(amex.length ? {} : { none: 'no American Express pay day (2nd / 8th) in this week' }) },
     total: cc == null ? null : r2(cc + ax),
+    tips: cc == null ? null : r2((cards.selectedTotal?.service ?? 0) + axTips),
   };
 }
 

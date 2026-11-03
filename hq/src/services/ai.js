@@ -196,7 +196,7 @@ export const CALCS = {
   payments_summary: {
     params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX", "DINERS"], group?: "week" | "month" }',
     about:
-      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges with tips, share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
+      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges = income WITHOUT tips (tips are not income), share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
     run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands, p.group),
   },
   vat_report: {
@@ -217,7 +217,7 @@ export const CALCS = {
   card_income_week: {
     params: '{ locationIds?, weekStart?: "YYYY-MM-DD" (any day of the week; default this week) }',
     about:
-      'the card money expected to come in during a Sunday–Saturday week, from Beecomm and the card companies\' pay rules: creditCards (VISA + MASTERCARD + DINERS of the week before, paid by Max on Wednesday) and amex (American Express: sales of the 1st–15th paid on the 2nd of the next month, of the 16th–end on the 8th) apart, and the total',
+      'the card money expected to come in during a Sunday–Saturday week, from Beecomm and the card companies\' pay rules: creditCards (VISA + MASTERCARD + DINERS of the week before, paid by Max on Wednesday) and amex (American Express: sales of the 1st–15th paid on the 2nd of the next month, of the 16th–end on the 8th) apart, and the total; amounts without tips, the card tips apart (tips)',
     run: (a, p) => analytics.cardIncomeWeek(locs(a, p), p.weekStart, todayLocal()),
   },
   cards_vs_bank: {
