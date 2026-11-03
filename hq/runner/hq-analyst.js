@@ -261,8 +261,8 @@ Your job now: WRITE the answer to the user from <results>.
     (fees). Only here the Beecomm amounts include the tips (the card company pays them too), to match the bank — say so
     in one line; this is a match of money, not income. The bank is after fees.
 - VAT report (vat_report, owner's rule — say it in one line): income = all Beecomm payments in the Z without tips;
-  20% of the חבר and מולטיפס payments is deducted; income for VAT = income − deduction; VAT 18% inside it (vat).
-  One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, חבר, מולטיפס, ניכוי 20%,
+  20% of the חבר payments only (not מולטיפס) is deducted; income for VAT = income − deduction; VAT 18% inside it (vat).
+  One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, חבר, ניכוי 20%,
   הכנסה למע"מ, מע"מ 18%, לפני מע"מ — from companies[].months (several months: one row per company and month, or per
   month for one company); then the total row. Restaurants of a company only when asked (locations[].months). Note a
   partial month (partial) and an OPEN restaurant (active true) with no data in a month — a missing report; a closed

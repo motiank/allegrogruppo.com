@@ -83,8 +83,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   and Σ(paid − refunded) = the Z total = dish sales (checked all branches, Aug 2026). `paymentsSummary` charges =
   paid − refunded (Beecomm "סה״כ"), tips apart in `service` / `totalService`; `card_income_week` amount = card
   charges − card tips, `tips` apart; `cards_vs_bank` uses the card charges with their tips (the bank gets them).
-- **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר + מולטיפס
-  deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
+- **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר only (not
+  מולטיפס, owner) deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system
   recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. The only number the model
   may "compute" — and the code replaces it anyway. README → Asking in words.

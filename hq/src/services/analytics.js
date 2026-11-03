@@ -644,12 +644,11 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
 
 // ---------------------------------------------------------------- monthly VAT report (owner, 2026-11-03)
 // The income for VAT, per month, from the Beecomm payments report: all payments in the Z (paid − refunded; their
-// total has no tips, see paymentsSummary); the payments of חבר (the credit brand "PRIVATE LABEL BRAND - חבר") and מולטיפס (its own payment type, its
-// sub-brands included) count only 80% — 20% is deducted before the total; VAT = 18/118 of what is left.
+// total has no tips, see paymentsSummary); the payments of חבר (the credit brand "PRIVATE LABEL BRAND - חבר") count
+// only 80% — 20% is deducted before the total; VAT = 18/118 of what is left. Only חבר — not מולטיפס (owner, 2026-11-03).
 export const VAT_RATE_PCT = 18;
 export const VAT_DEDUCT_PCT = 20;
 const isHever = (r) => r.type === CREDIT_TYPE && /חבר/.test(String(r.brand || ''));
-const isMultipass = (r) => r.brand == null && /מולטיפס|multipass/i.test(String(r.typeName || ''));
 
 /**
  * @param {string[]} locationIds
@@ -657,7 +656,7 @@ const isMultipass = (r) => r.brand == null && /מולטיפס|multipass/i.test(S
  */
 export async function vatReport(locationIds, from, to, info = new Map()) {
   const months = new Map();
-  const blank = (pp) => ({ from: pp.from, to: pp.to, income: 0, hever: 0, multipass: 0, days: new Set() });
+  const blank = (pp) => ({ from: pp.from, to: pp.to, income: 0, hever: 0, days: new Set() });
   const perLoc = [];
   let reason = null;
   for (const loc of locationIds) {
@@ -677,18 +676,16 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
       const net = r.charges - r.refunded;
       if (r.brand == null) m.income += net;
       if (isHever(r)) m.hever += net;
-      if (isMultipass(r)) m.multipass += net;
     }
     perLoc.push({ locationId: loc, name: info.get(String(loc))?.name ?? null, company: info.get(String(loc))?.company ?? null, active: info.get(String(loc))?.active ?? null, available: true, byMonth });
   }
   const line = (m, days) => {
-    const deduction = ((m.hever + m.multipass) * VAT_DEDUCT_PCT) / 100;
+    const deduction = (m.hever * VAT_DEDUCT_PCT) / 100;
     const vatIncome = m.income - deduction;
     const vat = (vatIncome * VAT_RATE_PCT) / (100 + VAT_RATE_PCT);
     return {
       income: r2(m.income),
       hever: r2(m.hever),
-      multipass: r2(m.multipass),
       deduction: r2(deduction),
       vatIncome: r2(vatIncome),
       vat: r2(vat),
@@ -699,7 +696,6 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
   const add = (a, m) => {
     a.income += m.income;
     a.hever += m.hever;
-    a.multipass += m.multipass;
     return a;
   };
   const companies = new Map();
@@ -731,7 +727,7 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
   return {
     period: { from, to },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored): payments in the Z (paid − refunded = Beecomm "סה״כ"; the Z total has no tips: card tips were paid to the workers from the cash register)',
-    rule: `income = all payments in the Z without tips; ${VAT_DEDUCT_PCT}% of the חבר payments (credit brand "PRIVATE LABEL BRAND - חבר") and of מולטיפס is deducted (deduction); vatIncome = income − deduction; vat = vatIncome × ${VAT_RATE_PCT}/${100 + VAT_RATE_PCT} (VAT ${VAT_RATE_PCT}% included); vatIncomeBeforeVat = vatIncome − vat (owner, 2026-11-03)`,
+    rule: `income = all payments in the Z without tips; ${VAT_DEDUCT_PCT}% of the חבר payments (credit brand "PRIVATE LABEL BRAND - חבר") is deducted (deduction) — only חבר, not מולטיפס; vatIncome = income − deduction; vat = vatIncome × ${VAT_RATE_PCT}/${100 + VAT_RATE_PCT} (VAT ${VAT_RATE_PCT}% included); vatIncomeBeforeVat = vatIncome − vat (owner, 2026-11-03)`,
     vatRatePct: VAT_RATE_PCT,
     deductPct: VAT_DEDUCT_PCT,
     ...(reason ? { missing: reason } : {}),
