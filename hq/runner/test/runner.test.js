@@ -112,6 +112,15 @@ await t('no team rules → no block; a bad rule value is dropped', async () => {
   assert.equal(hub.calls.find((c) => c[1].endsWith('/compute'))[2].rule, null);
 });
 
+await t('a table total is recalculated by the system and is not flagged as unverified', async () => {
+  const hub = fakeHub({ results: [{ calc: 'labor_summary', params: {}, result: { rows: [{ h: 10 }, { h: 32.5 }] } }] });
+  const writer = model('שעות:\n| עובד | שעות |\n|---|---|\n| א | 10 |\n| ב | 32.5 |\n| ג | — |\n| סה"כ | 40 |');
+  await handle({ id: 7, hub, planner: model('{"calcs":[]}'), writer, log: {} });
+  const ans = hub.calls.find((c) => c[1].endsWith('/answer'))[2];
+  assert.ok(ans.answer.includes('| ג | 0 |') && ans.answer.includes('| סה"כ | 42.5 |'));
+  assert.deepEqual(ans.meta.unverifiedNumbers, []);
+});
+
 console.log('number check');
 await t('rounded, thousands and percentages match; invented ones do not', () => {
   const r = { a: 48210.46, b: 0.123, c: 812, d: '2026-10-05', e: 12345 };

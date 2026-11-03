@@ -302,6 +302,12 @@ shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table
 `GET /api/joya/ai/requests/:id/tables/:n.xlsx` (`src/services/answerExcel.js`, exceljs from the repo root; only the
 asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader for both sides: `lib/answerTables.js`.
 
+**Table totals (owner, 2026-11-03, a lasting rule).** "When a table has a total and the system did not give it —
+calculate it, don't invent it; missing numbers in the table are zero." The writer ends a table whose numbers add up
+with one total row ("סה"כ" / "Total", the last row; "—" under dates, times, %, averages, rates, balances). The runner
+then recalculates that row from the rows above it (`lib/answerTables.js` `fillTotals`, called in `runner/runner.js`
+before the number check) and writes 0 in empty cells of number columns; the calculated totals count as verified.
+
 **Team rules (2026-11-01).** The chain admin teaches the AI team in the chat: "מעכשיו …", "כלל חדש: …", "from now
 on …" → the planner returns `rule: { op: add | edit | remove, text, area, id? }`, the hub checks it (`ai.js`
 `checkRule`: chain admin only, at most 60 rules of 600 characters) and shows it as a proposal (`TEAM_RULE`); it is

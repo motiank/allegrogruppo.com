@@ -5,7 +5,7 @@ import { applyMapping, parseNumber, parseDate, parseDateTime, suggestMapping } f
 import { shiftDemand, forecastUnit } from '../src/lib/demand.js';
 import { computeSlot, learnedAdjustments, validateRule } from '../src/lib/staffingRules.js';
 import { recommend, convert } from '../src/lib/recommend.js';
-import { splitAnswer, cellNumber } from '../lib/answerTables.js';
+import { splitAnswer, cellNumber, fillTotals } from '../lib/answerTables.js';
 import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
 
 let n = 0;
@@ -342,6 +342,18 @@ t('actual: diners per person per past shift, needed by the learned ratio, and a 
   assert.deepEqual([w.shifts, w.avgPeople, w.perPerson, w.minPerPerson, w.maxPerPerson, w.shiftsOver, w.shiftsUnder], [2, 4, 30, 24, 40, 1, 0]);
 });
 
+t('table totals: the total row is recalculated from the rows, missing numbers are 0, rates / dates / % are not summed', () => {
+  const a = ['שעות:', '| עובד | תאריך | שעות | שכר לשעה ₪ | עלות ₪ | אחוז |', '|---|---|---|---|---|---|', '| דנה | 18.10 | 12.5 | 40 | 1,200 | 10% |', '| יוסי | 19.10 | — | 45 | 2,350.5 | 20% |', '| רון | 20.10 | 7 | 38 |  | 5% |', '| סה"כ | — | 99 | — | 9,999 | 35% |'].join('\n');
+  const out = fillTotals(a);
+  assert.deepEqual(out.totals, [19.5, 3550.5]);
+  const rows = splitAnswer(out.text)[1].rows;
+  assert.deepEqual(rows[1], ['יוסי', '19.10', '0', '45', '2,350.5', '20%']);
+  assert.deepEqual(rows[3], ['סה"כ', '—', '19.5', '—', '3,550.5', '35%']);
+  // no total row, or two total rows: only the missing numbers become 0
+  assert.equal(fillTotals('| a | b |\n|---|---|\n| x | 1 |\n| y | 2 |').text, '| a | b |\n|---|---|\n| x | 1 |\n| y | 2 |');
+  assert.deepEqual(fillTotals('| a | b |\n|---|---|\n| Total | 5 |\n| x | 1 |\n| Total | 9 |').totals, []);
+  assert.deepEqual(fillTotals('| שבוע | ₪ |\n|---|---|\n| 1 | 1,000 |\n| 2 | -250 |\n| סה״כ | 0 |').totals, [750]);
+});
 t('answer tables: a pipe table becomes a table block between the text; numbers are read for Excel', () => {
   const b = splitAnswer('שלום\n\n| שבוע | אשראי | שינוי |\n|---|---:|---|\n| 18.10–24.10 | 221,776 ₪ | -3.6% |\n| 11.10–17.10 | **256,062** |\n\nסוף\n| not | a table |');
   assert.deepEqual(b.map((x) => x.type), ['text', 'table', 'text']);

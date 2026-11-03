@@ -66,3 +66,79 @@ export function cellNumber(s) {
   if (!Number.isFinite(n)) return null;
   return { value: neg ? -n : n, percent, money };
 }
+
+// ---------------------------------------------------------------- totals (owner 2026-11-03)
+// "When a table has a total and the system did not give it — calculate it, don't invent it; a missing number in the
+// table is zero." The writer ends a table with a total row; here the system recalculates every number in that row from
+// the rows above it, so a total is never the model's own number. Columns of dates, times or percentages are not summed.
+
+const TOTAL_ROW = /^(סה["״׳'`]?\s?כ|סך\s?ה?כו?ל|סיכום|total|sum\b)/i;
+const NOT_SUMMED = /תאריך|date|יום|day|שבוע|week|חודש|month|תקופה|period|שעת|כניסה|יציאה|clock|time|%|אחוז|percent|ממוצע|average|avg|תעריף|rate|יתרה|balance|שכר לשעה|per\b|ל-?(סועד|עובד|שעה)/i;
+const EMPTY = /^(|—|–|-|n\/a)$/i;
+
+function decimals(s) {
+  const m = String(s).replace(/,/g, '').match(/\.(\d+)/);
+  return m ? m[1].length : 0;
+}
+
+function formatLike(value, cellsSeen, original) {
+  const d = Math.max(0, ...cellsSeen.map(decimals));
+  const commas = cellsSeen.some((c) => /\d,\d{3}/.test(c)) || Math.abs(value) >= 1000;
+  let n = Math.abs(value).toFixed(d);
+  if (commas) {
+    const [i, f] = n.split('.');
+    n = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? `.${f}` : '');
+  }
+  if (value < 0) n = `-${n}`;
+  // keep what the writer put around the number (₪, a word)
+  const m = String(original).match(/^(.*?)[-−–(]?\d[\d,]*(?:\.\d+)?\)?(.*)$/);
+  return m ? `${m[1]}${n}${m[2]}` : n;
+}
+
+/**
+ * The answer with each table's total row recalculated from its rows, and missing numbers in number columns written
+ * as 0. A table is changed only when its LAST row is its only total row ("סה"כ", "Total"…); a total cell is changed
+ * only when the writer put a number there. Returns { text, totals: [numbers the system calculated] }.
+ */
+export function fillTotals(text) {
+  const lines = String(text ?? '').split('\n');
+  const totals = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!(isRow(lines[i]) && i + 1 < lines.length && isSeparator(lines[i + 1]))) continue;
+    const header = cells(lines[i]);
+    let j = i + 2;
+    while (j < lines.length && isRow(lines[j]) && !isSeparator(lines[j])) j++;
+    const rowIdx = Array.from({ length: j - i - 2 }, (_, k) => i + 2 + k);
+    const rows = rowIdx.map((k) => header.map((_, c) => cells(lines[k])[c] ?? ''));
+    const totalAt = rows.map((r, k) => (TOTAL_ROW.test(r[0]) ? k : -1)).filter((k) => k >= 0);
+    const hasTotal = totalAt.length === 1 && totalAt[0] === rows.length - 1 && rows.length >= 2;
+    const body = hasTotal ? rows.slice(0, -1) : rows;
+    let changed = false;
+    for (let c = 1; c < header.length; c++) {
+      if (NOT_SUMMED.test(header[c])) continue;
+      const col = body.map((r) => r[c]);
+      const nums = col.map(cellNumber);
+      // a number column: some numbers, every other cell empty, no percentages
+      if (!nums.some(Boolean) || col.some((v, k) => !nums[k] && !EMPTY.test(v)) || nums.some((x) => x?.percent)) continue;
+      body.forEach((r, k) => {
+        if (!nums[k]) {
+          r[c] = '0';
+          changed = true;
+        }
+      });
+      if (!hasTotal) continue;
+      const totalRow = rows[rows.length - 1];
+      if (!cellNumber(totalRow[c])) continue;
+      const sum = Math.round(nums.reduce((s, x) => s + (x?.value ?? 0), 0) * 1e6) / 1e6;
+      const cell = formatLike(sum, col.filter((v) => !EMPTY.test(v)), totalRow[c]);
+      totals.push(sum);
+      if (cell !== totalRow[c]) {
+        totalRow[c] = cell;
+        changed = true;
+      }
+    }
+    if (changed) rows.forEach((r, k) => (lines[rowIdx[k]] = `| ${r.join(' | ')} |`));
+    i = j - 1;
+  }
+  return { text: lines.join('\n'), totals };
+}

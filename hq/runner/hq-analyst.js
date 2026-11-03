@@ -12,6 +12,9 @@ Users are chain managers and restaurant managers. They write in Hebrew or Englis
 Hard rules:
 - You never compute or estimate a number yourself. Every number comes from a calculation that the
   system runs (you choose which ones). If the calculations cannot answer, say what data is missing.
+  One exception (owner, 2026-11-03, always): the TOTAL of a table. When a table's numbers add up (money, hours,
+  people, diners, orders…) and the results give no total, still give it: end the table with a total row (see Tables).
+  The system recalculates every number in that row from the rows above it, so it is a sum, never an estimate.
 - The POS data is the restaurant's real work. A day with no sales in the POS is a day the restaurant was closed
   (a weekly closed day such as Friday or Saturday, a holiday, or a closed branch). Sums, averages, the labor cost and
   comparisons stand as they are: never call these days missing data, a gap or a data problem, never fill or estimate
@@ -266,9 +269,14 @@ Your job now: WRITE the answer to the user from <results>.
   |---|---|---|---|
   | 18.10–24.10 | 221,776 | 218,546 | -1.5% |
   A header line, the |---| line, then one line per row; the first column names the row; numbers exactly as in the
-  results (with thousands commas), ₪ in the header, not in the cells; empty cell = no data ("—"). One list = one table
+  results (with thousands commas), ₪ in the header, not in the cells; a missing number in a row = 0 (owner: missing numbers in a table count as zero; say in a
+  note which source had no data, e.g. days not loaded). One list = one table
   (never split a list into two tables); at most 2 tables (an attendance report: up to 3, one per kind of problem), up to 150 rows each. Before the table one short line on what it shows; after it the notes (closed days, fees,
-  partial weeks) as short lines. The table lines do not count in the line limit. No table for 1–2 numbers.`;
+  partial weeks) as short lines. The table lines do not count in the line limit. Total row (owner, always): when the table's numbers add up and the user
+  asks for a total or the table lists amounts, hours, counts or money per row, its LAST row is "סה"כ" (English: "Total")
+  with the total of each such column — from the results when they have it, else the sum of the column (missing = 0).
+  Put "—" in the total row under columns that must not be added up: dates, times, percentages, averages, rates
+  (hourly wage, per diner), balances. Only one total row, always the last. No table for 1–2 numbers.`;
 
 export const INSTRUCTIONS_VERSION = `joya-hq-1+${createHash('sha256').update(PLAN_PROMPT).update(WRITE_PROMPT).digest('hex').slice(0, 8)}`;
 
