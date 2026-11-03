@@ -397,10 +397,11 @@ function periodRows(map, from, to, locations = 1) {
     }));
 }
 
-// Owner, 2026-11-03 (a global rule): tips are not income. Every Beecomm amount here is WITHOUT tips (charges −
-// service); the tips are given apart (service, totalService). withTips: true only for matching the bank (cards_vs_bank),
-// where the card companies pay the tips too.
-export async function paymentsSummary(locationIds, from, to, brands = null, group = null, { withTips = false } = {}) {
+// Owner, 2026-11-03 (a global rule): tips are not income. charges here = paid − refunded (Beecomm's "סה״כ"). The Z
+// total of them has NO tips: the tips paid by card are inside the card rows, but the workers get them in cash from
+// the register, so the cash row is lower by them (it can be negative) — checked 2026-11-03: Σ = Z totalIncome = dish
+// sales, for all branches. So never subtract service again from a total; service / totalService = the tips, apart.
+export async function paymentsSummary(locationIds, from, to, brands = null, group = null) {
   const by = GROUPS.includes(group) ? group : null;
   const newPeriod = (pp) => ({ from: pp.from, to: pp.to, days: new Set(), total: 0, creditCards: 0, membersClub: 0, brands: {} });
   const allPeriods = new Map();
@@ -418,7 +419,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
       out.push({ locationId: loc, available: false });
       continue;
     }
-    if (!withTips) src.rows = src.rows.map((r) => ({ ...r, charges: r.charges - r.service }));
+    src.rows = src.rows.map((r) => ({ ...r, charges: r.charges - r.refunded }));
     const types = new Map();
     const days = new Set();
     const prevDays = new Set();
@@ -556,8 +557,7 @@ export async function paymentsSummary(locationIds, from, to, brands = null, grou
   return {
     period: { from, to },
     comparedWith: { from: pFrom, to: addDays(from, -1) },
-    source: `Beecomm payments report via Allegro (/beecomm/payments/stored); ${withTips ? 'charges INCLUDE service (tips)' : 'charges = income WITHOUT tips (charges − service); the tips are service / totalService'}; shares are of the payments inside the Z`,
-    withTips,
+    source: 'Beecomm payments report via Allegro (/beecomm/payments/stored); charges = paid − refunded (Beecomm "סה״כ"); totalCharges (the Z total) = income WITHOUT tips — the card rows include the card tips, but the workers got them in cash from the register, so the cash row is lower by them (can be negative); service / totalService = the tips, apart, never subtracted from a total; shares are of the payments inside the Z',
     note: 'creditCards = VISA + MASTERCARD + AMEX + DINERS of the credit type (אשראי) = "credit card" (כרטיסי אשראי); membersClub = every other brand of that type (מועדון חברים: PRIVATE LABEL BRAND - חבר, Mishloha…); the type אשראי = both',
     ...(reason ? { missing: reason } : {}),
     creditCardsTotal: { charges: r2(groupTotals.creditCards.charges), prevCharges: r2(groupTotals.creditCards.prevCharges) },
@@ -575,6 +575,8 @@ const AMEX_PAY_DAYS = [
   { day: 2, half: 'first' },
   { day: 8, half: 'second' },
 ];
+// card sales without the card tips (a card row has its tips inside; the card company pays them too)
+const noTips = (x) => (x?.charges == null ? null : r2(x.charges - (x.service || 0)));
 const shiftSaturday = (d) => (weekdayOf(d) === 6 ? addDays(d, 1) : d);
 const monthAdd = (ym, n) => {
   const [y, m] = ym.split('-').map(Number);
@@ -606,13 +608,13 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
         payDate,
         salesFrom: sFrom,
         salesTo: sTo,
-        amount: r.selectedTotal?.charges ?? null,
+        amount: noTips(r.selectedTotal),
         tips: r.selectedTotal?.service ?? null,
-        byLocation: r.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, days: l.days ?? null })),
+        byLocation: r.locations.map((l) => ({ locationId: l.locationId, amount: noTips(l.selected), tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, days: l.days ?? null })),
       });
     }
   }
-  const cc = cards.selectedTotal?.charges ?? null;
+  const cc = noTips(cards.selectedTotal);
   const ax = amex.reduce((a, x) => a + (x.amount || 0), 0);
   const axTips = amex.reduce((a, x) => a + (x.tips || 0), 0);
   return {
@@ -625,7 +627,7 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
       payDate: addDays(from, 3),
       amount: cc,
       tips: cards.selectedTotal?.service ?? null,
-      byLocation: cards.locations.map((l) => ({ locationId: l.locationId, amount: l.selected?.charges ?? null, tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, byDay: l.selected?.byDay ?? [] })),
+      byLocation: cards.locations.map((l) => ({ locationId: l.locationId, amount: noTips(l.selected), tips: l.selected?.service ?? null, daysWithData: l.daysWithData ?? 0, byDay: l.selected?.byDay ?? [] })),
     },
     amex: { payments: amex, amount: amex.length ? r2(ax) : 0, tips: amex.length ? r2(axTips) : 0, ...(amex.length ? {} : { none: 'no American Express pay day (2nd / 8th) in this week' }) },
     total: cc == null ? null : r2(cc + ax),
@@ -634,8 +636,8 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
 }
 
 // ---------------------------------------------------------------- monthly VAT report (owner, 2026-11-03)
-// The income for VAT, per month, from the Beecomm payments report: all payments in the Z without tips (charges −
-// service); the payments of חבר (the credit brand "PRIVATE LABEL BRAND - חבר") and מולטיפס (its own payment type, its
+// The income for VAT, per month, from the Beecomm payments report: all payments in the Z (paid − refunded; their
+// total has no tips, see paymentsSummary); the payments of חבר (the credit brand "PRIVATE LABEL BRAND - חבר") and מולטיפס (its own payment type, its
 // sub-brands included) count only 80% — 20% is deducted before the total; VAT = 18/118 of what is left.
 export const VAT_RATE_PCT = 18;
 export const VAT_DEDUCT_PCT = 20;
@@ -665,7 +667,7 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
       const m = byMonth.get(pp.key) || blank(pp);
       byMonth.set(pp.key, m);
       m.days.add(r.date);
-      const net = r.charges - r.service;
+      const net = r.charges - r.refunded;
       if (r.brand == null) m.income += net;
       if (isHever(r)) m.hever += net;
       if (isMultipass(r)) m.multipass += net;
@@ -721,7 +723,7 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
   const monthsOf = (map) => [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([key, m]) => ({ month: key, ...line(m) }));
   return {
     period: { from, to },
-    source: 'Beecomm payments report via Allegro (/beecomm/payments/stored): payments in the Z, without tips (charges − service)',
+    source: 'Beecomm payments report via Allegro (/beecomm/payments/stored): payments in the Z (paid − refunded = Beecomm "סה״כ"; the Z total has no tips: card tips were paid to the workers from the cash register)',
     rule: `income = all payments in the Z without tips; ${VAT_DEDUCT_PCT}% of the חבר payments (credit brand "PRIVATE LABEL BRAND - חבר") and of מולטיפס is deducted (deduction); vatIncome = income − deduction; vat = vatIncome × ${VAT_RATE_PCT}/${100 + VAT_RATE_PCT} (VAT ${VAT_RATE_PCT}% included); vatIncomeBeforeVat = vatIncome − vat (owner, 2026-11-03)`,
     vatRatePct: VAT_RATE_PCT,
     deductPct: VAT_DEDUCT_PCT,

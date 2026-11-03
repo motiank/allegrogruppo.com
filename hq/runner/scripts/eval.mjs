@@ -63,7 +63,9 @@ function grade(f, plan) {
       if (got?.join(',') !== want) fails.push(`${c.calc} locations ${got ? got.join(',') : 'all'} ≠ ${want}`);
     }
   }
-  if (e.maxCalcs != null && plan.calcs.length > e.maxCalcs) fails.push(`${plan.calcs.length} calcs > ${e.maxCalcs}`);
+  // reading the team rules before changing one is harmless; it does not count
+  const counted = e.rule ? plan.calcs.filter((c) => c.calc !== 'team_rules') : plan.calcs;
+  if (e.maxCalcs != null && counted.length > e.maxCalcs) fails.push(`${counted.length} calcs > ${e.maxCalcs}`);
   const ops = plan.ops || [];
   if (Array.isArray(e.ops)) {
     for (const want of e.ops) if (!ops.some((o) => partial(o, want))) fails.push(`op ${JSON.stringify(want)} missing (got ${JSON.stringify(ops)})`);

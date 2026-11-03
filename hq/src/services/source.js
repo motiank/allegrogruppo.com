@@ -1,7 +1,7 @@
 // Source data, read from the Allegro admin Local Data API (lib/allegro.js) — never stored here.
 //
 //   locations      /branches, /status a Joya location id IS the Allegro branch id (nothing stored)
-//   sales checks   /beecomm/orders/stored   closed orders (status 2); amount = netTotal − serviceAmount
+//   sales checks   /beecomm/orders/stored   closed orders (status 2); amount = netTotal (it has no tips: serviceAmount is on top)
 //   dish sales     /beecomm/items/stored    per business day; amount = totalSales − order and item discounts
 //   payments       /beecomm/payments/stored per business day, payment type and card brand (דוח תשלומים)
 //   employees      /employees               Joya's employee id IS Allegro's employeeId
@@ -119,7 +119,7 @@ export async function checks(locationId, from, to) {
       opened_at: o.openedAt,
       closed_at: o.closedAt ?? null,
       diners: num(o.diners),
-      net_amount: o.netTotal == null ? null : r2(Number(o.netTotal) - Number(o.serviceAmount ?? 0)),
+      net_amount: o.netTotal == null ? null : r2(Number(o.netTotal)),
       order_type: o.orderType ?? null,
     }));
 }

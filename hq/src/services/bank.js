@@ -165,8 +165,8 @@ export async function cardsVsBank(companies, locationsOf, from, to) {
   let reason = null;
   for (const co of companies) {
     const locs = locationsOf(co.key);
-    const pay = locs.length ? await paymentsSummary(locs, start, end, null, 'week', { withTips: true }) : null;
-    const payM = locs.length ? await paymentsSummary(locs, mStart, mEnd, null, 'month', { withTips: true }) : null;
+    const pay = locs.length ? await paymentsSummary(locs, start, end, null, 'week') : null;
+    const payM = locs.length ? await paymentsSummary(locs, mStart, mEnd, null, 'month') : null;
     const bank = await sourceBank(co.key, addDays(start, 7), periodOf(addDays(mEnd, 1), 'month').to, { group: 'none', side: 'credit' });
     if (!bank.available) reason = bank.reason;
     const rows = bank.available ? bank.rows.filter((r) => r.credit != null) : [];

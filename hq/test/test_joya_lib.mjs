@@ -353,6 +353,12 @@ t('table totals: the total row is recalculated from the rows, missing numbers ar
   assert.equal(fillTotals('| a | b |\n|---|---|\n| x | 1 |\n| y | 2 |').text, '| a | b |\n|---|---|\n| x | 1 |\n| y | 2 |');
   assert.deepEqual(fillTotals('| a | b |\n|---|---|\n| Total | 5 |\n| x | 1 |\n| Total | 9 |').totals, []);
   assert.deepEqual(fillTotals('| שבוע | ₪ |\n|---|---|\n| 1 | 1,000 |\n| 2 | -250 |\n| סה״כ | 0 |').totals, [750]);
+  // a total column (last header "סה"כ") is summed per row; a broken number in a total cell is fixed too
+  const c = fillTotals('| מקור | רעננה | רמת החיל | סה"כ |\n|---|---|---|---|\n| אשראי | 448,341 | 344,730 | 793,000 |\n| מזומן | 6,784 | -17,196 | |\n| **סה"כ** | **455,125** | **327,534** | **1,964,79** |');
+  const cr = splitAnswer(c.text)[0].rows;
+  assert.deepEqual(cr[0], ['אשראי', '448,341', '344,730', '793,071']);
+  assert.deepEqual(cr[1], ['מזומן', '6,784', '-17,196', '-10,412']);
+  assert.deepEqual(cr[2], ['סה"כ', '455,125', '327,534', '782,659']);
 });
 t('answer tables: a pipe table becomes a table block between the text; numbers are read for Excel', () => {
   const b = splitAnswer('שלום\n\n| שבוע | אשראי | שינוי |\n|---|---:|---|\n| 18.10–24.10 | 221,776 ₪ | -3.6% |\n| 11.10–17.10 | **256,062** |\n\nסוף\n| not | a table |');

@@ -77,9 +77,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   vs American Express's payouts the next month (README → Weekly and monthly sums; 2026-10-27). The planner
   must use one grouped calc, never one calc per week.
 - **Tips are not income** (owner 2026-11-03, a GLOBAL rule — keep): every Beecomm income amount is without tips.
-  Sales / dishes already were (`netTotal − serviceAmount`); `paymentsSummary` now subtracts `service` by default
-  (tips apart in `service` / `totalService`), `card_income_week` gives `tips` apart; only `cards_vs_bank` uses
-  `{ withTips: true }`, to match the bank (the card companies pay the tips too). Hard rule in the prompts.
+  Beecomm's totals ALREADY have no tips — never subtract `service` from them (fixed 2026-11-03, it was subtracted
+  twice): order `netTotal` has no tips (`serviceAmount` is on top); in the payments report the card rows include the
+  card tips but the workers get them in cash from the register, so the cash row is lower by them (can be negative)
+  and Σ(paid − refunded) = the Z total = dish sales (checked all branches, Aug 2026). `paymentsSummary` charges =
+  paid − refunded (Beecomm "סה״כ"), tips apart in `service` / `totalService`; `card_income_week` amount = card
+  charges − card tips, `tips` apart; `cards_vs_bank` uses the card charges with their tips (the bank gets them).
 - **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר + מולטיפס
   deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system

@@ -196,7 +196,7 @@ export const CALCS = {
   payments_summary: {
     params: '{ locationIds?, from, to, brands?: ["VISA", "MASTERCARD", "AMEX", "DINERS"], group?: "week" | "month" }',
     about:
-      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges = income WITHOUT tips (tips are not income), share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
+      'payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges = paid − refunded (Beecomm "סה״כ"; their total = income WITHOUT tips: card rows include the card tips, the cash row is lower by them because the workers got them in cash), share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= "credit card": VISA + MASTERCARD + AMEX + DINERS only) and membersClub (every other brand of the credit type: the club card, Mishloha…), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)',
     run: (a, p) => analytics.paymentsSummary(locs(a, p), ...range(p), p.brands, p.group),
   },
   vat_report: {

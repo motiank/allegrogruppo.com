@@ -184,12 +184,13 @@ The staffing plan is exported as a **CSV for Tabit**. Nothing is sent to a suppl
 
 
 **Monthly VAT report (owner, 2026-11-03)** — calc `vat_report` (`analytics.vatReport`), from the Beecomm payments
-(`/beecomm/payments/stored`): income = all payments in the Z without tips (`charges − service`; Beecomm's own
-`noTips` is not used: it often equals the full amount although tips were paid); 20% of the payments of חבר (credit
+(`/beecomm/payments/stored`): income = all payments in the Z, paid − refunded (Beecomm's "סה״כ"). It has no tips:
+the card tips are inside the card rows, but the workers get them in cash from the register, so the cash row is lower by
+them — never subtract `service` again (it was, until the fix of 2026-11-03); 20% of the payments of חבר (credit
 brand "PRIVATE LABEL BRAND - חבר") and of מולטיפס (payment type, its sub-brands BUYME / רעיונית / קשרים פלוס inside) is
 deducted; income for VAT = income − deduction; VAT = 18/118 of it. Per month, per restaurant, per company, in total.
-Owner's answers: מועדון חברים = חבר (no other club brand is deducted); without tips; show the VAT. October 2026 checked
-against the table: income 5,218,088, deduction 172,165.6, VAT 769,716.98 (all restaurants).
+Owner's answers: מועדון חברים = חבר (no other club brand is deducted); without tips; show the VAT. Checked 2026-11-03
+against Beecomm's payments report: פסטלינה רמת החייל, August 2026 = 736,391, same as Beecomm's "סה״כ".
 ## Permissions
 
 - Login = an Allegro admin user (e-mail + the admin password, status `active`). The session is a JWT in the

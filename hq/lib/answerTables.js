@@ -75,6 +75,9 @@ export function cellNumber(s) {
 const TOTAL_ROW = /^(סה["״׳'`]?\s?כ|סך\s?ה?כו?ל|סיכום|total|sum\b)/i;
 const NOT_SUMMED = /תאריך|date|יום|day|שבוע|week|חודש|month|תקופה|period|שעת|כניסה|יציאה|clock|time|%|אחוז|percent|ממוצע|average|avg|תעריף|rate|יתרה|balance|שכר לשעה|per\b|ל-?(סועד|עובד|שעה)/i;
 const EMPTY = /^(|—|–|-|n\/a)$/i;
+// a total cell the writer meant as a number, even a broken one ("1,964,79")
+const LOOSE_NUMBER = /^[\s₪(−–+-]*\d[\d,.\s]*\)?\s*(₪|ש"ח)?\s*$/;
+const meantNumber = (s) => Boolean(cellNumber(s)) || LOOSE_NUMBER.test(String(s ?? ''));
 
 function decimals(s) {
   const m = String(s).replace(/,/g, '').match(/\.(\d+)/);
@@ -114,6 +117,25 @@ export function fillTotals(text) {
     const hasTotal = totalAt.length === 1 && totalAt[0] === rows.length - 1 && rows.length >= 2;
     const body = hasTotal ? rows.slice(0, -1) : rows;
     let changed = false;
+    // a total COLUMN (the last header is "סה"כ"): each row's total = the sum of the number columns before it
+    const last = header.length - 1;
+    const numberCol = (c) => {
+      const col = body.map((r) => r[c]);
+      return !NOT_SUMMED.test(header[c]) && col.some((v) => cellNumber(v)) && col.every((v) => cellNumber(v) || EMPTY.test(v)) && !col.some((v) => cellNumber(v)?.percent);
+    };
+    const parts = Array.from({ length: Math.max(0, last - 1) }, (_, k) => k + 1);
+    if (last >= 2 && TOTAL_ROW.test(header[last]) && parts.every(numberCol)) {
+      for (const r of rows) {
+        if (!meantNumber(r[last]) && !EMPTY.test(r[last])) continue;
+        const sum = Math.round(parts.reduce((a, c) => a + (cellNumber(r[c])?.value ?? 0), 0) * 1e6) / 1e6;
+        const cell = formatLike(sum, parts.map((c) => r[c]).filter((v) => !EMPTY.test(v)), r[last]);
+        totals.push(sum);
+        if (cell !== r[last]) {
+          r[last] = cell;
+          changed = true;
+        }
+      }
+    }
     for (let c = 1; c < header.length; c++) {
       if (NOT_SUMMED.test(header[c])) continue;
       const col = body.map((r) => r[c]);
@@ -128,7 +150,7 @@ export function fillTotals(text) {
       });
       if (!hasTotal) continue;
       const totalRow = rows[rows.length - 1];
-      if (!cellNumber(totalRow[c])) continue;
+      if (!meantNumber(totalRow[c])) continue;
       const sum = Math.round(nums.reduce((s, x) => s + (x?.value ?? 0), 0) * 1e6) / 1e6;
       const cell = formatLike(sum, col.filter((v) => !EMPTY.test(v)), totalRow[c]);
       totals.push(sum);
