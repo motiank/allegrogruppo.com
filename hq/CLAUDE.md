@@ -85,6 +85,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   charges − card tips, `tips` apart; `cards_vs_bank` uses the card charges with their tips (the bank gets them).
 - **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר only (not
   מולטיפס, owner) deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
+- **Chat paging** (owner 2026-11-04): 10 questions per page, older on scroll up; a chat keeps its newest 100
+  (`CHAT_KEEP`, older rows are DELETED on the next question). README → Asking in words.
 - **Chat history** (2026-11-04, the owner felt "context is lost"): `buildContext` adds `history` (the last 3 answered
   questions of the same user + chat, last 3 hours; calcs + params, cut answers) → `<history>` in both prompts. Eval
   fixtures `h-*` take `history`. README → Asking in words.

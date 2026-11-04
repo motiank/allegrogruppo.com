@@ -306,6 +306,11 @@ history. While the user types, the chat box suggests questions of that area (str
 the user's own past questions. The detailed pages keep their routes but are not in the menu; Settings is at the
 bottom of the menu for a chain admin.
 
+**Chat paging (owner, 2026-11-04).** A chat area opens with its newest 10 questions; scrolling to the top loads the
+10 before (`GET /api/joya/ai/requests?…&limit=10&beforeId=<oldest shown id>`), up to 100. The server keeps only the
+newest 100 of a chat (`ai.js` `CHAT_KEEP`, `pruneChat` after each new question; one still being answered or with a
+change waiting for Apply is kept).
+
 **Chat history (2026-11-04).** Each question gets the earlier questions of the same chat as `<history>` (the same
 user and chat; GENERAL also the same restaurant): up to `HISTORY_MAX` = 3 answered questions of the last
 `HISTORY_HOURS` = 3 hours, oldest first, with their calcs + params; the writer also gets their answers, cut to 1,200

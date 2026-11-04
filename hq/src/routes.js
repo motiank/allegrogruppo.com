@@ -244,7 +244,7 @@ for (const step of ['recognize', 'import']) {
 
 // ---------------------------------------------------------------- AI (user side)
 r.post('/joya/ai/ask', h(async (req) => ({ request: await ai.ask(req.joya, req.body || {}) })));
-r.get('/joya/ai/requests', h(async (req) => ({ requests: await ai.listRequests(req.joya, { contextKind: req.query.contextKind, contextId: req.query.contextId, limit: req.query.limit }) })));
+r.get('/joya/ai/requests', h(async (req) => ({ requests: await ai.listRequests(req.joya, { contextKind: req.query.contextKind, contextId: req.query.contextId, limit: req.query.limit, beforeId: req.query.beforeId }) })));
 r.get('/joya/ai/requests/:id', h(async (req) => ({ request: await ai.getRequest(req.joya, id(req)) })));
 r.post('/joya/ai/requests/:id/apply', h(async (req) => ai.applyProposal(req.joya, id(req))));
 r.delete('/joya/ai/requests/:id', h(async (req) => (await ai.deleteRequest(req.joya, id(req)), { ok: true })));

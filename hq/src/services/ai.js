@@ -34,6 +34,8 @@ export const MAX_CALCS = 6;
 export const HISTORY_MAX = 3;
 export const HISTORY_HOURS = 3;
 export const HISTORY_ANSWER_CHARS = 1200;
+// A chat keeps its newest CHAT_KEEP questions (owner, 2026-11-04: "keep up to 100"); the client loads CHAT_PAGE at a time.
+export const CHAT_KEEP = 100;
 
 function locs(access, p) {
   const ids = p.locationIds ?? (p.locationId != null ? [p.locationId] : null);
@@ -506,7 +508,24 @@ export async function ask(access, { question, locationId = null, companyKey = nu
       lang: lang === 'en' ? 'en' : 'he',
     })
   ).insertId;
+  await pruneChat(access.username, contextKind, contextId);
   return getRequest(access, id);
+}
+
+// Delete the questions of a chat beyond its newest CHAT_KEEP; one still being answered or with a change waiting for
+// Apply is kept.
+async function pruneChat(username, kind, contextId) {
+  const ctx = contextId != null ? 'context_id=:c' : 'context_id IS NULL';
+  const edge = await one(
+    `SELECT id FROM joya_ai_requests WHERE username=:u AND context_kind=:k AND ${ctx} ORDER BY id DESC LIMIT 1 OFFSET ${CHAT_KEEP - 1}`,
+    { u: username, k: kind, c: contextId },
+  );
+  if (!edge) return;
+  await q(
+    `DELETE FROM joya_ai_requests WHERE username=:u AND context_kind=:k AND ${ctx} AND id < :id
+        AND status <> 'THINKING' AND (proposal_status IS NULL OR proposal_status <> 'PENDING')`,
+    { u: username, k: kind, c: contextId, id: edge.id },
+  );
 }
 
 export async function getRequest(access, id) {
@@ -516,11 +535,13 @@ export async function getRequest(access, id) {
   return shape(r);
 }
 
-export async function listRequests(access, { contextKind, contextId, limit = 20 }) {
+// newest first; beforeId: the page of older questions (id < beforeId), for "scroll up to load more"
+export async function listRequests(access, { contextKind, contextId, limit = 20, beforeId = null }) {
   await failStale();
+  const before = parseInt(beforeId, 10) > 0 ? parseInt(beforeId, 10) : null;
   const rows = await q(
-    `SELECT * FROM joya_ai_requests WHERE username=:u ${contextKind ? 'AND context_kind=:k' : ''} ${contextId ? 'AND context_id=:c' : ''} ORDER BY id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)}`,
-    { u: access.username, k: contextKind, c: contextId },
+    `SELECT * FROM joya_ai_requests WHERE username=:u ${contextKind ? 'AND context_kind=:k' : ''} ${contextId ? 'AND context_id=:c' : ''} ${before ? 'AND id < :b' : ''} ORDER BY id DESC LIMIT ${Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)}`,
+    { u: access.username, k: contextKind, c: contextId, b: before },
   );
   return rows.map(shape);
 }

@@ -209,6 +209,8 @@ export default {
   'joya.ask.placeholder': 'למשל: למה צריך שלושה טבחים ביום חמישי בבוקר?',
   'joya.ask.send': 'שליחה',
   'joya.ask.delete': 'מחיקת השאלה',
+  'joya.ask.loadingOlder': 'טוען שאלות קודמות…',
+  'joya.ask.keepNote': 'נשמרות רק {n} השאלות האחרונות',
   'joya.ask.resend': 'שליחת השאלה שוב',
   'joya.ask.edit': 'עריכת השאלה',
   'joya.ask.thinking': 'המטה מחשב ועונה… (בדרך כלל פחות מדקה)',

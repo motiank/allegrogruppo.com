@@ -51,6 +51,7 @@ const useStyles = createUseStyles((theme) => ({
     '&:hover': { background: 'rgba(127,127,127,0.16)', color: theme.text },
     '&:disabled': { opacity: 0.4, cursor: 'default' },
   },
+  older: { textAlign: 'center', fontSize: '0.75rem', color: theme.textSecondary, padding: '0.3rem 0 0.7rem' },
   sep: { border: 0, borderTop: `1px solid ${theme.border}`, margin: '0.55rem 0 0.3rem' },
   dock: {
     position: 'fixed',
@@ -323,7 +324,12 @@ function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
  * @param {string} [p.intro]
  * @param {string[]} p.suggestions  the area's questions (translated)
  */
-export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], limit = 20 }) {
+// a chat shows its newest PAGE questions; scrolling to the top loads the PAGE before, up to KEEP (the server keeps
+// only the newest KEEP of a chat, ai.js CHAT_KEEP)
+const PAGE = 10;
+const KEEP = 100;
+
+export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [] }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
@@ -335,6 +341,14 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const [draft, setDraft] = useState(null);
   const timer = useRef(null);
   const scrollDown = useRef(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  // distance from the page bottom before older questions are added on top, so the view does not jump
+  const keepPos = useRef(null);
+  const olderAdded = useRef(false);
+  // true after the first scroll to the bottom; before it, the top of the list is in view and must not load more
+  const [ready, setReady] = useState(false);
+  const top = useRef(null);
   const contextKind = 'AREA';
   const { uploads, add: addFiles, run: importFiles, remove: removeUpload } = useUploads();
   const dragging = useWindowDrop((files) => {
@@ -342,10 +356,40 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     addFiles(files);
   });
 
+  // the newest page; the older questions already loaded stay (a refresh while one is being answered)
   const load = () =>
-    api(`/ai/requests${qs({ contextKind, contextId, limit })}`)
-      .then((d) => setItems(d.requests))
+    api(`/ai/requests${qs({ contextKind, contextId, limit: PAGE })}`)
+      .then((d) => {
+        const fresh = d.requests;
+        setItems((xs) => {
+          if (xs == null) {
+            setHasMore(fresh.length === PAGE);
+            return fresh;
+          }
+          const ids = new Set(fresh.map((r) => r.id));
+          const low = fresh.length ? fresh[fresh.length - 1].id : Infinity;
+          return [...fresh, ...xs.filter((r) => !ids.has(r.id) && r.id < low)];
+        });
+      })
       .catch(setErr);
+  const loadOlder = async () => {
+    if (!hasMore || loadingOlder || !items?.length) return;
+    setLoadingOlder(true);
+    try {
+      const d = await api(`/ai/requests${qs({ contextKind, contextId, limit: PAGE, beforeId: items[items.length - 1].id })}`);
+      keepPos.current = document.documentElement.scrollHeight - window.scrollY;
+      olderAdded.current = d.requests.length > 0;
+      setItems((xs) => {
+        const next = [...xs, ...d.requests.filter((r) => !xs.some((x) => x.id === r.id))];
+        setHasMore(d.requests.length === PAGE && next.length < KEEP);
+        return next;
+      });
+    } catch (e) {
+      setErr(e);
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
   useEffect(() => {
     load();
     return () => clearTimeout(timer.current);
@@ -359,14 +403,35 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
+  useLayoutEffect(() => {
+    if (keepPos.current == null) return;
+    window.scrollTo({ top: document.documentElement.scrollHeight - keepPos.current, behavior: 'auto' });
+    keepPos.current = null;
+  }, [items]);
   // the newest question is at the bottom, next to the field
   useEffect(() => {
     if (!items?.length) return;
+    // older questions were added on top: the view stays where it was (above)
+    if (olderAdded.current) {
+      olderAdded.current = false;
+      return;
+    }
     const smooth = scrollDown.current;
     scrollDown.current = false;
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    requestAnimationFrame(() => setReady(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items?.length, items?.[0]?.status, uploads.length]);
+
+  // scrolled to the top of the list → the page of older questions
+  useEffect(() => {
+    const el = top.current;
+    if (!el || !hasMore || !ready) return;
+    const io = new IntersectionObserver((es) => es[0].isIntersecting && loadOlder(), { rootMargin: '200px 0px 0px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, items, loadingOlder, ready]);
 
   const pool = useMemo(() => [...new Set([...suggestions, ...(items || []).map((r) => r.question)])], [suggestions, items]);
 
@@ -416,6 +481,9 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     <>
       {overlay}
       <div className={classes.list}>
+        <div ref={top} className={classes.older}>
+          {loadingOlder ? t('joya.ask.loadingOlder') : hasMore ? '' : items.length >= KEEP ? t('joya.ask.keepNote', { n: KEEP }) : ''}
+        </div>
         {[...items].reverse().map((r) => (
           <Card
             key={r.id}
