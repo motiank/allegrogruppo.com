@@ -25,8 +25,10 @@ const useStyles = createUseStyles((theme) => ({
     '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', whiteSpace: 'nowrap' },
     '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
     '& tr:last-child td': { borderBottom: 0 },
-    // numbers align like the text (owner 2026-11-04)
+    // numbers align like the text: right in Hebrew, left only in English (owner 2026-11-04)
     '& td.num': { fontVariantNumeric: 'tabular-nums' },
+    '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
+    '&[dir=ltr] th, &[dir=ltr] td': { textAlign: 'left' },
   },
   excel: { fontSize: '0.74rem', color: theme.primary, textDecoration: 'none', display: 'inline-block', marginBottom: '0.35rem', '&:hover': { textDecoration: 'underline' } },
   meta: { fontSize: '0.7rem', color: theme.textSecondary, marginTop: '0.15rem' },
@@ -128,7 +130,7 @@ function ProposalPreview({ p, classes }) {
 
 /** The answer text with its tables (see lib/answerTables.js) as table components, each with an Excel download. */
 function AnswerBody({ r, classes }) {
-  const { t } = useT();
+  const { t, dir } = useT();
   const blocks = useMemo(() => splitAnswer(floorMoney(r.answer)), [r.answer]);
   return blocks.map((b, i) =>
     b.type === 'text' ? (
@@ -138,7 +140,7 @@ function AnswerBody({ r, classes }) {
     ) : (
       <div key={i}>
         <div className={classes.tableWrap}>
-          <table className={classes.table} dir="auto">
+          <table className={classes.table} dir={dir}>
             <thead>
               <tr>
                 {b.header.map((h, k) => (
