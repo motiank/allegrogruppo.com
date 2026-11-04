@@ -208,6 +208,8 @@ export default {
   'joya.ask.placeholder': 'e.g. Why do we need three cooks on Thursday morning?',
   'joya.ask.send': 'Send',
   'joya.ask.delete': 'Delete this question',
+  'joya.ask.resend': 'Ask this question again',
+  'joya.ask.edit': 'Edit this question',
   'joya.ask.thinking': 'Headquarters is calculating… (usually under a minute)',
   'joya.ask.failed': 'No answer came back.',
   'joya.ask.unverified': 'Numbers in the answer that are not in the calculations — check them:',

@@ -1,5 +1,5 @@
 // The chat of a main-menu area (pages/Area.js). Before the first question the ask field is in the
-// middle of the page; after it, every question is a box (the question, a line, the answer, × to delete)
+// middle of the page; after it, every question is a box (the question, a line, the answer; ↻ asks it again, ✎ puts it in the field to edit, × deletes)
 // and the ask field stays fixed at the bottom of the screen. The field opens a list of suggestions: the
 // area's fixed questions when it is empty, the ones that fit the typed words while typing. Files dropped on the page
 // (or picked with the paperclip) are read with the Allegro admin's upload code and imported on "Import" (FileDrop.js).
@@ -34,6 +34,22 @@ const useStyles = createUseStyles((theme) => ({
     lineHeight: 1,
     cursor: 'pointer',
     '&:hover': { background: 'rgba(127,127,127,0.16)', color: theme.text },
+  },
+  // the box's buttons: send again, edit, delete
+  tools: { flex: 'none', display: 'flex', alignItems: 'center', gap: '0.15rem' },
+  tool: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    border: 0,
+    background: 'none',
+    color: theme.textSecondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    '&:hover': { background: 'rgba(127,127,127,0.16)', color: theme.text },
+    '&:disabled': { opacity: 0.4, cursor: 'default' },
   },
   sep: { border: 0, borderTop: `1px solid ${theme.border}`, margin: '0.55rem 0 0.3rem' },
   dock: {
@@ -132,7 +148,19 @@ function SendIcon({ rtl }) {
   );
 }
 
-function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles }) {
+const RefreshIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z" />
+  </svg>
+);
+const EditIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z" />
+  </svg>
+);
+
+// draft: { text, n } — "edit" on a question box puts its text in the field (n changes on every click)
+function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, draft }) {
   const { t, isRtl } = useT();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -152,6 +180,15 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles })
     el.style.overflowY = el.scrollHeight > 140 ? 'auto' : 'hidden';
   }, [text]);
   useEffect(() => setActive(-1), [text, open]);
+  useEffect(() => {
+    if (!draft) return;
+    setText(draft.text);
+    setOpen(false);
+    const el = field.current;
+    if (!el) return;
+    el.focus();
+    requestAnimationFrame(() => el.setSelectionRange(draft.text.length, draft.text.length));
+  }, [draft]);
 
   const send = async () => {
     if (!typed || busy) return;
@@ -249,7 +286,7 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles })
   );
 }
 
-function Card({ r, classes, onDelete, onChanged }) {
+function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
   const { t } = useT();
   return (
     <div className={classes.card}>
@@ -260,9 +297,17 @@ function Card({ r, classes, onDelete, onChanged }) {
             <Term>{fmtWhen(r.createdAt)}</Term>
           </div>
         </div>
-        <button type="button" className={classes.x} onClick={onDelete} aria-label={t('joya.ask.delete')} title={t('joya.ask.delete')}>
-          ×
-        </button>
+        <div className={classes.tools}>
+          <button type="button" className={classes.tool} onClick={onResend} disabled={busy} aria-label={t('joya.ask.resend')} title={t('joya.ask.resend')}>
+            <RefreshIcon />
+          </button>
+          <button type="button" className={classes.tool} onClick={onEdit} aria-label={t('joya.ask.edit')} title={t('joya.ask.edit')}>
+            <EditIcon />
+          </button>
+          <button type="button" className={classes.x} onClick={onDelete} aria-label={t('joya.ask.delete')} title={t('joya.ask.delete')}>
+            ×
+          </button>
+        </div>
       </div>
       <hr className={classes.sep} />
       <Answer r={r} head={false} onChanged={onChanged} />
@@ -287,6 +332,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const [items, setItems] = useState(null); // newest first, as the server sends them
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState(null);
   const timer = useRef(null);
   const scrollDown = useRef(false);
   const contextKind = 'AREA';
@@ -351,7 +397,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   };
 
   if (items == null) return <ErrorBox error={err} />;
-  const composer = <Composer classes={classes} docked={items.length + uploads.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} onFiles={addFiles} />;
+  const composer = <Composer classes={classes} docked={items.length + uploads.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} onFiles={addFiles} draft={draft} />;
   const overlay = dragging ? <DropOverlay /> : null;
 
   if (!items.length && !uploads.length)
@@ -371,7 +417,16 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
       {overlay}
       <div className={classes.list}>
         {[...items].reverse().map((r) => (
-          <Card key={r.id} r={r} classes={classes} onDelete={() => remove(r.id)} onChanged={() => load()} />
+          <Card
+            key={r.id}
+            r={r}
+            classes={classes}
+            busy={busy}
+            onDelete={() => remove(r.id)}
+            onChanged={() => load()}
+            onResend={() => send(r.question)}
+            onEdit={() => setDraft((d) => ({ text: r.question, n: (d?.n || 0) + 1 }))}
+          />
         ))}
         {uploads.map((u) => (
           <UploadCard key={u.key} u={u} onImport={(rests) => importFiles(u, rests)} onRemove={() => removeUpload(u.key)} />
