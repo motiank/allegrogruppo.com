@@ -267,6 +267,8 @@ const Employees = () => {
         wage: e.wage == null ? "" : String(e.wage),
         travel: e.travel == null ? "" : String(e.travel),
         maxTravel: e.maxTravel == null ? "" : String(e.maxTravel),
+        // 0 שכיר · 1 קבלן · 2 מוגבל שעות (employees.contractor).
+        employment: Number(e.employment ?? (e.contractor ? 1 : 0)) || 0,
         contractor: !!e.contractor,
         savedContractor: !!e.contractor,
         active: e.active !== false,
@@ -339,10 +341,10 @@ const Employees = () => {
     setSaveResult(null);
   };
 
-  const toggleContractor = (empIdx) => {
+  const setEmployment = (empIdx, value) => {
     setEmployees((prev) => {
       const next = prev.slice();
-      next[empIdx] = { ...next[empIdx], contractor: !next[empIdx].contractor };
+      next[empIdx] = { ...next[empIdx], employment: value, contractor: value === 1 };
       return next;
     });
     setDirty(true);
@@ -795,6 +797,7 @@ const Employees = () => {
           travel: e.travel,
           maxTravel: e.maxTravel,
           contractor: !!e.contractor,
+          employment: Number(e.employment) || 0,
         })),
       };
       const res = await axios.post("/admin/payroll/employees/update", payload, {
@@ -1430,7 +1433,7 @@ const Employees = () => {
               }
               onUpdateTravel={updateTravel}
               onUpdateMaxTravel={updateMaxTravel}
-              onToggleContractor={toggleContractor}
+              onSetEmployment={setEmployment}
               actions={{
                 keyOf: (emp) => emp.employee_id,
                 menuOpenFor,

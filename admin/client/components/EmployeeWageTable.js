@@ -13,7 +13,7 @@ import { formatWage } from "../../../shared/wage.js";
 //   onEditRoleWage(empIdx, roleIdx)     open the per-role wage dialog
 //   onUpdateTravel(empIdx, val)
 //   onUpdateMaxTravel(empIdx, val)
-//   onToggleContractor(empIdx)
+//   onSetEmployment(empIdx, value)      0 שכיר · 1 קבלן · 2 מוגבל שעות
 //   actions: {
 //     keyOf(emp),            stable identity for the open-menu / removing state
 //     menuOpenFor, setMenuOpenFor,
@@ -27,7 +27,7 @@ const EmployeeWageTable = ({
   onEditRoleWage,
   onUpdateTravel,
   onUpdateMaxTravel,
-  onToggleContractor,
+  onSetEmployment,
   actions,
 }) => {
   const { theme } = useTheme();
@@ -118,19 +118,22 @@ const EmployeeWageTable = ({
                         />
                       </td>
                       <td rowSpan={roles.length} style={styles.tdEmpBoundary}>
-                        <button
-                          type="button"
-                          aria-pressed={!!emp.contractor}
-                          onClick={() => onToggleContractor(empIdx)}
-                          style={
-                            emp.contractor
-                              ? styles.toggleButtonActive
-                              : styles.toggleButton
+                        <select
+                          value={Number(emp.employment) || 0}
+                          onChange={(ev) =>
+                            onSetEmployment(empIdx, Number(ev.target.value))
                           }
-                          title="Mark as contractor (קבלן)"
+                          style={
+                            Number(emp.employment)
+                              ? styles.employmentSelectActive
+                              : styles.employmentSelect
+                          }
+                          title="קבלן: not exported · מוגבל שעות: at most 182 hours at 100% and 45 at 150% a month"
                         >
-                          {emp.contractor ? "קבלן" : "שכיר"}
-                        </button>
+                          <option value={0}>שכיר</option>
+                          <option value={1}>קבלן</option>
+                          <option value={2}>מוגבל שעות</option>
+                        </select>
                       </td>
                     </>
                   ) : null}
@@ -266,6 +269,26 @@ const buildStyles = (theme) => ({
     color: theme.text,
     cursor: "pointer",
     whiteSpace: "nowrap",
+  },
+  employmentSelect: {
+    padding: "7px 8px",
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    border: `1px solid ${theme.border}`,
+    borderRadius: "6px",
+    backgroundColor: theme.surface,
+    color: theme.text,
+    cursor: "pointer",
+  },
+  employmentSelectActive: {
+    padding: "7px 8px",
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    border: `1px solid ${theme.active || "#2196f3"}`,
+    borderRadius: "6px",
+    backgroundColor: theme.active || "#2196f3",
+    color: "#ffffff",
+    cursor: "pointer",
   },
   toggleButtonActive: {
     padding: "8px 14px",

@@ -15,6 +15,8 @@ import {
   normalizeRoles,
   isValidWageType,
   effectiveHourlyRate,
+  EMPLOYMENT_HOUR_CAPPED,
+  capPayrollHours,
 } from "../../../shared/wage.js";
 
 const require = createRequire(import.meta.url);
@@ -42,6 +44,19 @@ const toDecimalString = (v) => {
 // Serialize a roles array to the compound JSON stored in employees.roles:
 // [{ role, new_wage_type, wage }]. Accepts the legacy bare-number format on
 // input (normalizeRoleWage upgrades it) so a save migrates the row in place.
+// employees.contractor holds the employment type (the Employees page dropdown):
+// 0 = שכיר, 1 = קבלן (contractor, not exported), 2 = מוגבל שעות (the export
+// caps the monthly hours, see HOUR_CAPS in shared/wage.js).
+const EMPLOYMENT = { SALARIED: 0, CONTRACTOR: 1, HOUR_CAPPED: EMPLOYMENT_HOUR_CAPPED };
+const isContractorRow = (r) => Number(r && r.contractor) === EMPLOYMENT.CONTRACTOR;
+// The value to store: `employment` when sent, else the old contractor flag.
+const employmentOf = (emp) => {
+  const v = emp && emp.employment;
+  const n = v == null || v === "" ? NaN : Number(v);
+  if (Object.values(EMPLOYMENT).includes(n)) return n;
+  return emp && emp.contractor ? EMPLOYMENT.CONTRACTOR : EMPLOYMENT.SALARIED;
+};
+
 const serializeRoles = (roles) =>
   JSON.stringify(
     (Array.isArray(roles) ? roles : [])
@@ -122,9 +137,14 @@ export const buildExportRow = (emp, ctx) => {
   const stdHours = ctx.stdHours;
   const MIN_HOURLY_WAGE = Number(ctx.minHourlyWage) || 35.4;
 
-  const payroll = emp.payroll_data || {};
   const name = (emp.name || "").trim();
   const dbEmp = empByName.get(name) || {};
+  // מוגבל שעות: paid (and so exported) for at most the monthly hour caps; the
+  // saved payroll_data keeps every hour worked.
+  const payroll =
+    Number(dbEmp.contractor) === EMPLOYMENT_HOUR_CAPPED
+      ? capPayrollHours(emp.payroll_data || {})
+      : emp.payroll_data || {};
   const idNmbr = dbEmp.ID_nmbr
     ? String(dbEmp.ID_nmbr).trim()
     : emp.ID_nmbr
@@ -347,7 +367,7 @@ export const buildExportRow = (emp, ctx) => {
     ID_nmbr: idNmbr,
     isGlobal,
     // קבלן (contractor) employees are excluded from the export entirely.
-    contractor: !!dbEmp.contractor,
+    contractor: isContractorRow(dbEmp),
     new_wage_type: newWageType,
     // employee default effective hourly rate, used by the Shiklulit exporter to
     // decide which roles map to base component code 1 vs 31.
@@ -917,6 +937,86 @@ async function loadExportCtx(rest, month) {
   return { ctx, payrollSoft };
 }
 
+// The Micpal / Shiklulit import file, rendered FROM the tlush of the
+// exportable employees (classifyForExport). Used by /save-export and
+// /export-file.
+async function renderImportFile(classified, opts) {
+  const { rest, month, payrollSoft } = opts;
+  const exportableTlushes = classified
+    .filter((c) => c.exportable && c.tlush)
+    .map((c) => c.tlush);
+  const company = micCompanyForBranch(rest) || String(opts.company || "").trim();
+  const restLabel = String(opts.restLabel || rest);
+  const [y, m] = month.split("-");
+  const monthInt = m ? String(Number(m)) : "";
+  const workMonth = Number(monthInt);
+  const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
+  let buf;
+  let filename;
+  // Rate-conflict alerts: same recordType+componentCode with differing rates
+  // for one employee (can't merge into a single Shiklulit line).
+  const alerts = [];
+  // Micpal only: a 3rd+ distinct rate for an employee, excluded from the
+  // export entirely (see buildMicRows/groupRoleBreakdownByRate — only 2
+  // rate slots exist) and needing manual handling.
+  const excludedRates = [];
+  if (payrollSoft === "shik") {
+    const allRows = [];
+    for (const t of exportableTlushes) {
+      // Merge identical (recordType, componentCode, rate) rows by summing
+      // quantity; flag differing-rate duplicates for the same employee.
+      const rows = mergeShikRows(tlushToShikRows(t, workMonth));
+      for (const r of rows) allRows.push(r);
+      for (const c of detectShikRateConflicts(rows)) {
+        alerts.push({
+          employeeNumber: t.employeeNumber ?? null,
+          name: t.name || "",
+          ID_nmbr: t.ID_nmbr || "",
+          recordType: c.recordType,
+          componentCode: c.componentCode,
+          rates: c.rates,
+        });
+      }
+    }
+    buf = await writeShikRowsXlsx(allRows);
+    filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
+  } else {
+    const xl = new MicpImportXL({ company, year: y || "", month: monthInt });
+    // Sorted by employee number (מס עובד) — a stable sort keeps a
+    // multi-row employee's rows adjacent since they share a number.
+    const sortedTlushes = [...exportableTlushes].sort((a, b) => {
+      const an = Number(a.employeeNumber);
+      const bn = Number(b.employeeNumber);
+      if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+      return String(a.employeeNumber ?? "").localeCompare(
+        String(b.employeeNumber ?? ""),
+      );
+    });
+    buf = await xl.generate(sortedTlushes.flatMap(tlushToMicRows));
+    filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
+    // 3rd+ distinct rate for an employee — excluded from the export
+    // entirely (Micpal's row format only fits 2), needs manual handling.
+    for (const t of exportableTlushes) {
+      for (const g of t.excludedRateGroups || []) {
+        excludedRates.push({
+          employeeNumber: t.employeeNumber ?? null,
+          name: t.name || "",
+          ID_nmbr: t.ID_nmbr || "",
+          rate: g.rate,
+          hours: g.hours,
+        });
+      }
+    }
+  }
+  return {
+    buf,
+    filename,
+    exported: exportableTlushes.length,
+    alerts,
+    excludedRates,
+  };
+}
+
 const isFiniteNum = (v) => v != null && v !== "" && Number.isFinite(Number(v));
 
 // Classify one employee for export and (when exportable) build its tlush.
@@ -1336,7 +1436,7 @@ const Router = () => {
                 wage: wageVal,
                 tr: travelVal,
                 mtr: maxTravelVal,
-                ctr: emp.contractor ? 1 : 0,
+                ctr: employmentOf(emp),
               },
             );
             inserted += 1;
@@ -1414,7 +1514,8 @@ const Router = () => {
           wage: asDecimalString(r.wage),
           travel: asDecimalString(r.travel),
           maxTravel: asDecimalString(r.maxTravel),
-          contractor: !!r.contractor,
+          contractor: isContractorRow(r),
+          employment: Number(r.contractor) || EMPLOYMENT.SALARIED,
         };
         if (scope === "all") {
           entry.active = r.active == null ? true : !!Number(r.active);
@@ -1494,7 +1595,7 @@ const Router = () => {
               wage: wageVal,
               tr: travelVal,
               mtr: maxTravelVal,
-              ctr: emp.contractor ? 1 : 0,
+              ctr: employmentOf(emp),
             },
           );
           if (result && result.affectedRows >= 1) updated += 1;
@@ -2748,9 +2849,7 @@ const Router = () => {
         return res.status(400).json({ error: "No employees in request body" });
 
       const { ctx, payrollSoft } = await loadExportCtx(rest, month);
-      const [y, m] = month.split("-");
-      const monthInt = m ? String(Number(m)) : "";
-      const workMonth = Number(monthInt);
+      const workMonth = Number(month.split("-")[1]);
 
       const classified = list
         .map((emp) =>
@@ -2804,71 +2903,16 @@ const Router = () => {
         }
       }
 
-      // Render xlsx FROM the stored tlush (exportable employees only).
-      const exportableTlushes = classified
-        .filter((c) => c.exportable && c.tlush)
-        .map((c) => c.tlush);
-      const company =
-        micCompanyForBranch(rest) || String(req.body?.company || "").trim();
-      const restLabel = String(req.body?.restLabel || rest);
-      const safeRest = restLabel.replace(/[^\w֐-׿.-]+/g, "_");
-      let buf;
-      let filename;
-      // Rate-conflict alerts: same recordType+componentCode with differing rates
-      // for one employee (can't merge into a single Shiklulit line).
-      const alerts = [];
-      // Micpal only: a 3rd+ distinct rate for an employee, excluded from the
-      // export entirely (see buildMicRows/groupRoleBreakdownByRate — only 2
-      // rate slots exist) and needing manual handling.
-      const excludedRates = [];
-      if (payrollSoft === "shik") {
-        const allRows = [];
-        for (const t of exportableTlushes) {
-          // Merge identical (recordType, componentCode, rate) rows by summing
-          // quantity; flag differing-rate duplicates for the same employee.
-          const rows = mergeShikRows(tlushToShikRows(t, workMonth));
-          for (const r of rows) allRows.push(r);
-          for (const c of detectShikRateConflicts(rows)) {
-            alerts.push({
-              employeeNumber: t.employeeNumber ?? null,
-              name: t.name || "",
-              ID_nmbr: t.ID_nmbr || "",
-              recordType: c.recordType,
-              componentCode: c.componentCode,
-              rates: c.rates,
-            });
-          }
-        }
-        buf = await writeShikRowsXlsx(allRows);
-        filename = `siklulit_import_${safeRest}_${month || "month"}.xlsx`;
-      } else {
-        const xl = new MicpImportXL({ company, year: y || "", month: monthInt });
-        // Sorted by employee number (מס עובד) — a stable sort keeps a
-        // multi-row employee's rows adjacent since they share a number.
-        const sortedTlushes = [...exportableTlushes].sort((a, b) => {
-          const an = Number(a.employeeNumber);
-          const bn = Number(b.employeeNumber);
-          if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-          return String(a.employeeNumber ?? "").localeCompare(
-            String(b.employeeNumber ?? ""),
-          );
-        });
-        buf = await xl.generate(sortedTlushes.flatMap(tlushToMicRows));
-        filename = `micpal_import_${safeRest}_${month || "month"}.xlsx`;
-        // 3rd+ distinct rate for an employee — excluded from the export
-        // entirely (Micpal's row format only fits 2), needs manual handling.
-        for (const t of exportableTlushes) {
-          for (const g of t.excludedRateGroups || []) {
-            excludedRates.push({
-              employeeNumber: t.employeeNumber ?? null,
-              name: t.name || "",
-              ID_nmbr: t.ID_nmbr || "",
-              rate: g.rate,
-              hours: g.hours,
-            });
-          }
-        }
-      }
+      // Save only (the Save button) → no file. The file comes from /export-file.
+      const file = req.body?.noFile
+        ? { exported: 0, alerts: [], excludedRates: [] }
+        : await renderImportFile(classified, {
+            rest,
+            month,
+            restLabel: req.body?.restLabel,
+            company: req.body?.company,
+            payrollSoft,
+          });
 
       const unexportable = classified
         .filter((c) => !c.exportable)
@@ -2889,16 +2933,86 @@ const Router = () => {
         unresolved,
         errors,
         payrollSoft,
-        filename,
-        xlsxBase64: Buffer.from(buf).toString("base64"),
-        exported: exportableTlushes.length,
+        filename: file.filename,
+        xlsxBase64: file.buf ? Buffer.from(file.buf).toString("base64") : null,
+        exported: file.exported,
         unexportable,
-        alerts,
-        excludedRates,
+        alerts: file.alerts,
+        excludedRates: file.excludedRates,
       });
     } catch (err) {
       console.error("payroll/save-export error:", err);
       res.status(500).json({ error: err.message || "save+export failed" });
+    }
+  });
+
+  // The Micpal / Shiklulit import file of the payroll on screen, without
+  // saving it (the Export dialog). Same file as /save-export renders.
+  // employeeNumbers: only these מס' עובד; empty → everyone exportable.
+  router.post("/export-file", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      const list = Array.isArray(req.body?.employees) ? req.body.employees : [];
+      const incompleteSet = new Set(
+        (Array.isArray(req.body?.incompleteNames)
+          ? req.body.incompleteNames
+          : []
+        ).map((n) => String(n || "").trim()),
+      );
+      const numbers = new Set(
+        (Array.isArray(req.body?.employeeNumbers) ? req.body.employeeNumbers : [])
+          .map((n) => String(n ?? "").trim())
+          .filter(Boolean),
+      );
+      if (!rest) return res.status(400).json({ error: "missing rest" });
+      if (!/^\d{4}-\d{2}$/.test(month))
+        return res.status(400).json({ error: "month must be YYYY-MM" });
+      if (list.length === 0)
+        return res.status(400).json({ error: "No employees in request body" });
+
+      const { ctx, payrollSoft } = await loadExportCtx(rest, month);
+      const workMonth = Number(month.split("-")[1]);
+      let classified = list
+        .map((emp) =>
+          classifyForExport(emp, ctx, payrollSoft, workMonth, incompleteSet),
+        )
+        .filter((c) => !c.dummy);
+      if (numbers.size > 0) {
+        classified = classified.filter(
+          (c) =>
+            c.exportable &&
+            c.tlush &&
+            numbers.has(String(c.tlush.employeeNumber ?? "").trim()),
+        );
+        if (classified.length === 0)
+          return res
+            .status(400)
+            .json({ error: "no employees match those numbers" });
+      }
+      const file = await renderImportFile(classified, {
+        rest,
+        month,
+        restLabel: req.body?.restLabel,
+        company: req.body?.company,
+        payrollSoft,
+      });
+      res.json({
+        rest,
+        month,
+        payrollSoft,
+        filename: file.filename,
+        xlsxBase64: Buffer.from(file.buf).toString("base64"),
+        exported: file.exported,
+        unexportable: classified
+          .filter((c) => !c.exportable)
+          .map((c) => ({ name: c.name, ID_nmbr: c.ID_nmbr, reasons: c.reasons })),
+        alerts: file.alerts,
+        excludedRates: file.excludedRates,
+      });
+    } catch (err) {
+      console.error("payroll/export-file error:", err);
+      res.status(500).json({ error: err.message || "export failed" });
     }
   });
 

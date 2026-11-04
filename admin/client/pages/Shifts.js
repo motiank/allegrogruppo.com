@@ -28,6 +28,8 @@ import EmployeeWageTable from "../components/EmployeeWageTable";
 import {
   normalizeRoleWage,
   effectiveHourlyRate,
+  EMPLOYMENT_HOUR_CAPPED,
+  hourCapExcess,
 } from "../../../shared/wage.js";
 
 const STEPS = [
@@ -256,6 +258,8 @@ const buildWageMap = (employeesFromDb) => {
       travel: e.travel == null ? null : Number(e.travel),
       maxTravel: e.maxTravel == null ? null : Number(e.maxTravel),
       contractor: !!e.contractor,
+      // 0 שכיר · 1 קבלן · 2 מוגבל שעות (the export caps the hours).
+      employment: Number(e.employment) || 0,
     };
     if (e.ID_nmbr) {
       const idKey = `id:${String(e.ID_nmbr).trim()}`;
@@ -686,10 +690,14 @@ const Shifts = () => {
   const [payrollError, setPayrollError] = useState(null);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
-  const [exportingTlushXlsx, setExportingTlushXlsx] = useState(false);
-  // Export chooser dialog: "all" vs a comma-separated list of mic numbers.
+  // Export dialog: the file format ("micpal" = the Micpal / Shiklulit import
+  // file, "tlush" = the תצוגת תלוש table) and a comma-separated list of
+  // מס' עובד (empty = everyone).
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState("micpal");
   const [exportEmpNumbers, setExportEmpNumbers] = useState("");
+  // Rate warnings of the last Micpal / Shiklulit file ({ alerts, excludedRates }).
+  const [exportWarnings, setExportWarnings] = useState(null);
   // After a Micpal XL download: employees that were skipped because no
   // Micpal keyName (מס עובד) was found for them.
   const [micpalMissing, setMicpalMissing] = useState(null);
@@ -837,7 +845,7 @@ const Shifts = () => {
     setTabitFetchedAt(null);
     setNotInTabit([]);
     setAdvanceStatus({});
-    setUpdateResult(null);
+    setExportWarnings(null);
     setTlushData(null);
   };
 
@@ -1720,7 +1728,7 @@ const Shifts = () => {
 
   // Save one employee's מפרעה to the saved payroll row when the field is
   // left (blur / Enter). Empty → 0. Not saved yet for this month → it is
-  // saved with the payroll ("עדכון" / "שמירה וייצוא").
+  // saved with the payroll ("שמירה").
   // advanceStatus: { [name]: "saving" | "saved" | "later" | { error } }.
   const [advanceStatus, setAdvanceStatus] = useState({});
   const saveAdvance = async (name) => {
@@ -1752,69 +1760,6 @@ const Shifts = () => {
         ...prev,
         [name]: { error: err.response?.data?.error || err.message || "save failed" },
       }));
-    }
-  };
-
-  const [updatingPayroll, setUpdatingPayroll] = useState(false);
-  const [updateResult, setUpdateResult] = useState(null);
-
-  // "עדכון" — persist current edits (incl. מפרעה, empty → 0) to the payroll
-  // table without exporting. Uses /payroll-data, leaving any saved tlush intact.
-  const handleUpdatePayroll = async () => {
-    if (updatingPayroll || !month || allEmployees.length === 0) return;
-    setUpdatingPayroll(true);
-    setUpdateResult(null);
-    try {
-      // New shifts (from Tabit or Excel) → their daily labor cost too, as
-      // "שמירה וייצוא" does. Non-fatal.
-      if (freshExtract) {
-        try {
-          await axios.post(
-            "/admin/payroll/labor-cost",
-            { rest: selectedRestaurant, items: computeDailyLaborCost() },
-            { withCredentials: true },
-          );
-        } catch (laborErr) {
-          console.error("labor-cost error:", laborErr);
-        }
-      }
-      const employees = allEmployees.map((e) => ({
-        name: e.name,
-        ID_nmbr: e.ID_nmbr,
-        payroll_data: e.payroll_data || {},
-        role_extras: e.role_extras || {},
-        workdays: e.workdays ?? null,
-        global: e.global ?? null,
-        netGross: e.netGross ?? null,
-        in_advance: coerceAdvance(e.in_advance),
-        work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
-        daily_breakdown:
-          e.daily_breakdown && typeof e.daily_breakdown === "object"
-            ? e.daily_breakdown
-            : {},
-        daily_hours:
-          e.daily_hours && typeof e.daily_hours === "object"
-            ? e.daily_hours
-            : {},
-        notes: Array.isArray(e.notes) ? e.notes : [],
-      }));
-      const res = await axios.post(
-        "/admin/payroll/payroll-data",
-        { rest: selectedRestaurant, month, employees },
-        { withCredentials: true },
-      );
-      // Reflect the empty→0 normalization back into the table.
-      setAllEmployees((prev) =>
-        prev.map((e) => ({ ...e, in_advance: coerceAdvance(e.in_advance) })),
-      );
-      setUpdateResult(res.data);
-      markMonthSaved();
-    } catch (err) {
-      setUpdateResult({
-        error: err.response?.data?.error || err.message || "update failed",
-      });
-    } finally {
-      setUpdatingPayroll(false);
     }
   };
 
@@ -1920,11 +1865,13 @@ const Shifts = () => {
         { withCredentials: true },
       );
       setTlushData(res.data || null);
+      return res.data || null;
     } catch (err) {
       setTlushError(
         err.response?.data?.error || err.message || "tlush preview failed",
       );
       setTlushData(null);
+      return null;
     } finally {
       setTlushLoading(false);
     }
@@ -1947,9 +1894,10 @@ const Shifts = () => {
     }
   }, [payrollView, tlushData, tlushLoading, allEmployees, fetchTlushPreview]);
 
-  // Unified Save + Export: persists payroll_data + tlush and downloads the file
-  // (rendered from the saved tlush).
-  const handleSaveExport = async () => {
+  // Save: persists payroll_data + tlush, the daily labor cost (new shifts
+  // only) and shows the labor-cost summary. No file — that is the Export
+  // dialog.
+  const handleSave = async () => {
     if (savingPayroll) return;
     if (!month) {
       setPayrollError("month not detected from upload — cannot save payroll");
@@ -1982,40 +1930,12 @@ const Shifts = () => {
           month,
           employees: buildPayrollEmployeesPayload(),
           incompleteNames: Array.from(flaggedNames),
+          noFile: true,
         },
         { withCredentials: true },
       );
       setPayrollResult(res.data);
       markMonthSaved();
-      const { xlsxBase64, filename, unexportable } = res.data || {};
-      if (xlsxBase64) {
-        const binary = atob(xlsxBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++)
-          bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename || `export_${month || "month"}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-      // Surface the not-exported employees (with reasons) in the existing dialog.
-      if (Array.isArray(unexportable) && unexportable.length > 0) {
-        setSkippedContractors(null);
-        setMicpalMissing(
-          unexportable.map((u) => ({
-            name: u.name,
-            ID_nmbr: u.ID_nmbr,
-            reason: (u.reasons || []).map(reasonLabel).join(", "),
-          })),
-        );
-      }
       // Refresh the in-memory tlush views to match what was just saved.
       setTlushData(null);
       // Labor-cost summary dialog (same as the old save).
@@ -2040,102 +1960,127 @@ const Shifts = () => {
     } catch (err) {
       console.error("save-export error:", err);
       setPayrollError(
-        err.response?.data?.error || err.message || "Save & export failed",
+        err.response?.data?.error || err.message || "Save failed",
       );
     } finally {
       setSavingPayroll(false);
     }
   };
 
-  // ---------- Step 4: XL download ----------
-  // micNumbers: optional array of mic numbers (מס' עובד). When provided, only
-  // employees whose empNumber is in the list are exported; otherwise everyone.
-  const handleDownloadXlsx = async (micNumbers = null) => {
+  // ---------- Step 4: export (the Export dialog) ----------
+  const downloadXlsx = (xlsxBase64, filename) => {
+    const binary = atob(xlsxBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  // Downloads the file in exportFormat for the מס' עובד in exportEmpNumbers
+  // (empty → everyone). Nothing is saved.
+  const handleExport = async () => {
     if (downloadingXlsx) return;
-    if (!allEmployees || allEmployees.length === 0) {
+    if (!month || dedupedEmployees.length === 0) {
       setDownloadError("no extracted employees to export");
       return;
     }
-    // dedupedEmployees, not allEmployees — see buildPayrollEmployeesPayload's
-    // comment: two DB rows sharing one מס' עובד must collapse to one, same as
-    // the final table and tlush view already do.
-    let source = dedupedEmployees;
-    if (Array.isArray(micNumbers)) {
-      const set = new Set(micNumbers.map((n) => String(n).trim()));
-      source = dedupedEmployees.filter((e) => {
-        const n = lookupEmpData(wageMap, e)?.empNumber;
-        return n != null && set.has(String(n).trim());
-      });
-      if (source.length === 0) {
-        setDownloadError("no employees match those numbers");
-        return;
-      }
-    }
+    const numbers = exportEmpNumbers
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     setShowExportDialog(false);
     setDownloadingXlsx(true);
     setDownloadError(null);
+    setExportWarnings(null);
     try {
-      const payload = {
-        rest: selectedRestaurant,
-        restLabel: selectedLabel,
-        month,
-        employees: source.map((e) => {
-          const empData = lookupEmpData(wageMap, e);
-          return {
+      if (exportFormat === "tlush") {
+        const data = tlushData || (await fetchTlushPreview());
+        if (!data) throw new Error("tlush preview failed");
+        // Unlike the on-screen תלוש table (exportable only, i.e. has a micpal
+        // number), the file also has employees whose only blocker is a
+        // missing micpal number — their pay is still computed server-side,
+        // and the file puts them on a second sheet so the office can process
+        // them manually.
+        const wanted = new Set(numbers);
+        const employees = (data.employees || [])
+          .filter((e) => (e.components || []).length > 0)
+          .filter(
+            (e) =>
+              wanted.size === 0 ||
+              wanted.has(String(e.employeeNumber ?? "").trim()),
+          )
+          .map((e) => ({
             name: e.name,
-            ID_nmbr: e.ID_nmbr,
-            payroll_data: e.payroll_data || {},
-            role_extras: e.role_extras || {},
-            workdays: e.workdays,
-            // Total break hours → meals (שווי ארוחות) in the export. Computed
-            // the same way as the on-screen breaks column (0.5h per long day,
-            // excluding hourly-min/tip-based roles).
-            breaks: computeBreaks(e, (role) => isHourlyMinWage(empData, role)),
-            in_advance: e.in_advance ?? null, // מפרעה
-            // Source for the Shiklulit recordType=4 actual-attendance rows:
-            // work_dates → actual work days, daily_hours → actual work hours.
-            work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
-            daily_hours:
-              e.daily_hours && typeof e.daily_hours === "object"
-                ? e.daily_hours
-                : {},
-            hourly_wage: empData?.hourly_wage ?? null,
-            wage_type: empData?.wage_type ?? null,
-            travel: empData?.travel ?? null,
-            maxTravel: empData?.maxTravel ?? null,
-          };
-        }),
-      };
-      const res = await axios.post("/admin/payroll/export-micpal", payload, {
-        withCredentials: true,
-      });
-      const { xlsxBase64, filename, missing, skippedContractors: skipped } =
-        res.data || {};
-      if (xlsxBase64) {
-        const binary = atob(xlsxBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename || `micpal_import_${month || "month"}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-      if (Array.isArray(missing) && missing.length > 0) {
-        setMicpalMissing(missing);
-      }
-      if (Array.isArray(skipped) && skipped.length > 0) {
-        setSkippedContractors(skipped);
+            employeeNumber: e.employeeNumber ?? "",
+            mixedRates: !!e.mixedRates,
+            excludedRateGroups: e.excludedRateGroups || [],
+            components: (e.components || []).map((c) => ({
+              code: c.code,
+              label: c.label,
+              quantity: c.quantity,
+              wage: c.wage,
+              netGross: c.netGross,
+            })),
+          }));
+        if (employees.length === 0)
+          throw new Error(
+            wanted.size > 0
+              ? "no employees match those numbers"
+              : "no employees to export",
+          );
+        const res = await axios.post(
+          "/admin/payroll/export-tlush-xlsx",
+          { employees, restaurant: selectedLabel, month },
+          { withCredentials: true },
+        );
+        const { xlsxBase64, filename } = res.data || {};
+        if (xlsxBase64)
+          downloadXlsx(xlsxBase64, filename || `tlush_${month}.xlsx`);
+      } else {
+        const res = await axios.post(
+          "/admin/payroll/export-file",
+          {
+            rest: selectedRestaurant,
+            restLabel: selectedLabel,
+            month,
+            employees: buildPayrollEmployeesPayload(),
+            incompleteNames: Array.from(flaggedNames),
+            employeeNumbers: numbers,
+          },
+          { withCredentials: true },
+        );
+        const { xlsxBase64, filename, unexportable, alerts, excludedRates } =
+          res.data || {};
+        if (xlsxBase64)
+          downloadXlsx(xlsxBase64, filename || `export_${month}.xlsx`);
+        // The not-exported employees (with reasons) in the existing dialog.
+        if (Array.isArray(unexportable) && unexportable.length > 0) {
+          setSkippedContractors(null);
+          setMicpalMissing(
+            unexportable.map((u) => ({
+              name: u.name,
+              ID_nmbr: u.ID_nmbr,
+              reason: (u.reasons || []).map(reasonLabel).join(", "),
+            })),
+          );
+        }
+        if ((alerts || []).length > 0 || (excludedRates || []).length > 0)
+          setExportWarnings({ alerts, excludedRates });
       }
     } catch (err) {
-      console.error("export-micpal error:", err);
-      setDownloadError(err.message || "download failed");
+      console.error("export error:", err);
+      setDownloadError(
+        err.response?.data?.error || err.message || "export failed",
+      );
     } finally {
       setDownloadingXlsx(false);
     }
@@ -2239,6 +2184,12 @@ const Shifts = () => {
       const breaksByRole = computeBreaksByRole(emp, isHourlyMin);
       // Payroll-software employee number (מס עובד) for the new table column.
       const empNumber = empData?.empNumber ?? null;
+      // מוגבל שעות over a monthly cap: the table shows every hour, the export
+      // cuts them (capPayrollHours on the server) → flagged next to the name.
+      const capExcess =
+        Number(empData?.employment) === EMPLOYMENT_HOUR_CAPPED
+          ? hourCapExcess(emp.payroll_data)
+          : [];
 
       // הערות surfaced next to the name, each enriched with that date's hours
       // split (100/125/150) summed from the per-day breakdown.
@@ -2332,6 +2283,7 @@ const Shifts = () => {
           empty: true,
           name: emp.name,
           notes: empNotes,
+          capExcess,
           in_advance: emp.in_advance,
           empNumber,
           workdays: emp.workdays,
@@ -2354,6 +2306,7 @@ const Shifts = () => {
           isTotal: false,
           name: emp.name,
           notes: i === 0 ? empNotes : null,
+          capExcess,
           in_advance: i === 0 ? emp.in_advance : null,
           empNumber,
           workdays: emp.workdays,
@@ -2425,13 +2378,16 @@ const Shifts = () => {
   const displayedPayrollRows = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();
     const restrictUnexp = payrollView === "unexportable";
+    const restrictCap = payrollView === "overCap";
     let rows = fullPayrollRows;
-    if (q || restrictUnexp) {
+    if (q || restrictUnexp || restrictCap) {
       // Build per-employee haystack (name + מס' עובד + all roles).
       const byEmp = new Map();
+      const overCap = new Set();
       for (const r of fullPayrollRows) {
         if (r.isGrandTotal) continue;
         const key = r.name || "";
+        if (r.capExcess && r.capExcess.length > 0) overCap.add(key);
         if (!byEmp.has(key)) byEmp.set(key, [key]);
         const hay = byEmp.get(key);
         if (r.empNumber != null && r.empNumber !== "")
@@ -2442,7 +2398,8 @@ const Shifts = () => {
       for (const [key, hay] of byEmp) {
         const textOk = !q || hay.join(" ").toLowerCase().includes(q);
         const unexpOk = !restrictUnexp || unexportableNames.has(key.trim());
-        if (textOk && unexpOk) matched.add(key);
+        const capOk = !restrictCap || overCap.has(key);
+        if (textOk && unexpOk && capOk) matched.add(key);
       }
       rows = fullPayrollRows.filter(
         (r) => !r.isGrandTotal && matched.has(r.name || ""),
@@ -3448,67 +3405,6 @@ const Shifts = () => {
       .filter((c) => c.netGross === "gross")
       .reduce((s, c) => s + payment(c), 0);
 
-    const handleExportTlushXlsx = async () => {
-      if (exportingTlushXlsx) return;
-      // Unlike the on-screen table (`emps`, exportable-only i.e. has a micpal
-      // number), the export also includes employees whose only blocker is a
-      // missing micpal number — their pay is still computed server-side, and
-      // the export puts them on a second sheet so the office can process them
-      // manually. Same search-query filter as the on-screen table.
-      const employees = (tlushData?.employees || [])
-        .filter((e) => (e.components || []).length > 0)
-        .filter(
-          (e) =>
-            !q || `${e.name} ${e.employeeNumber ?? ""}`.toLowerCase().includes(q),
-        )
-        .map((e) => ({
-          name: e.name,
-          employeeNumber: e.employeeNumber ?? "",
-          mixedRates: !!e.mixedRates,
-          excludedRateGroups: e.excludedRateGroups || [],
-          components: (e.components || []).map((c) => ({
-            code: c.code,
-            label: c.label,
-            quantity: c.quantity,
-            wage: c.wage,
-            netGross: c.netGross,
-          })),
-        }));
-      if (employees.length === 0) return;
-      setExportingTlushXlsx(true);
-      setDownloadError(null);
-      try {
-        const res = await axios.post(
-          "/admin/payroll/export-tlush-xlsx",
-          { employees, restaurant: selectedLabel, month },
-          { withCredentials: true },
-        );
-        const { xlsxBase64, filename } = res.data || {};
-        if (xlsxBase64) {
-          const binary = atob(xlsxBase64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++)
-            bytes[i] = binary.charCodeAt(i);
-          const blob = new Blob([bytes], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename || `tlush_${month || "month"}.xlsx`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }
-      } catch (err) {
-        console.error("export-tlush-xlsx error:", err);
-        setDownloadError(err.message || "download failed");
-      } finally {
-        setExportingTlushXlsx(false);
-      }
-    };
-
     return (
       <>
         {excludedRateWarnings.length > 0 && (
@@ -3747,30 +3643,50 @@ const Shifts = () => {
             </tbody>
           </table>
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginTop: "12px",
-          }}
-        >
-          <button
-            type="button"
-            style={{
-              ...styles.secondaryButton,
-              opacity: exportingTlushXlsx ? 0.7 : 1,
-              cursor: exportingTlushXlsx ? "wait" : "pointer",
-            }}
-            onClick={handleExportTlushXlsx}
-            disabled={exportingTlushXlsx}
-            title="ייצוא תצוגת התלוש לאקסל"
-          >
-            {exportingTlushXlsx ? "מייצא…" : "ייצוא לאקסל"}
-          </button>
-        </div>
       </>
     );
   };
+
+  // Rate warnings of a Micpal / Shiklulit file: { alerts, excludedRates }.
+  const renderRateWarnings = (r) => (
+    <>
+      {r.alerts && r.alerts.length > 0 && (
+        <div style={{ marginTop: "8px", color: "#b26a00" }}>
+          <strong>
+            ⚠️ התנגשות תעריפים — אותו רכיב עם תעריף שונה (
+            {r.alerts.length}):
+          </strong>
+          <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
+            {r.alerts.map((a, i) => (
+              <li key={i}>
+                {a.name || "(ללא שם)"}
+                {a.employeeNumber ? ` · מס' ${a.employeeNumber}` : ""} — סוג
+                רשומה {a.recordType}, קוד רכיב {a.componentCode}, תעריפים:{" "}
+                {(a.rates || []).join(", ")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {r.excludedRates && r.excludedRates.length > 0 && (
+          <div style={{ marginTop: "8px", color: "#b26a00" }}>
+            <strong>
+              ⚠️ יותר משלושה תעריפים לעובד — שעות לא כלולות בקובץ מיקפל, יש
+              לשלם בנפרד ({r.excludedRates.length}):
+            </strong>
+            <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
+              {r.excludedRates.map((e, i) => (
+                <li key={i}>
+                  {e.name || "(ללא שם)"}
+                  {e.employeeNumber ? ` · מס' ${e.employeeNumber}` : ""} —{" "}
+                  {fmtNum(e.hours)}ש בתעריף ₪{fmtNum(e.rate)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+    </>
+  );
 
   const renderStep4 = () => (
     <div style={styles.card}>
@@ -3878,6 +3794,7 @@ const Shifts = () => {
           <option value="data">תצוגת נתונים</option>
           <option value="tlush">תצוגת תלוש</option>
           <option value="unexportable">לא ניתנים לייצוא</option>
+          <option value="overCap">Exceeded cap — חריגה ממגבלת שעות</option>
         </select>
         <select
           value={payrollSort}
@@ -3909,21 +3826,32 @@ const Shifts = () => {
             opacity: refreshingFinal ? 0.6 : 1,
           }}
         >
-          <span
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
             style={{
-              display: "inline-block",
               animation: refreshingFinal ? "spin 0.8s linear infinite" : "none",
             }}
           >
-            ↻
-          </span>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
         </button>
         {tlushLoading && (
           <span style={{ fontSize: "0.85rem", color: theme.textSecondary }}>
             טוען…
           </span>
         )}
-        {(payrollSearch.trim() || payrollView === "unexportable") && (
+        {(payrollSearch.trim() ||
+          payrollView === "unexportable" ||
+          payrollView === "overCap") && (
           <span style={{ fontSize: "0.85rem", color: theme.textSecondary }}>
             {
               new Set(
@@ -4030,7 +3958,50 @@ const Shifts = () => {
                           gap: "6px",
                         }}
                       >
-                        <span>{r.name}</span>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          {r.name}
+                          {r.capExcess && r.capExcess.length > 0 && (
+                            <span
+                              title={
+                                "מוגבל שעות — the export cuts the hours: " +
+                                r.capExcess
+                                  .map(
+                                    (c) =>
+                                      `${c.label} ${fmtNum(c.total)} → ${c.cap}`,
+                                  )
+                                  .join(", ")
+                              }
+                              aria-label="Exceeded hour cap"
+                              style={{
+                                display: "inline-flex",
+                                color: "#e67e22",
+                                cursor: "help",
+                              }}
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <circle cx="12" cy="13" r="8" />
+                                <path d="M12 9v4l2 2" />
+                                <path d="M9 2h6" />
+                              </svg>
+                            </span>
+                          )}
+                        </span>
                         <NotesBadge notes={r.notes} />
                       </span>
                     ) : (
@@ -4123,16 +4094,6 @@ const Shifts = () => {
           marginTop: "12px",
         }}
       >
-        {updateResult &&
-          (updateResult.error ? (
-            <span style={{ color: theme.error || "#e53935", fontSize: "0.9rem" }}>
-              {updateResult.error}
-            </span>
-          ) : (
-            <span style={{ color: theme.text, fontSize: "0.9rem" }}>
-              נשמר · עודכנו {updateResult.inserted ?? 0} רשומות
-            </span>
-          ))}
         {canUpdateFromTabit && (
           <button
             type="button"
@@ -4142,7 +4103,7 @@ const Shifts = () => {
               cursor: processing ? "wait" : "pointer",
             }}
             onClick={updateFromTabit}
-            disabled={processing || savingPayroll || updatingPayroll}
+            disabled={processing || savingPayroll}
             title="Read this month's shifts from Tabit again; the מפרעה stays. Then check step 3 and save."
           >
             {processing ? "Reading from Tabit…" : "Update from Tabit"}
@@ -4152,28 +4113,15 @@ const Shifts = () => {
           type="button"
           style={{
             ...styles.secondaryButton,
-            opacity: updatingPayroll ? 0.7 : 1,
-            cursor: updatingPayroll ? "wait" : "pointer",
-          }}
-          onClick={handleUpdatePayroll}
-          disabled={updatingPayroll || !month || allEmployees.length === 0}
-          title="שמירת שינויים (כולל מפרעה) ללא ייצוא"
-        >
-          {updatingPayroll ? "מעדכן…" : "עדכון"}
-        </button>
-        <button
-          type="button"
-          style={{
-            ...styles.secondaryButton,
             marginRight: "8px",
             opacity: downloadingXlsx ? 0.7 : 1,
             cursor: downloadingXlsx ? "wait" : "pointer",
           }}
           onClick={() => setShowExportDialog(true)}
-          disabled={downloadingXlsx || allEmployees.length === 0}
-          title="ייצוא נבחרים בלבד (ללא שמירה)"
+          disabled={downloadingXlsx || !month || allEmployees.length === 0}
+          title="ייצוא קובץ תלוש או מיכפל (ללא שמירה)"
         >
-          {downloadingXlsx ? "Building…" : "ייצוא נבחרים"}
+          {downloadingXlsx ? "מייצא…" : "ייצוא"}
         </button>
         <button
           type="button"
@@ -4182,11 +4130,11 @@ const Shifts = () => {
             opacity: savingPayroll ? 0.7 : 1,
             cursor: savingPayroll ? "wait" : "pointer",
           }}
-          onClick={handleSaveExport}
+          onClick={handleSave}
           disabled={savingPayroll || !month}
-          title={!month ? "month not detected" : ""}
+          title={!month ? "month not detected" : "שמירת השכר ועלות העבודה"}
         >
-          {savingPayroll ? "שומר ומייצא…" : "שמירה וייצוא"}
+          {savingPayroll ? "שומר…" : "שמירה"}
         </button>
       </div>
 
@@ -4230,42 +4178,12 @@ const Shifts = () => {
               </ul>
             </div>
           )}
-          {payrollResult.alerts && payrollResult.alerts.length > 0 && (
-            <div style={{ marginTop: "8px", color: "#b26a00" }}>
-              <strong>
-                ⚠️ התנגשות תעריפים — אותו רכיב עם תעריף שונה (
-                {payrollResult.alerts.length}):
-              </strong>
-              <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
-                {payrollResult.alerts.map((a, i) => (
-                  <li key={i}>
-                    {a.name || "(ללא שם)"}
-                    {a.employeeNumber ? ` · מס' ${a.employeeNumber}` : ""} — סוג
-                    רשומה {a.recordType}, קוד רכיב {a.componentCode}, תעריפים:{" "}
-                    {(a.rates || []).join(", ")}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {payrollResult.excludedRates &&
-            payrollResult.excludedRates.length > 0 && (
-              <div style={{ marginTop: "8px", color: "#b26a00" }}>
-                <strong>
-                  ⚠️ יותר משלושה תעריפים לעובד — שעות לא כלולות בקובץ מיקפל, יש
-                  לשלם בנפרד ({payrollResult.excludedRates.length}):
-                </strong>
-                <ul style={{ margin: "4px 0 0", paddingRight: "20px" }}>
-                  {payrollResult.excludedRates.map((e, i) => (
-                    <li key={i}>
-                      {e.name || "(ללא שם)"}
-                      {e.employeeNumber ? ` · מס' ${e.employeeNumber}` : ""} —{" "}
-                      {fmtNum(e.hours)}ש בתעריף ₪{fmtNum(e.rate)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          {renderRateWarnings(payrollResult)}
+        </div>
+      )}
+      {exportWarnings && (
+        <div style={{ ...styles.errorBox, marginTop: "12px" }}>
+          {renderRateWarnings(exportWarnings)}
         </div>
       )}
     </div>
@@ -4664,10 +4582,6 @@ const Shifts = () => {
   const renderExportDialog = () => {
     if (!showExportDialog) return null;
     const close = () => setShowExportDialog(false);
-    const parsedNumbers = exportEmpNumbers
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
     const inputStyle = {
       width: "100%",
       boxSizing: "border-box",
@@ -4680,6 +4594,7 @@ const Shifts = () => {
       outline: "none",
       marginTop: "6px",
     };
+    const labelStyle = { display: "block", fontSize: "0.9rem", fontWeight: 600 };
     return (
       <div
         style={{
@@ -4694,8 +4609,12 @@ const Shifts = () => {
         }}
         onClick={close}
       >
-        <div
+        <form
           onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleExport();
+          }}
           style={{
             backgroundColor: theme.surface,
             color: theme.text,
@@ -4706,74 +4625,51 @@ const Shifts = () => {
             boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
           }}
         >
+          <div style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "16px" }}>
+            ייצוא / Export
+          </div>
+
+          <label style={labelStyle}>
+            פורמט / Format
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+              style={{ ...inputStyle, cursor: "pointer" }}
+            >
+              <option value="micpal">מיכפל / Micpal</option>
+              <option value="tlush">תלוש / Tlush</option>
+            </select>
+          </label>
+
+          <label style={{ ...labelStyle, marginTop: "14px" }}>
+            מס' עובד, מופרד בפסיקים (ריק = כולם)
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="444, 264, 398"
+              value={exportEmpNumbers}
+              onChange={(e) => setExportEmpNumbers(e.target.value)}
+              style={inputStyle}
+              autoFocus
+            />
+          </label>
+
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "16px",
+              justifyContent: "flex-end",
+              gap: "8px",
+              marginTop: "18px",
             }}
           >
-            <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>ייצוא / Export</div>
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Close"
-              style={{
-                background: "none",
-                border: "none",
-                color: theme.text,
-                fontSize: "1.4rem",
-                lineHeight: 1,
-                cursor: "pointer",
-              }}
-            >
-              ×
+            <button type="button" style={styles.secondaryButton} onClick={close}>
+              ביטול / Cancel
+            </button>
+            <button type="submit" style={styles.primaryButton}>
+              ייצוא / Export
             </button>
           </div>
-
-          <button
-            type="button"
-            style={{ ...styles.primaryButton, width: "100%" }}
-            onClick={() => handleDownloadXlsx()}
-          >
-            ייצוא הכל / Export all
-          </button>
-
-          <div
-            style={{
-              borderTop: `1px solid ${theme.border}`,
-              margin: "18px 0 14px",
-            }}
-          />
-
-          <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>
-            ייצוא לפי מספר עובד (מס' עובד), מופרד בפסיקים:
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="444, 264, 398"
-            value={exportEmpNumbers}
-            onChange={(e) => setExportEmpNumbers(e.target.value)}
-            style={inputStyle}
-            autoFocus
-          />
-          <button
-            type="button"
-            style={{
-              ...styles.secondaryButton,
-              width: "100%",
-              marginTop: "10px",
-              opacity: parsedNumbers.length === 0 ? 0.6 : 1,
-              cursor: parsedNumbers.length === 0 ? "not-allowed" : "pointer",
-            }}
-            disabled={parsedNumbers.length === 0}
-            onClick={() => handleDownloadXlsx(parsedNumbers)}
-          >
-            ייצוא נבחרים / Export selected
-          </button>
-        </div>
+        </form>
       </div>
     );
   };

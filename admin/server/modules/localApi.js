@@ -269,7 +269,9 @@ const toEmployee = (r, payrollNumbers) => ({
   employeeNumber: payrollNumberOf(r, payrollNumbers),
   phone: r.phone,
   active: !!r.active,
-  contractor: !!r.contractor,
+  // employees.contractor: 0 = שכיר, 1 = קבלן, 2 = מוגבל שעות (hours capped).
+  contractor: Number(r.contractor) === 1,
+  hourCapped: Number(r.contractor) === 2,
   duplicateOf: r.duplicate,
   wageType: r.new_wage_type,
   wage: r.wage,

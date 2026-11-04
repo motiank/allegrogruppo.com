@@ -128,3 +128,48 @@ export function wrongWageTypeRoles(emp) {
     .filter((r) => isTipRole(r.role) !== defTip)
     .map((r) => ({ role: String(r.role).trim(), tipRole: isTipRole(r.role) }));
 }
+
+// ---- מוגבל שעות (hour-capped employees) ----
+// employees.contractor = 2 (0 שכיר, 1 קבלן). Their export pays at most these
+// monthly totals, summed over every role (payroll_data[role].hours index:
+// 0 = 100%, 2 = 150%). The saved payroll keeps every hour worked.
+export const EMPLOYMENT_HOUR_CAPPED = 2;
+export const HOUR_CAPS = [
+  { idx: 0, label: "100%", cap: 182 },
+  { idx: 2, label: "150%", cap: 45 },
+];
+
+const bandTotal = (payroll_data, idx) =>
+  Object.values(payroll_data || {}).reduce(
+    (s, p) => s + (Number(p && p.hours && p.hours[idx]) || 0),
+    0,
+  );
+
+// The bands of a payroll_data over their cap: [{ label, total, cap }].
+export const hourCapExcess = (payroll_data) =>
+  HOUR_CAPS.map((c) => ({ ...c, total: bandTotal(payroll_data, c.idx) }))
+    .filter((c) => c.total > c.cap)
+    .map(({ label, total, cap }) => ({ label, total, cap }));
+
+// A copy of payroll_data with each band cut to its cap. The excess comes off
+// the role with the most hours in that band first.
+export function capPayrollHours(payroll_data) {
+  const out = {};
+  for (const [role, p] of Object.entries(payroll_data || {}))
+    out[role] = { ...p, hours: [...((p && p.hours) || [])] };
+  for (const { idx, cap } of HOUR_CAPS) {
+    let excess = bandTotal(out, idx) - cap;
+    if (excess <= 0) continue;
+    const roles = Object.keys(out).sort(
+      (a, b) => (Number(out[b].hours[idx]) || 0) - (Number(out[a].hours[idx]) || 0),
+    );
+    for (const role of roles) {
+      if (excess <= 0) break;
+      const h = Number(out[role].hours[idx]) || 0;
+      const take = Math.min(h, excess);
+      out[role].hours[idx] = h - take;
+      excess -= take;
+    }
+  }
+  return out;
+}

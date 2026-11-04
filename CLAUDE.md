@@ -73,6 +73,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   owner 2026-10-30; `--replace-past` in the script replaces them). The daily 06:30 job copies this week and next week; by hand: `node scripts/tabit_rota_fetch.js [--week
   YYYY-MM-DD] [--apply]`.
   Table created on prod 2026-10-29 (`scripts/utils/create_tabit_rota_table.sql`); week 2026-10-25 loaded.
+- **Employment type** (2026-11-04): `employees.contractor` = 0 שכיר / 1 קבלן / 2 מוגבל שעות (dropdown on the
+  Employees page). מוגבל שעות: the export (`buildExportRow` → תלוש, Micpal/Shiklulit files) pays at most 182h at
+  100% and 45h at 150% a month (`capPayrollHours` in `shared/wage.js`); the saved payroll keeps every hour. Step 4
+  flags them (clock icon, view "Exceeded cap"). Step 4 buttons: Save (payroll + labor cost, no file) and one Export
+  dialog (format מיכפל / תלוש, employee numbers; `/payroll/export-file`, `/payroll/export-tlush-xlsx`).
 - **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
   (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
   equal rows in the file; `UNIQUE` + `INSERT IGNORE`. Test: `node scripts/test_bank_hapoalim.js`.
