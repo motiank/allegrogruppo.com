@@ -1,5 +1,5 @@
 // The chat of a main-menu area (pages/Area.js). Before the first question the ask field is in the
-// middle of the page; after it, every question is a box (the question, a line, the answer; ↻ asks it again, ✎ puts it in the field to edit, × deletes)
+// middle of the page; after it, every question is a box (the question, a line, the answer; ↻ answers it again in the same box, ✎ puts it in the field to edit, × deletes)
 // and the ask field stays fixed at the bottom of the screen. The field opens a list of suggestions: the
 // area's fixed questions when it is empty, the ones that fit the typed words while typing. Files dropped on the page
 // (or picked with the paperclip) are read with the Allegro admin's upload code and imported on "Import" (FileDrop.js).
@@ -299,7 +299,7 @@ function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
           </div>
         </div>
         <div className={classes.tools}>
-          <button type="button" className={classes.tool} onClick={onResend} disabled={busy} aria-label={t('joya.ask.resend')} title={t('joya.ask.resend')}>
+          <button type="button" className={classes.tool} onClick={onResend} disabled={busy || r.status === 'THINKING'} aria-label={t('joya.ask.resend')} title={t('joya.ask.resend')}>
             <RefreshIcon />
           </button>
           <button type="button" className={classes.tool} onClick={onEdit} aria-label={t('joya.ask.edit')} title={t('joya.ask.edit')}>
@@ -450,6 +450,16 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
       setBusy(false);
     }
   };
+  // ↻: the same box is answered again (the server clears the answer; the 3-second refresh shows the new one)
+  const retry = async (id) => {
+    setErr(null);
+    try {
+      const { request } = await api(`/ai/requests/${id}/retry`, { method: 'POST' });
+      setItems((xs) => xs.map((r) => (r.id === id ? request : r)));
+    } catch (e) {
+      setErr(e);
+    }
+  };
   const remove = async (id) => {
     const before = items;
     setItems((xs) => xs.filter((r) => r.id !== id));
@@ -492,7 +502,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
             busy={busy}
             onDelete={() => remove(r.id)}
             onChanged={() => load()}
-            onResend={() => send(r.question)}
+            onResend={() => retry(r.id)}
             onEdit={() => setDraft((d) => ({ text: r.question, n: (d?.n || 0) + 1 }))}
           />
         ))}

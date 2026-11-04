@@ -568,6 +568,21 @@ export async function deleteRequest(access, id) {
   await audit(access.username, 'AI_REQUEST_DELETED', 'ai_request', id, r.locationId, { question: r.question.slice(0, 200) });
 }
 
+// "Ask again" (↻): the same question is answered again in the same box — the row goes back to THINKING and its
+// answer, calculations and change are cleared; the picker scope it was asked with stays.
+export async function retryRequest(access, id) {
+  const r = await getRequest(access, id);
+  if (r.status === 'THINKING') throw err('CONFLICT', 'this question is still being answered');
+  const raw = await one(`SELECT meta_json FROM joya_ai_requests WHERE id=:id`, { id });
+  const scope = parseJson(raw?.meta_json)?.scope;
+  await q(
+    `UPDATE joya_ai_requests SET status='THINKING', answer_text=NULL, calcs_json=NULL, proposal_json=NULL, proposal_status=NULL,
+            error=NULL, meta_json=:m, claimed_at=NULL, answered_at=NULL, created_at=NOW() WHERE id=:id`,
+    { id, m: scope ? JSON.stringify({ scope }) : null },
+  );
+  return getRequest(access, id);
+}
+
 export async function discardProposal(access, id) {
   const r = await getRequest(access, id);
   if (r.proposalStatus !== 'PENDING') throw err('CONFLICT', 'nothing to discard');

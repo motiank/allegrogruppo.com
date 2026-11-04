@@ -257,6 +257,7 @@ r.get(
     res.send(Buffer.from(buffer));
   }),
 );
+r.post('/joya/ai/requests/:id/retry', h(async (req) => ({ request: await ai.retryRequest(req.joya, id(req)) })));
 r.post('/joya/ai/requests/:id/discard', h(async (req) => ({ request: await ai.discardProposal(req.joya, id(req)) })));
 
 export default r;
