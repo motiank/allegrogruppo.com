@@ -10,7 +10,7 @@ import { Page } from '../ui.js';
 // area → context id of the chat (src/services/ai.js AREAS) and how many suggestions its strings have
 export const AREAS = {
   stock: { id: 1, suggestions: 10 },
-  people: { id: 2, suggestions: 12 },
+  people: { id: 2, suggestions: 4 },
   performance: { id: 3, suggestions: 3 },
   bank: { id: 4, suggestions: 8 },
   accounting: { id: 5, suggestions: 8 },

@@ -6,7 +6,7 @@
 // ran with this user's access; those calculations are listed under the answer.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
-import { api, qs } from './api.js';
+import { api, qs, ApiError } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
@@ -29,6 +29,18 @@ const useStyles = createUseStyles((theme) => ({
     '& td.num': { fontVariantNumeric: 'tabular-nums' },
     '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
     '&[dir=ltr] th, &[dir=ltr] td': { textAlign: 'left' },
+  },
+  files: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', fontSize: '0.8rem' },
+  fileBtn: {
+    border: `1px solid ${theme.primary}`,
+    borderRadius: 999,
+    padding: '0.3rem 0.8rem',
+    background: 'none',
+    color: theme.primary,
+    fontFamily: 'inherit',
+    fontSize: '0.78rem',
+    cursor: 'pointer',
+    '&:disabled': { opacity: 0.5, cursor: 'default' },
   },
   excel: { fontSize: '0.74rem', color: theme.primary, textDecoration: 'none', display: 'inline-block', marginBottom: '0.35rem', '&:hover': { textDecoration: 'underline' } },
   meta: { fontSize: '0.7rem', color: theme.textSecondary, marginTop: '0.15rem' },
@@ -169,6 +181,57 @@ function AnswerBody({ r, classes }) {
   );
 }
 
+/** A file download as a button: the file is fetched first, so an error is shown here and not saved as a file. */
+function FileButton({ href, label, classes }) {
+  const { t } = useT();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const click = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(href, { credentials: 'same-origin' });
+      if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
+      const name = decodeURIComponent((res.headers.get('content-disposition') || '').match(/filename\*=UTF-8''([^;]+)/i)?.[1] || 'file.xlsx');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className={classes.fileBtn} onClick={click} disabled={busy}>
+        ⬇ {busy ? t('joya.ask.downloading') : label}
+      </button>
+      {error ? <span className={classes.warn}>{error.message}</span> : null}
+    </>
+  );
+}
+
+/** The payroll files of a payroll_files calc: per location, the payslip Excel and the payroll-software file. */
+function PayrollFiles({ r, classes }) {
+  const { t } = useT();
+  const rows = (r.calcs || []).filter((c) => c.calc === 'payroll_files').flatMap((c) => c.result?.files || []);
+  return rows
+    .filter((f) => f.downloads)
+    .map((f) => (
+      <div key={`${f.locationId}-${f.month}`} className={classes.files}>
+        <span dir="auto">
+          {f.location} · <Term>{f.month}</Term>
+        </span>
+        <FileButton href={f.downloads.tlush} label={t('joya.ask.file.tlush')} classes={classes} />
+        <FileButton href={f.downloads.import} label={t('joya.ask.file.import')} classes={classes} />
+      </div>
+    ));
+}
+
 /** The answer to one question: the text, how it was calculated, and a proposed change. head = show the question and time. */
 export function Answer({ r, onChanged, head = true }) {
   const theme = useTheme();
@@ -206,6 +269,7 @@ export function Answer({ r, onChanged, head = true }) {
       {r.status === 'ANSWERED' && (
         <>
           <AnswerBody r={r} classes={classes} />
+          <PayrollFiles r={r} classes={classes} />
           {unverified.length ? (
             <div className={classes.warn}>
               ⚠ {t('joya.ask.unverified')} <Term>{unverified.join(', ')}</Term>

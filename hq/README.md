@@ -332,6 +332,17 @@ Numbers are never taken from history. A deleted question leaves the history.
   (2026-11-04)**; until they are added the dashboard shows the last stored day and says so.
 Without `locationIds`, these three leave out the closed restaurants.
 
+**The manpower menu (owner, 2026-11-04)** — the כח אדם area suggests only four items:
+- **Active employees** → calc `employees` with this month (the 1st up to today): the people with clock times this month.
+- **Employee wages** → the same calc: each person's wage type, wage and the rate per role.
+- **Payslip Excel** and **Export to Micpal** → calc `payroll_files` (`ai.js` `payrollFiles`): per restaurant the last
+  SAVED payroll month (a named month when one is asked; a month is saved only after it ends), the employees saved and
+  when. The chat shows two download buttons under the answer (`AskBox.js` `PayrollFiles`) →
+  `GET /api/joya/payroll/files/tlush.xlsx|import.xlsx?locationId=&month=` (payroll access + the location; audit
+  `PAYROLL_FILE_DOWNLOADED`) → the admin's Local API `/payroll/tlush.xlsx` / `/payroll/import.xlsx`, which make the
+  same files as the Shifts page's Export from the saved payroll (`admin/server/modules/payroll.js`
+  `savedPayrollFile`). Nothing is kept in Joya.
+
 **Tables in answers (2026-10-27).** When an answer has several rows of the same numbers (weeks, days, restaurants,
 employees…), the writer puts them in a pipe table (`| a | b |` + `|---|---|`; rules in `runner/hq-analyst.js`). The chat
 shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table a **Download Excel** link:

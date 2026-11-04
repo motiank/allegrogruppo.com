@@ -31,7 +31,7 @@ import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
 const r = Router();
-const STATUS = { BAD_REQUEST: 400, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, MANDATORY_MIN: 422, UPSTREAM: 502, NOT_LOADED: 503 };
+const STATUS = { BAD_REQUEST: 400, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409, MANDATORY_MIN: 422, UPSTREAM: 502, NOT_SUPPORTED: 502, NOT_LOADED: 503 };
 
 const h = (fn) => async (req, res) => {
   try {
@@ -255,6 +255,16 @@ r.get(
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(Buffer.from(buffer));
+  }),
+);
+// the payroll files of a saved month (calc payroll_files), made by the Allegro admin; users with payroll access only
+r.get(
+  '/joya/payroll/files/:kind.xlsx',
+  h(async (req, res) => {
+    const { buffer, fileName } = await ai.payrollFile(req.joya, req.query.locationId, req.query.month, req.params.kind);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    res.send(buffer);
   }),
 );
 r.post('/joya/ai/requests/:id/retry', h(async (req) => ({ request: await ai.retryRequest(req.joya, id(req)) })));

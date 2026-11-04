@@ -11,7 +11,8 @@
 //   clock times    /shifts/raw              Tabit detailed report; an attendance id IS the raw shift id
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
 //   work plan      /shifts/plan             the Tabit Shift work plan (סידור עבודה): date × shift × role × employee
-//   payroll        /payroll, /shifts/summary
+//   payroll        /payroll, /payroll/months, /shifts/summary
+//   payroll files  /payroll/tlush.xlsx, /payroll/import.xlsx  of a saved month (payslip Excel, Micpal / Shiklulit file)
 //   labor cost     /labor/daily(/employees)  the admin's payroll rules and payslips (never computed here)
 //   freshness      /status
 //   bank           /bank/transactions/stored  per company (its bank accounts), from the uploaded bank files
@@ -19,7 +20,7 @@
 // What Joya keeps is its own: decisions, edits, rules, notes, corrections (keyed by the ids above),
 // and the roleAliases config (Allegro role name → Joya role code). Dated data is fetched per branch and
 // calendar month, so the 5-minute memory cache serves every question about the same month.
-import { get } from '../../lib/allegro.js';
+import { get, getFile } from '../../lib/allegro.js';
 import { getConfig, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import log from '../../lib/log.js';
@@ -394,6 +395,16 @@ export async function employeeNames(locationIds) {
 export async function payroll(locationId, period) {
   const branch = String(locationId);
   return (await get('/payroll', { month: period, branch })).data || [];
+}
+
+/** The saved payroll months of one location, newest first: [{ month, employees, withTlush, updatedAt }]. */
+export async function payrollMonths(locationId) {
+  return (await get('/payroll/months', { branch: String(locationId) })).data || [];
+}
+
+/** A saved month's file: kind 'tlush' = the payslip Excel, 'import' = the Micpal / Shiklulit import file. */
+export function payrollFile(locationId, month, kind) {
+  return getFile(`/payroll/${kind}.xlsx`, { branch: String(locationId), month });
 }
 
 /** Monthly hours per employee after the payroll rules (breaks, overtime buckets). */

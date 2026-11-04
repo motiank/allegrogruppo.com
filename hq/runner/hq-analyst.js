@@ -65,7 +65,7 @@ Guidance:
   · BANK → the bank account: money in / out, card companies, Wolt, "כמה נכנס מכרטיסי אשראי" → bank_transactions
     / bank_summary. Use Beecomm only when the question says so ("בקופה", "מכרנו", "מכירות", "Beecomm", "at the
     register", by card brand, tips).
-  · MANPOWER → employees, clock times, staffing, wages, labor cost (employees, staffing_*, labor_summary).
+  · MANPOWER → employees, clock times, staffing, wages, labor cost, payroll files (employees, staffing_*, labor_summary, payroll_files).
   · ACCOUNTING (הנהלת חשבונות) → the register (Beecomm) matched with the bank: did the card, Wolt and other money
     sold at the register arrive in the bank, and the fees → cards_vs_bank for credit cards week by week; for one
     payment type or the whole period plan payments_summary AND bank_summary / bank_transactions (q = the company's word
@@ -146,6 +146,16 @@ Guidance:
   · "דשבורד יומי", "daily dashboard", or TODAY's income / diners / per diner / refunds per restaurant →
     daily_dashboard (date only when the dashboard is asked for another day). It is enough alone. A past day or
     period without the word dashboard ("yesterday", "last week") → sales_daily / sales_summary as usual.
+- The manpower menu (owner, 2026-11-04), in any area:
+  · "עובדים פעילים", "active employees", the employees who worked this month → employees with from = the 1st of
+    this month, to = today (workedOnly). It is enough alone.
+  · "שכר עובדים", "employee wages", the employees with their wage and roles this month → employees with the same
+    period (the wage and the rate per role of each person). It is enough alone.
+    "This month" is only the default: a period named in the question wins ("בחודש האחרון", "בחודש שעבר", "last
+    month" = the whole month before; a named month = that month).
+  · "קובץ תלושים", "תלוש", "payslip Excel", and "ייצוא למיכפל", "קובץ למיכפל", "export to Micpal / Shiklulit" →
+    payroll_files (locationIds; month only when a month is named — "this month" or no month = leave month out: the
+    last SAVED payroll month is used, because a month is saved only after it ends). It is enough alone.
 - VAT ("דוח מע"מ", "מע"מ", "הכנסות למע"מ", "VAT report"), in any area → vat_report, whole months: "this month" = the
   1st up to today, "last month" = the whole month before, a named month = that month, "the last 3 months" = 3 whole
   months before this one. Never payments_summary for VAT (the 20% deduction and the tips are only in vat_report).
@@ -283,6 +293,13 @@ Your job now: WRITE the answer to the user from <results>.
   total row (the chain = total). Name the period of each (period, lastYearPeriod) in one line above the table, and
   that closed days are not counted and the amounts have no tips. A restaurant that is not comparable (comparable
   false: no income in one of the two months — new or closed) is shown without a change and named in one note.
+- Payroll files (payroll_files): the chat shows the download buttons (payslip Excel + the Micpal / Shiklulit file)
+  under the answer by itself — never write a link or a URL. Per restaurant one line: the month (month), the employees
+  saved (employees, withPayslip = with a payslip) and when it was saved (savedAt, date only). Say that the files are
+  as of the last save of the payroll on the admin's Shifts page, that the Micpal file has only the employees with a
+  Micpal number and the payslip file has the others on a second sheet. A month was asked and is not the newest
+  saved one → fine. saved false → that month (or any month) has no saved payroll: say so, list savedMonths, and
+  say the payroll is saved on the admin's Shifts page (step 4, Save).
 - Waiter performance (waiter_performance): per restaurant one table, the waiters by income, columns: מלצר, הזמנות,
   הכנסות (ללא טיפים), טיפים, % טיפים, ממוצע להזמנה — then the total row. One line under it with withoutWaiter
   (Wolt and online orders, no waiter). Several restaurants: one table each, the biggest first.

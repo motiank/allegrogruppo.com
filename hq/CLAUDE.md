@@ -93,6 +93,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Performance menu** (owner 2026-11-04): only three suggestions — `month_vs_last_year`, `waiter_performance`,
   `daily_dashboard` (README → Asking in words). The dashboard is live only where the admin has the Beecomm backoffice
   key (`BCOM_BO_*`); the production server's `.env` does not have it yet → it shows the last stored day.
+- **Manpower menu** (owner 2026-11-04): four suggestions — active employees and employee wages (`employees`, this
+  month), the payslip Excel and the Micpal / Shiklulit file (`payroll_files`: last saved month, download buttons; files
+  made by the admin's Local API `/payroll/tlush.xlsx`, `/payroll/import.xlsx`). README → Asking in words.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system
   recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. The only number the model
   may "compute" — and the code replaces it anyway. README → Asking in words.

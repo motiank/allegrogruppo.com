@@ -125,6 +125,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /payroll/months?branch=` | Months that have saved payroll | `payroll` |
 | `GET /payroll?month=\|updatedSince=[&branch=][&employeeId=]` | Saved payroll + payslip components (tlush) | `payroll` |
 | `GET /payroll/labor-cost?branch=&month=` | Daily revenue vs. the stored labor cost | `bcom_cash` |
+| `GET /payroll/tlush.xlsx?branch=&month=` / `GET /payroll/import.xlsx?branch=&month=` | Files of a saved month: the payslip Excel / the Micpal or Shiklulit import file | `payroll` (tlush) |
 | `GET /labor/daily?from=&to=[&branch=]` | Per branch per day: revenue, hours, payslip gross, labor % | `payroll` + `employees` + `bcom_cash` |
 | `GET /labor/daily/employees?from=&to=[&branch=][&employeeId=]` | The same per employee per day | `payroll` + `employees` |
 | `GET /beecomm/daily?from=&to=[&branch=]` | Daily sales totals (stored) | `bcom_cash` |
@@ -486,6 +487,22 @@ Daily revenue (Beecomm) against labor cost (entered on the payroll screen), the 
 `meta.totals` = `{ revenue, laborCost, laborPct }` for the month. `laborCost` is `null` on days without an entry. `laborPct` is `laborCost / revenue × 100`.
 
 This is the **stored** figure only, and it has gaps (see below). For the restaurant's daily gross use `/labor/daily`.
+
+### `GET /payroll/tlush.xlsx?branch=<id>&month=YYYY-MM` and `GET /payroll/import.xlsx?branch=<id>&month=YYYY-MM`
+
+The files of a **saved** payroll month, the same files as the Export button on the Shifts page, as of the month's last
+save. They are made from the `tlush` saved with each employee (`payroll.js` `savedPayrollFile`), not from the screen.
+The answer is the `.xlsx` file itself (`Content-Disposition` has the file name), not JSON.
+
+- `tlush.xlsx`: the payslip Excel. Sheet "עם מספר מיקפל" = the employees with a payroll-software number, sheet
+  "ללא מספר מיקפל" = the others (their pay is computed, they need a number before they can be imported).
+- `import.xlsx`: the import file of the branch's payroll software (`company.payrollSoft`: Micpal `micpal_import_…`
+  or Shiklulit `siklulit_import_…`). Only employees with a number.
+- One person = one employee number (else ID number): when a month has saved rows under two names, the row saved
+  last counts. Employees without payslip lines (contractors, no wage) are left out.
+- Headers: `X-Employees` (people in the file), `X-Without-Number`; the import file also `X-Payroll-Soft`,
+  `X-Alerts` (Shiklulit rate conflicts) and `X-Excluded-Rates` (a 4th+ rate, not exported — pay by hand).
+- `404 not_saved` when the month has no saved payroll; `400` for a bad month.
 
 ---
 

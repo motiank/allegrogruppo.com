@@ -77,6 +77,27 @@ export async function postFiles(path, body, contentType, headers = {}) {
   return out?.data;
 }
 
+/**
+ * GET a file (the saved payroll month's Excel files) → { buffer, fileName, headers }. Never cached. A 404 with
+ * code not_saved = the month is not saved (NOT_FOUND); any other 404 = this Allegro version has no such file yet.
+ */
+export async function getFile(path, params = {}) {
+  let res;
+  try {
+    res = await fetch(urlOf(path, params), { signal: AbortSignal.timeout(Math.max(timeout(), 120_000)) });
+  } catch (e) {
+    throw upstream(`not reachable (${e.cause?.code || e.name})`);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const code = body?.error?.code === 'not_saved' ? 'NOT_FOUND' : res.status === 404 ? 'NOT_SUPPORTED' : res.status === 400 ? 'BAD_REQUEST' : 'UPSTREAM';
+    throw upstream(`${res.status} ${body?.error?.message || res.statusText}`, code);
+  }
+  const cd = res.headers.get('content-disposition') || '';
+  const m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  return { buffer: Buffer.from(await res.arrayBuffer()), fileName: m ? decodeURIComponent(m[1]) : 'file.xlsx', headers: Object.fromEntries(res.headers) };
+}
+
 /** Forget every cached answer (after a change in Allegro the user wants to see now). */
 export function clearCache() {
   cache.clear();

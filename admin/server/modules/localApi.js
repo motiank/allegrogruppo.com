@@ -3,7 +3,7 @@ import { createRequire } from "module";
 import { executeSql } from "../sources/dbpool.js";
 import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
-import { tabitMonthPayroll } from "./payroll.js";
+import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
 import { parseFiles, recognizeUploads, importUploads } from "./files.js";
 import {
   bcomGetOrders,
@@ -512,6 +512,8 @@ const ENDPOINTS = [
   "GET /payroll/months?branch=",
   "GET /payroll?month=YYYY-MM|updatedSince=[&branch=a,b][&employeeId=]",
   "GET /payroll/labor-cost?branch=&month=YYYY-MM",
+  "GET /payroll/tlush.xlsx?branch=&month=YYYY-MM (file)",
+  "GET /payroll/import.xlsx?branch=&month=YYYY-MM (file: Micpal / Shiklulit)",
   "GET /labor/daily?from=&to=[&branch=a,b]",
   "GET /labor/daily/employees?from=&to=[&branch=a,b][&employeeId=]",
   "GET /beecomm/daily?from=&to=[&branch=a,b]",
@@ -1304,6 +1306,38 @@ const Router = () => {
     });
     return { data, meta: payrollMeta(branchIds, f, asOf) };
   });
+
+  // The files of a SAVED payroll month, as the Shifts page's Export makes them (payroll.js savedPayrollFile):
+  // tlush.xlsx = the payslip Excel (sheets with / without a Micpal number), import.xlsx = the Micpal / Shiklulit
+  // import file (employees with a number only). Headers: X-Employees, X-Without-Number (+ X-Payroll-Soft,
+  // X-Alerts, X-Excluded-Rates for the import file). 404 not_saved when the month has no saved payroll.
+  for (const kind of ["tlush", "import"]) {
+    router.get(`/payroll/${kind}.xlsx`, async (req, res) => {
+      try {
+        const branch = await requireBranch(req);
+        const month = String(req.query.month || "").trim();
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw badRequest("month must be YYYY-MM");
+        const label = (await loadBranches()).find((b) => b.id === branch)?.name;
+        const file = await savedPayrollFile(branch, month, kind, label);
+        if (!file) throw new ApiError(404, "not_saved", `the payroll of ${month} is not saved for this branch`);
+        res.set({
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+          "X-Employees": String(file.employees),
+          "X-Without-Number": String(file.withoutNumber),
+          ...(kind === "import"
+            ? { "X-Payroll-Soft": file.payrollSoft, "X-Alerts": String(file.alerts), "X-Excluded-Rates": String(file.excludedRates) }
+            : {}),
+        });
+        res.send(file.buf);
+      } catch (err) {
+        if (err instanceof ApiError)
+          return res.status(err.status).json({ error: { code: err.code, message: err.message } });
+        console.error(`local-api ${req.path} error:`, err);
+        res.status(500).json({ error: { code: "internal_error", message: err.message } });
+      }
+    });
+  }
 
   // Daily revenue vs. labor cost (labor_cost is entered from the payroll screen).
   get("/payroll/labor-cost", async (req) => {

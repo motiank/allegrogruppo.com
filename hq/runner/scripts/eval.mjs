@@ -51,6 +51,10 @@ function grade(f, plan) {
     const got = plan.calcs.filter((c) => c.calc === calc);
     if (got.length && !got.some((c) => partial(c.params, want))) fails.push(`${calc} params ${JSON.stringify(got[0].params)} ≠ ${JSON.stringify(want)}`);
   }
+  // params the calculation must leave out (e.g. no month → the default month)
+  for (const [calc, keys] of Object.entries(e.noParams || {})) {
+    for (const c of plan.calcs.filter((x) => x.calc === calc)) for (const k of keys) if (c.params?.[k] != null) fails.push(`${calc} has ${k}=${JSON.stringify(c.params[k])}, expected none`);
+  }
   if (e.range) {
     const dated = plan.calcs.filter((c) => c.params?.from || c.params?.to);
     if (!dated.length) fails.push('no dated calculation');

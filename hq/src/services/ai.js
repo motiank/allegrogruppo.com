@@ -46,6 +46,44 @@ function locs(access, p) {
   if (!allowed.length) throw err('FORBIDDEN', 'no access to the requested location(s)');
   return allowed;
 }
+// The payroll files of a saved month per location (owner 2026-11-04: "payslip excel download", "export to Micpal"):
+// the month (asked, else the last saved one) and links to /api/joya/payroll/files/… — the files are made by the
+// Allegro admin from the saved payroll (Local API /payroll/tlush.xlsx, /payroll/import.xlsx), nothing is kept here.
+async function payrollFiles(access, p) {
+  if (!access.payroll) throw err('FORBIDDEN', 'payroll files need payroll access');
+  if (p.month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(p.month))) throw err('BAD_REQUEST', 'month must be YYYY-MM');
+  const names = new Map((await listLocations(access)).map((l) => [String(l.id), l.name]));
+  const files = [];
+  for (const id of locs(access, p)) {
+    const months = await source.payrollMonths(id);
+    const m = p.month ? months.find((x) => x.month === String(p.month)) : months.find((x) => x.withTlush > 0);
+    const link = (kind) => `/api/joya/payroll/files/${kind}.xlsx?locationId=${encodeURIComponent(id)}&month=${m.month}`;
+    files.push({
+      locationId: id,
+      location: names.get(String(id)) ?? id,
+      month: m?.month ?? null,
+      saved: !!m,
+      employees: m ? m.employees : 0,
+      withPayslip: m ? m.withTlush : 0,
+      savedAt: m?.updatedAt ?? null,
+      downloads: m ? { tlush: link('tlush'), import: link('import') } : null,
+      savedMonths: months.slice(0, 6).map((x) => x.month),
+    });
+  }
+  return { source: 'Allegro admin, saved payroll (Local API /payroll/months, /payroll/tlush.xlsx, /payroll/import.xlsx)', period: p.month ? { month: p.month } : undefined, files };
+}
+
+/** One payroll file for the download route: { buffer, fileName }. */
+export async function payrollFile(access, locationId, month, kind) {
+  if (!access.payroll) throw err('FORBIDDEN', 'payroll files need payroll access');
+  if (!['tlush', 'import'].includes(kind)) throw err('NOT_FOUND', 'unknown file');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) throw err('BAD_REQUEST', 'month must be YYYY-MM');
+  assertLocation(access, String(locationId));
+  const f = await source.payrollFile(locationId, month, kind);
+  await audit(access.username, 'PAYROLL_FILE_DOWNLOADED', 'payroll_file', null, String(locationId), { month, kind });
+  return f;
+}
+
 // Employees with their wages (Allegro /employees), for users with payroll access. No national ids or phones.
 async function employeeList(access, p) {
   if (!access.payroll) throw err('FORBIDDEN', 'wages need payroll access');
@@ -369,6 +407,12 @@ export const CALCS = {
     about:
       'the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee, and newEmployees (worked in the period with no Micpal employee number = no form 101 yet). Users with payroll access only',
     run: (a, p) => employeeList(a, p),
+  },
+  payroll_files: {
+    params: '{ locationIds?, month?: "YYYY-MM" (default: the last saved payroll month of each location) }',
+    about:
+      'the payroll files to download, per location: the payslip Excel (tlush, the Shifts page export) and the Micpal / Shiklulit import file, of a SAVED payroll month (as of its last save), with the month, the employees saved and the saved months. The chat shows the download buttons under the answer. Users with payroll access only',
+    run: (a, p) => payrollFiles(a, p),
   },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },
   team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
