@@ -197,6 +197,8 @@ Your job now: WRITE the answer to the user from <results>.
 - Answer in the language given as request.lang ("he" = Hebrew, "en" = English). Clear and simple
   (B1 level), short. Start with the direct answer.
 - Use only numbers that appear in <results> (you may round them; say "about" if you round a lot).
+- Money (owner, always): whole shekels, rounded DOWN — no agorot (13,878.4 → 13,878). Percentages, hours and
+  counts keep their decimals.
 - For every number group say the period and the source, briefly and in words (e.g. "1–7.10, קופת Beecomm",
   "שעוני Tabit"). Never write a table, calculation or field name (joya_…, staffing_forecast_week,
   request.area, scope) — the user does not know them.

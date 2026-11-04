@@ -164,3 +164,43 @@ export function fillTotals(text) {
   }
   return { text: lines.join('\n'), totals };
 }
+
+// ---------------------------------------------------------------- money in whole shekels (owner 2026-11-04)
+// "When displaying a number, round it down to NIS": money is shown without agorot, cut down (1,234.9 → 1,234;
+// -17.6 → -17). Money = a number next to ₪ / ש"ח in the text, or a cell in a table column whose header is money.
+// Percentages, hours, counts and other non-money numbers keep their decimals.
+
+const MONEY_SIGN = '(?:₪|ש["״]ח|NIS)';
+const MONEY_HEADER = new RegExp(`${MONEY_SIGN}|הכנס|מכיר|סכום|טיפ|תשלומ|זיכו|חיוב|מע["״]מ|ניכוי|עלות|שכר|אשראי|בנק|מזומן|income|sales|amount|tips?\\b|revenue|refund|charge|vat|cost|wage|pay`, 'i');
+const NOT_MONEY_HEADER = /%|אחוז|percent|שעות|hours|סועד(ים)?$|diners$|הזמנות$|orders$|ימים|days|מספר|count|כמות|qty/i;
+
+// 1,234.56 → 1,234 (keeps the thousands commas as written)
+const cutAgorot = (num) => {
+  const [i] = num.split('.');
+  return /^[-−–]?0$/.test(i) ? '0' : i;
+};
+
+/** The answer with every money amount cut down to whole shekels. */
+export function floorMoney(text) {
+  const before = new RegExp(`(${MONEY_SIGN}\\s?[-−–]?)(\\d[\\d,]*\\.\\d+)`, 'g');
+  const after = new RegExp(`([-−–]?\\d[\\d,]*\\.\\d+)(?=\\s?${MONEY_SIGN})`, 'g');
+  const lines = String(text ?? '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (isRow(lines[i]) && i + 1 < lines.length && isSeparator(lines[i + 1])) {
+      const header = cells(lines[i]);
+      const money = header.map((h, c) => c > 0 && MONEY_HEADER.test(h) && !NOT_MONEY_HEADER.test(h));
+      let j = i + 2;
+      for (; j < lines.length && isRow(lines[j]) && !isSeparator(lines[j]); j++) {
+        const r = cells(lines[j]);
+        const out = r.map((v, c) => {
+          const n = cellNumber(v);
+          if (!n || n.percent || !(n.money || money[c]) || !/\.\d/.test(v)) return v.replace(before, (m, a, b) => a + cutAgorot(b)).replace(after, (m) => cutAgorot(m));
+          return v.replace(/[-−–]?\d[\d,]*\.\d+/, (m) => cutAgorot(m));
+        });
+        if (out.some((v, c) => v !== r[c])) lines[j] = `| ${out.join(' | ')} |`;
+      }
+      i = j - 1;
+    } else lines[i] = lines[i].replace(before, (m, a, b) => a + cutAgorot(b)).replace(after, (m) => cutAgorot(m));
+  }
+  return lines.join('\n');
+}

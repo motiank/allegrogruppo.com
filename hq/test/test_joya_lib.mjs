@@ -5,7 +5,7 @@ import { applyMapping, parseNumber, parseDate, parseDateTime, suggestMapping } f
 import { shiftDemand, forecastUnit } from '../src/lib/demand.js';
 import { computeSlot, learnedAdjustments, validateRule } from '../src/lib/staffingRules.js';
 import { recommend, convert } from '../src/lib/recommend.js';
-import { splitAnswer, cellNumber, fillTotals } from '../lib/answerTables.js';
+import { splitAnswer, cellNumber, fillTotals, floorMoney } from '../lib/answerTables.js';
 import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
 
 let n = 0;
@@ -359,6 +359,11 @@ t('table totals: the total row is recalculated from the rows, missing numbers ar
   assert.deepEqual(cr[0], ['אשראי', '448,341', '344,730', '793,071']);
   assert.deepEqual(cr[1], ['מזומן', '6,784', '-17,196', '-10,412']);
   assert.deepEqual(cr[2], ['סה"כ', '455,125', '327,534', '782,659']);
+});
+t('money is cut down to whole shekels; %, hours and counts keep their decimals', () => {
+  assert.equal(floorMoney('הכנסות 13,878.4 ₪, ₪ 1,234.99, טיפים 5.6%, 3.5 שעות'), 'הכנסות 13,878 ₪, ₪ 1,234, טיפים 5.6%, 3.5 שעות');
+  const a = floorMoney('| עובד | שעות | עלות ₪ | אחוז | הכנסות | סועדים |\n|---|---|---|---|---|---|\n| דנה | 12.5 | 2,350.5 | 10.5% | -17.6 | 3.5 |');
+  assert.deepEqual(splitAnswer(a)[0].rows[0], ['דנה', '12.5', '2,350', '10.5%', '-17', '3.5']);
 });
 t('answer tables: a pipe table becomes a table block between the text; numbers are read for Excel', () => {
   const b = splitAnswer('שלום\n\n| שבוע | אשראי | שינוי |\n|---|---:|---|\n| 18.10–24.10 | 221,776 ₪ | -3.6% |\n| 11.10–17.10 | **256,062** |\n\nסוף\n| not | a table |');

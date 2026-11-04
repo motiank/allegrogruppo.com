@@ -10,7 +10,7 @@ import { api, qs } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
-import { splitAnswer, cellNumber } from '../lib/answerTables.js';
+import { splitAnswer, cellNumber, floorMoney } from '../lib/answerTables.js';
 
 const useStyles = createUseStyles((theme) => ({
   box: { border: `1px solid ${theme.border}`, borderRadius: 10, padding: '0.7rem 0.85rem', background: theme.surface, marginBottom: '0.7rem' },
@@ -25,7 +25,8 @@ const useStyles = createUseStyles((theme) => ({
     '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', whiteSpace: 'nowrap' },
     '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
     '& tr:last-child td': { borderBottom: 0 },
-    '& td.num': { textAlign: 'end', fontVariantNumeric: 'tabular-nums' },
+    // numbers align like the text (owner 2026-11-04)
+    '& td.num': { fontVariantNumeric: 'tabular-nums' },
   },
   excel: { fontSize: '0.74rem', color: theme.primary, textDecoration: 'none', display: 'inline-block', marginBottom: '0.35rem', '&:hover': { textDecoration: 'underline' } },
   meta: { fontSize: '0.7rem', color: theme.textSecondary, marginTop: '0.15rem' },
@@ -128,7 +129,7 @@ function ProposalPreview({ p, classes }) {
 /** The answer text with its tables (see lib/answerTables.js) as table components, each with an Excel download. */
 function AnswerBody({ r, classes }) {
   const { t } = useT();
-  const blocks = useMemo(() => splitAnswer(r.answer), [r.answer]);
+  const blocks = useMemo(() => splitAnswer(floorMoney(r.answer)), [r.answer]);
   return blocks.map((b, i) =>
     b.type === 'text' ? (
       <div key={i} className={classes.a} dir="auto">

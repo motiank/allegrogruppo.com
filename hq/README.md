@@ -344,6 +344,12 @@ with one total row ("סה"כ" / "Total", the last row; "—" under dates, times,
 then recalculates that row from the rows above it (`lib/answerTables.js` `fillTotals`, called in `runner/runner.js`
 before the number check) and writes 0 in empty cells of number columns; the calculated totals count as verified.
 
+**Money in whole shekels (owner 2026-11-04).** Money is shown without agorot, cut down (13,878.4 → 13,878):
+`floorMoney` (`lib/answerTables.js`) changes numbers next to ₪ / ש"ח and cells of money columns (header with ₪ or a
+money word: הכנסות, טיפים, עלות…). Percentages, hours and counts keep their decimals. It runs in the runner before
+`fillTotals`, and again when the chat shows an answer and in the Excel download, so older answers look the same.
+Number cells align like the text (right in Hebrew).
+
 **Team rules (2026-11-01).** The chain admin teaches the AI team in the chat: "מעכשיו …", "כלל חדש: …", "from now
 on …" → the planner returns `rule: { op: add | edit | remove, text, area, id? }`, the hub checks it (`ai.js`
 `checkRule`: chain admin only, at most 60 rules of 600 characters) and shows it as a proposal (`TEAM_RULE`); it is

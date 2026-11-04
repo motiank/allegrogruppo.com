@@ -1,13 +1,13 @@
 // One table of an AI answer as an Excel file (the chat's "Download Excel" link under each table).
 // exceljs comes from the repo root's node_modules (the admin uses it), like shared/wage.js.
 import ExcelJS from 'exceljs';
-import { answerTables, cellNumber } from '../../lib/answerTables.js';
+import { answerTables, cellNumber, floorMoney } from '../../lib/answerTables.js';
 import { err } from '../db.js';
 import { getRequest } from './ai.js';
 
 export async function answerTableXlsx(access, requestId, n) {
   const r = await getRequest(access, requestId);
-  const t = answerTables(r.answer)[Number(n)];
+  const t = answerTables(floorMoney(r.answer))[Number(n)];
   if (!t) throw err('NOT_FOUND', 'no such table in this answer');
   return { fileName: `joya-${r.id}-${Number(n) + 1}.xlsx`, buffer: await tableXlsx(r, t) };
 }

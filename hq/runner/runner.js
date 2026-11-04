@@ -2,7 +2,7 @@
 // → check the numbers → answer (joya-hq). Separate from index.js so tests can drive it with
 // a fake model and a fake hub.
 import { unverifiedNumbers } from './verify.js';
-import { fillTotals } from '../lib/answerTables.js';
+import { fillTotals, floorMoney } from '../lib/answerTables.js';
 
 const MAX_RESULT_CHARS = 60_000;
 
@@ -116,8 +116,8 @@ export async function handle({ id, hub, planner, writer, log = console, instruct
     const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule });
     const w = await writer.call(writePrompt(ctx, computed, plan));
     cost += w.costUsd ?? 0;
-    // table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)
-    const { text: answer, totals } = fillTotals(String(w.text || '').trim());
+    // money in whole ₪, cut down; table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)
+    const { text: answer, totals } = fillTotals(floorMoney(String(w.text || '').trim()));
     const unverified = unverifiedNumbers(answer, totals, computed.results, computed.proposal, ctx.request.question, ctx.today, ctx.object, ctx.shifts, ctx.locations);
     await hub.post(`/joya/ai/runner/${id}/answer`, {
       answer,

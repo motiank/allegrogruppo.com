@@ -96,6 +96,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system
   recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. The only number the model
   may "compute" — and the code replaces it anyway. README → Asking in words.
+- **Money in whole ₪** (owner 2026-11-04, keep): amounts are shown without agorot, cut down (`floorMoney` in
+  `lib/answerTables.js`: runner before `fillTotals`, chat display, Excel). %, hours, counts keep decimals. Number
+  cells in answer tables align like the text (right in Hebrew), not to the other side.
 - **Team rules from the chat** (2026-11-01, owner: "instruct the chat for new rules to add to the team"): the chain
   admin writes a lasting rule in any chat → proposal `TEAM_RULE` → Apply → `joya_settings` 'teamRules' → given to the
   model in `<team_rules>` for every later request of that area (README → Asking in words). No new table.
