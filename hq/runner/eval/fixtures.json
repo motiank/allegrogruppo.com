@@ -166,6 +166,16 @@
     { "key": "v-vat-lastmonth", "kind": "AREA", "lang": "he", "question": "תכין לי דוח מע\"מ לחודש שעבר",
       "expect": { "calcs": ["vat_report"], "range": { "from": "2026-09-01", "to": "2026-09-30" }, "maxCalcs": 1 } },
     { "key": "v-vat-en", "kind": "GENERAL", "lang": "en", "question": "What is the income for VAT in August?",
-      "expect": { "calcs": ["vat_report"], "range": { "from": "2026-08-01", "to": "2026-08-31" }, "maxCalcs": 1 } }
+      "expect": { "calcs": ["vat_report"], "range": { "from": "2026-08-01", "to": "2026-08-31" }, "maxCalcs": 1 } },
+    { "key": "p-weekly", "kind": "AREA", "lang": "he", "question": "דוח ביצועים שבועי: ממוצע ההכנסה היומי החודש מול אותו חודש בשנה שעברה", "request": { "contextId": 3, "area": "PERFORMANCE" },
+      "expect": { "calcs": ["month_vs_last_year"], "maxCalcs": 1 } },
+    { "key": "p-waiters", "kind": "AREA", "lang": "he", "question": "ביצועי מלצרים החודש", "request": { "contextId": 3, "area": "PERFORMANCE" },
+      "expect": { "calcs": ["waiter_performance"], "range": { "from": "2026-10-01", "to": "2026-10-21" }, "maxCalcs": 1 } },
+    { "key": "p-dash", "kind": "AREA", "lang": "he", "question": "דשבורד יומי: הכנסות היום לפי מסעדה, סועדים, הכנסה לסועד וזיכויים", "request": { "contextId": 3, "area": "PERFORMANCE" },
+      "expect": { "calcs": ["daily_dashboard"], "maxCalcs": 1 } },
+    { "key": "p-dash-en", "kind": "GENERAL", "lang": "en", "question": "How much did each restaurant sell today, with diners and refunds?",
+      "expect": { "calcs": ["daily_dashboard"], "maxCalcs": 1 } },
+    { "key": "p-ly-en", "kind": "GENERAL", "lang": "en", "question": "Compare our average income per day in October with October last year",
+      "expect": { "calcs": ["month_vs_last_year"], "params": { "month_vs_last_year": { "month": "2026-10" } }, "maxCalcs": 1 } }
   ]
 }

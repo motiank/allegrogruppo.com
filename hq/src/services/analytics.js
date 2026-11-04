@@ -8,13 +8,14 @@ import { median } from '../lib/demand.js';
 import { effectiveAttendance } from './attendance.js';
 import { listShifts } from './master.js';
 import { shiftWindow } from '../lib/demand.js';
-import { checks as sourceChecks, dishSales, laborDaily, laborDailyEmployees, monthsBetween, payments as sourcePayments } from './source.js';
+import { checks as sourceChecks, dailyIncome, dayReport, dishSales, laborDaily, laborDailyEmployees, monthsBetween, payments as sourcePayments } from './source.js';
 
 const SALES_SOURCE = 'Beecomm via Allegro (/beecomm/orders/stored)';
 
 const r2 = (x) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 100) / 100);
 const div = (a, b) => (a == null || b == null || b === 0 ? null : a / b);
 const weekdayOf = (d) => new Date(d + 'T00:00:00Z').getUTCDay();
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Daily totals per location from checks (revenue, checks, diners) — the base of most numbers. */
 export async function dailyTotals(locationIds, from, to) {
@@ -735,5 +736,190 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
     locations,
     companies: [...companies.entries()].map(([company, map]) => ({ company, months: monthsOf(map) })),
     total: monthsOf(total),
+  };
+}
+
+// ---------------------------------------------------------------- the performance menu (owner, 2026-11-04)
+
+/**
+ * This month's average income per day vs the same month last year (owner: "compare the average daily income of the
+ * current month to the average daily income of the same month last year, add the income of the month last year").
+ * From the admin's daily totals (bcom_cash, since 2024; total = the Z total, no tips). A day counts when it has income
+ * (closed days are left out of the average, in both years). This month runs up to yesterday: today is not closed.
+ * @param {Map<string, string>} names location id → name
+ */
+export async function monthVsLastYear(locationIds, month, today, names = new Map()) {
+  const m = /^\d{4}-\d{2}$/.test(month || '') ? month : today.slice(0, 7);
+  const cur = periodOf(`${m}-01`, 'month');
+  const curTo = cur.to < today ? cur.to : addDays(today, -1);
+  const ly = periodOf(`${Number(m.slice(0, 4)) - 1}${m.slice(4)}-01`, 'month');
+  const sum = (rows, from, to) => {
+    const days = rows.filter((r) => r.date >= from && r.date <= to && (r.total || 0) > 0);
+    const income = days.reduce((a, r) => a + r.total, 0);
+    return { from, to, daysWithData: days.length, lastDataDate: days.length ? days[days.length - 1].date : null, income: r2(income), avgPerDay: days.length ? r2(income / days.length) : null };
+  };
+  const locations = [];
+  let reason = null;
+  for (const loc of locationIds) {
+    const a = curTo >= cur.from ? await dailyIncome(loc, cur.from, curTo) : { available: true, rows: [] };
+    const b = await dailyIncome(loc, ly.from, ly.to);
+    if (!a.available || !b.available) {
+      reason = a.reason || b.reason;
+      locations.push({ locationId: loc, name: names.get(String(loc)) ?? null, available: false });
+      continue;
+    }
+    const month = sum(a.rows, cur.from, curTo);
+    const lastYear = sum(b.rows, ly.from, ly.to);
+    const comparable = month.avgPerDay != null && lastYear.avgPerDay != null;
+    locations.push({
+      locationId: loc,
+      name: names.get(String(loc)) ?? null,
+      available: true,
+      month,
+      lastYear,
+      // false = no income in one of the two months (a new or a closed restaurant): left out of the total's change
+      comparable,
+      changePct: comparable ? r2(div(month.avgPerDay - lastYear.avgPerDay, lastYear.avgPerDay) * 100) : null,
+    });
+  }
+  const ok = locations.filter((l) => l.available);
+  const both = ok.filter((l) => l.comparable);
+  const add = (list, k, f) => r2(list.reduce((x, l) => x + (l[k][f] || 0), 0));
+  const tm = add(both, 'month', 'avgPerDay');
+  const tl = add(both, 'lastYear', 'avgPerDay');
+  return {
+    month: m,
+    period: { from: cur.from, to: curTo },
+    lastYearPeriod: { from: ly.from, to: ly.to },
+    source: "Allegro /beecomm/daily (the admin's bcom_cash): the Z total per restaurant per day, without tips",
+    rule: 'avgPerDay = income ÷ days with income (closed days are not counted); this month up to yesterday; the same month last year in full',
+    ...(reason ? { missing: reason } : {}),
+    locations,
+    total: {
+      // the chain's income per day = the sum of the restaurants' averages; only restaurants with both months
+      restaurants: both.length,
+      month: { income: add(ok, 'month', 'income'), avgPerDay: both.length ? tm : null },
+      lastYear: { income: add(ok, 'lastYear', 'income'), avgPerDay: both.length ? tl : null },
+      changePct: both.length ? r2(div(tm - tl, tl) * 100) : null,
+    },
+  };
+}
+
+/**
+ * Per waiter (who opened the order in Beecomm): orders, income (no tips) and tips, per location; the orders
+ * without a waiter (Wolt, online) apart.
+ */
+export async function waiterPerformance(locationIds, from, to, names = new Map()) {
+  const locations = [];
+  for (const loc of locationIds) {
+    const by = new Map();
+    const none = { orders: 0, income: 0 };
+    for (const c of await sourceChecks(loc, from, to)) {
+      if (!c.waiter) {
+        none.orders++;
+        none.income += c.net_amount ?? 0;
+        continue;
+      }
+      const w = by.get(c.waiter) || { waiter: c.waiter, orders: 0, income: 0, tips: 0, days: new Set() };
+      by.set(c.waiter, w);
+      w.orders++;
+      w.income += c.net_amount ?? 0;
+      w.tips += c.service ?? 0;
+      w.days.add(c.business_date);
+    }
+    const waiters = [...by.values()]
+      .sort((a, b) => b.income - a.income)
+      .map((w) => ({ waiter: w.waiter, orders: w.orders, income: r2(w.income), tips: r2(w.tips), avgOrder: r2(div(w.income, w.orders)), tipsPct: r2(div(w.tips, w.income) * 100), days: w.days.size }));
+    locations.push({ locationId: loc, name: names.get(String(loc)) ?? null, waiters, withoutWaiter: { orders: none.orders, income: r2(none.income) } });
+  }
+  return {
+    period: { from, to },
+    source: `${SALES_SOURCE}: closed orders; waiter = the order's creator (who opened it); income = netTotal (no tips), tips = serviceAmount`,
+    note: 'withoutWaiter = orders with no waiter (Wolt and other outside orders, online orders); tipsPct = tips ÷ income',
+    locations,
+  };
+}
+
+/**
+ * The daily dashboard: per location and in total the income, diners, income per diner and refunds of one business
+ * day. Today comes live from Beecomm (the day is still open); when the live call cannot be made, the last stored day.
+ * perDiner as Beecomm counts it: the income of the orders with diners ÷ their diners (Wolt has no diners).
+ */
+export async function dailyDashboard(locationIds, date, today, names = new Map()) {
+  const want = DATE_RE.test(date || '') ? date : today;
+  let rep = null;
+  let day = want;
+  let live = false;
+  let liveMissing = null;
+  if (want === today) {
+    rep = await dayReport(locationIds, today, { live: true });
+    live = rep.available;
+    if (!rep.available) liveMissing = rep.reason;
+    // nothing sold yet today (the night, the morning): yesterday, live too — its Z may not be stored before 06:00
+    else if (!rep.z.some((r) => r.income) && !rep.orders.length) {
+      const y = await dayReport(locationIds, addDays(today, -1), { live: true });
+      if (y.available && (y.z.length || y.orders.length)) {
+        rep = y;
+        day = addDays(today, -1);
+      }
+    }
+  }
+  if (!live) {
+    // the last stored day: the date asked (a past day), else up to 4 days back from yesterday
+    const tries = want === today ? [1, 2, 3, 4].map((n) => addDays(today, -n)) : [want];
+    rep = null;
+    for (const d of tries) {
+      const r = await dayReport(locationIds, d);
+      if (r.available && r.z.length) {
+        rep = r;
+        day = d;
+        break;
+      }
+    }
+  }
+  const locations = locationIds.map((loc) => {
+    const id = String(loc);
+    const z = rep?.z.find((r) => r.locationId === id) || null;
+    const os = (rep?.orders || []).filter((o) => o.locationId === id);
+    const closed = os.filter((o) => o.status === 2);
+    const withDiners = closed.filter((o) => o.diners > 0);
+    const dinersOrders = withDiners.reduce((a, o) => a + o.diners, 0);
+    const income = z?.income ?? (closed.length ? closed.reduce((a, o) => a + o.total, 0) : null);
+    const diners = z?.diners ?? (closed.length ? dinersOrders : null);
+    return {
+      locationId: id,
+      name: names.get(id) ?? null,
+      income: r2(income),
+      diners,
+      perDiner: dinersOrders ? r2(withDiners.reduce((a, o) => a + o.total, 0) / dinersOrders) : null,
+      refunds: z ? r2(z.refunds ?? 0) : null,
+      orders: closed.length,
+      ...(live && day === today ? { openOrders: os.filter((o) => o.status !== 2).length } : {}),
+      // from the orders when Beecomm has no Z for the day yet
+      ...(z ? {} : closed.length ? { fromOrders: true } : { noData: true }),
+    };
+  });
+  const has = locations.filter((l) => !l.noData);
+  const tDin = has.reduce((a, l) => a + (l.diners || 0), 0);
+  // the total per diner from the orders, like each restaurant's
+  const allOrders = (rep?.orders || []).filter((o) => o.status === 2 && o.diners > 0);
+  const oDin = allOrders.reduce((a, o) => a + o.diners, 0);
+  return {
+    date: day,
+    asked: want,
+    live,
+    ...(want === today && !live ? { liveMissing: liveMissing || 'no live data', note: `today is not available live; this is the last stored day (${day})` } : {}),
+    ...(live && day !== want ? { note: `nothing was sold yet today; this is yesterday (${day}), live` } : {}),
+    ...(rep ? {} : { missing: `no stored Beecomm Z report for ${want === today ? 'the last 4 days' : want}` }),
+    source: live ? 'Beecomm live via Allegro (/beecomm/z-reports, /beecomm/orders), the day so far' : 'Beecomm via Allegro (/beecomm/z-reports/stored, /beecomm/orders/stored)',
+    note2: 'income = the Z total (no tips); perDiner = income of the orders with diners ÷ their diners (as Beecomm counts it); refunds = the Z refunds (זיכויים)',
+    locations,
+    total: {
+      income: r2(has.reduce((a, l) => a + (l.income || 0), 0)),
+      diners: tDin,
+      perDiner: oDin ? r2(allOrders.reduce((a, o) => a + o.total, 0) / oDin) : null,
+      refunds: r2(has.reduce((a, l) => a + (l.refunds || 0), 0)),
+      orders: has.reduce((a, l) => a + l.orders, 0),
+    },
   };
 }

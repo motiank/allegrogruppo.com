@@ -306,6 +306,20 @@ history. While the user types, the chat box suggests questions of that area (str
 the user's own past questions. The detailed pages keep their routes but are not in the menu; Settings is at the
 bottom of the menu for a chain admin.
 
+**The performance menu (owner, 2026-11-04)** — the ביצועים area suggests only three reports:
+- **Weekly performance report** → calc `month_vs_last_year` (`analytics.monthVsLastYear`): per restaurant and for the
+  chain, this month's average income per day (up to yesterday) vs the same month last year, the change in %, and the
+  income of both months (last year: the whole month). From `/beecomm/daily` (the admin's `bcom_cash`, since 2024; total
+  = the Z total, no tips). Only days with income count (closed days are left out).
+- **Waiter performance** → calc `waiter_performance`: per waiter (the Beecomm order's `creator`, who opened it) orders,
+  income without tips, tips and tips %; Wolt / online orders have no waiter and are shown apart.
+- **Daily dashboard** → calc `daily_dashboard`: per restaurant and in total the income (Z total), diners, income per
+  diner (orders with diners ÷ their diners — as Beecomm counts it) and refunds (זיכויים). Today comes **live**
+  (`/beecomm/z-reports`, `/beecomm/orders`); before anything is sold today, yesterday live. Live needs
+  `BCOM_BO_API_KEY` + `BCOM_BO_REFRESH_TOKEN` in the admin's `.env` — **missing on the production server
+  (2026-11-04)**; until they are added the dashboard shows the last stored day and says so.
+Without `locationIds`, these three leave out the closed restaurants.
+
 **Tables in answers (2026-10-27).** When an answer has several rows of the same numbers (weeks, days, restaurants,
 employees…), the writer puts them in a pipe table (`| a | b |` + `|---|---|`; rules in `runner/hq-analyst.js`). The chat
 shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table a **Download Excel** link:

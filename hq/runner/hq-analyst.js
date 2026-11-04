@@ -130,6 +130,14 @@ Guidance:
   creditCards). Every other brand of the credit type (PRIVATE LABEL BRAND - חבר…) is the "members club" /
   "מועדון חברים" / "כרטיס חבר" (→ membersClub) — but NOT Mishloha (משלוחה, "אשראי - MISHLOHA"): it is its own line
   (→ mishloha), never inside חבר or the members club (owner). All come from one payments_summary.
+- The performance menu (owner, 2026-11-04), in any area:
+  · "דוח ביצועים שבועי", "weekly performance report", this month's average daily income vs the same month last year
+    → month_vs_last_year (month only when another month is named). It is enough alone.
+  · "ביצועי מלצרים", "waiter performance", sales / tips per waiter → waiter_performance (locationIds, from, to; no
+    period named → this month, the 1st up to today). Not employees or staffing_actual.
+  · "דשבורד יומי", "daily dashboard", or TODAY's income / diners / per diner / refunds per restaurant →
+    daily_dashboard (date only when the dashboard is asked for another day). It is enough alone. A past day or
+    period without the word dashboard ("yesterday", "last week") → sales_daily / sales_summary as usual.
 - VAT ("דוח מע"מ", "מע"מ", "הכנסות למע"מ", "VAT report"), in any area → vat_report, whole months: "this month" = the
   1st up to today, "last month" = the whole month before, a named month = that month, "the last 3 months" = 3 whole
   months before this one. Never payments_summary for VAT (the 20% deduction and the tips are only in vat_report).
@@ -260,6 +268,19 @@ Your job now: WRITE the answer to the user from <results>.
   · Not in these columns: the members club (חבר משרתי קבע, monthly), Max's 008… payouts (monthly), Isracard debits
     (fees). Only here the Beecomm amounts include the tips (the card company pays them too), to match the bank — say so
     in one line; this is a match of money, not income. The bank is after fees.
+- Weekly performance report (month_vs_last_year): one table, one row per restaurant (locations[].name), columns:
+  ממוצע יומי החודש, ממוצע יומי אשתקד, שינוי %, הכנסות החודש עד אתמול, הכנסות החודש אשתקד (כל החודש) — then the
+  total row (the chain = total). Name the period of each (period, lastYearPeriod) in one line above the table, and
+  that closed days are not counted and the amounts have no tips. A restaurant that is not comparable (comparable
+  false: no income in one of the two months — new or closed) is shown without a change and named in one note.
+- Waiter performance (waiter_performance): per restaurant one table, the waiters by income, columns: מלצר, הזמנות,
+  הכנסות (ללא טיפים), טיפים, % טיפים, ממוצע להזמנה — then the total row. One line under it with withoutWaiter
+  (Wolt and online orders, no waiter). Several restaurants: one table each, the biggest first.
+- Daily dashboard (daily_dashboard): first the day in one line — live and date = today: "היום עד עכשיו" (and the
+  open orders, if any); live and date = yesterday: nothing was sold yet today, this is yesterday (note); not live:
+  say plainly that today is not available live yet (liveMissing) and that this is the last closed day (date). Then one table, one row per restaurant, columns: הכנסות, סועדים, הכנסה לסועד, זיכויים — then the total row
+  (total). A restaurant with noData: "אין נתונים". fromOrders: the Z is not closed yet, the numbers come from the
+  orders. No tips.
 - VAT report (vat_report, owner's rule — say it in one line): income = all Beecomm payments in the Z without tips;
   20% of the חבר payments only (not מולטיפס) is deducted; income for VAT = income − deduction; VAT 18% inside it (vat).
   One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, חבר, ניכוי 20%,

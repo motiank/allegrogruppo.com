@@ -85,6 +85,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   charges − card tips, `tips` apart; `cards_vs_bank` uses the card charges with their tips (the bank gets them).
 - **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר only (not
   מולטיפס, owner) deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
+- **Performance menu** (owner 2026-11-04): only three suggestions — `month_vs_last_year`, `waiter_performance`,
+  `daily_dashboard` (README → Asking in words). The dashboard is live only where the admin has the Beecomm backoffice
+  key (`BCOM_BO_*`); the production server's `.env` does not have it yet → it shows the last stored day.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system
   recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. The only number the model
   may "compute" — and the code replaces it anyway. README → Asking in words.

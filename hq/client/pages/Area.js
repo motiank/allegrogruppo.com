@@ -11,7 +11,7 @@ import { Page } from '../ui.js';
 export const AREAS = {
   stock: { id: 1, suggestions: 10 },
   people: { id: 2, suggestions: 12 },
-  performance: { id: 3, suggestions: 11 },
+  performance: { id: 3, suggestions: 3 },
   bank: { id: 4, suggestions: 8 },
   accounting: { id: 5, suggestions: 8 },
 };

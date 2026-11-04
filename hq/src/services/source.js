@@ -4,6 +4,9 @@
 //   sales checks   /beecomm/orders/stored   closed orders (status 2); amount = netTotal (it has no tips: serviceAmount is on top)
 //   dish sales     /beecomm/items/stored    per business day; amount = totalSales − order and item discounts
 //   payments       /beecomm/payments/stored per business day, payment type and card brand (דוח תשלומים)
+//   daily totals   /beecomm/daily           Z total, tips, diners per branch per day, since 2024 (bcom_cash)
+//   Z reports      /beecomm/z-reports(/stored) live (today, needs the Beecomm key in the admin) or stored
+//   orders, live   /beecomm/orders          today's orders, for the per-diner average
 //   employees      /employees               Joya's employee id IS Allegro's employeeId
 //   clock times    /shifts/raw              Tabit detailed report; an attendance id IS the raw shift id
 //   staff per shift /shifts/by-shift        people and clock hours per date × shift × role (from Tabit)
@@ -121,7 +124,56 @@ export async function checks(locationId, from, to) {
       diners: num(o.diners),
       net_amount: o.netTotal == null ? null : r2(Number(o.netTotal)),
       order_type: o.orderType ?? null,
+      // who opened the order in Beecomm (the waiter); empty for Wolt and other outside orders, "API" for online ones
+      waiter: o.creator && o.creator !== 'API' ? String(o.creator).trim() : null,
+      service: num(o.serviceAmount) ?? 0,
     }));
+}
+
+/**
+ * Daily totals of one location from the admin's bcom_cash (since 2024): total = the Z total (no tips), service = the
+ * tips, diners. { available: false, reason } when the admin has no such endpoint.
+ */
+export async function dailyIncome(locationId, from, to) {
+  try {
+    const { data } = await get('/beecomm/daily', { from, to, branch: String(locationId) });
+    return {
+      available: true,
+      rows: (data || []).filter((r) => r.date >= from && r.date <= to).map((r) => ({ date: r.date, total: num(r.total), service: num(r.service), diners: num(r.diners) })),
+    };
+  } catch (e) {
+    if (e.code === 'NOT_SUPPORTED') return { available: false, reason: 'Allegro has no /beecomm/daily endpoint' };
+    throw e;
+  }
+}
+
+/**
+ * One business day of several locations: the Z report (income, diners, refunds) and the orders (for the income per
+ * diner, as Beecomm counts it: the orders with diners ÷ their diners). live: from Beecomm now (today, the open day);
+ * else from the stored copy. { available: false, reason } when the live call cannot be made (no Beecomm key in the
+ * admin) or nothing is stored.
+ */
+export async function dayReport(locationIds, date, { live = false } = {}) {
+  const branch = locationIds.map(String).join(',');
+  try {
+    if (live) {
+      const [z, o] = await Promise.all([get('/beecomm/z-reports', { from: date, to: date, branch }), get('/beecomm/orders', { from: date, to: date, branch })]);
+      return {
+        available: true,
+        z: (z.data || []).filter((r) => r.branchId !== '900').map((r) => ({ locationId: String(r.branchId), income: num(r.totalIncome), diners: num(r.dinnersCount), refunds: num(r.totalPaymentRefund), tips: num(r.serviceTotal) })),
+        orders: (o.data || []).map((x) => ({ locationId: String(x.branchId), status: x.status, total: num(x.netTotal) ?? 0, diners: num(x.dinnersCount) ?? 0 })),
+      };
+    }
+    const [z, o] = await Promise.all([get('/beecomm/z-reports/stored', { from: date, to: date, branch }), get('/beecomm/orders/stored', { from: date, to: date, branch })]);
+    return {
+      available: true,
+      z: (z.data || []).map((r) => ({ locationId: String(r.branch), income: num(r.totalIncome), diners: num(r.diners), refunds: num(r.refunds), tips: num(r.service) })),
+      orders: (o.data || []).map((x) => ({ locationId: String(x.branch ?? x.branchId), status: x.status, total: num(x.netTotal) ?? 0, diners: num(x.diners) ?? 0 })),
+    };
+  } catch (e) {
+    if (e.code === 'NOT_SUPPORTED' || e.code === 'NOT_LOADED' || (live && /BCOM_BO_|must be set/.test(e.message))) return { available: false, reason: e.message };
+    throw e;
+  }
 }
 
 /** Dish sales per business day (no lines per check exist in Beecomm). */

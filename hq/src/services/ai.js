@@ -178,6 +178,14 @@ async function bankCompanies(access, p) {
   return [...known.values()].filter((c) => all.some((l) => ids.has(String(l.id)) && l.company?.key === c.key));
 }
 
+// The locations in scope (see locs) and their names; without locationIds the closed restaurants are left out.
+async function activeScope(access, p) {
+  const all = await listLocations(access);
+  const info = new Map(all.map((l) => [String(l.id), l]));
+  const ids = locs(access, p).filter((id) => p.locationIds?.length || info.get(String(id))?.active !== false);
+  return { ids, names: new Map(all.map((l) => [String(l.id), l.name])) };
+}
+
 function range(p) {
   if (!DATE.test(p.from || '') || !DATE.test(p.to || '')) throw err('BAD_REQUEST', 'from and to must be YYYY-MM-DD');
   if (p.from > p.to) throw err('BAD_REQUEST', 'from is after to');
@@ -206,6 +214,33 @@ export const CALCS = {
     run: async (a, p) => {
       const info = new Map((await listLocations(a)).map((l) => [String(l.id), { name: l.name, company: l.company?.label ?? null, active: l.active }]));
       return analytics.vatReport(locs(a, p), ...range(p), info);
+    },
+  },
+  month_vs_last_year: {
+    params: '{ locationIds?, month?: "YYYY-MM" (default this month) }',
+    about:
+      'the weekly performance report (owner): per restaurant and for the chain, the average income per day of the month (up to yesterday) vs the average income per day of the same month last year, the change in %, and the income of both months (last year: the whole month); days with income only (closed days not counted); income = the Z total, without tips; data since 2024',
+    run: async (a, p) => {
+      const { ids, names } = await activeScope(a, p);
+      return analytics.monthVsLastYear(ids, p.month, todayLocal(), names);
+    },
+  },
+  waiter_performance: {
+    params: '{ locationIds?, from, to }',
+    about:
+      'per waiter (who opened the order in Beecomm) per restaurant: orders, income (no tips), tips and tips % of income, average order, days worked; orders without a waiter (Wolt, online) apart',
+    run: async (a, p) => {
+      const { ids, names } = await activeScope(a, p);
+      return analytics.waiterPerformance(ids, ...range(p), names);
+    },
+  },
+  daily_dashboard: {
+    params: '{ locationIds?, date?: "YYYY-MM-DD" (default today) }',
+    about:
+      'the daily dashboard (owner): per restaurant and in total the income, number of diners, income per diner and refunds (זיכויים) of one business day; today live from Beecomm (the day so far, with open orders), or — when live is not available — the last stored day (date says which day); a past date from the stored data',
+    run: async (a, p) => {
+      const { ids, names } = await activeScope(a, p);
+      return analytics.dailyDashboard(ids, p.date, todayLocal(), names);
     },
   },
   bank_summary: {
