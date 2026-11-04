@@ -29,6 +29,11 @@ const THINKING_TIMEOUT_MS = Number(process.env.JOYA_AI_TIMEOUT_MS ?? 6 * 60_000)
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // Most calculations one request may run. Sent to the model in the context (limits.maxCalcs).
 export const MAX_CALCS = 6;
+// The chat's memory: the earlier questions of the same user in the same chat, so a short follow-up ("and last year?",
+// "only Raanana") keeps its period, restaurants and topic. Only recent answered ones; their answers are cut.
+export const HISTORY_MAX = 3;
+export const HISTORY_HOURS = 3;
+export const HISTORY_ANSWER_CHARS = 1200;
 
 function locs(access, p) {
   const ids = p.locationIds ?? (p.locationId != null ? [p.locationId] : null);
@@ -594,6 +599,29 @@ export async function contextFor(id) {
   return buildContext(access, r);
 }
 
+/** The answered questions just before request r, in the same chat of the same user, oldest first. */
+async function chatHistory(access, r) {
+  if (!r.id || !access.username) return [];
+  const rows = await q(
+    `SELECT question, calcs_json, answer_text, created_at FROM joya_ai_requests
+      WHERE username=:u AND context_kind=:k AND id < :id AND status='ANSWERED'
+        AND created_at >= NOW() - INTERVAL ${HISTORY_HOURS} HOUR
+        ${r.context_id != null ? 'AND context_id=:c' : 'AND context_id IS NULL'}
+        ${r.context_kind === 'GENERAL' ? (r.location_id != null ? 'AND location_id=:l' : 'AND location_id IS NULL') : ''}
+      ORDER BY id DESC LIMIT ${HISTORY_MAX}`,
+    { u: access.username, k: r.context_kind, id: r.id, c: r.context_id, l: r.location_id },
+  );
+  return rows.reverse().map((h) => {
+    const text = String(h.answer_text || '');
+    return {
+      question: h.question,
+      askedAt: h.created_at,
+      calcs: (parseJson(h.calcs_json) || []).map((c) => ({ calc: c.calc, params: c.params ?? {} })),
+      answer: text.length > HISTORY_ANSWER_CHARS ? `${text.slice(0, HISTORY_ANSWER_CHARS)} …` : text,
+    };
+  });
+}
+
 /** The context for a request row (or a row-like object: the runner eval builds fixed contexts with it). */
 export async function buildContext(access, r) {
   const today = todayLocal();
@@ -639,6 +667,8 @@ export async function buildContext(access, r) {
     calculations: catalogue().filter((c) => mayRun(access, c.name)),
     // the team's lasting rules for this area (the runner gives them to the model as instructions, apart from the data)
     teamRules: (await teamRules(r.context_kind === 'AREA' ? AREAS[r.context_id] : null)).map((x) => ({ id: x.id, text: x.text, area: x.area })),
+    // the earlier questions of this chat (the runner gives them apart from the data, in <history>)
+    history: await chatHistory(access, r),
     limits: { maxCalcs: MAX_CALCS },
     changeFormats: CHANGE_FORMATS,
     object,

@@ -1,6 +1,6 @@
 // The Joya runner with a fake model and a fake hub. Run: node joya/test/runner.test.js
 import assert from 'assert/strict';
-import { handle, parseJsonObject } from '../runner.js';
+import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt } from '../runner.js';
 import { unverifiedNumbers } from '../verify.js';
 
 let passed = 0;
@@ -119,6 +119,24 @@ await t('a table total is recalculated by the system and is not flagged as unver
   const ans = hub.calls.find((c) => c[1].endsWith('/answer'))[2];
   assert.ok(ans.answer.includes('| ג | 0 |') && ans.answer.includes('| סה"כ | 42.5 |'));
   assert.deepEqual(ans.meta.unverifiedNumbers, []);
+});
+
+await t('chat history: in both prompts outside the context, oldest first; answers only for the writer', () => {
+  const ctx = {
+    request: { question: 'ובשנה שעברה?', lang: 'he', contextKind: 'AREA' },
+    today: '2026-11-04',
+    history: [
+      { question: 'מה ההכנסות של רעננה בספטמבר?', askedAt: '2026-11-04T08:00:00', calcs: [{ calc: 'sales_summary', params: { locationIds: ['r'] } }], answer: 'א' },
+      { question: 'ובאוקטובר?', askedAt: '2026-11-04T08:05:00', calcs: [], answer: 'ב' },
+    ],
+  };
+  assert.deepEqual(historyBlock({}), []);
+  const plan = planPrompt(ctx);
+  assert.ok(plan.indexOf('<history>') < plan.indexOf('<context>'));
+  assert.ok(!plan.split('<context>')[1].includes('"history"'));
+  assert.ok(plan.indexOf('ספטמבר') < plan.indexOf('ובאוקטובר'));
+  assert.ok(!plan.includes('"answer"'));
+  assert.ok(writePrompt(ctx, { results: [] }, {}).includes('"answer":"ב"'));
 });
 
 console.log('number check');

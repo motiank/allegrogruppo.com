@@ -32,11 +32,20 @@ export function rulesBlock(ctx) {
   return ['<team_rules>', ...rules.map((r) => `${r.id}. [${r.area || 'ALL'}] ${r.text}`), '</team_rules>'];
 }
 
+// The earlier questions of the same chat, oldest first. withAnswers: the writer also gets their (cut) answers.
+export function historyBlock(ctx, { withAnswers = false } = {}) {
+  const list = Array.isArray(ctx.history) ? ctx.history : [];
+  if (!list.length) return [];
+  const items = list.map((h) => ({ question: h.question, askedAt: h.askedAt, calcs: h.calcs || [], ...(withAnswers ? { answer: h.answer || '' } : {}) }));
+  return ['<history>', JSON.stringify(items), '</history>'];
+}
+
 export function planPrompt(ctx) {
-  const { teamRules, ...data } = ctx;
+  const { teamRules, history, ...data } = ctx;
   return [
     'Plan the answer to this request. Reply with the JSON object only.',
     ...rulesBlock(ctx),
+    ...historyBlock(ctx),
     '<context>',
     JSON.stringify(data),
     '</context>',
@@ -47,6 +56,7 @@ export function writePrompt(ctx, computed, plan) {
   const parts = [
     `request.lang = ${ctx.request.lang}`,
     ...rulesBlock(ctx),
+    ...historyBlock(ctx, { withAnswers: true }),
     '<request>',
     JSON.stringify({ question: ctx.request.question, contextKind: ctx.request.contextKind, today: ctx.today }),
     '</request>',

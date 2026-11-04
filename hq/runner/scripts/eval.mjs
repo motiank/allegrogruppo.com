@@ -95,6 +95,8 @@ function contextFor(f) {
   if (f.request) Object.assign(ctx.request, f.request);
   // f.teamRules: the team rules this question is asked with
   if (f.teamRules) ctx.teamRules = f.teamRules;
+  // f.history: the earlier questions of the chat ({ question, calcs: [{ calc, params }], answer? })
+  ctx.history = f.history || [];
   if (f.inquiryContent && ctx.object?.inquiry) ctx.object.inquiry.content = f.inquiryContent;
   return ctx;
 }

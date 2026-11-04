@@ -306,6 +306,13 @@ history. While the user types, the chat box suggests questions of that area (str
 the user's own past questions. The detailed pages keep their routes but are not in the menu; Settings is at the
 bottom of the menu for a chain admin.
 
+**Chat history (2026-11-04).** Each question gets the earlier questions of the same chat as `<history>` (the same
+user and chat; GENERAL also the same restaurant): up to `HISTORY_MAX` = 3 answered questions of the last
+`HISTORY_HOURS` = 3 hours, oldest first, with their calcs + params; the writer also gets their answers, cut to 1,200
+characters (`ai.js` `chatHistory`, `runner.js` `historyBlock`). So a short follow-up ("and last year?", "ובחיפה?",
+"per day") keeps its period, restaurants and topic and runs the calcs again; a question that stands alone ignores it.
+Numbers are never taken from history. A deleted question leaves the history.
+
 **The performance menu (owner, 2026-11-04)** — the ביצועים area suggests only three reports:
 - **Weekly performance report** → calc `month_vs_last_year` (`analytics.monthVsLastYear`): per restaurant and for the
   chain, this month's average income per day (up to yesterday) vs the same month last year, the change in %, and the
