@@ -1,6 +1,6 @@
 # CLAUDE.md — allegrogruppo.com
 
-The Allegro group's web systems. One repo, one root `package.json` (except `hq/`), several separate services:
+The Allegro group's web systems. One repo, one root `package.json` (except `hq/` and `hash-sync/`), several separate services:
 
 | Service | Folder | Port | Production |
 |---|---|---|---|
@@ -8,9 +8,10 @@ The Allegro group's web systems. One repo, one root `package.json` (except `hq/`
 | Admin (payroll, Beecomm, uploads, Local Data API) | `admin/` | 3021 | https://admin.allegrogruppo.com — `allegro-admin.service` |
 | Events pages (SSR, read-only) | `events/` | 3023 | events.allegrogruppo.com |
 | **Joya HQ** (the restaurants' AI headquarters) | `hq/` (own `package.json`, AI runner `hq/runner/`) | 4300 | https://hq.allegrogruppo.com — `joya-hq.service` + `joya-runner.service` |
+| Hashavshevet sync (SQL Server → MySQL `allegro_finance`, every company and year in one DB, no data dropped) | `hash-sync/` (own `package.json`) | none (by hand so far; cron planned) | `allegro_finance` on the production MySQL server (loaded 2026-11-06, Pastalina 2025–2026); dev = local `allegro_finance_dev`; source = local SQL Server 2025 Express, DB `PastaLina`; passwords and tokens not copied |
 
 Read the service's own docs first: `README.md` (repo), `local_api_readme.md` (the admin's Local Data API),
-`events/README.md`, `hq/CLAUDE.md` + `hq/README.md`.
+`events/README.md`, `hq/CLAUDE.md` + `hq/README.md`, `hash-sync/README.md`.
 
 ## Language rules (always follow)
 

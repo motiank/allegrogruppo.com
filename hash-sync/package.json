@@ -1,0 +1,18 @@
+{
+  "name": "hash-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Copies Hashavshevet (SQL Server) into the allegro_finance MySQL database without losing data",
+  "scripts": {
+    "schema": "node src/schema.js",
+    "load": "node src/load.js",
+    "verify": "node src/verify.js",
+    "sync": "node src/sync.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mssql": "^11.0.1",
+    "mysql2": "^3.10.0"
+  }
+}
