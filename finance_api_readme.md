@@ -4,7 +4,7 @@ A read-only JSON API that lets Joya HQ answer finance questions from the `allegr
 MySQL server. It covers all 24 use cases on the
 [Pastalina finance use cases page](https://claude.ai/artifact/Fuc2728rtXo45rWzj5RV6d).
 
-**Status: built on 2026-11-07, not deployed.** The admin side is done: 28 endpoints, every use case, a settings file
+**Status: built and deployed on 2026-11-07** (production answers at `http://localhost:3021/local-api/v1/finance` on the droplet). The admin side is done: 28 endpoints, every use case, a settings file
 for the accounting rules, and a test that calls every endpoint against a copy of the real data
 ([section 11](#11-tests)). The Joya side (the chat calculations) is a separate task ([section 10](#10-joya-hq-side)).
 **No number here has been checked against Hashavshevet's own reports.** Every answer carries the `not_validated`
@@ -778,7 +778,6 @@ The real admin server was also started once with the production settings (`ADMIN
 4. **Sales source for use case 6:** Beecomm, as built. The page says Tabit.
 5. **Is cost code 104 (גויה הרצליה) the Allegro branch הרצליה?** Mapped so, marked unconfirmed.
 6. **A read-only MySQL user** on production: yes or no. Until then the API uses the admin's `DB_*` user.
-7. **Deploy:** the admin service restart on the droplet, after the pull. No table changes are needed.
 
 **The accountant:**
 
