@@ -437,3 +437,42 @@ export async function status() {
   return { branches: data || [], sources: meta?.sources || {} };
 }
 
+
+// ---------------------------------------------------------------- finance (the Hashavshevet books)
+
+// The admin's Finance API (../finance_api_readme.md): the Hashavshevet copy `allegro_finance`, read only, with
+// data warnings on every answer. Nothing is kept here. company = the finance company code (allegro_finance
+// companies.code, e.g. 'pastalina'), not the Allegro company key; financeCompanies() links the two.
+const FINANCE_MISSING = {
+  NOT_SUPPORTED: 'the Allegro admin has no Finance API yet (finance_api_readme.md)',
+  NOT_LOADED: 'the finance database (allegro_finance) is not loaded in Allegro yet',
+};
+
+/**
+ * GET /finance/<path> → { available: true, data, meta } (meta holds sync and warnings), or { available: false, reason }
+ * when the admin has no Finance API, the finance database cannot be reached, or the company / account is unknown
+ * (reason = the admin's message). Other errors are thrown.
+ */
+export async function finance(path, params = {}) {
+  try {
+    const { data, meta } = await get(`/finance${path}`, params);
+    return { available: true, data, meta: meta || {} };
+  } catch (e) {
+    if (FINANCE_MISSING[e.code]) return { available: false, reason: FINANCE_MISSING[e.code] };
+    if (/finance_db_unavailable|allegro_finance can't be reached/.test(e.message)) return { available: false, reason: "the finance database (allegro_finance) can't be reached right now" };
+    if (/ 503 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, '') };
+    if (/ 404 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, '') };
+    if (/ 400 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, ''), badRequest: true };
+    throw e;
+  }
+}
+
+/**
+ * The companies in the finance database, linked to the Allegro company key (restaurants.json): [{ code, name,
+ * allegroKey, years }]. [] when there is no Finance API or nothing is loaded.
+ */
+export async function financeCompanies() {
+  const r = await finance('/companies');
+  if (!r.available) return { available: false, reason: r.reason, companies: [] };
+  return { available: true, companies: (r.data || []).map((c) => ({ code: c.code, name: c.name, allegroKey: c.allegroKey ?? null, allegroLabel: c.allegroLabel ?? null, years: c.years || [] })) };
+}

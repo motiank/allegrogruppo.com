@@ -379,3 +379,64 @@ t('answer tables: a pipe table becomes a table block between the text; numbers a
 });
 
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);
+
+console.log('finance (the books)');
+const { dates: finDates, warningsOf } = await import('../src/services/finance.js');
+const { mayRun, FINANCE_CALCS, CALCS, catalogue } = await import('../src/services/ai.js');
+t('finance dates: from required, to optional, order checked', () => {
+  assert.deepEqual(finDates({ from: '2026-01-01', to: '2026-03-31' }), { from: '2026-01-01', to: '2026-03-31' });
+  assert.deepEqual(finDates({ from: '2026-01-01' }), { from: '2026-01-01' });
+  assert.deepEqual(finDates({}, { required: false }), {});
+  assert.throws(() => finDates({}), /from must be/);
+  assert.throws(() => finDates({ from: '2026-13-01' }), /from must be/);
+  assert.throws(() => finDates({ from: '2026-03-01', to: '2026-02-01' }), /after/);
+});
+t('finance warnings: high first, affects kept only when present', () => {
+  const w = warningsOf([{ code: 'not_validated', severity: 'info', message: 'x', affects: [] }, { code: 'no_salary_expense', severity: 'high', message: 'y', affects: ['2026-08'] }]);
+  assert.deepEqual(w.map((x) => x.code), ['no_salary_expense', 'not_validated']);
+  assert.deepEqual(w[0].affects, ['2026-08']);
+  assert.ok(!('affects' in w[1]));
+  assert.deepEqual(warningsOf(null), []);
+});
+t('the books are for the chain admin only; every finance calc is in the catalogue', () => {
+  const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
+  const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
+  const accountant = { role: 'ACCOUNTANT', isAdmin: false };
+  assert.equal(FINANCE_CALCS.size, 23);
+  for (const name of FINANCE_CALCS) {
+    assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
+    assert.equal(mayRun(admin, name), true);
+    assert.equal(mayRun(manager, name), false, `${name} not for a manager`);
+    assert.equal(mayRun(accountant, name), false, `${name} not for the accountant yet`);
+  }
+  assert.equal(mayRun(accountant, 'cards_vs_bank'), true);
+  assert.equal(mayRun(manager, 'sales_summary'), true);
+  const names = catalogue().map((c) => c.name);
+  for (const name of FINANCE_CALCS) assert.ok(names.includes(name));
+  for (const c of catalogue()) assert.ok(c.about && c.params, `${c.name} documented`);
+});
+const ta = async (name, fn) => {
+  try {
+    await fn();
+    n++;
+    console.log(`  ok  ${name}`);
+  } catch (e) {
+    console.error(`  FAIL ${name}\n${e.stack}`);
+    process.exitCode = 1;
+  }
+};
+await ta('finance calcs refuse a non-admin before calling Allegro, and check their params', async () => {
+  const manager = { role: 'LOCATION_MANAGER', isAdmin: false, locationIds: ['demo-tlv'], payroll: true };
+  await assert.rejects(() => CALCS.pnl.run(manager, { from: '2026-01-01' }), /chain admin only/);
+  const { aging, accountCard, payrollCheck, journalSearch, cheques } = await import('../src/services/finance.js');
+  await assert.rejects(() => aging([], {}), /side must be/);
+  await assert.rejects(() => accountCard([], { from: '2026-01-01' }), /account .* or q/);
+  await assert.rejects(() => payrollCheck([], { month: '2026-13' }), /month must be/);
+  await assert.rejects(() => journalSearch([], {}), /give a period/);
+  await assert.rejects(() => cheques([], { state: 'lost' }), /state must be/);
+  // with no companies nothing is read: an empty, well-formed result
+  const empty = await cheques([], { state: 'future' });
+  assert.deepEqual([empty.report, empty.companies], ['cheques', []]);
+});
+
+console.log(`\n${n} checks passed`);

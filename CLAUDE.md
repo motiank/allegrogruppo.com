@@ -94,7 +94,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   (read only, loopback only, like the Local Data API). Its DB settings are `FINANCE_DB_*` in the root `.env` (default: the
   admin's `DB_*` server, database `allegro_finance`). Test: `node --test scripts/test_finance_api.js` (local
   `allegro_finance_dev` from `hash-sync/.env`; the mixed endpoints also read the production `allegro` DB). Deployed
-  2026-11-07 (`4a88e42`, `allegro-admin.service` restarted); the Joya side (`hq/`) is a separate task. Every number still carries the `not_validated` warning until the accountant checks it.
+  2026-11-07 (`4a88e42`, `allegro-admin.service` restarted). Joya side built the same day (`hq/src/services/finance.js`,
+  chain admin only, in הנהלת חשבונות; `hq/README.md` → "The books"). Every number still carries the `not_validated` warning until the accountant checks it.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

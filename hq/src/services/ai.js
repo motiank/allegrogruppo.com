@@ -19,6 +19,7 @@ import * as staffing from './staffing.js';
 import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
+import * as fin from './finance.js';
 import * as source from './source.js';
 import { attendanceReport, clockRows } from './attendance.js';
 import { recentSameWeekday } from './demand.js';
@@ -223,6 +224,19 @@ async function bankCompanies(access, p) {
   return [...known.values()].filter((c) => all.some((l) => ids.has(String(l.id)) && l.company?.key === c.key));
 }
 
+// The books (the Finance API) are per company and for the chain admin only (owner 2026-11-07, decision 1). The
+// same company choice as the bank; the accountant does not get them yet.
+async function financeCompanies(access, p) {
+  if (!access.isAdmin) throw err('FORBIDDEN', 'the books (finance data) are for the chain admin only');
+  return bankCompanies(access, p);
+}
+const finCalc = (fn) => async (a, p) => {
+  const cos = await financeCompanies(a, p || {});
+  cos.asked = Boolean(p?.companyKeys || p?.companyKey); // named companies get an answer each, even without books
+  return fn(cos, p || {});
+};
+const FIN_PERIOD = 'from: "YYYY-MM-DD", to?: "YYYY-MM-DD" (default today)';
+
 // The locations in scope (see locs) and their names; without locationIds the closed restaurants are left out.
 async function activeScope(access, p) {
   const all = await listLocations(access);
@@ -415,6 +429,122 @@ export const CALCS = {
     run: (a, p) => payrollFiles(a, p),
   },
   payroll_issues: { params: '{ locationIds?, period?: "YYYY-MM", status? }', about: 'payroll preparation issues', run: async (a, p) => ({ source: 'joya_payroll_issues', issues: await payroll.listIssues(a, { locationIds: locs(a, p), period: p.period, status: p.status }) }) },
+  // ── the books (Hashavshevet, allegro_finance) — chain admin only; every result carries the admin's data warnings
+  finance_status: {
+    params: '{ companyKeys?: string[], months?: number }',
+    about: 'how complete and fresh the books are: the last sync and its data date, per month the income, purchases, salaries, general expenses, unposted entries and whether the month is complete (no high warning), the bank account(s) and the supplier balances. Read it before a finance answer, or when asked "is the bookkeeping up to date"',
+    run: finCalc(fin.financeStatus),
+  },
+  pnl: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, by?: "month" | "year" | "branch" | "account" (default month), compare?: "prev_period" | "prev_year", locationIds?: string[] (branches), includeUnposted?: boolean }`,
+    about: 'profit and loss from the books (דוח רווח והפסד): income, purchases (food cost), salaries, general expenses and profit per month / year / branch / account, without VAT; compare = the same rows for the period before or the same period last year, with the change. by branch also gives "No branch" (the part the books do not split) and branch_partial',
+    run: finCalc(fin.pnl),
+  },
+  cash_position: {
+    params: '{ companyKeys?, asOf?: "YYYY-MM-DD" }',
+    about: 'cash today and in 30, 60 and 90 days: the bank balance (statement lines, and the running balance Hashavshevet shows), cheques out by due date (next 30 / 31–60 / 61–90 / later), cheques due and not cleared, open customer invoices by due date, and the projected balance',
+    run: finCalc(fin.cashPosition),
+  },
+  branch_costs: {
+    params: `{ companyKeys?, ${FIN_PERIOD} (up to 400 days), locationIds? }`,
+    about: 'food cost % and labor cost % per branch per month: revenue (the books, or Beecomm without VAT when the books have no branch), food cost (purchases of the branch in the books), the admin labor cost and payslip gross (saved payroll or Tabit), and their % of revenue',
+    run: finCalc(fin.branchCosts),
+  },
+  sales_vs_books: {
+    params: `{ companyKeys?, ${FIN_PERIOD} (up to 400 days), locationIds? }`,
+    about: 'the sales system (Beecomm, without VAT) compared with the income posted in the books, per month and branch, with a company total row and the difference in ₪ and %',
+    run: finCalc(fin.salesVsBooks),
+  },
+  spending: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, by?: "supplier" (default) | "account" | "group", top?: number (default 20, 0 = all), compare?: "prev_period" | "prev_year", locationIds? }`,
+    about: 'top suppliers (supplier invoices with VAT) or spending by expense account / group (without VAT), biggest first, with the total; compare = each row vs the period before or last year (previous, change, changePct)',
+    run: finCalc(fin.spending),
+  },
+  aging: {
+    params: '{ companyKeys?, side: "suppliers" | "customers", asOf?, excludeGroupCompanies?: boolean, q?: "part of a name", account?: "account key", limit? }',
+    about: 'debts with age (גיול חובות): per supplier (what the company owes) or per customer (what they owe), the balance and the open items in buckets current / 1-30 / 31-60 / 61-90 / 90+ days by due date, the biggest first, with totals; the supplier side carries supplier_balances_suspect when the balances look wrong',
+    run: finCalc(fin.aging),
+  },
+  intercompany: {
+    params: '{ companyKeys?, asOf?, from? }',
+    about: 'loans and money between group companies, shareholders and related parties: the balance of each listed account (plus = they owe the company) and its movement; one side only, the other company is not loaded',
+    run: finCalc(fin.intercompany),
+  },
+  trial_balance: {
+    params: '{ companyKeys?, asOf?: "YYYY-MM-DD" (default today), from?: "YYYY-MM-DD" (then the movement of from..asOf and the opening balance), group?: "500,700" (account groups), q?: "part of a name", limit? }',
+    about: 'trial balance (מאזן בוחן): debit, credit and balance per account up to a date, with totals (debit = credit) and whether it balances; a group or a name narrows the list',
+    run: finCalc(fin.trialBalance),
+  },
+  account_card: {
+    params: `{ companyKeys?, account?: "account key, e.g. 500059", q?: "part of the account name" (one of the two), ${FIN_PERIOD}, includeUnposted?, limit?, offset? }`,
+    about: 'the account card (כרטסת) of one account: every line of the period with date, entry, counter account, debit, credit and running balance, the opening and closing balance; several accounts match a name → ambiguous with the matches (ask which one)',
+    run: finCalc(fin.accountCard),
+  },
+  journal_search: {
+    params: '{ companyKeys?, from?, to?, batch?: number, reference?: number, account?: "account key", type?: "entry type, e.g. ח18", q?: "text in the description or names", posted?: "0" | "1", limit? }  |  { companyKeys?, year: number, transId: number }  (one entry)',
+    about: 'journal entries (פקודות יומן) by batch, reference, date, account, type or text, with amount and accounts; or one entry (year + transId) with its lines, document and cheque',
+    run: finCalc(fin.journalSearch),
+  },
+  bank_reconciliation: {
+    params: '{ companyKeys?, account?: "bank account key" }',
+    about: 'bank reconciliation (התאמת בנקים) from the books: the bank statement balance vs the book balance per bank account, the open (unmatched) amounts and lines on both sides with their age, the matched amounts that should be equal, and the gap',
+    run: finCalc(fin.bankReconciliation),
+  },
+  bank_open_items: {
+    params: '{ companyKeys?, side: "bank" | "book", minAge?: number (days), from?, to?, account?, limit? }',
+    about: 'the open items of the bank reconciliation, oldest first: bank statement lines not matched to the books (side bank), or book lines of the bank account not matched to the statement (side book: cheques, transfers…)',
+    run: finCalc(fin.bankOpenItems),
+  },
+  bank_match_suggestions: {
+    params: '{ companyKeys?, days?: number (default 30), minAmount?, account?, limit? }',
+    about: 'suggested matches for open bank lines: the open book lines with the same amount and direction within N days (confidence single / many); suggestions only, nothing is matched',
+    run: finCalc(fin.bankMatchSuggestions),
+  },
+  customer_invoices: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, q?: "part of the customer name", account?, type?: "invoice" | "credit", limit? }`,
+    about: 'customer invoices and credit notes from the books (with VAT): date, number, customer, amount, kind customer / register (the monthly register entries are not real customers); the total of the selection',
+    run: finCalc(fin.customerInvoices),
+  },
+  account_statement: {
+    params: '{ companyKeys?, account?: "account key", q?: "part of the name" (one of the two), from?, to? }',
+    about: 'the card of one supplier or customer (כרטיס ספק / לקוח): invoices, credit notes, payments and other lines of the period, the open items with their age, the balance (plus = owed) and totals; several accounts match → ambiguous (ask which one)',
+    run: finCalc(fin.accountStatement),
+  },
+  cheques: {
+    params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", limit? }',
+    about: 'issued cheques (שיקים) from the books: payee, amount, due date, state (future = due after today; cleared = matched to the bank; not_cleared = due and not matched), with totals per state; returned cheques are not available yet',
+    run: finCalc(fin.cheques),
+  },
+  vat_summary: {
+    params: `{ companyKeys?, ${FIN_PERIOD} (whole months), issues?: boolean (also the 874 report runs), includeUnposted? }`,
+    about: 'VAT from the BOOKS per month: sales VAT, input VAT, VAT on fixed assets, to pay (sales − input − assets), the VAT accounts and their balances; issues = also the 874 report runs with their totals by record type (not checked yet). For the Beecomm-based VAT report use vat_report instead',
+    run: finCalc(fin.vatSummary),
+  },
+  withholding: {
+    params: '{ companyKeys?, from?, to?, expiring?: number (days, default 60), q?: "part of a supplier name", account? }',
+    about: 'tax deducted at source (ניכוי במקור): per supplier the payments, the amount deducted and its %; the suppliers\' withholding certificates with their end date and state (valid / expiring / expired) and how many have none',
+    run: finCalc(fin.withholding),
+  },
+  allocation_numbers: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, missingOnly?: boolean, minAmount?: number, account?, limit? }`,
+    about: 'allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period',
+    run: finCalc(fin.allocationNumbers),
+  },
+  payroll_check: {
+    params: '{ companyKeys?, month: "YYYY-MM", locationIds? }',
+    about: 'the salary expense posted in the books (group 720) against the payslip gross of the admin payroll (saved, or built from Tabit), per branch for one month, with the difference; the books have no 2026 salaries (no_salary_expense)',
+    run: finCalc(fin.payrollCheck),
+  },
+  exceptions: {
+    params: '{ companyKeys?, type?: "unposted" | "future_dated" | "possible_duplicate" | "missing_branch", from?, to? (default this year), limit? }',
+    about: 'exceptions in the books (חריגים): entries not posted, entries dated in the future, possible duplicate entries (same accounts, amount and reference), expense lines without a branch; counts per type. "Wrong account" has no rule yet',
+    run: finCalc(fin.exceptions),
+  },
+  change_history: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, kind?: "account" | "login" | "sync" | "vat_run", account?, limit? }`,
+    about: 'change history in Hashavshevet (מי שינה מה): changes of account details (user, date, field, old and new value), logins, 874 report runs, and what the nightly sync found changed; journal edits are not logged by Hashavshevet',
+    run: finCalc(fin.changeHistory),
+  },
   team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
   pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };
@@ -449,7 +579,9 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
-const mayRun = (access, name) => access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name);
+// the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history']);
+export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
 // Lasting rules for the AI team, given in the chat by the chain admin ("from now on…", "כלל חדש: …"). The planner
@@ -788,7 +920,7 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
     }
     const def = CALCS[c?.calc];
     if (def && !mayRun(user, c.calc)) {
-      results.push({ calc: c.calc, params: c.params, error: 'not in the accounting area: the accountant may not run it' });
+      results.push({ calc: c.calc, params: c.params, error: FINANCE_CALCS.has(c.calc) ? 'the books (finance data) are for the chain admin only' : 'not in the accounting area: the accountant may not run it' });
       continue;
     }
     if (!def) {

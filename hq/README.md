@@ -137,6 +137,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
+| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `vat_summary`, `withholding`, `allocation_numbers`, `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
 
 **Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** (and ISRACARD, DISCOVER, MAESTRO — owner, 2026-11-03) of
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
@@ -169,7 +170,8 @@ question decide, and the **menu area sets the default** (owner, 2026-10-26; rule
 - **Manpower** → employees, clock times, payroll. **Stock** → order lists and items.
 - **Accounting** (הנהלת חשבונות, owner 2026-10-31) → the register matched with the bank: card, Wolt and other money sold
   at the register vs what arrived in the bank, and the fees (`cards_vs_bank`, `payments_summary` + `bank_*`). For
-  the chain admin and the accountant. Supplier invoices come later (a database + an Excel upload); nothing yet.
+  the chain admin and the accountant. **Since 2026-11-07 also the books** (below): profit and loss, suppliers, debts,
+  trial balance, account cards, cheques, VAT in the books… — the chain admin only (owner's decision 1).
 - No area (a page's chat):
   - **sold / charged at the register** (by brand, tips, refunds) = **Beecomm payments**
     (`payments_summary`): the day of the sale, gross.
@@ -192,6 +194,23 @@ brand "PRIVATE LABEL BRAND - חבר") is deducted — only חבר; מולטיפ�
 version); income for VAT = income − deduction; VAT = 18/118 of it. Per month, per restaurant, per company, in total.
 Owner's answers: מועדון חברים = חבר (no other club brand is deducted); without tips; show the VAT. Checked 2026-11-03
 against Beecomm's payments report: פסטלינה רמת החייל, August 2026 = 736,391, same as Beecomm's "סה״כ".
+**The books (owner 2026-11-07)** — the accountant's bookkeeping in Hashavshevet, copied nightly by `hash-sync` into the
+`allegro_finance` database and served by the admin's **Finance API** (`/local-api/v1/finance/*`, `../finance_api_readme.md`,
+built and deployed 2026-11-07). Joya reads it through `source.finance()` / `source.financeCompanies()` and the
+calculations in `src/services/finance.js`, **per company** (a finance company is linked to an Allegro company key by
+`/finance/companies`; today only Pastalina is loaded — the other companies answer "no finance data yet"). Nothing is
+stored or computed here: every number is the admin's. **Chain admin only** (decision 1; the accountant may get them later
+by adding them to `ACCOUNTANT_CALCS`). The default source for accounting words in the הנהלת חשבונות area, and the
+source in any area when the question says "בספרים" / "from the books"; "הכנסות" alone stays Beecomm. Every result has
+`companies[].warnings` from the admin, `high` first: no salary expense in 2026, income not posted after August 2026, a bank
+gap of 6.16 million, supplier balances that look wrong, "not checked by the accountant yet" — the writer puts a `high`
+warning as a "⚠" line next to the numbers it affects (WRITE prompt, "The books"). Amounts are without VAT except supplier
+invoices, customer invoices and cheques. `vat_summary` (the books) is not `vat_report` (Beecomm). An account named by
+text (`q`) that matches several accounts comes back `ambiguous` with the matches, and the answer asks which one. The
+accounting menu suggests 8 more questions for the chain admin (`joya.area.accounting.s9`–`s16`). Eval fixtures `f-*`
+(kind `ACCOUNTING`, 21 questions) + `f-pnl-general-area`; the fake API serves made-up finance shapes
+(`scripts/fake-allegro.mjs` `FIN_ROUTES`: companies, status, pnl, cash, aging, trial-balance, ledger).
+
 ## Permissions
 
 - Login = an Allegro admin user (e-mail + the admin password, status `active`). The session is a JWT in the

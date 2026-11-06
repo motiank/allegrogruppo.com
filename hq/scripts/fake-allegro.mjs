@@ -208,7 +208,62 @@ const inRange = (u, key) => {
   const to = u.searchParams.get('to') || from;
   return (r) => (!from || r[key] >= from) && (!to || r[key] <= to);
 };
+// ── the Finance API (../finance_api_readme.md): made-up books of the demo company, in the API's shapes. A finance
+// route returns { finance: true, data, meta } so the server can add meta.sync and meta.warnings like the real API.
+const FIN_SYNC = { lastRunAt: `${T} 02:05:00`, status: 'done', dataUpTo: addDays(T, -1) };
+const FIN_WARN = [
+  { code: 'no_salary_expense', severity: 'high', message: `${lastMonth} has no salary expense in the books (group 720)`, affects: [lastMonth] },
+  { code: 'not_validated', severity: 'info', message: 'the numbers were not yet checked by the accountant against Hashavshevet', affects: [] },
+];
+const finMonths = (() => {
+  const out = [];
+  for (let i = 11; i >= 0; i--) {
+    const m = addDays(`${T.slice(0, 7)}-01`, -i * 30).slice(0, 7);
+    const income = 1_500_000 + Math.round(rnd() * 200_000);
+    out.push({ month: m, income, purchases: Math.round(income * 0.3), salaries: m === lastMonth ? 0 : Math.round(income * 0.33), general: Math.round(income * 0.2), unposted: 0, entries: 800 });
+  }
+  return out;
+})();
+const finAccounts = [
+  { accountKey: '500059', name: 'וואלט אנטרפריזס ישראל בע"מ', group: 500, groupName: 'ספקים', balance: -894372.06 },
+  { accountKey: '500082', name: 'גמלא הראל עסקה משותפת', group: 500, groupName: 'ספקים', balance: -256820.01 },
+  { accountKey: '200010', name: '10 ביס קו. איל בע"מ', group: 200, groupName: 'לקוחות', balance: 34688.35 },
+  { accountKey: '500060', name: '10 ביס.קו.איל בע"מ', group: 500, groupName: 'ספקים', balance: -83319.02 },
+  { accountKey: '700000', name: 'הכנסות קופה רושמת', group: 700, groupName: 'הכנסות', balance: -17000000 },
+  { accountKey: '110011', name: 'בנק הפועלים 584-136663', group: 110, groupName: 'בנקים', balance: -2000000 },
+];
+const fin = (data, meta = {}) => ({ finance: true, data, meta: { company: 'demo', sync: FIN_SYNC, warnings: FIN_WARN, ...meta } });
+const finCompany = (u) => (u.searchParams.get('company') === 'demo' ? null : { error: { code: u.searchParams.get('company') ? 'not_found' : 'bad_request', message: 'unknown company' }, status: u.searchParams.get('company') ? 404 : 400 });
+const pnlRow = (m) => ({ period: m.month, income: m.income, purchases: m.purchases, salaries: m.salaries, general: m.general, profit: m.income - m.purchases - m.salaries - m.general });
+const FIN_ROUTES = {
+  '/finance/companies': () => ({ finance: true, data: [{ code: 'demo', name: 'Demo company', taxId: null, allegroKey: DEMO_COMPANY.key, allegroLabel: DEMO_COMPANY.label, years: [Number(T.slice(0, 4)) - 1, Number(T.slice(0, 4))], rules: true }], meta: {} }),
+  '/finance/status': (u) => finCompany(u) || fin({ lastRun: { at: FIN_SYNC.lastRunAt, status: 'done', changedRows: 3, error: null }, dataUpTo: FIN_SYNC.dataUpTo, dataStart: finMonths[0].month, years: [Number(T.slice(0, 4))], banks: [{ accountKey: '110011', name: 'בנק הפועלים', bankBalance: 121642.83, lastRunningBalance: 121642.83, bookBalance: -2000000, bankOpen: 17708.88, bookOpen: -2100000, openBankLines: 58, openBookLines: 93 }], suppliers: { debitCount: 2, debitTotal: 10000, creditCount: 40, creditTotal: 2500000 }, months: finMonths.map((m) => ({ ...m, warnings: m.salaries ? [] : ['no_salary_expense'], complete: !!m.salaries })) }),
+  '/finance/pnl': (u) => {
+    if (finCompany(u)) return finCompany(u);
+    const from = u.searchParams.get('from'), to = u.searchParams.get('to') || T;
+    if (!from) return { error: { code: 'bad_request', message: 'from must be YYYY-MM-DD' }, status: 400 };
+    const rows = finMonths.filter((m) => m.month >= from.slice(0, 7) && m.month <= to.slice(0, 7)).map(pnlRow);
+    const totals = rows.reduce((t, r) => ({ income: t.income + r.income, purchases: t.purchases + r.purchases, salaries: t.salaries + r.salaries, general: t.general + r.general, profit: t.profit + r.profit }), { income: 0, purchases: 0, salaries: 0, general: 0, profit: 0 });
+    const by = u.searchParams.get('by') || 'month';
+    const data = by === 'branch' ? BRANCHES.map((b, i) => ({ branch: b.id, branchName: b.name, costCode: String(101 + i), branchSource: { cost: 1, account: 1, description: 0 }, ...Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, Math.round(v / 2)])) })).concat([{ branch: null, branchName: 'No branch', costCode: null, branchSource: { cost: 0, account: 0, description: 0 }, income: 0, purchases: 0, salaries: 0, general: 0, profit: 0 }]) : rows;
+    return fin(data, { from, to, by, totals, ...(u.searchParams.get('compare') ? { compare: { mode: u.searchParams.get('compare'), from, to, totals } } : {}) });
+  },
+  '/finance/cash': (u) => finCompany(u) || fin({ bankBalance: 121642.83, bankBalanceDate: FIN_SYNC.dataUpTo, lastRunningBalance: 121642.83, bookBankBalance: -2000000, banks: [], chequesOut: { next30: { count: 6, amount: 67713 }, days31to60: { count: 3, amount: 39850 }, days61to90: { count: 2, amount: 18125 }, later: { count: 17, amount: 127644 } }, chequesDueNotCleared: { count: 12, amount: 43850 }, expectedIn: { overdue: 648388, next30: 0, days31to60: 0, days61to90: 0, later: 0 }, projected: { day30: 10079, day60: -29771, day90: -47896 } }, { asOf: T }),
+  '/finance/aging': (u) => finCompany(u) || fin(finAccounts.filter((a) => (u.searchParams.get('side') === 'customers' ? a.group === 200 : a.group === 500)).map((a) => ({ accountKey: a.accountKey, name: a.name, group: a.group, isGroupCompany: false, balance: Math.abs(a.balance), openTotal: Math.abs(a.balance), openCount: 3, oldest: addDays(T, -120), buckets: { current: 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': Math.abs(a.balance) }, method: 'matched', tie: true })), { side: u.searchParams.get('side'), asOf: T, totals: { balance: 0, openTotal: 0, buckets: {} }, methods: { matched: 3, oldest_first: 0 }, untied: [] }),
+  '/finance/trial-balance': (u) => finCompany(u) || fin(finAccounts.map((a) => ({ accountKey: a.accountKey, name: a.name, group: a.group, groupName: a.groupName, debit: a.balance > 0 ? a.balance : 0, credit: a.balance < 0 ? -a.balance : 0, balance: a.balance, lines: 10 })), { asOf: T, totals: { debit: 1, credit: 1, balance: 0 }, balanced: true }),
+  '/finance/ledger': (u) => {
+    if (finCompany(u)) return finCompany(u);
+    const q = u.searchParams.get('q');
+    const hits = finAccounts.filter((a) => (q ? a.name.includes(q) : a.accountKey === u.searchParams.get('account')));
+    if (!hits.length) return { error: { code: 'not_found', message: 'unknown account' }, status: 404 };
+    if (hits.length > 1) return fin(null, { ambiguous: true, accounts: hits.map(({ balance, ...a }) => a) });
+    const a = hits[0];
+    return fin([{ date: addDays(T, -10), year: Number(T.slice(0, 4)), transId: 1, lineId: 1, type: 'ח18', reference: 0, description: a.name, counterAccount: '800000', counterName: 'קניות', debit: 0, credit: 1000, runningBalance: a.balance, posted: true, matched: false }], { account: { accountKey: a.accountKey, name: a.name, group: a.group }, from: u.searchParams.get('from'), to: u.searchParams.get('to') || T, total: 1, openingBalance: a.balance + 1000, closingBalance: a.balance, debit: 0, credit: 1000 });
+  },
+};
+
 const ROUTES = {
+  ...FIN_ROUTES,
   '/health': () => ({ status: 'ok', db: 'ok', time: new Date().toISOString() }),
   '/branches': () => BRANCHES.map((b) => ({ id: b.id, name: b.name, demo: true, company: { ...DEMO_COMPANY, companyId: 'demo', payrollSoft: 'mic' }, bcomRestaurantId: 'demo' })),
   '/status': (u) =>
@@ -246,6 +301,11 @@ http
       return res.end(JSON.stringify({ error: { code: 'not_found', message: `no fake for ${path}` } }));
     }
     const out = fn(u);
+    if (out && out.error) {
+      res.statusCode = out.status || 400;
+      return res.end(JSON.stringify({ error: out.error }));
+    }
+    if (out && out.finance) return res.end(JSON.stringify({ data: out.data, meta: { ...out.meta, ...(Array.isArray(out.data) ? { count: out.data.length } : {}) } }));
     res.end(JSON.stringify({ data: out, meta: { asOf: new Date().toISOString(), sources: {}, ...(Array.isArray(out) ? { count: out.length } : {}) } }));
   })
   .listen(PORT, '127.0.0.1', () => console.log(`fake Allegro API on http://localhost:${PORT}/local-api/v1 — ${data.orders.length} orders, ${data.items.length} dish rows, ${data.employees.length} employees, ${data.raw.length} clock rows`));

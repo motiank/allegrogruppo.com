@@ -731,8 +731,9 @@ The same errors as the Local Data API: `{ "error": { "code", "message" } }`.
 
 ## 10. Joya HQ side
 
-Joya's own rules still apply (`hq/CLAUDE.md`). Joya code must not change admin code, so the admin side got its own task
-(this one). **Not built yet.**
+Joya's own rules still apply (`hq/CLAUDE.md`). **Built on 2026-11-07** (`hq/src/services/finance.js`, 23 calculations,
+`hq/README.md` → "The books"): in the existing הנהלת חשבונות area, for the chain admin only (decision 1). The list
+below was the plan; what differs is noted.
 
 - **Reading:** add finance functions to `src/services/source.js` only. Never save the answers in a `joya_*` table.
 - **Numbers:** each answer comes from a calculation in `src/services/ai.js`, never from the model. Suggested calculations: `finance_status`, `pnl`, `cash_position`, `spending`, `aging`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_open_items`, `customer_invoices`, `account_statement`, `cheques`, `vat_summary`, `withholding`, `exceptions`.
@@ -740,7 +741,9 @@ Joya's own rules still apply (`hq/CLAUDE.md`). Joya code must not change admin c
 - **Display:** whole shekels, cut down, and a "סה"כ" row. Every text in both `*.he.js` and `*.en.js`.
 - **Names:** a customer or supplier name goes through `q`. If `meta.ambiguous` comes back, Joya asks which one, or lists `meta.accounts`.
 - **Scope:** the top-bar picker gives `company` and `branch`. Map the company key (`allegroKey` in `/companies`) in the calculation. A company with no finance data gets a clear "not loaded yet" answer.
-- **Rights:** see decision 1. Check them in `src/access.js` before the calculation runs.
+- **Rights:** decision 1 (owner 2026-11-07): the chain admin only; `FINANCE_CALCS` in `hq/src/services/ai.js`. The
+  accountant role keeps the register-vs-bank calculations only, until the owner opens the books to it.
+- **Area:** no new area (owner 2026-11-07): the books live in הנהלת חשבונות, with 8 more suggested questions for the admin.
 - **Tests:** add the finance shapes to `scripts/fake-allegro.mjs`, with made-up data.
 
 ---

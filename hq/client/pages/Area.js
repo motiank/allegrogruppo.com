@@ -13,14 +13,16 @@ export const AREAS = {
   people: { id: 2, suggestions: 4 },
   performance: { id: 3, suggestions: 3 },
   bank: { id: 4, suggestions: 8 },
-  accounting: { id: 5, suggestions: 8 },
+  // the accounting area: 8 register-vs-bank questions for everyone in it, then 8 about the books (chain admin only)
+  accounting: { id: 5, suggestions: 8, adminSuggestions: 8 },
 };
 
 export default function Area({ area }) {
   const { t } = useT();
   const j = useJoya();
   const a = AREAS[area];
-  const suggestions = Array.from({ length: a.suggestions }, (_, i) => t(`joya.area.${area}.s${i + 1}`));
+  const n = a.suggestions + (j.me?.isAdmin ? a.adminSuggestions || 0 : 0);
+  const suggestions = Array.from({ length: n }, (_, i) => t(`joya.area.${area}.s${i + 1}`));
   // the section's name is in the middle of the top bar (JoyaApp.js), not on the page
   return (
     <Page>

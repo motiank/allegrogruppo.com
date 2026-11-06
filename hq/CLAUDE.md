@@ -118,8 +118,14 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   hours per role, and the clock names it could not link (`unlinkedClockNames`). Users with payroll access only
   (admin and restMngr, their own locations). No national ids or phones.
 - Users: only the admin's `users.json` (admin → chain admin, restMngr → its `restaurants`; payroll for both).
-- Planner eval 37/37 (`joya-hq-1+9638d0b5`; 3 of its cases are INQUIRY, a context that no longer exists — remove
-  them with the prompt's `draft` field at the next prompt change). Unit 25, runner 8, smoke 63 + 1 known failure ("the raised quantity
+- **The books** (2026-11-07, owner: admin only, in the existing הנהלת חשבונות area): 23 finance calcs in
+  `src/services/finance.js` over the admin's Finance API `/finance/*` (`../finance_api_readme.md`; `source.finance()`),
+  per company (only Pastalina is loaded), chain admin only (`FINANCE_CALCS` in `ai.js`), warnings shown beside the
+  numbers (WRITE prompt "The books"). README → "The books". Eval 2026-11-07 (`joya-hq-1+d9d73484`): `f-*` 21/21, full run
+  115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
+  `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
+  other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
+- Planner eval: see the books (2026-11-07) for the latest run. Unit 34, runner 12, smoke 63 + 1 known failure ("the raised quantity
   moves the next recommendation" — a weighted median of 8 lists cannot move on one raised list; test/design
   mismatch, not a bug).
 
