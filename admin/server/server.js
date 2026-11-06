@@ -32,6 +32,7 @@ const managementModule = await import("./auth/management.js");
 const managementRouter = managementModule.default;
 const { Router: orderSystemRouter } = await import("./modules/orderSystem.js");
 const { Router: localApiRouter } = await import("./modules/localApi.js");
+const { Router: financeApiRouter } = await import("./modules/financeApi.js");
 
 const app = express();
 const PORT = process.env.ADMIN_PORT || 3021;
@@ -75,7 +76,9 @@ app.get("/config", (req, res) => {
   res.json({ darkMode });
 });
 
-// Read-only data API (shifts, payroll, beecomm) - no login, loopback connections only
+// Read-only data API (shifts, payroll, beecomm) - no login, loopback connections only.
+// The Finance API (allegro_finance, finance_api_readme.md) comes first: the local API ends with a 404 catch-all.
+app.use("/local-api/v1/finance", financeApiRouter());
 app.use("/local-api/v1", localApiRouter());
 
 // Protected admin routes - require authentication

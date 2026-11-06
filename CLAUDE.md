@@ -89,6 +89,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   dropdown (`admin/client/components/Layout.js`). To reopen: set it to false, put the dropdown back, build, restart
   `allegro.service`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
+- **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
+  `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
+  (read only, loopback only, like the Local Data API). Its DB settings are `FINANCE_DB_*` in the root `.env` (default: the
+  admin's `DB_*` server, database `allegro_finance`). Test: `node --test scripts/test_finance_api.js` (local
+  `allegro_finance_dev` from `hash-sync/.env`; the mixed endpoints also read the production `allegro` DB). Not deployed yet;
+  the Joya side (`hq/`) is a separate task. Every number still carries the `not_validated` warning until the accountant checks it.
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.
   Fix at least `/auth/register` and the password leak before sharing hq.allegrogruppo.com with managers.

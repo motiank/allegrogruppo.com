@@ -2,6 +2,7 @@
 
 A read-only JSON API over the group's operational data: **branches, employees, shifts, payroll (salaries), labor cost and Beecomm sales**. It is part of the admin service (`admin/server`) and is reachable **only from the machine the admin server runs on**. It's meant for local scripts, reports, spreadsheets and agents.
 
+- **Finance data** (the Hashavshevet copy, `allegro_finance`) has its own part of this API at `/local-api/v1/finance`, with the same access rules. See `finance_api_readme.md`.
 - **Base URL:** `http://localhost:3021/local-api/v1`. The port is `ADMIN_PORT`: 3021 by default and in `npm run adminDev`, 3022 in `admin:test`.
 - **Code:** `admin/server/modules/localApi.js`, mounted in `admin/server/server.js`.
 - **Methods:** `GET` only. The API never writes to the DB or to Beecomm.

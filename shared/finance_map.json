@@ -1,0 +1,82 @@
+{
+  "_doc": [
+    "Accounting rules of the Finance API (admin/server/modules/financeApi.js), per company code of allegro_finance.companies.",
+    "The accountant can correct these without a code change. finance_api_readme.md section 5 explains each block.",
+    "confirmed: false marks a rule that still waits for the owner or the accountant."
+  ],
+  "companies": {
+    "pastalina": {
+      "allegroKey": "pastaLina",
+      "vatRate": 0.18,
+      "reportLines": {
+        "income": [700],
+        "purchases": [800],
+        "salaries": [720],
+        "general": [900]
+      },
+      "balanceGroups": {
+        "cash": [100, 110, 130],
+        "customers": [200, 210],
+        "registerCustomers": [210],
+        "suppliers": [500],
+        "vat": [400],
+        "payrollAndTax": [410, 420, 450, 510],
+        "fixedAssets": [300],
+        "shareholders": [490]
+      },
+      "groupLabels": {
+        "0": "ללא קבוצה",
+        "105": "הלוואות",
+        "130": "פקדונות",
+        "250": "לקוחות אחרים",
+        "510": "קרנות פנסיה והשתלמות",
+        "550": "ספקים אחרים"
+      },
+      "foodCostAccounts": null,
+      "_foodCostAccounts": "null = every account of group 800. The accountant's list of food accounts goes here, e.g. [\"800000\", \"800001\", ...].",
+      "invoiceTypes": {
+        "supplier": ["ח18", "תצ", "ת23", "חק", "ת"],
+        "customer": ["ע"],
+        "customerCredit": ["חז"],
+        "withholdingPayment": ["0"]
+      },
+      "_invoiceTypes": "ת (1,628 entries, 2025) is not in Hashavshevet's type table, but its entries are expense + supplier + input VAT, like ח18. Confirm with the accountant.",
+      "vatAccounts": {
+        "sales": "400001",
+        "input": "400002",
+        "assets": "400003",
+        "settlement": "400004"
+      },
+      "withholdingAccounts": ["410001"],
+      "branches": [
+        { "costCode": "101", "hashName": "רמת החייל", "branch": "6012624f0d491ef6429e127c", "name": "רמת החיל", "words": ["רמת החייל", "רמת החיל"], "accounts": [], "confirmed": true },
+        { "costCode": "102", "hashName": "ראש פינה", "branch": "655ef6eb9df0c279bbfb7482", "name": "ראש פינה", "words": ["ראש פינה"], "accounts": [], "confirmed": true },
+        { "costCode": "103", "hashName": "רעננה", "branch": "5ff419934676f0fddabaef3a", "name": "רעננה", "words": ["רעננה"], "accounts": [], "confirmed": true },
+        { "costCode": "104", "hashName": "גויה הרצליה", "branch": "5fd7030f4f421bfe0e2e13bd", "name": "הרצליה", "words": ["הרצליה"], "accounts": [], "confirmed": false }
+      ],
+      "_branches": "Rule 1: the entry's cost code. Rule 2: the account (its own cost code, the accounts list, or a word of the branch in the account name). Rule 3: a word in the entry description. Decision 5 (104 = הרצליה) is open.",
+      "intercompany": [
+        { "accountKey": "500084", "kind": "group_company", "confirmed": false },
+        { "accountKey": "500115", "kind": "group_company", "confirmed": false },
+        { "accountKey": "500064", "kind": "group_company", "confirmed": false },
+        { "accountKey": "500117", "kind": "group_company", "confirmed": false },
+        { "accountKey": "200040", "kind": "group_company", "confirmed": false },
+        { "accountKey": "105001", "kind": "loan", "confirmed": false },
+        { "accountKey": "490002", "kind": "shareholder", "confirmed": false },
+        { "accountKey": "490003", "kind": "shareholder", "confirmed": false }
+      ],
+      "_intercompany": "Candidates from the data (decision 3). The owner must confirm the list.",
+      "allocationNumber": {
+        "thresholds": [
+          { "from": "2024-05-05", "minAmount": 25000 },
+          { "from": "2025-01-01", "minAmount": 20000 },
+          { "from": "2026-01-01", "minAmount": 10000 }
+        ],
+        "confirmed": false,
+        "_note": "The legal limit (invoice total with VAT) per date. Not confirmed with the accountant."
+      },
+      "validated": [],
+      "_validated": "Endpoint paths the accountant has checked, e.g. [\"/trial-balance\"]. They stop carrying the not_validated warning."
+    }
+  }
+}
