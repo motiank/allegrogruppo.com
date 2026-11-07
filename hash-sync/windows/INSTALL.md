@@ -26,6 +26,8 @@ old version of a changed row is kept in `row_history`.
    - `HASH_MSSQL_INSTANCE` — the instance name, usually `WIZSOFT`. The service "SQL Server Browser" must run.
      If the instance uses a fixed port, leave the instance empty and set `HASH_MSSQL_PORT`.
    - `HASH_MSSQL_PASSWORD` and `HASH_MSSQL_DATABASE` — the login password and the name of the company database.
+     A password with `#`, spaces or quotes must be written in single quotes: `HASH_MSSQL_PASSWORD='pa#ss'`.
+     Each SQL Server instance has its own `sa` password: use the instance (or port) that works with that password.
    - `TARGET_DB_HOST`, `TARGET_DB_USER`, `TARGET_DB_PASSWORD` — from `.env.production`.
    Save and close Notepad. The install then checks both connections and prints what it finds, with a hint for each
    problem. If the SQL Server database name is wrong, the check prints the list of databases on the server.
