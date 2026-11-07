@@ -4,7 +4,7 @@
 // The admin's Downloads page (admin/server/modules/downloads.js) calls buildWindowsPackage() so the download always
 // matches the code of the deployed repo. By hand: node scripts/build-windows-package.js  →  dist/hash-sync-windows-<version>.zip
 // jszip comes from the repo's root node_modules (a dependency of the admin).
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
@@ -23,7 +23,8 @@ export function windowsPackageFiles() {
     const raw = readFileSync(diskPath);
     out.push({ path: zipPath, content: CRLF_EXT.has(ext(zipPath)) ? crlf(raw) : raw, mtime: statSync(diskPath).mtime });
   };
-  for (const name of ['package.json', 'package-lock.json', 'README.md']) add(name, join(ROOT, name));
+  // The repo's root .gitignore ignores every package-lock.json; hash-sync's is force-added, but a copy without it still works (install.ps1 then uses npm install).
+  for (const name of ['package.json', 'package-lock.json', 'README.md']) if (existsSync(join(ROOT, name))) add(name, join(ROOT, name));
   for (const dir of ['src', 'sql']) for (const name of readdirSync(join(ROOT, dir)).sort()) add(`${dir}/${name}`, join(ROOT, dir, name));
   for (const name of readdirSync(join(ROOT, 'windows')).sort()) {
     if (name === 'env.example') add('.env.example', join(ROOT, 'windows', name));

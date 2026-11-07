@@ -21,10 +21,11 @@ Write-Host "Node.js $version at $($node.Source)"
 Set-Content -Path (Join-Path $root 'node-path.txt') -Value $node.Source -NoNewline
 
 # 2. The packages (mssql, mysql2, dotenv), exactly the versions of package-lock.json
-Write-Host "Installing the packages (npm ci)..."
-& npm ci --omit=dev --no-audit --no-fund
+$npmCommand = if (Test-Path (Join-Path $root 'package-lock.json')) { 'ci' } else { 'install' }
+Write-Host "Installing the packages (npm $npmCommand)..."
+& npm $npmCommand --omit=dev --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "npm ci failed. Check the internet connection and run install.cmd again." -ForegroundColor Red
+  Write-Host "npm $npmCommand failed. Check the internet connection and run install.cmd again." -ForegroundColor Red
   exit 1
 }
 
