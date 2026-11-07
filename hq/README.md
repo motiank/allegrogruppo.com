@@ -214,7 +214,7 @@ accounting menu suggests 8 more questions for the chain admin (`joya.area.accoun
 **The detailed bank reconciliation report** (דוח התאמת בנק מפורט, owner 2026-11-07: "I want it in the Joya HQ") is the
 admin's report (`admin/server/modules/bankRecon.js`, Hebrew RTL HTML + Excel) served to Joya by the Finance API
 (`/finance/bank/report?company&account&from&to&format=json|html|xlsx`, `/finance/bank/report/accounts`). Two ways in,
-chain admin only: the page `/accounting/bank-recon` (main-menu item "דוח התאמת בנק מפורט", also a button above the accounting chat; picks the
+chain admin only: the page `/accounting/bank-recon` (not in the menu: asked in free language in the accounting chat, suggestion "תכין לי דוח התאמת בנק מפורט לחודש שעבר", and opened from the buttons under the answer; picks the
 account and dates, shows the admin's HTML in a frame, offers the Excel and a print tab — Joya routes
 `/api/joya/finance/bank-recon[/accounts]`, `source.financeBankReport*`), and the calc `bank_recon_report` in the chat
 ("תכין לי דוח התאמת בנק מפורט לאוקטובר"): the summary that ties the bank balance to the book balance, the biggest rows of
