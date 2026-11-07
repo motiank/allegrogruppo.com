@@ -131,6 +131,18 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   README → "The detailed bank reconciliation report". Eval fixtures `f-bank-recon-report*`, `f-bank-recon-sections`.
   Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
   from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
+- **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
+  company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
+  (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the
+  area's chat (AREA 6). Everything is said in the chat: planner field `payments` (add / move / amount / cancel,
+  `CHANGE_FORMATS.PAYMENTS`; forward dates, week-of-month windows 1–7 / 8–14 / 15–21 / 22–end, monthly series) →
+  `payments.checkOps` → proposal `PAYMENT_OPS` → Apply → `applyOps`; reading = calc `payments_due`. **PAID only from the
+  bank file** (`matchWithBank`: 485 transfers / 515 standing orders, same amount, −7…+21 days, the payee's name after
+  "לטובת:", else the only candidate; unclear → the board's confirm button). Transfers only, no cheques. The board's grid
+  has a free `side` slot for the cash-flow panel (next). README → "Payments". Tests `test/test_payments.mjs` (20); eval `p-*`
+  13/13; full run 131/133 at concurrency 2 (one JSON glitch passed on rerun; `f-bank-recon-sections` had drifted to
+  bank_open_items ×2 → the report rule now says "both sides at once → bank_recon_report alone", 3/3 after). The planner
+  writes `dueWeek` as numbers { year, month, week }: a quoted "YYYY-MM" inside the object lost its closing quote every time.
 - Planner eval: see the books (2026-11-07) for the latest run. Unit 34, runner 12, smoke 63 + 1 known failure ("the raised quantity
   moves the next recommendation" — a weighted median of 8 lists cannot move on one raised list; test/design
   mismatch, not a bug).

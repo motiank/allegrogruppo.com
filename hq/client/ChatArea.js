@@ -329,7 +329,7 @@ function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
 const PAGE = 10;
 const KEEP = 100;
 
-export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [] }) {
+export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], onChanged = null }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
@@ -501,7 +501,10 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
             classes={classes}
             busy={busy}
             onDelete={() => remove(r.id)}
-            onChanged={() => load()}
+            onChanged={(what) => {
+              load();
+              if (what === 'apply') onChanged?.();
+            }}
             onResend={() => retry(r.id)}
             onEdit={() => setDraft((d) => ({ text: r.question, n: (d?.n || 0) + 1 }))}
           />

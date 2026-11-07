@@ -108,6 +108,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
   else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
+- **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
+  the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
+  and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own
+  table `joya_payments` (`hq/sql/add-joya.sql`, created on production 2026-11-07). `hq/README.md` → "Payments". The cash-flow
+  view will sit next to the payments board (owner).
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

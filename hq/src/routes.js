@@ -22,6 +22,7 @@ import * as payroll from './services/payroll.js';
 import * as quality from './services/quality.js';
 import * as work from './services/work.js';
 import * as ai from './services/ai.js';
+import * as payments from './services/payments.js';
 import { answerTableXlsx } from './services/answerExcel.js';
 import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
@@ -218,6 +219,30 @@ r.get(
     res.send(file.buffer);
   }),
 );
+
+// ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
+// Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank
+// match; changes come from the chat (a PAYMENT_OPS proposal applied in ai.js) or from these routes — the same
+// checkOps → applyOps path, so the rules are one.
+const paymentOp = async (req, op) => payments.applyOps(req.joya, await payments.checkOps(req.joya, [op], { companyKey: req.body?.companyKey ?? req.query.company ?? null }), { via: 'API' });
+r.get('/joya/payments', requireAdmin, h(async (req) => payments.list(req.joya, { companyKey: req.query.company || null, from: req.query.from || null, to: req.query.to || null, status: req.query.status || 'PLANNED' })));
+r.get('/joya/payments/payees', requireAdmin, h(async (req) => ({ payees: await payments.payees(req.query.company || null) })));
+r.post('/joya/payments', requireAdmin, h(async (req) => paymentOp(req, { ...(req.body || {}), op: 'add' })));
+r.patch(
+  '/joya/payments/:id',
+  requireAdmin,
+  h(async (req) => {
+    const b = req.body || {};
+    const pid = id(req);
+    let n = 0;
+    if (b.dueDate || b.dueWeek) (n++, await paymentOp(req, { op: 'move', id: pid, dueDate: b.dueDate, dueWeek: b.dueWeek, scope: b.scope }));
+    if (b.amount != null) (n++, await paymentOp(req, { op: 'amount', id: pid, amount: b.amount, scope: b.scope }));
+    if (!n) throw Object.assign(new Error('nothing to change: dueDate / dueWeek or amount'), { code: 'BAD_REQUEST' });
+    return { payment: await payments.get(req.joya, pid) };
+  }),
+);
+r.post('/joya/payments/:id/cancel', requireAdmin, h(async (req) => (await paymentOp(req, { op: 'cancel', id: id(req), scope: req.body?.scope }), { payment: await payments.get(req.joya, id(req)) })));
+r.post('/joya/payments/:id/match', requireAdmin, h(async (req) => ({ payment: await payments.confirmMatch(req.joya, id(req), req.body?.bankTxKey) })));
 
 // ---------------------------------------------------------------- quality, overview, audit
 r.get('/joya/quality', h(async (req) => quality.report(req.joya, locsOf(req))));

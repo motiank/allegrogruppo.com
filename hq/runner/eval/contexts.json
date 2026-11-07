@@ -3298,6 +3298,449 @@
    },
    "object": null,
    "teamRules": []
+  },
+  "PAYMENTS": {
+   "request": {
+    "id": 0,
+    "question": "",
+    "lang": "he",
+    "contextKind": "AREA",
+    "contextId": 6,
+    "locationId": null,
+    "area": "PAYMENTS"
+   },
+   "user": {
+    "role": "CHAIN_ADMIN",
+    "payroll": true
+   },
+   "today": "2026-10-21",
+   "locations": [
+    {
+     "id": "demo-hfa",
+     "name": "ג׳ויה חיפה (דמו)",
+     "company": "חברת דמו",
+     "active": true,
+     "isDemo": true,
+     "companyKey": "demo"
+    },
+    {
+     "id": "demo-tlv",
+     "name": "ג׳ויה תל אביב (דמו)",
+     "company": "חברת דמו",
+     "active": true,
+     "isDemo": true,
+     "companyKey": "demo"
+    }
+   ],
+   "shifts": [
+    {
+     "locationId": "demo-tlv",
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": "demo-tlv",
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    },
+    {
+     "locationId": "demo-hfa",
+     "code": "morning",
+     "name": "בוקר",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "start": "07:30:00",
+     "end": "16:00:00"
+    },
+    {
+     "locationId": "demo-hfa",
+     "code": "evening",
+     "name": "ערב",
+     "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      6
+     ],
+     "start": "16:00:00",
+     "end": "23:30:00"
+    }
+   ],
+   "roles": [
+    {
+     "code": "cook",
+     "he": "טבח",
+     "en": "Cook"
+    },
+    {
+     "code": "checker",
+     "he": "צ׳קר",
+     "en": "Checker"
+    },
+    {
+     "code": "barista",
+     "he": "בריסטה",
+     "en": "Barista"
+    },
+    {
+     "code": "bartender",
+     "he": "ברמן",
+     "en": "Bartender"
+    },
+    {
+     "code": "runner",
+     "he": "ראנר",
+     "en": "Runner"
+    },
+    {
+     "code": "waiter",
+     "he": "מלצר",
+     "en": "Waiter"
+    }
+   ],
+   "calculations": [
+    {
+     "name": "sales_summary",
+     "params": "{ locationIds?: string[], from: \"YYYY-MM-DD\", to: \"YYYY-MM-DD\" }",
+     "about": "revenue, checks (= orders), diners, average per check and per diner for the period, compared with the same-length period before; change split into volume effect and average-spend effect"
+    },
+    {
+     "name": "sales_daily",
+     "params": "{ locationIds?, from, to }",
+     "about": "day by day revenue, checks, diners; missing days marked"
+    },
+    {
+     "name": "sales_by_shift",
+     "params": "{ locationIds?, from, to }",
+     "about": "revenue, checks, diners per shift"
+    },
+    {
+     "name": "payments_summary",
+     "params": "{ locationIds?, from, to, brands?: [\"VISA\", \"MASTERCARD\", \"AMEX\", \"DINERS\"], group?: \"week\" | \"month\" }",
+     "about": "payments by type (credit, cash, Wolt, 10bis, Sodexo, Multipass, hakafa…) and card brand: charges = paid − refunded (Beecomm \"סה״כ\"; their total = income WITHOUT tips: card rows include the card tips, the cash row is lower by them because the workers got them in cash), share of all payments, refunds, number and average payment, service (tips); vs the same-length period before. Always: creditCards (= \"credit card\": VISA + MASTERCARD + AMEX + DINERS + ISRACARD + DISCOVER + MAESTRO only) and membersClub (every other brand of the credit type: the club card…, NOT Mishloha) and mishloha (\"אשראי - MISHLOHA\", its own group), per location (day by day up to 62 days) and in total. brands: also the sum of only these card brands (selected; selectedTotal). group: also the sums per Sunday–Saturday week or per month (byPeriod per location, byPeriodTotal over all)"
+    },
+    {
+     "name": "vat_report",
+     "params": "{ locationIds?, from, to }  (whole months: from = the 1st, to = the last day or today)",
+     "about": "the monthly VAT report (דוח מע\"מ): per month, per restaurant, per company and in total — the income from Beecomm (all payments in the Z, without tips), the payments of חבר and the 20% deducted from them (only חבר, not מולטיפס), the income for VAT (income − deduction), the VAT inside it (18/118) and the income before VAT; daysWithData per restaurant and month"
+    },
+    {
+     "name": "month_vs_last_year",
+     "params": "{ locationIds?, month?: \"YYYY-MM\" (default this month) }",
+     "about": "the weekly performance report (owner): per restaurant and for the chain, the average income per day of the month (up to yesterday) vs the average income per day of the same month last year, the change in %, and the income of both months (last year: the whole month); days with income only (closed days not counted); income = the Z total, without tips; data since 2024"
+    },
+    {
+     "name": "waiter_performance",
+     "params": "{ locationIds?, from, to }",
+     "about": "per waiter (who opened the order in Beecomm) per restaurant: orders, income (no tips), tips and tips % of income, average order, days worked; orders without a waiter (Wolt, online) apart"
+    },
+    {
+     "name": "daily_dashboard",
+     "params": "{ locationIds?, date?: \"YYYY-MM-DD\" (default today) }",
+     "about": "the daily dashboard (owner): per restaurant and in total the income, number of diners, income per diner and refunds (זיכויים) of one business day; today live from Beecomm (the day so far, with open orders), or — when live is not available — the last stored day (date says which day); a past date from the stored data"
+    },
+    {
+     "name": "bank_summary",
+     "params": "{ companyKeys?: string[], from, to, group?: \"week\" | \"month\" }",
+     "about": "the company's bank account(s): money in and out, net, the balance at the start and end and the lowest, the biggest sources and uses (action + details), day by day up to 62 days; group: per Sunday–Saturday week or per month (byPeriod) instead of day by day; vs the same-length period before. Chain admin only"
+    },
+    {
+     "name": "card_income_week",
+     "params": "{ locationIds?, weekStart?: \"YYYY-MM-DD\" (any day of the week; default this week) }",
+     "about": "the card money expected to come in during a Sunday–Saturday week, from Beecomm and the card companies' pay rules: creditCards (VISA + MASTERCARD + DINERS of the week before, paid by Max on Wednesday) and amex (American Express: sales of the 1st–15th paid on the 2nd of the next month, of the 16th–end on the 8th) apart, and the total; amounts without tips, the card tips apart (tips)"
+    },
+    {
+     "name": "cards_vs_bank",
+     "params": "{ companyKeys?, from, to }",
+     "about": "card sales in Beecomm vs the card companies' payouts in the bank, the way they pay: per Sunday–Saturday week VISA + MASTERCARD vs Max's payout the next Wednesday (fee ≈ 1.6%), and per month AMEX vs American Express's payouts in the next month; with the difference in %. Chain admin only"
+    },
+    {
+     "name": "bank_transactions",
+     "params": "{ companyKeys?, from, to, q?: \"text in the action or details, e.g. WOLT, מקס, ביטוח לאומי\", side?: \"credit\" | \"debit\", order?: \"amount\" | \"date\", limit? }",
+     "about": "single bank transactions (biggest or newest first) with their count and sums; filter by text and money in/out. Chain admin only"
+    },
+    {
+     "name": "sales_by_dish",
+     "params": "{ locationIds?, from, to, limit? }",
+     "about": "units and revenue per dish vs the previous period"
+    },
+    {
+     "name": "sales_anomalies",
+     "params": "{ locationIds?, from, to }",
+     "about": "days with unusual revenue vs the same weekday of the 8 weeks before, and missing days"
+    },
+    {
+     "name": "labor_summary",
+     "params": "{ locationIds?, from, to }",
+     "about": "worked hours, sales per labor hour; with payroll access also the labor cost and the payslip gross as the Allegro admin computes them (its payroll rules; months without a saved payroll built from the Tabit reports), labor % of sales, and the hours with no wage (people named)"
+    },
+    {
+     "name": "planned_vs_actual_hours",
+     "params": "{ locationIds?, from, to }",
+     "about": "approved staffing plan hours vs worked hours per week"
+    },
+    {
+     "name": "shift_demand_recent",
+     "params": "{ locationId, weekday: 0-6 (0 = Sunday), shiftCode?, weeks? }",
+     "about": "demand units (diners per shift, peak hour, orders…) on the recent same weekdays"
+    },
+    {
+     "name": "shift_profile",
+     "params": "{ locationId, weeks? }",
+     "about": "the usual shift: diners and deliveries per weekday and shift (morning / evening), an EMA over the last weeks (default 8; recent weeks weigh more)"
+    },
+    {
+     "name": "staffing_forecast_week",
+     "params": "{ locationId, weekStart?: \"YYYY-MM-DD\" (a Sunday; default next week), weeks? }",
+     "about": "people needed per role in every shift of a week, without a plan: expected diners from the usual shift (EMA of the last weeks), and per role the diners per person learned from the clock times of the last weeks"
+    },
+    {
+     "name": "staffing_actual",
+     "params": "{ locationId, from, to, role?: \"role name, e.g. מלצר\" }",
+     "about": "past shifts as they really were (Tabit clock times): per role and shift the people, hours and diners per person (e.g. diners per waiter), the shifts with more or fewer people than the load needed by the usual ratio, and a summary per role; up to 92 days"
+    },
+    {
+     "name": "clock_rows",
+     "params": "{ locationIds?, from, to, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", shift?: \"morning\" | \"evening\" }",
+     "about": "the shifts themselves from the Tabit Shift clock report: one row per entry and exit (date, weekday, name, role, morning / evening, clock in, clock out, hours, open = a time is missing), up to 400 rows, plus a line per person (days, hours). For \"the shifts of <person>\" or \"who worked on <date> (evening)\""
+    },
+    {
+     "name": "attendance_report",
+     "params": "{ locationIds?, from, to }",
+     "about": "דיווחי נוכחות: the Tabit Shift clock report only, and its problems per location: open shifts (an entry without an exit, an exit without an entry; no exit today = still at work), no-shows (in the Tabit work plan that day but no clock times) and people who clocked in on a day they were not in the plan; each with the date, name, role and times"
+    },
+    {
+     "name": "staffing_plan_lines",
+     "params": "{ planId, date?, shiftCode?, roleCode? }",
+     "about": "the lines of a staffing plan with the rules, demand and calculation behind each number"
+    },
+    {
+     "name": "staffing_forecast",
+     "params": "{ planId, date?, shiftCode? }",
+     "about": "the demand forecast of a plan and the past dates it came from"
+    },
+    {
+     "name": "staffing_rules",
+     "params": "{ locationId }",
+     "about": "the staffing rules that apply to a location"
+    },
+    {
+     "name": "order_list",
+     "params": "{ listId }",
+     "about": "an order list: working lines, the original recommendation with the basis of each quantity, and the edits"
+    },
+    {
+     "name": "item_patterns",
+     "params": "{ locationId }",
+     "about": "what was learned per item from final order lists"
+    },
+    {
+     "name": "shortages",
+     "params": "{ locationIds?, days? }",
+     "about": "reported shortages"
+    },
+    {
+     "name": "data_quality",
+     "params": "{ locationIds? }",
+     "about": "missing, stale and unmapped data per location"
+    },
+    {
+     "name": "employees",
+     "params": "{ locationIds?, q?: \"part of a name\", role?: \"role name, e.g. מלצר\", active?: true | false | \"all\" (default true), from?, to?, workedOnly?: true (default with a period) | false, limit? }",
+     "about": "the employees from Allegro: name, location, roles, wage type and wage (hourly rate, or a monthly amount for a global wage), the hourly rate per role, contractor, active; with a count and the average hourly rate per role. With from/to: only the people who worked in the period (workedOnly), each with hours and days worked and the hours per role from the Tabit clock times, plus clock names not linked to an employee, and newEmployees (worked in the period with no Micpal employee number = no form 101 yet). Users with payroll access only"
+    },
+    {
+     "name": "payroll_files",
+     "params": "{ locationIds?, month?: \"YYYY-MM\" (default: the last saved payroll month of each location) }",
+     "about": "the payroll files to download, per location: the payslip Excel (tlush, the Shifts page export) and the Micpal / Shiklulit import file, of a SAVED payroll month (as of its last save), with the month, the employees saved and the saved months. The chat shows the download buttons under the answer. Users with payroll access only"
+    },
+    {
+     "name": "payroll_issues",
+     "params": "{ locationIds?, period?: \"YYYY-MM\", status? }",
+     "about": "payroll preparation issues"
+    },
+    {
+     "name": "finance_status",
+     "params": "{ companyKeys?: string[], months?: number }",
+     "about": "how complete and fresh the books are: the last sync and its data date, per month the income, purchases, salaries, general expenses, unposted entries and whether the month is complete (no high warning), the bank account(s) and the supplier balances. Read it before a finance answer, or when asked \"is the bookkeeping up to date\""
+    },
+    {
+     "name": "pnl",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), by?: \"month\" | \"year\" | \"branch\" | \"account\" (default month), compare?: \"prev_period\" | \"prev_year\", locationIds?: string[] (branches), includeUnposted?: boolean }",
+     "about": "profit and loss from the books (דוח רווח והפסד): income, purchases (food cost), salaries, general expenses and profit per month / year / branch / account, without VAT; compare = the same rows for the period before or the same period last year, with the change. by branch also gives \"No branch\" (the part the books do not split) and branch_partial"
+    },
+    {
+     "name": "cash_position",
+     "params": "{ companyKeys?, asOf?: \"YYYY-MM-DD\" }",
+     "about": "cash today and in 30, 60 and 90 days: the bank balance (statement lines, and the running balance Hashavshevet shows), cheques out by due date (next 30 / 31–60 / 61–90 / later), cheques due and not cleared, open customer invoices by due date, and the projected balance"
+    },
+    {
+     "name": "branch_costs",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today) (up to 400 days), locationIds? }",
+     "about": "food cost % and labor cost % per branch per month: revenue (the books, or Beecomm without VAT when the books have no branch), food cost (purchases of the branch in the books), the admin labor cost and payslip gross (saved payroll or Tabit), and their % of revenue"
+    },
+    {
+     "name": "sales_vs_books",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today) (up to 400 days), locationIds? }",
+     "about": "the sales system (Beecomm, without VAT) compared with the income posted in the books, per month and branch, with a company total row and the difference in ₪ and %"
+    },
+    {
+     "name": "spending",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), by?: \"supplier\" (default) | \"account\" | \"group\", top?: number (default 20, 0 = all), compare?: \"prev_period\" | \"prev_year\", locationIds? }",
+     "about": "top suppliers (supplier invoices with VAT) or spending by expense account / group (without VAT), biggest first, with the total; compare = each row vs the period before or last year (previous, change, changePct)"
+    },
+    {
+     "name": "aging",
+     "params": "{ companyKeys?, side: \"suppliers\" | \"customers\", asOf?, excludeGroupCompanies?: boolean, q?: \"part of a name\", account?: \"account key\", limit? }",
+     "about": "debts with age (גיול חובות): per supplier (what the company owes) or per customer (what they owe), the balance and the open items in buckets current / 1-30 / 31-60 / 61-90 / 90+ days by due date, the biggest first, with totals; the supplier side carries supplier_balances_suspect when the balances look wrong"
+    },
+    {
+     "name": "intercompany",
+     "params": "{ companyKeys?, asOf?, from? }",
+     "about": "loans and money between group companies, shareholders and related parties: the balance of each listed account (plus = they owe the company) and its movement; one side only, the other company is not loaded"
+    },
+    {
+     "name": "trial_balance",
+     "params": "{ companyKeys?, asOf?: \"YYYY-MM-DD\" (default today), from?: \"YYYY-MM-DD\" (then the movement of from..asOf and the opening balance), group?: \"500,700\" (account groups), q?: \"part of a name\", limit? }",
+     "about": "trial balance (מאזן בוחן): debit, credit and balance per account up to a date, with totals (debit = credit) and whether it balances; a group or a name narrows the list"
+    },
+    {
+     "name": "account_card",
+     "params": "{ companyKeys?, account?: \"account key, e.g. 500059\", q?: \"part of the account name\" (one of the two), from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), includeUnposted?, limit?, offset? }",
+     "about": "the account card (כרטסת) of one account: every line of the period with date, entry, counter account, debit, credit and running balance, the opening and closing balance; several accounts match a name → ambiguous with the matches (ask which one)"
+    },
+    {
+     "name": "journal_search",
+     "params": "{ companyKeys?, from?, to?, batch?: number, reference?: number, account?: \"account key\", type?: \"entry type, e.g. ח18\", q?: \"text in the description or names\", posted?: \"0\" | \"1\", limit? }  |  { companyKeys?, year: number, transId: number }  (one entry)",
+     "about": "journal entries (פקודות יומן) by batch, reference, date, account, type or text, with amount and accounts; or one entry (year + transId) with its lines, document and cheque"
+    },
+    {
+     "name": "bank_reconciliation",
+     "params": "{ companyKeys?, account?: \"bank account key\" }",
+     "about": "bank reconciliation (התאמת בנקים) from the books: the bank statement balance vs the book balance per bank account, the open (unmatched) amounts and lines on both sides with their age, the matched amounts that should be equal, and the gap"
+    },
+    {
+     "name": "bank_open_items",
+     "params": "{ companyKeys?, side: \"bank\" | \"book\", minAge?: number (days), from?, to?, account?, limit? }",
+     "about": "the open items of the bank reconciliation, oldest first: bank statement lines not matched to the books (side bank), or book lines of the bank account not matched to the statement (side book: cheques, transfers…)"
+    },
+    {
+     "name": "bank_match_suggestions",
+     "params": "{ companyKeys?, days?: number (default 30), minAmount?, account?, limit? }",
+     "about": "suggested matches for open bank lines: the open book lines with the same amount and direction within N days (confidence single / many); suggestions only, nothing is matched"
+    },
+    {
+     "name": "customer_invoices",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), q?: \"part of the customer name\", account?, type?: \"invoice\" | \"credit\", limit? }",
+     "about": "customer invoices and credit notes from the books (with VAT): date, number, customer, amount, kind customer / register (the monthly register entries are not real customers); the total of the selection"
+    },
+    {
+     "name": "account_statement",
+     "params": "{ companyKeys?, account?: \"account key\", q?: \"part of the name\" (one of the two), from?, to? }",
+     "about": "the card of one supplier or customer (כרטיס ספק / לקוח): invoices, credit notes, payments and other lines of the period, the open items with their age, the balance (plus = owed) and totals; several accounts match → ambiguous (ask which one)"
+    },
+    {
+     "name": "cheques",
+     "params": "{ companyKeys?, state?: \"future\" | \"due\" | \"cleared\" | \"not_cleared\", from?, to? (due dates), account?, q?: \"part of the payee\", limit? }",
+     "about": "issued cheques (שיקים) from the books: payee, amount, due date, state (future = due after today; cleared = matched to the bank; not_cleared = due and not matched), with totals per state; returned cheques are not available yet"
+    },
+    {
+     "name": "vat_summary",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today) (whole months), issues?: boolean (also the 874 report runs), includeUnposted? }",
+     "about": "VAT from the BOOKS per month: sales VAT, input VAT, VAT on fixed assets, to pay (sales − input − assets), the VAT accounts and their balances; issues = also the 874 report runs with their totals by record type (not checked yet). For the Beecomm-based VAT report use vat_report instead"
+    },
+    {
+     "name": "withholding",
+     "params": "{ companyKeys?, from?, to?, expiring?: number (days, default 60), q?: \"part of a supplier name\", account? }",
+     "about": "tax deducted at source (ניכוי במקור): per supplier the payments, the amount deducted and its %; the suppliers' withholding certificates with their end date and state (valid / expiring / expired) and how many have none"
+    },
+    {
+     "name": "allocation_numbers",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), missingOnly?: boolean, minAmount?: number, account?, limit? }",
+     "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
+    },
+    {
+     "name": "payroll_check",
+     "params": "{ companyKeys?, month: \"YYYY-MM\", locationIds? }",
+     "about": "the salary expense posted in the books (group 720) against the payslip gross of the admin payroll (saved, or built from Tabit), per branch for one month, with the difference; the books have no 2026 salaries (no_salary_expense)"
+    },
+    {
+     "name": "exceptions",
+     "params": "{ companyKeys?, type?: \"unposted\" | \"future_dated\" | \"possible_duplicate\" | \"missing_branch\", from?, to? (default this year), limit? }",
+     "about": "exceptions in the books (חריגים): entries not posted, entries dated in the future, possible duplicate entries (same accounts, amount and reference), expense lines without a branch; counts per type. \"Wrong account\" has no rule yet"
+    },
+    {
+     "name": "change_history",
+     "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), kind?: \"account\" | \"login\" | \"sync\" | \"vat_run\", account?, limit? }",
+     "about": "change history in Hashavshevet (מי שינה מה): changes of account details (user, date, field, old and new value), logins, 874 report runs, and what the nightly sync found changed; journal edits are not logged by Hashavshevet"
+    },
+    {
+     "name": "team_rules",
+     "params": "{ area?: \"STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING\" }",
+     "about": "the team rules the chain admin added from the chat (id, text, area; area null = all areas)"
+    },
+    {
+     "name": "pending_decisions",
+     "params": "{ locationIds? }",
+     "about": "drafts waiting for approval, open payroll issues, recent shortages per location"
+    }
+   ],
+   "limits": {
+    "maxCalcs": 6
+   },
+   "changeFormats": {
+    "ORDER_LIST": [
+     "{ \"op\": \"add\", \"ingredientId\"?: number, \"name\"?: string, \"qty\"?: number, \"unit\"?: string, \"note\"?: string }",
+     "{ \"op\": \"set_qty\", \"lineId\": number, \"qty\": number }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "{ \"op\": \"restore\", \"lineId\": number }"
+    ],
+    "STAFFING_PLAN": [
+     "{ \"op\": \"add\", \"date\": \"YYYY-MM-DD\", \"shiftCode\": string, \"roleCode\": string, \"headcount\": number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"set\", \"lineId\": number, \"headcount\"?: number, \"start\"?: \"HH:MM\", \"end\"?: \"HH:MM\" }",
+     "{ \"op\": \"remove\", \"lineId\": number }",
+     "what-if (nothing saved, the plan diff is proposed): { \"whatIf\": [ { \"role_code\", \"rule_type\": \"RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA\", \"demand_unit\"?, \"params\": {…}, \"shift_code\"?, \"days_json\"?: [0-6] } ] }"
+    ],
+    "INQUIRY": [
+     "{ \"draft\": \"the reply text\" }"
+    ]
+   },
+   "object": null,
+   "teamRules": [],
+   "payees": [
+    "אבי כהן",
+    "חברת החשמל",
+    "נכסי רעננה בע\"מ",
+    "רואה חשבון - כהן ושות'"
+   ]
   }
  }
 }

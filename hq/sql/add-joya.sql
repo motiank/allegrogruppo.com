@@ -216,6 +216,40 @@ CREATE TABLE IF NOT EXISTS joya_ai_requests (
   INDEX idx_ctx (context_kind, context_id)
 );
 
+-- ---------------------------------------------------------------- payments (2026-11-07)
+
+-- A planned bank transfer of a company (chain admin only; made in the Payments chat / page). A payment becomes PAID
+-- only by a match with a line of the admin's bank file (bank_transactions through the Local Data API), never by hand.
+-- A monthly series: the first row is the head (series_id = its own id) and holds repeat_json
+-- ({ "every": "month", "day": 15 } or { "every": "month", "week": 2 }, "until"?: "YYYY-MM-DD"); the instances point to it.
+-- due_kind WEEK = a flexible window: week 1 = days 1–7, 2 = 8–14, 3 = 15–21, 4 = 22–end of the month.
+CREATE TABLE IF NOT EXISTS joya_payments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  company_key VARCHAR(32) NOT NULL,               -- Allegro company key (shared/restaurants.json), e.g. pastaLina
+  payee VARCHAR(255) NOT NULL,                    -- the name as the owner said it
+  payee_norm VARCHAR(255) NOT NULL,               -- normalised name: matching with the bank line and the payee list
+  amount DECIMAL(12,2) NOT NULL,
+  due_kind ENUM('DATE','WEEK') NOT NULL DEFAULT 'DATE',
+  due_date DATE NOT NULL,                         -- the day, or the first day of the week window
+  due_to DATE NULL,                               -- WEEK: the last day of the window
+  series_id BIGINT NULL,                          -- the head row of a monthly series
+  repeat_json JSON NULL,                          -- only on the head row
+  status ENUM('PLANNED','PAID','CANCELLED') NOT NULL DEFAULT 'PLANNED',
+  paid_date DATE NULL,                            -- the bank line's date
+  bank_tx_key VARCHAR(160) NULL,                  -- account|date|reference|debit of the matched bank line (one line → one payment)
+  match_json JSON NULL,                           -- the bank line matched and how (auto / confirmed)
+  note VARCHAR(1000) NULL,
+  request_id BIGINT NULL,                         -- joya_ai_requests.id when made from the chat
+  created_by VARCHAR(255) NULL,
+  cancelled_by VARCHAR(255) NULL,
+  cancelled_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_bank_tx (bank_tx_key),
+  INDEX idx_co_status_due (company_key, status, due_date),
+  INDEX idx_series (series_id, due_date)
+);
+
 -- ---------------------------------------------------------------- defaults (INSERT IGNORE: never overwrite)
 
 -- Every number is visible and editable on the Settings page.

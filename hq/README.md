@@ -87,6 +87,7 @@ never kept or shown.
 | `joya_ingredients`, `joya_menu_items` (+ `recipe_json`), `joya_shortages` | Stock master data and reported shortages. |
 | `joya_payroll_issues`, `joya_attendance_corrections` | Payroll checks (by period / status) and documented clock corrections (by raw shift id). |
 | `joya_ai_requests` | The chat queue the runner polls by status. |
+| `joya_payments` | The planned bank transfers of a company (the Payments area, 2026-11-07): payee, amount, a day or a week-of-month window, a monthly series (the head row holds `repeat_json`, the instances point to it by `series_id`), status PLANNED / PAID / CANCELLED, the bank line that paid it (`bank_tx_key`, unique). PAID comes only from the bank file. |
 | `joya_audit_log` | Who did what. |
 
 Dropped for this phase (owner, 2026-10-24): tasks, Instagram/Google inquiries, and CSV imports (menu, recipes and
@@ -220,6 +221,35 @@ account and dates, shows the admin's HTML in a frame, offers the Excel and a pri
 ("תכין לי דוח התאמת בנק מפורט לאוקטובר"): the summary that ties the bank balance to the book balance, the biggest rows of
 each section, and the buttons "פתח את הדוח המלא" / Excel under the answer (`AskBox.js` `BankReconFiles`). Nothing is
 computed or stored in Joya.
+
+**Payments (תשלומים, owner 2026-11-07: "a new section on the main menu … pay to someone now / in the future, see the
+payments for today / week / upcoming to feed the bank, move a payment, later side by side with the cash flow").** The
+only Joya-owned finance data: the planned **bank transfers** of a company (`joya_payments`, `src/services/payments.js`),
+chain admin only. Main-menu area `/payments` (`client/pages/Payments.js`): the board on top (tabs היום / השבוע / 30 יום /
+הכל; groups overdue → today → this week → later → paid → cancelled with totals; the company when there are several;
+"the bank file is loaded up to …") and the area's chat under it (context `AREA` 6, suggestions `joya.area.payments.s1`–`s6`).
+The board is read-only: everything is said in the chat, in any area — "תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "תעביר
+עכשיו …", "בשבוע השני של דצמבר תשלם לבעל הבית 20,000", "כל חודש ב-10 לחודש …", "תזיז את תשלום #12 ל-20.11", "תשנה את
+הסכום של תשלום #12 ל-6,000", "תבטל את תשלום #12" → the planner's `payments` list (`CHANGE_FORMATS.PAYMENTS`: add /
+move / amount / cancel; dates look forward, "now" = today, a day without a month = the next such day) → `checkOps`
+(a past day or week is refused; a known payee in another spelling takes the known spelling, `context.payees`) → proposal
+`PAYMENT_OPS` with one text line per change → **Apply** → `applyOps` (audit `PAYMENT_ADDED / MOVED / AMOUNT / CANCELLED`).
+A "week of the month" is a window: week 1 = days 1–7, 2 = 8–14, 3 = 15–21, 4 = 22–end. A monthly series is made
+`HORIZON_MONTHS` (12) ahead and topped up when the board is read; "scope: series" moves the rule / changes the amount /
+ends the series from that month. Reading: calc `payments_due` (from, to, status) → "מה צריך לשלם היום / השבוע?".
+**Paid only from the bank file**: when the board or the calc is read, `matchWithBank` takes the company's debit lines
+from the admin (`/bank/transactions/stored`, operation codes 485 transfers and 515 standing orders, never 473 fees),
+and a PLANNED payment becomes PAID when a line of the same amount, dated 7 days before the due day to 21 days after
+the window, carries its payee's name after "לטובת:" (or a standing order's action text) — else when it is the only
+such line of the only such payment; two payments of one amount with unnamed lines stay open and the board shows
+"יש בבנק שורה בסכום הזה — זה התשלום הזה?" with a confirm button (`POST /joya/payments/:id/match`). A bank line pays one
+payment only (`bank_tx_key` unique). OVERDUE = a planned payment whose window passed with no bank line. The company:
+the picker's, the one the question names (`companyKey`), or the one company with a bank account. Routes (admin):
+`GET /joya/payments?company&from&to&status`, `GET /joya/payments/payees`, `POST /joya/payments`, `PATCH /joya/payments/:id`,
+`POST /joya/payments/:id/cancel|match` — the same `checkOps → applyOps` path as the chat. The board is a grid with a free
+`side` slot: **the cash-flow panel will sit next to the payments there** (owner: remember it for the cash-flow work).
+Tests: `test/test_payments.mjs` (windows, month ends, series, name matching, the two-pass bank match, the ops); eval
+fixtures `p-*` (kind `PAYMENTS`, context `contexts.json` → PAYMENTS with `payees`; `expect.payments`).
 
 ## Permissions
 
@@ -389,6 +419,9 @@ before the number check) and writes 0 in empty cells of number columns; the calc
 money word: הכנסות, טיפים, עלות…). Percentages, hours and counts keep their decimals. It runs in the runner before
 `fillTotals`, and again when the chat shows an answer and in the Excel download, so older answers look the same.
 Number cells align like the text (right in Hebrew).
+
+**Payments (2026-11-07).** The planned bank transfers are added, moved and cancelled in the chat (planner field
+`payments`, proposal `PAYMENT_OPS`, saved on Apply) and listed with `payments_due`; see "Payments" in the data map.
 
 **Team rules (2026-11-01).** The chain admin teaches the AI team in the chat: "מעכשיו …", "כלל חדש: …", "from now
 on …" → the planner returns `rule: { op: add | edit | remove, text, area, id? }`, the hub checks it (`ai.js`

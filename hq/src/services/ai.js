@@ -20,6 +20,7 @@ import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
 import * as fin from './finance.js';
+import * as payments from './payments.js';
 import * as source from './source.js';
 import { attendanceReport, clockRows } from './attendance.js';
 import { recentSameWeekday } from './demand.js';
@@ -550,7 +551,15 @@ export const CALCS = {
     about: 'change history in Hashavshevet (מי שינה מה): changes of account details (user, date, field, old and new value), logins, 874 report runs, and what the nightly sync found changed; journal edits are not logged by Hashavshevet',
     run: finCalc(fin.changeHistory),
   },
-  team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
+  payments_due: {
+    params: '{ companyKeys?, from?: "YYYY-MM-DD" (default today), to?: "YYYY-MM-DD" (default today + 30 days), status?: "PLANNED" | "PAID" | "CANCELLED" | "all" (default PLANNED) }',
+    about: 'the planned bank transfers (תשלומים) the owner entered in the Payments chat, per company: overdue, today, thisWeek (Sunday–Saturday), upcoming and their totals; a payment is PAID only when a line of the bank file paid it (paidDate, bank); candidates = bank lines of its amount that may have paid it, to confirm on the Payments page. Not the Beecomm payments report (payments_summary), not cheques, not the bank lines themselves',
+    run: async (a, p) => {
+      if (!a.isAdmin) throw err('FORBIDDEN', 'payments are for the chain admin only');
+      return payments.listForCalc(await bankCompanies(a, p || {}), p || {}, todayLocal());
+    },
+  },
+  team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING|PAYMENTS" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
   pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };
 
@@ -580,12 +589,12 @@ const shape = (r) => ({
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
@@ -655,6 +664,7 @@ async function contextAllowed(access, kind, id) {
   if (kind === 'AREA') {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
     if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
+    if (AREAS[id] === 'PAYMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the payments area is for the chain admin only');
     if (AREAS[id] === 'ACCOUNTING' && !access.accounting) throw err('FORBIDDEN', 'the accounting area is for the chain admin and the accountant only');
     if (access.role === 'ACCOUNTANT' && AREAS[id] !== 'ACCOUNTING') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
     return null;
@@ -736,6 +746,7 @@ export async function applyProposal(access, id) {
   if (p.type === 'ORDER_OPS') result = await repl.applyOps(access, p.listId, p.ops, { via: 'CHAT' });
   else if (p.type === 'STAFFING_OPS') result = await staffing.applyOps(access, p.planId, p.ops, { via: 'CHAT' });
   else if (p.type === 'TEAM_RULE') result = await applyRule(access, p);
+  else if (p.type === 'PAYMENT_OPS') result = await payments.applyOps(access, p, { via: 'CHAT' });
   else throw err('BAD_REQUEST', 'unknown proposal');
   await q(`UPDATE joya_ai_requests SET proposal_status='APPLIED' WHERE id=:id`, { id });
   await audit(access.username, 'AI_PROPOSAL_APPLIED', 'ai_request', id, r.locationId, { type: p.type });
@@ -803,11 +814,14 @@ async function requestAccess(id) {
  * all the user's. Calculations with no location of their own use it (see locs).
  */
 async function scopeOf(access, r) {
-  if (r.location_id != null) return { kind: 'LOCATION', locationIds: [String(r.location_id)] };
+  if (r.location_id != null) {
+    const loc = (await listLocations(access)).find((l) => String(l.id) === String(r.location_id));
+    return { kind: 'LOCATION', locationIds: [String(r.location_id)], companyKey: loc?.company?.key ?? null };
+  }
   const key = parseJson(r.meta_json)?.scope?.companyKey;
   if (key == null) return null;
   const inCo = (await listLocations(access)).filter((l) => (l.company?.key ?? '') === key && l.active);
-  return { kind: 'COMPANY', company: inCo[0]?.company?.label ?? key, locationIds: inCo.map((l) => String(l.id)) };
+  return { kind: 'COMPANY', company: inCo[0]?.company?.label ?? key, companyKey: key, locationIds: inCo.map((l) => String(l.id)) };
 }
 
 /** Everything the model needs to plan: who asks, what they may see, today, the calculations, the object in view. */
@@ -886,6 +900,8 @@ export async function buildContext(access, r) {
     teamRules: (await teamRules(r.context_kind === 'AREA' ? AREAS[r.context_id] : null)).map((x) => ({ id: x.id, text: x.text, area: x.area })),
     // the earlier questions of this chat (the runner gives them apart from the data, in <history>)
     history: await chatHistory(access, r),
+    // the payees of earlier payments (chain admin): the planner reuses their spelling in a payment op
+    ...(access.isAdmin ? { payees: (await payments.payees(scope?.companyKey ?? null, 50).catch(() => [])).map((x) => x.name) } : {}),
     limits: { maxCalcs: MAX_CALCS },
     changeFormats: CHANGE_FORMATS,
     object,
@@ -905,13 +921,20 @@ export const CHANGE_FORMATS = {
     '{ "op": "remove", "lineId": number }',
     'what-if (nothing saved, the plan diff is proposed): { "whatIf": [ { "role_code", "rule_type": "RATIO|STEPS|FIXED|MIN|MAX|PEAK_EXTRA", "demand_unit"?, "params": {…}, "shift_code"?, "days_json"?: [0-6] } ] }',
   ],
+  // planned bank transfers (services/payments.js), in the plan's "payments" list — any chat, chain admin only
+  PAYMENTS: [
+    '{ "op": "add", "payee": string, "amount": number, "dueDate"?: "YYYY-MM-DD", "dueWeek"?: { "year": YYYY, "month": 1-12, "week": 1-4 }, "repeat"?: { "every": "month", "day"?: 1-31, "week"?: 1-4, "until"?: "YYYY-MM-DD" }, "note"?: string, "companyKey"?: string (only when the question names the company) }',
+    '{ "op": "move", "id": number, "dueDate"?: "YYYY-MM-DD", "dueWeek"?: { "year": YYYY, "month": 1-12, "week": 1-4 }, "scope"?: "one" | "series" }',
+    '{ "op": "amount", "id": number, "amount": number, "scope"?: "one" | "series" }',
+    '{ "op": "cancel", "id": number, "scope"?: "one" | "series" }',
+  ],
 };
 
 /**
  * Run the model's plan: calculations with the user's access, and validation of the
  * proposed change. Errors are returned per calculation (the model can explain them).
  */
-export async function compute(id, { calcs = [], ops = null, whatIf = null, rule = null }) {
+export async function compute(id, { calcs = [], ops = null, whatIf = null, rule = null, payments: paymentOps = null }) {
   const { r, access: user } = await requestAccess(id);
   const scope = await scopeOf(user, r);
   const access = scope?.locationIds.length ? { ...user, scopeIds: scope.locationIds } : user;
@@ -925,7 +948,7 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
     }
     const def = CALCS[c?.calc];
     if (def && !mayRun(user, c.calc)) {
-      results.push({ calc: c.calc, params: c.params, error: FINANCE_CALCS.has(c.calc) ? 'the books (finance data) are for the chain admin only' : 'not in the accounting area: the accountant may not run it' });
+      results.push({ calc: c.calc, params: c.params, error: c.calc === 'payments_due' ? 'payments are for the chain admin only' : FINANCE_CALCS.has(c.calc) ? 'the books (finance data) are for the chain admin only' : 'not in the accounting area: the accountant may not run it' });
       continue;
     }
     if (!def) {
@@ -943,6 +966,9 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
   try {
     if (rule && typeof rule === 'object') {
       proposal = await checkRule(user, rule, r.context_kind === 'AREA' ? AREAS[r.context_id] : null);
+    } else if (Array.isArray(paymentOps) && paymentOps.length) {
+      // planned bank transfers: checked here, saved on Apply (payments.applyOps)
+      proposal = await payments.checkOps(user, paymentOps, { companyKey: scope?.companyKey ?? null, today: todayLocal(), requestId: id });
     } else if (r.context_kind === 'ORDER_LIST' && Array.isArray(ops) && ops.length) {
       const checked = await repl.checkOps(access, r.context_id, ops);
       proposal = { type: 'ORDER_OPS', listId: r.context_id, ops: checked.map(toOrderOp), preview: checked };

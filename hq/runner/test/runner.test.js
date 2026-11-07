@@ -1,6 +1,6 @@
 // The Joya runner with a fake model and a fake hub. Run: node joya/test/runner.test.js
 import assert from 'assert/strict';
-import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt } from '../runner.js';
+import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt, cleanPlan } from '../runner.js';
 import { unverifiedNumbers } from '../verify.js';
 
 let passed = 0;
@@ -147,6 +147,21 @@ await t('rounded, thousands and percentages match; invented ones do not', () => 
 });
 await t('JSON is found inside extra text', () => {
   assert.deepEqual(parseJsonObject('Here: {"calcs":[]} done'), { calcs: [] });
+});
+
+await t('the plan keeps the payment ops (objects only) and sends them to compute', async () => {
+  const plan = cleanPlan({ calcs: [], payments: [{ op: 'add', payee: 'אבי כהן', amount: 5000, dueDate: '2026-11-15' }, null, 'x'], note: 'pay' });
+  assert.deepEqual(plan.payments, [{ op: 'add', payee: 'אבי כהן', amount: 5000, dueDate: '2026-11-15' }]);
+  assert.equal(cleanPlan({ calcs: [] }).payments, null);
+  const hub = fakeHub({ proposal: { type: 'PAYMENT_OPS', company: 'פסטה לינה', ops: [{ op: 'add', payee: 'אבי כהן', amount: 5000, dueKind: 'DATE', dueDate: '2026-11-15' }], preview: [{ op: 'add', text: 'תשלום חדש · אבי כהן · 5,000 ₪ · 15.11.2026' }] } });
+  const planner = model('{"calcs":[],"payments":[{"op":"add","payee":"אבי כהן","amount":5000,"dueDate":"2026-11-15"}],"note":"pay"}');
+  const writer = model('התשלום לאבי כהן, 5,000 ₪ ב-15.11.2026, מחכה לאישור (החלה).');
+  const out = await handle({ id: 7, hub, planner, writer, log: {} });
+  assert.equal(out.answered, true);
+  const compute = hub.calls.find((c) => c[1].endsWith('/compute'));
+  assert.deepEqual(compute[2].payments, [{ op: 'add', payee: 'אבי כהן', amount: 5000, dueDate: '2026-11-15' }]);
+  assert.ok(writer.calls[0].includes('<proposal>') && writer.calls[0].includes('PAYMENT_OPS'));
+  assert.deepEqual(out.unverified, []); // the amount and the date are in the proposal preview
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

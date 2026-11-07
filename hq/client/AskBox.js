@@ -111,6 +111,23 @@ function ProposalPreview({ p, classes }) {
       </>
     );
   }
+  if (p.type === 'PAYMENT_OPS') {
+    // planned bank transfers: the server writes each line (services/payments.js previewLine)
+    return (
+      <>
+        {p.company ? (
+          <div className={classes.meta} dir="auto">
+            {p.company}
+          </div>
+        ) : null}
+        {(p.preview || []).map((o, i) => (
+          <div key={i} className={classes.propLine} dir="auto" style={o.op === 'cancel' ? { textDecoration: 'line-through' } : null}>
+            {o.text}
+          </div>
+        ))}
+      </>
+    );
+  }
   const lines = p.preview || [];
   return (
     <>

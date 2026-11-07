@@ -383,6 +383,10 @@ export function statusTone(s) {
       REJECTED: 'muted',
       OPEN: 'warn',
       IN_PROGRESS: 'info',
+      // payments (pages/Payments.js)
+      PLANNED: 'info',
+      PAID: 'ok',
+      OVERDUE: 'bad',
       DONE: 'ok',
       CANCELLED: 'muted',
       CORRECTED: 'ok',

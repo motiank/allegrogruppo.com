@@ -67,7 +67,7 @@ export function writePrompt(ctx, computed, plan) {
     JSON.stringify(trimResults(computed.results || [])),
     '</results>',
   ];
-  if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, op: computed.proposal.op, rule: computed.proposal.rule, before: computed.proposal.before, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note }), '</proposal>');
+  if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, op: computed.proposal.op, rule: computed.proposal.rule, before: computed.proposal.before, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note, company: computed.proposal.company, ops: computed.proposal.ops }), '</proposal>');
   if (computed.proposalError) parts.push('<proposal_error>', JSON.stringify(computed.proposalError), '</proposal_error>');
   if (plan.note) parts.push(`planner note: ${plan.note}`);
   parts.push('Write the answer now (plain text, with a table only as the rules say).');
@@ -83,6 +83,7 @@ export function cleanPlan(plan) {
     whatIf: Array.isArray(p.whatIf) ? p.whatIf : null,
     draft: typeof p.draft === 'string' ? p.draft : null,
     rule: p.rule && typeof p.rule === 'object' && !Array.isArray(p.rule) ? p.rule : null,
+    payments: Array.isArray(p.payments) ? p.payments.filter((o) => o && typeof o === 'object') : null,
     note: typeof p.note === 'string' ? p.note : null,
   };
 }
@@ -113,7 +114,7 @@ export async function handle({ id, hub, planner, writer, log = console, instruct
       raw = parseJsonObject(p.text);
     }
     const plan = cleanPlan(raw);
-    const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule });
+    const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule, payments: plan.payments });
     const w = await writer.call(writePrompt(ctx, computed, plan));
     cost += w.costUsd ?? 0;
     // money in whole ₪, cut down; table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)

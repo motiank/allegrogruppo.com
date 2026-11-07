@@ -9,7 +9,7 @@
     "dev": "nodemon --watch server.js --watch src --watch lib server.js",
     "dev:client": "vite",
     "build": "vite build",
-    "test": "node test/test_joya_lib.mjs",
+    "test": "node test/test_joya_lib.mjs && node test/test_payments.mjs",
     "smoke": "node scripts/joya-smoke.mjs",
     "runner": "node runner/index.js",
     "test:runner": "node runner/test/runner.test.js",

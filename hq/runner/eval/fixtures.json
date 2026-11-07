@@ -2012,6 +2012,242 @@
         ],
         "maxCalcs": 2
       }
+    },
+    {
+      "key": "p-add-date",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "payee": "אבי כהן",
+            "amount": 5000,
+            "dueDate": "2026-11-15"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-add-now",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תעביר עכשיו 1,200 ₪ לחברת החשמל",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "payee": "חברת החשמל",
+            "amount": 1200,
+            "dueDate": "2026-10-21"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-add-week",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "בשבוע השני של דצמבר תשלם לבעל הבית 20,000 ₪",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "amount": 20000,
+            "dueWeek": {
+              "year": 2026,
+              "month": 12,
+              "week": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-add-repeat",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "כל חודש ב-10 לחודש תשלם 3,500 ₪ לרואה החשבון",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "amount": 3500,
+            "repeat": {
+              "every": "month",
+              "day": 10
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-add-next-day",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תשלם לאבי כהן 2,000 ₪ ב-15 לחודש",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "payee": "אבי כהן",
+            "amount": 2000,
+            "dueDate": "2026-11-15"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-add-en",
+      "kind": "PAYMENTS",
+      "lang": "en",
+      "question": "Pay Avi Cohen 5,000 on November 15",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "amount": 5000,
+            "dueDate": "2026-11-15"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-move",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תזיז את תשלום #12 ל-20 בנובמבר",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "move",
+            "id": 12,
+            "dueDate": "2026-11-20"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-amount",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תשנה את הסכום של תשלום 12 ל-6,000 ₪",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "amount",
+            "id": 12,
+            "amount": 6000
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-cancel",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "תבטל את תשלום 12",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "cancel",
+            "id": 12
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-list-today",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "מה צריך לשלם היום?",
+      "expect": {
+        "calcs": [
+          "payments_due"
+        ],
+        "maxCalcs": 1,
+        "payments": "none"
+      }
+    },
+    {
+      "key": "p-list-week-en",
+      "kind": "PAYMENTS",
+      "lang": "en",
+      "question": "What do we pay this week?",
+      "expect": {
+        "calcs": [
+          "payments_due"
+        ],
+        "maxCalcs": 1,
+        "payments": "none"
+      }
+    },
+    {
+      "key": "p-list-paid",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "אילו תשלומים כבר שולמו החודש?",
+      "expect": {
+        "calcs": [
+          "payments_due"
+        ],
+        "params": {
+          "payments_due": {
+            "status": "PAID"
+          }
+        },
+        "maxCalcs": 1,
+        "payments": "none"
+      }
+    },
+    {
+      "key": "p-add-in-manpower",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "payee": "אבי כהן",
+            "amount": 5000,
+            "dueDate": "2026-11-15"
+          }
+        ]
+      }
+    },
+    {
+      "key": "p-not-beecomm",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "כמה שילמו אצלנו באשראי בשבוע שעבר?",
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "payments": "none"
+      }
     }
   ]
 }

@@ -15,6 +15,8 @@ export const AREAS = {
   bank: { id: 4, suggestions: 8 },
   // the accounting area: 8 register-vs-bank questions for everyone in it, then 9 about the books (chain admin only; the first is the detailed bank reconciliation report)
   accounting: { id: 5, suggestions: 8, adminSuggestions: 9 },
+  // the payments area (chain admin): its page is pages/Payments.js (the board + this chat)
+  payments: { id: 6, suggestions: 6 },
 };
 
 export default function Area({ area }) {

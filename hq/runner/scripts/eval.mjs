@@ -34,9 +34,10 @@ function same(actual, expected) {
   if (typeof expected === 'string' && expected.includes('|')) return expected.split('|').some((e) => same(actual, e));
   if (typeof expected === 'number') return Number(actual) === expected;
   if (typeof expected === 'string' && typeof actual === 'string') return actual === expected || actual.startsWith(`${expected}:`);
+  if (expected && typeof expected === 'object') return partial(actual, expected); // a nested object: a partial match (e.g. dueWeek)
   return actual === expected;
 }
-const partial = (obj, exp) => obj && Object.entries(exp).every(([k, v]) => same(obj[k], v));
+const partial = (obj, exp) => !!obj && typeof obj === 'object' && Object.entries(exp).every(([k, v]) => same(obj[k], v));
 const locIds = (p) => {
   const v = p?.locationIds ?? (p?.locationId != null ? [p.locationId] : null);
   return v == null ? null : (Array.isArray(v) ? v : [v]).map(String).sort();
@@ -81,6 +82,14 @@ function grade(f, plan) {
   if (!!e.whatIf !== hasWhatIf) fails.push(e.whatIf ? 'whatIf missing' : `unexpected whatIf ${JSON.stringify(plan.whatIf)}`);
   const hasDraft = !!plan.draft?.trim();
   if (!!e.draft !== hasDraft) fails.push(e.draft ? 'draft missing' : 'unexpected draft');
+  // payments: the planned bank transfers (partial ops, like ops); 'none' or absent = no payment op
+  const pays = plan.payments || [];
+  if (Array.isArray(e.payments)) {
+    for (const want of e.payments) if (!pays.some((o) => partial(o, want))) fails.push(`payment ${JSON.stringify(want)} missing (got ${JSON.stringify(pays)})`);
+    if (pays.length > e.payments.length) fails.push(`${pays.length} payment ops, expected ${e.payments.length}`);
+  } else if (e.payments === 'some') {
+    if (!pays.length) fails.push('no payment ops');
+  } else if (pays.length) fails.push(`unexpected payment ops ${JSON.stringify(pays)}`);
   // rule: a partial team-rule change that must match; absent = no rule change
   if (e.rule) {
     if (!partial(plan.rule, e.rule)) fails.push(`rule ${JSON.stringify(plan.rule)} ≠ ${JSON.stringify(e.rule)}`);

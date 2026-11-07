@@ -10,6 +10,8 @@ import mgmtHe from './mgmt.he.js';
 import mgmtEn from './mgmt.en.js';
 import dataHe from './data.he.js';
 import dataEn from './data.en.js';
+import paymentsHe from './payments.he.js';
+import paymentsEn from './payments.en.js';
 
-export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe };
-export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn };
+export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe, ...paymentsHe };
+export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn, ...paymentsEn };
