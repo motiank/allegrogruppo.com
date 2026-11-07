@@ -143,6 +143,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   13/13; full run 131/133 at concurrency 2 (one JSON glitch passed on rerun; `f-bank-recon-sections` had drifted to
   bank_open_items ×2 → the report rule now says "both sides at once → bank_recon_report alone", 3/3 after). The planner
   writes `dueWeek` as numbers { year, month, week }: a quoted "YYYY-MM" inside the object lost its closing quote every time.
+  Deployed 2026-11-08 (`63218b2`; hq build + joya-hq and joya-runner restarted); owner's click-through still open.
 - Planner eval: see the books (2026-11-07) for the latest run. Unit 34, runner 12, smoke 63 + 1 known failure ("the raised quantity
   moves the next recommendation" — a weighted median of 8 lists cannot move on one raised list; test/design
   mismatch, not a bug).
