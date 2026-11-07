@@ -19,6 +19,7 @@ import Shifts from "./pages/Shifts";
 import Employees from "./pages/Employees";
 import Upload from "./pages/Upload";
 import BankRecon from "./pages/BankRecon";
+import Downloads from "./pages/Downloads";
 import axios from "axios";
 import useCurrentUser, { clearCachedUser } from "./hooks/useCurrentUser";
 
@@ -273,6 +274,18 @@ const App = () => {
               <RestrictByRole allow={["admin"]}>
                 <Layout>
                   <BankRecon />
+                </Layout>
+              </RestrictByRole>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/downloads"
+          element={
+            <ProtectedRoute>
+              <RestrictByRole allow={["admin"]}>
+                <Layout>
+                  <Downloads />
                 </Layout>
               </RestrictByRole>
             </ProtectedRoute>
