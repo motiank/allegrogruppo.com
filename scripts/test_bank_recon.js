@@ -105,8 +105,12 @@ test("HTML and Excel", async () => {
   const html = renderBankReconHtml(r);
   assert.ok(html.startsWith("<!doctype html>"));
   assert.ok(html.includes('dir="rtl"'));
-  for (const t of ["דוח התאמת בנק מפורט", "<th>מוטב</th>", "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
+  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
     assert.ok(html.includes(t), t);
+  // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
+  assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
+  assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
+  assert.equal((html.match(/data-filter="1"/g) || []).length, 6 + (r.bookFutureMatched.length ? 2 : 0)); // פרטים, מוטב, חשבון נגדי per table
   const body = renderBankReconBody(r);
   assert.ok(body.startsWith('<div class="bank-recon">') && !body.includes("<html"));
   assert.ok(body.includes("<script") === false);

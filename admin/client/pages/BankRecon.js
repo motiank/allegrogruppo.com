@@ -1,10 +1,10 @@
 // Bank reconciliation (דוח התאמת בנק מפורט) — admin only. Pick the company's bank account and a date range; the
 // server builds the report (GET /admin/bank-recon/report) and this page shows the Hebrew HTML from
 // shared/bankReconHtml.js, with buttons for Excel and for the report in its own tab (printing).
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
-import { renderBankReconBody, CSS } from "../../../shared/bankReconHtml.js";
+import { renderBankReconBody, bankReconBehavior, CSS } from "../../../shared/bankReconHtml.js";
 
 const errText = (err, fallback) => err.response?.data?.error?.message || err.response?.data?.error || err.message || fallback;
 
@@ -18,6 +18,10 @@ const BankRecon = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const reportRef = useRef(null); // the rendered HTML; bankReconBehavior adds the filters and the collapsing after each render
+  useEffect(() => {
+    if (report && reportRef.current) bankReconBehavior(reportRef.current.querySelector(".bank-recon"));
+  }, [report]);
 
   useEffect(() => {
     axios
@@ -119,7 +123,7 @@ const BankRecon = () => {
         {bank && <span style={styles.hint}>נתוני הבנק בחשבשבת: {bank.from} עד {bank.dataUpTo} ({bank.lines} תנועות)</span>}
       </div>
       {error && <div style={styles.error}>{String(error)}</div>}
-      {report && <div style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report) }} />}
+      {report && <div ref={reportRef} style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report) }} />}
       {!report && !error && !loading && <p style={styles.hint}>בחר חשבון ותקופה ולחץ "הצג דוח". הדוח נבנה מספרי חשבשבת (allegro_finance) לקריאה בלבד.</p>}
     </div>
   );

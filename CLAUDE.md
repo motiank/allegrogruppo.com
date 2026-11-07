@@ -98,7 +98,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   chain admin only, in הנהלת חשבונות; `hq/README.md` → "The books"). Every number still carries the `not_validated` warning until the accountant checks it.
 - **Bank reconciliation report** (דוח התאמת בנק מפורט, 2026-11-07): admin menu "Bank reconciliation" (`/bank-recon`, admin role
   only) → `GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx` (`admin/server/modules/bankRecon.js`,
-  Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page). Reads `allegro_finance` only. Sections: open
+  Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page; `bankReconBehavior` there adds the collapsible
+  sections and the Google-Sheets-like column filters on פרטים / מוטב / חשבון נגדי, 2026-11-07). Reads `allegro_finance` only. Sections: open
   bank lines, open book lines (cheques excluded), cheques cleared (paired by cheque number + amount, else Hashavshevet's
   match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
   Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07. Also in Joya HQ (page

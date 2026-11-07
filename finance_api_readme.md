@@ -581,7 +581,9 @@ deposits are the likely case, but this is not built.
 The detailed bank reconciliation report (דוח התאמת בנק מפורט) of the admin menu, `admin/server/modules/bankRecon.js`,
 for Joya HQ (page `/accounting/bank-recon`, calc `bank_recon_report`). Not a JSON envelope with warnings like the
 other endpoints: `format=json` → `{ data: report, meta: { company, account, from, to } }`; `html` → the Hebrew RTL page
-(`shared/bankReconHtml.js`); `xlsx` → the Excel file (`Content-Disposition: attachment`). `to` defaults to today,
+(`shared/bankReconHtml.js`; in the browser every section collapses on its title and the columns פרטים, מוטב and חשבון נגדי
+have a Google-Sheets-like filter — icon in the header, a panel with a search box and the values with checkboxes, a
+"מסונן" line above the total; `bankReconBehavior` in the same file, embedded in the page and called by the admin page); `xlsx` → the Excel file (`Content-Disposition: attachment`). `to` defaults to today,
 `from` to 1 January of `to`'s year, `account` to the company's first bank account. The report, as of `to`: `summary`
 (bankBalance = Hashavshevet's running balance after the last line ≤ `to`; bookBalance; bankOpen, bookOpen,
 chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
