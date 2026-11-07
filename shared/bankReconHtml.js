@@ -54,6 +54,7 @@ export const CSS = `
 .bank-recon th{background:#eef1f5;font-weight:700;white-space:nowrap}
 .bank-recon td.num,.bank-recon th.num{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
 .bank-recon td.neg{color:#b00020}
+.bank-recon td.missing{color:#b00020;font-style:italic}
 .bank-recon td.strong,.bank-recon tr.total td{font-weight:700}
 .bank-recon tr.total td{background:#f4f6f9}
 .bank-recon tr.older td{color:#777;background:#fafafa}
@@ -123,20 +124,24 @@ function summary(r) {
 
 const olderClass = (row, from) => (row.date && from && String(row.date) < String(from) ? "older" : "");
 
+// the beneficiary of a cheque line (payee from Hashavshevet; "missing" = the cheque is not in Hashavshevet yet)
+export const PAYEE_MISSING = "לא נמצא בחשבשבת";
+export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payee || "");
+
 function bankOpenTable(r) {
   const rows = r.bankOpen || [];
   if (!rows.length) return `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות.</div>`;
   return `
 <h2>${SECTION_TITLES.bankOpen}</h2>
 <table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th><th>פרטים</th><th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
+  <thead><tr><th>תאריך</th><th>אסמכתא</th><th>פרטים</th><th>מוטב</th><th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="3">סה"כ ${fmtInt(rows.length)} תנועות</td>${money(r.summary.bankOpen.total)}<td></td><td></td></tr>
+    <tr class="total"><td colspan="4">סה"כ ${fmtInt(rows.length)} תנועות</td>${money(r.summary.bankOpen.total)}<td></td><td></td></tr>
   </tbody>
 </table>`;
 }

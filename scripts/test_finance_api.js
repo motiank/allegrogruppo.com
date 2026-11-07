@@ -592,6 +592,10 @@ describe("endpoints", () => {
       assert.equal(bank.meta.total, 758);
       close(bank.meta.amount, 17708.88);
       assert.ok(bank.data.every((l, i, a) => ["in", "out"].includes(l.direction) && (i === 0 || a[i - 1].date <= l.date)), "oldest first");
+      const chq = await ok(`/bank/open?company=${COMPANY}&side=bank&from=2026-01-01&limit=1000`);
+      const chequeLines = chq.data.filter((l) => /^שיק/.test(l.details));
+      assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
+      assert.equal(chq.meta.payees.lines, chq.data.filter((l) => /^שיק|החזרת שיק|בטול שיק/.test(l.details)).length);
       const old = await ok(`/bank/open?company=${COMPANY}&side=bank&minAge=90&limit=5`);
       assert.ok(old.meta.total < bank.meta.total && old.data.every((l) => l.ageDays >= 90));
       const ranged = await ok(`/bank/open?company=${COMPANY}&side=bank&from=2026-10-01&to=2026-10-31&limit=1000`);

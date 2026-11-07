@@ -56,6 +56,12 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     assert.equal(s.expectedBookBalance, expected);
     assert.equal(s.unexplained, Math.round((s.bookBalance - expected) * 100) / 100);
     assert.equal(s.unexplained, 0, "Hashavshevet's matches should explain the whole gap");
+    // Cheque lines of section 1 carry the beneficiary (or "missing"); the summary counts them.
+    const chq = r.bankOpen.filter((x) => /^שיק/.test(x.details));
+    assert.ok(chq.every((x) => ["cheques", "journal", "missing"].includes(x.payeeSource) && (x.payeeSource === "missing" ? x.payee === null : x.payee)));
+    assert.ok(r.bankOpen.filter((x) => !/שיק/.test(x.details)).every((x) => !("payee" in x)));
+    assert.equal(s.bankOpen.cheques.missing, r.bankOpen.filter((x) => x.payeeSource === "missing").length);
+    assert.ok(s.bankOpen.cheques.found + s.bankOpen.cheques.missing === s.bankOpen.cheques.count);
     // Every row is dated up to `to`; cleared cheques inside the period.
     assert.ok(r.bankOpen.every((x) => x.date <= to));
     assert.ok(r.bookOpen.every((x) => x.date <= to && !r.chequesOpen.some((c) => c.lineId === x.lineId)));
@@ -99,7 +105,7 @@ test("HTML and Excel", async () => {
   const html = renderBankReconHtml(r);
   assert.ok(html.startsWith("<!doctype html>"));
   assert.ok(html.includes('dir="rtl"'));
-  for (const t of ["דוח התאמת בנק מפורט", "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
+  for (const t of ["דוח התאמת בנק מפורט", "<th>מוטב</th>", "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
     assert.ok(html.includes(t), t);
   const body = renderBankReconBody(r);
   assert.ok(body.startsWith('<div class="bank-recon">') && !body.includes("<html"));
@@ -113,4 +119,5 @@ test("HTML and Excel", async () => {
   assert.ok(wb.worksheets.every((w) => w.views?.[0]?.rightToLeft === true), "every sheet is right to left");
   const s1 = wb.getWorksheet("1 בנק ללא ספרים");
   assert.equal(s1.rowCount, r.bankOpen.length + 2); // header + rows + total
+  assert.ok(s1.getRow(1).values.includes("מוטב"), "the Excel has the beneficiary column");
 });

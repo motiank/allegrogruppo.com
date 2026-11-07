@@ -111,7 +111,7 @@ export async function bankTransactions(companies, from, to, { q = null, side = n
       out.push({ company: co.label, companyKey: co.key, available: false });
       continue;
     }
-    const rows = res.rows.map((r) => ({ date: r.date, account: r.account, action: r.action, details: r.details, reference: r.reference, moneyIn: r.credit, moneyOut: r.debit, balance: r.balance }));
+    const rows = res.rows.map((r) => ({ date: r.date, account: r.account, action: r.action, details: r.details, reference: r.reference, moneyIn: r.credit, moneyOut: r.debit, balance: r.balance, ...(r.payeeSource ? { payee: r.payee, payeeSource: r.payeeSource } : {}) }));
     const amount = (r) => r.moneyIn ?? r.moneyOut ?? 0;
     const sorted = order === 'date' ? rows : [...rows].sort((a, b) => amount(b) - amount(a));
     out.push({
@@ -130,6 +130,7 @@ export async function bankTransactions(companies, from, to, { q = null, side = n
     period: { from, to },
     filter: { q: q || null, side: side || 'all', order: order === 'date' ? 'date' : 'amount' },
     source: SOURCE,
+    note: 'a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet)',
     ...(reason ? { missing: reason } : {}),
     companies: out,
   };

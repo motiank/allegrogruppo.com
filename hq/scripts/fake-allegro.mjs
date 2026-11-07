@@ -247,7 +247,7 @@ const FIN_ROUTES = {
       chequesOpen: { count: 1, total: -2500, pastDueCount: 1, pastDueTotal: -2500, notDueCount: 0, notDueTotal: 0, clearedUnmatchedCount: 0, clearedUnmatchedTotal: 0 },
       bookFutureMatched: { count: 0, total: 0 }, chequesCleared: { count: 1, total: -4175, groupOnly: 0 }, cancelledCheques: 0, expectedBookBalance: -2000000, unexplained: 0 };
     return { finance: true, data: { company: { code: 'demo', name: 'Demo company' }, account: { key: '110011', name: 'בנק הפועלים' }, from, to, dataUpTo: FIN_SYNC.dataUpTo, lastSync: FIN_SYNC.lastRunAt, generatedAt: T,
-      summary, notes: ['demo'], bankOpen: [row(to, 1000, 'זיכוי'), row(to, 500, 'העברה')], bookOpen: [{ lineId: 1, date: to, reference: 120, type: null, description: 'העברה לספק', counterAccount: '500001', counterName: 'ספק', amount: -3000, ageDays: 1, posted: true }],
+      summary, notes: ['demo'], bankOpen: [row(to, 1000, 'זיכוי'), { ...row(to, 500, 'שיק'), reference: 17028, payee: 'ספק לדוגמה בע"מ', payeeSource: 'cheques' }], bookOpen: [{ lineId: 1, date: to, reference: 120, type: null, description: 'העברה לספק', counterAccount: '500001', counterName: 'ספק', amount: -3000, ageDays: 1, posted: true }],
       bookFutureMatched: [], chequesCleared: [{ chequeNo: 15940, payee: 'ספק', issueDate: from, dueDate: from, amount: -4175, clearedDate: from, bankAmount: -4175, bankReference: 15940, daysAfterDue: 1, status: 'cleared' }],
       chequesOpen: [{ chequeNo: 16000, payee: 'ספק', issueDate: from, dueDate: from, amount: -2500, daysAfterDue: 20, clearedDate: null, status: 'past_due' }] }, meta: { company: 'demo', account: '110011', from, to, sync: FIN_SYNC } };
   },

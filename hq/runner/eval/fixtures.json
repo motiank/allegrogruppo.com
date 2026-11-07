@@ -2000,6 +2000,18 @@
         },
         "maxCalcs": 2
       }
+    },
+    {
+      "key": "f-bank-cheques-payee",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים ירדו בבנק בחודש אוקטובר ולמי הם שולמו?",
+      "expect": {
+        "calcs": [
+          "bank_transactions"
+        ],
+        "maxCalcs": 2
+      }
     }
   ]
 }

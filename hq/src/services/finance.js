@@ -252,7 +252,7 @@ export async function bankReconciliation(companies, p = {}) {
 export async function bankReconReport(companies, p = {}) {
   const params = { ...textOf(p, 'account'), ...dates(p, { required: false }) };
   const n = LIMITS.recon;
-  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays });
+  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource } : {}) });
   const bookRow = (x) => ({ date: x.date, reference: x.reference, description: x.description, counter: x.counterName || x.counterAccount, amount: x.amount, ageDays: x.ageDays, ...(x.posted ? {} : { posted: false }) });
   const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status });
   const top = (rows, by) => [...rows].sort((a, b) => Math.abs(b[by]) - Math.abs(a[by]));
@@ -276,7 +276,7 @@ export async function bankReconReport(companies, p = {}) {
       downloads: { page: `/accounting/bank-recon?${qs}`, xlsx: `/api/joya/finance/bank-recon?${qs}&format=xlsx`, html: `/api/joya/finance/bank-recon?${qs}&format=html` },
     };
   }), {
-    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links',
+    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1; a cheque line carries payee / payeeSource, see summary.bankOpen.cheques: count, found, missing = cheques in the bank that are not in Hashavshevet yet), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links',
   });
 }
 
@@ -287,7 +287,7 @@ export async function bankOpenItems(companies, p = {}) {
   const limit = clamp(p.limit, LIMITS.open, 500);
   const params = { side, ...dates(p, { required: false }), ...textOf(p, 'account'), ...(p.minAge != null ? { minAge: Number(p.minAge) || 0 } : {}), ...flagOf(p, 'includeUnposted'), limit };
   return result('bank_open_items', params, await perCompany(companies, '/bank/open', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, rows: d })), {
-    note: 'bank side: direction in / out, money in is plus; book side: side debit / credit on the bank account; ageDays = days since the line',
+    note: 'bank side: direction in / out, money in is plus, a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet); book side: side debit / credit on the bank account; ageDays = days since the line',
   });
 }
 

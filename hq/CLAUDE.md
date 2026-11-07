@@ -129,6 +129,8 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).
   README → "The detailed bank reconciliation report". Eval fixtures `f-bank-recon-report*`, `f-bank-recon-sections`.
+  Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
+  from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
 - Planner eval: see the books (2026-11-07) for the latest run. Unit 34, runner 12, smoke 63 + 1 known failure ("the raised quantity
   moves the next recommendation" — a weighted median of 8 lists cannot move on one raised list; test/design
   mismatch, not a bug).

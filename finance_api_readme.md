@@ -546,7 +546,13 @@ they differ by bank line 3167 (23,695.28). Bank side: money in is plus. Book sid
 ### `GET /finance/bank/open?company=&side=bank|book[&account=][&minAge=][&from=][&to=][&includeUnposted=1][&limit=][&offset=]`
 
 Use case 14. The open lines, oldest first. Bank line `direction` is `in` or `out`; a book line has `side`,
-`counterAccount` and `chequeId`. `meta.total` and `meta.amount` cover the whole selection.
+`counterAccount` and `chequeId`. `meta.total` and `meta.amount` cover the whole selection. A bank cheque line (`details`
+שיק / החזרת שיק / בטול שיק, `reference` = the cheque number) also has `payee` and `payeeSource`: the beneficiary from
+`cheques.payee_name` (`cheques`), else from the journal entry on the bank account with that reference and the same amount
+(`journal`), else
+`missing` (`payee` null — the cheque is not in Hashavshevet yet); with a duplicate number the row with the same amount
+wins (`admin/server/modules/chequePayees.js`, also used by `/bank/suggestions`, the report and the Local Data API's
+`/bank/transactions/stored`). `meta.payees` = `{ lines, found, missing[, error] }`.
 
 - `is_matched = 1` with `match_num` means a bank line is matched.
 - `bank_matches.linked_id` with `side = 'book'` is a `journal_lines.line_id`, not a `trans_id`.
@@ -579,7 +585,8 @@ other endpoints: `format=json` → `{ data: report, meta: { company, account, fr
 `from` to 1 January of `to`'s year, `account` to the company's first bank account. The report, as of `to`: `summary`
 (bankBalance = Hashavshevet's running balance after the last line ≤ `to`; bookBalance; bankOpen, bookOpen,
 chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
-(Hebrew), and the rows `bankOpen`, `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
+(Hebrew), and the rows `bankOpen` (cheque lines with `payee` / `payeeSource`, see `/bank/open`; `summary.bankOpen.cheques` =
+`{ count, found, missing, missingTotal }`), `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
 date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). "Open" =
 no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on both sides. `/bank/report/accounts` →
 `{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:

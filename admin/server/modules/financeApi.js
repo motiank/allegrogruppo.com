@@ -5,6 +5,7 @@ import { executeSql } from "../sources/dbpool.js";
 import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } from "./localApi.js";
 import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
+import { addChequePayees } from "./chequePayees.js";
 
 // Finance API: read-only, localhost-only JSON API over allegro_finance (the Hashavshevet copy made by hash-sync),
 // for Joya HQ. Mounted at /local-api/v1/finance by server.js; documented in finance_api_readme.md.
@@ -1397,7 +1398,9 @@ route("/bank/open", async (req, ctx) => {
       : { lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, account: r.account_key, date: r.d, reference: r.reference, description: r.description, type: r.trans_type, posted: r.status === 1,
           counterAccount: r.debit_account === r.account_key ? r.credit_account : r.debit_account, side: r.side, amount: round2(r.amount), signedAmount: round2(r.signed_amount), chequeId: r.cheque_id || null, ageDays: num(r.age) },
   );
-  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt) }, codes: ["bank_gap"] };
+  // cheque lines of the bank get the beneficiary from Hashavshevet (payee / payeeSource: cheques, journal, missing)
+  const payees = side === "bank" ? await addChequePayees(data, { company: ctx.companyId, bankAccounts: ctx.bankAccounts }) : undefined;
+  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}) }, codes: ["bank_gap"] };
 });
 
 route("/bank/suggestions", async (req, ctx) => {
@@ -1434,9 +1437,11 @@ route("/bank/suggestions", async (req, ctx) => {
     if (!cands.length) continue;
     all.push({ bankLineId: b.bank_line_id, account: b.account_key, bankDate: b.d, reference: b.reference, details: b.details, direction: b.direction, amount: round2(b.amount), candidates: cands, confidence: cands.length === 1 ? "single" : "many" });
   }
+  const page = all.slice(offset, offset + limit);
+  const payees = await addChequePayees(page, { company: ctx.companyId, bankAccounts: ctx.bankAccounts });
   return {
-    data: all.slice(offset, offset + limit),
-    meta: { accounts: keys, days, minAmount, limit, offset, total: all.length, openBankLines: bank.length, openBookLines: book.length, single: all.filter((x) => x.confidence === "single").length, many: all.filter((x) => x.confidence === "many").length, matching: "one bank line to one book line, same amount and direction", note: "suggestions only; the accountant matches in Hashavshevet" },
+    data: page,
+    meta: { accounts: keys, days, minAmount, limit, offset, total: all.length, openBankLines: bank.length, openBookLines: book.length, payees, single: all.filter((x) => x.confidence === "single").length, many: all.filter((x) => x.confidence === "many").length, matching: "one bank line to one book line, same amount and direction", note: "suggestions only; the accountant matches in Hashavshevet" },
     codes: ["bank_gap"],
   };
 });

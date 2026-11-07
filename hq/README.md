@@ -132,7 +132,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Dishes sold | `bcom_items_daily` | Beecomm API, daily job | `/beecomm/items/stored` | `sales_by_dish` |
 | **Income by payment method** (credit card + brand, cash, Wolt, 10bis, Sodexo…), tips, refunds | `bcom_payments_daily` | Beecomm payments report, daily job | `/beecomm/payments/stored` | `payments_summary` |
 | Z reports, daily cash summary | `bcom_z_reports`, `bcom_cash` | Beecomm | `/beecomm/z-reports/stored`, `/beecomm/daily` | (data quality, labor %) |
-| **Bank account**: money in/out, balance, deposits, checks, transfers | `bank_transactions` | bank file on the Upload page | `/bank/transactions/stored` | `bank_summary`, `bank_transactions`, `cards_vs_bank` (with Beecomm payments) |
+| **Bank account**: money in/out, balance, deposits, checks (a cheque row carries the beneficiary from Hashavshevet: `payee` / `payeeSource`), transfers | `bank_transactions` | bank file on the Upload page | `/bank/transactions/stored` | `bank_summary`, `bank_transactions`, `cards_vs_bank` (with Beecomm payments) |
 | Employees, roles, wages | `employees` | admin Employees page | `/employees` | `employees` |
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |

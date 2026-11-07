@@ -17,7 +17,8 @@ import { createRequire } from "module";
 import { financeSql } from "../sources/financePool.js";
 import { ApiError, badRequest, isIsoDate } from "./localApi.js";
 import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
-import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES } from "../../../shared/bankReconHtml.js";
+import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
+import { addChequePayees } from "./chequePayees.js";
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
@@ -248,6 +249,8 @@ export async function buildBankReconReport(query = {}) {
   const bankOpen = bankOpenRows.map((r) => ({
     bankLineId: r.bank_line_id, year: r.fiscal_year, date: r.d, reference: r.reference, details: r.details, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to),
   }));
+  // the beneficiary of every cheque line, from Hashavshevet (payee / payeeSource: cheques, journal, missing)
+  const payeeStats = await addChequePayees(bankOpen, { company: company.companyId, bankAccounts: [accountKey] });
 
   const bookFutureMatched = futureMatchedRows.map((r) => ({
     lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, date: r.d, reference: r.reference, type: r.trans_type, description: r.description || r.details,
@@ -264,7 +267,10 @@ export async function buildBankReconReport(query = {}) {
   const summary = {
     bankBalance, bankBalanceDate: day(lastLine?.line_date), bankLinesSum: round2(bankSum?.s), bankLinesCount: num(bankSum?.n),
     bookBalance, bookLinesCount: num(book?.n), unpostedCount: num(book?.unposted),
-    bankOpen: { count: bankOpen.length, total: sum(bankOpen, (x) => x.amount), beforeCount: older(bankOpen).length, beforeTotal: sum(older(bankOpen), (x) => x.amount) },
+    bankOpen: {
+      count: bankOpen.length, total: sum(bankOpen, (x) => x.amount), beforeCount: older(bankOpen).length, beforeTotal: sum(older(bankOpen), (x) => x.amount),
+      cheques: { count: payeeStats.lines, found: payeeStats.found, missing: payeeStats.missing, missingTotal: sum(bankOpen.filter((x) => x.payeeSource === "missing"), (x) => x.amount) },
+    },
     bookOpen: { count: bookOpen.length, total: sum(bookOpen, (x) => x.amount), beforeCount: older(bookOpen).length, beforeTotal: sum(older(bookOpen), (x) => x.amount) },
     chequesOpen: {
       count: chequesOpen.length, total: sum(chequesOpen, (x) => x.amount),
@@ -287,6 +293,9 @@ export async function buildBankReconReport(query = {}) {
   if (summary.unpostedCount) notes.push(`${summary.unpostedCount} תנועות ספרים עד התאריך עדיין לא נקלטו (מנה פתוחה); הן נכללות ביתרת הספרים ומסומנות "לא נקלט".`);
   if (bookFutureMatched.length)
     notes.push(`${bookFutureMatched.length} תנועות ספרים בתאריך מאוחר מ-${fmtDate(to)} כבר הותאמו לתנועות בנק עד תאריך זה (למשל צ'ק שנרשם בתאריך ערך מאוחר); הן מוצגות בסוף סעיף 2 ומנוכות בסיכום.`);
+  if (payeeStats.missing)
+    notes.push(`${payeeStats.missing} צ'קים שנפרעו בבנק לא נמצאו בחשבשבת (לא במודול הצ'קים ולא בפקודת יומן עם מספר הצ'ק); הם מסומנים "${payeeText({ payeeSource: "missing" })}" בסעיף 1 – אלה הצ'קים שיש לרשום.`);
+  if (payeeStats.error) notes.push(`שמות המוטבים של הצ'קים לא נשלפו הפעם (${payeeStats.error}).`);
   if (cancelledCount) notes.push(`${cancelledCount} צ'קים מבוטלים (יש להם רישום הפוך) אינם מופיעים בסעיף 3.`);
   if (summary.chequesCleared.groupOnly) notes.push(`${summary.chequesCleared.groupOnly} צ'קים הותאמו בחשבשבת בתוך קבוצת התאמה גדולה ולא נמצאה שורת בנק עם אותו מספר צ'ק ואותו סכום; מוצג תאריך ההתאמה או שורת הבנק היחידה בקבוצה.`);
   if (clearedUnmatched.length) notes.push(`${clearedUnmatched.length} צ'קים כבר נפרעו בבנק (לפי מספר הצ'ק והסכום) אבל עדיין לא הותאמו בחשבשבת; הם נספרים כצ'קים פתוחים עד להתאמה.`);
@@ -304,6 +313,8 @@ export async function buildBankReconReport(query = {}) {
 // ── Excel ────────────────────────────────────────────────────────────────
 
 const MONEY_FMT = '#,##0.00;[Red]-#,##0.00';
+
+const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", missing: "חסר" };
 
 function sheet(wb, title, columns, rows, totalLabel, total) {
   const ws = wb.addWorksheet(title.slice(0, 31), { views: [{ rightToLeft: true, state: "frozen", ySplit: 1 }] });
@@ -362,6 +373,7 @@ export async function renderBankReconXlsx(r) {
 
   sheet(wb, "1 בנק ללא ספרים", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 },
+    { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
     { header: "מזהה שורה", key: "bankLineId", width: 10 },
   ], r.bankOpen, 'סה"כ', s.bankOpen.total);
