@@ -232,6 +232,25 @@ function PayrollFiles({ r, classes }) {
     ));
 }
 
+/** The detailed bank reconciliation report of a bank_recon_report calc: per company, the full page and the Excel. */
+function BankReconFiles({ r, classes }) {
+  const { t } = useT();
+  const rows = (r.calcs || []).filter((c) => c.calc === 'bank_recon_report').flatMap((c) => c.result?.companies || []);
+  return rows
+    .filter((x) => x.downloads)
+    .map((x) => (
+      <div key={`${x.companyKey}-${x.account?.key}-${x.from}`} className={classes.files}>
+        <span dir="auto">
+          {x.company} · {x.account?.name} · <Term>{x.from}</Term>–<Term>{x.to}</Term>
+        </span>
+        <a className={classes.fileBtn} href={x.downloads.page}>
+          {t('joya.ask.file.bankReconPage')}
+        </a>
+        <FileButton href={x.downloads.xlsx} label={t('joya.ask.file.bankReconXlsx')} classes={classes} />
+      </div>
+    ));
+}
+
 /** The answer to one question: the text, how it was calculated, and a proposed change. head = show the question and time. */
 export function Answer({ r, onChanged, head = true }) {
   const theme = useTheme();
@@ -270,6 +289,7 @@ export function Answer({ r, onChanged, head = true }) {
         <>
           <AnswerBody r={r} classes={classes} />
           <PayrollFiles r={r} classes={classes} />
+      <BankReconFiles r={r} classes={classes} />
           {unverified.length ? (
             <div className={classes.warn}>
               ⚠ {t('joya.ask.unverified')} <Term>{unverified.join(', ')}</Term>

@@ -17,7 +17,7 @@ const isDate = (v) => {
 const DATE = { test: isDate };
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 // rows given to the model per list (the API has more; count / total say how many)
-const LIMITS = { aging: 30, trialBalance: 120, ledger: 150, journal: 60, invoices: 100, cheques: 80, exceptions: 60, open: 60, suggestions: 30, changes: 60, allocation: 60, spending: 20 };
+const LIMITS = { recon: 15, aging: 30, trialBalance: 120, ledger: 150, journal: 60, invoices: 100, cheques: 80, exceptions: 60, open: 60, suggestions: 30, changes: 60, allocation: 60, spending: 20 };
 
 const bad = (m) => Object.assign(new Error(m), { code: 'BAD_REQUEST' });
 const num = (v) => (v == null || v === '' ? null : Number(v));
@@ -241,6 +241,42 @@ export async function bankReconciliation(companies, p = {}) {
   const params = textOf(p, 'account');
   return result('bank_reconciliation', params, await perCompany(companies, '/bank/reconciliation', params, (d, m) => ({ accounts: d, sign: m.sign })), {
     note: 'bankBalance = the statement lines added up; bookBalance = the books (debit is plus, a minus is a credit balance); bankOpen / bookOpen = not matched yet; bankMatched should equal bookMatched; openAge = the open items by age (count and amount)',
+  });
+}
+
+/**
+ * The detailed bank reconciliation report (דוח התאמת בנק מפורט — the admin's bankRecon.js): for one bank account and a
+ * period, as of `to`: the summary (bank balance − open bank lines + open book lines + uncleared cheques = book
+ * balance), the first rows of each section and the links to the full page / Excel. The chat shows the buttons.
+ */
+export async function bankReconReport(companies, p = {}) {
+  const params = { ...textOf(p, 'account'), ...dates(p, { required: false }) };
+  const n = LIMITS.recon;
+  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays });
+  const bookRow = (x) => ({ date: x.date, reference: x.reference, description: x.description, counter: x.counterName || x.counterAccount, amount: x.amount, ageDays: x.ageDays, ...(x.posted ? {} : { posted: false }) });
+  const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status });
+  const top = (rows, by) => [...rows].sort((a, b) => Math.abs(b[by]) - Math.abs(a[by]));
+  return result('bank_recon_report', params, await perCompany(companies, '/bank/report', params, (d) => {
+    const q = { company: d.company?.code, account: d.account?.key, from: d.from, to: d.to };
+    const qs = Object.entries(q).filter(([, v]) => v != null && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+    return {
+      account: d.account,
+      from: d.from,
+      to: d.to,
+      dataUpTo: d.dataUpTo,
+      summary: d.summary,
+      notes: d.notes,
+      sections: {
+        bankOpen: shown(top(d.bankOpen || [], 'amount').map(bankRow), n),
+        bookOpen: shown(top(d.bookOpen || [], 'amount').map(bookRow), n),
+        bookFutureMatched: shown((d.bookFutureMatched || []).map(bookRow), n),
+        chequesCleared: shown(top(d.chequesCleared || [], 'amount').map(chequeRow), n),
+        chequesOpen: shown(top(d.chequesOpen || [], 'amount').map(chequeRow), n),
+      },
+      downloads: { page: `/accounting/bank-recon?${qs}`, xlsx: `/api/joya/finance/bank-recon?${qs}&format=xlsx`, html: `/api/joya/finance/bank-recon?${qs}&format=html` },
+    };
+  }), {
+    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links',
   });
 }
 

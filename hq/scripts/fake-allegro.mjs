@@ -237,6 +237,20 @@ const finCompany = (u) => (u.searchParams.get('company') === 'demo' ? null : { e
 const pnlRow = (m) => ({ period: m.month, income: m.income, purchases: m.purchases, salaries: m.salaries, general: m.general, profit: m.income - m.purchases - m.salaries - m.general });
 const FIN_ROUTES = {
   '/finance/companies': () => ({ finance: true, data: [{ code: 'demo', name: 'Demo company', taxId: null, allegroKey: DEMO_COMPANY.key, allegroLabel: DEMO_COMPANY.label, years: [Number(T.slice(0, 4)) - 1, Number(T.slice(0, 4))], rules: true }], meta: {} }),
+  '/finance/bank/report/accounts': () => ({ finance: true, data: [{ companyId: 1, code: 'demo', name: 'Demo company', banks: [{ key: '110011', name: 'בנק הפועלים', from: `${Number(T.slice(0, 4)) - 1}-01-16`, dataUpTo: FIN_SYNC.dataUpTo, lines: 7877 }] }], meta: { today: T } }),
+  '/finance/bank/report': (u) => {
+    if (finCompany(u)) return finCompany(u);
+    const to = u.searchParams.get('to') || T, from = u.searchParams.get('from') || `${to.slice(0, 4)}-01-01`;
+    const row = (d, amount, details) => ({ bankLineId: 1, year: Number(d.slice(0, 4)), date: d, reference: 10132, details, amount, ageDays: 3 });
+    const summary = { bankBalance: 121642.83, bankLinesSum: 145338.11, bookBalance: -2000000, unpostedCount: 0,
+      bankOpen: { count: 2, total: 1500, beforeCount: 0, beforeTotal: 0 }, bookOpen: { count: 1, total: -3000, beforeCount: 0, beforeTotal: 0 },
+      chequesOpen: { count: 1, total: -2500, pastDueCount: 1, pastDueTotal: -2500, notDueCount: 0, notDueTotal: 0, clearedUnmatchedCount: 0, clearedUnmatchedTotal: 0 },
+      bookFutureMatched: { count: 0, total: 0 }, chequesCleared: { count: 1, total: -4175, groupOnly: 0 }, cancelledCheques: 0, expectedBookBalance: -2000000, unexplained: 0 };
+    return { finance: true, data: { company: { code: 'demo', name: 'Demo company' }, account: { key: '110011', name: 'בנק הפועלים' }, from, to, dataUpTo: FIN_SYNC.dataUpTo, lastSync: FIN_SYNC.lastRunAt, generatedAt: T,
+      summary, notes: ['demo'], bankOpen: [row(to, 1000, 'זיכוי'), row(to, 500, 'העברה')], bookOpen: [{ lineId: 1, date: to, reference: 120, type: null, description: 'העברה לספק', counterAccount: '500001', counterName: 'ספק', amount: -3000, ageDays: 1, posted: true }],
+      bookFutureMatched: [], chequesCleared: [{ chequeNo: 15940, payee: 'ספק', issueDate: from, dueDate: from, amount: -4175, clearedDate: from, bankAmount: -4175, bankReference: 15940, daysAfterDue: 1, status: 'cleared' }],
+      chequesOpen: [{ chequeNo: 16000, payee: 'ספק', issueDate: from, dueDate: from, amount: -2500, daysAfterDue: 20, clearedDate: null, status: 'past_due' }] }, meta: { company: 'demo', account: '110011', from, to, sync: FIN_SYNC } };
+  },
   '/finance/status': (u) => finCompany(u) || fin({ lastRun: { at: FIN_SYNC.lastRunAt, status: 'done', changedRows: 3, error: null }, dataUpTo: FIN_SYNC.dataUpTo, dataStart: finMonths[0].month, years: [Number(T.slice(0, 4))], banks: [{ accountKey: '110011', name: 'בנק הפועלים', bankBalance: 121642.83, lastRunningBalance: 121642.83, bookBalance: -2000000, bankOpen: 17708.88, bookOpen: -2100000, openBankLines: 58, openBookLines: 93 }], suppliers: { debitCount: 2, debitTotal: 10000, creditCount: 40, creditTotal: 2500000 }, months: finMonths.map((m) => ({ ...m, warnings: m.salaries ? [] : ['no_salary_expense'], complete: !!m.salaries })) }),
   '/finance/pnl': (u) => {
     if (finCompany(u)) return finCompany(u);

@@ -137,7 +137,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
-| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `vat_summary`, `withholding`, `allocation_numbers`, `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
+| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_recon_report`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `vat_summary`, `withholding`, `allocation_numbers`, `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
 
 **Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** (and ISRACARD, DISCOVER, MAESTRO — owner, 2026-11-03) of
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
@@ -209,7 +209,17 @@ invoices, customer invoices and cheques. `vat_summary` (the books) is not `vat_r
 text (`q`) that matches several accounts comes back `ambiguous` with the matches, and the answer asks which one. The
 accounting menu suggests 8 more questions for the chain admin (`joya.area.accounting.s9`–`s16`). Eval fixtures `f-*`
 (kind `ACCOUNTING`, 21 questions) + `f-pnl-general-area`; the fake API serves made-up finance shapes
-(`scripts/fake-allegro.mjs` `FIN_ROUTES`: companies, status, pnl, cash, aging, trial-balance, ledger).
+(`scripts/fake-allegro.mjs` `FIN_ROUTES`: companies, status, pnl, cash, aging, trial-balance, ledger, bank/report).
+
+**The detailed bank reconciliation report** (דוח התאמת בנק מפורט, owner 2026-11-07: "I want it in the Joya HQ") is the
+admin's report (`admin/server/modules/bankRecon.js`, Hebrew RTL HTML + Excel) served to Joya by the Finance API
+(`/finance/bank/report?company&account&from&to&format=json|html|xlsx`, `/finance/bank/report/accounts`). Two ways in,
+chain admin only: the page `/accounting/bank-recon` (button "דוח התאמת בנק מפורט" above the accounting chat; picks the
+account and dates, shows the admin's HTML in a frame, offers the Excel and a print tab — Joya routes
+`/api/joya/finance/bank-recon[/accounts]`, `source.financeBankReport*`), and the calc `bank_recon_report` in the chat
+("תכין לי דוח התאמת בנק מפורט לאוקטובר"): the summary that ties the bank balance to the book balance, the biggest rows of
+each section, and the buttons "פתח את הדוח המלא" / Excel under the answer (`AskBox.js` `BankReconFiles`). Nothing is
+computed or stored in Joya.
 
 ## Permissions
 

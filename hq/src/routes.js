@@ -27,6 +27,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -194,6 +195,29 @@ r.post('/joya/payroll/issues/:id/resolve', h(async (req) => (await payroll.resol
 r.post('/joya/payroll/corrections', h(async (req) => payroll.correctAttendance(req.joya, req.body || {})));
 r.get('/joya/payroll/attendance', h(async (req) => ({ rows: await payroll.attendanceRows(req.joya, locId(req.query.locationId), ...period(req)) })));
 r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLines(req.joya, locId(req.query.locationId), req.query.period)));
+
+// ---------------------------------------------------------------- the books: the detailed bank reconciliation report
+// The admin's report (admin/server/modules/bankRecon.js) through the Finance API, for the chain admin: the bank
+// accounts to pick from, the JSON, the Hebrew HTML page (shown in an iframe) and the Excel file. Joya keeps nothing.
+const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to });
+r.get('/joya/finance/bank-recon/accounts', requireAdmin, h(async () => financeBankAccounts()));
+r.get(
+  '/joya/finance/bank-recon',
+  requireAdmin,
+  h(async (req, res) => {
+    const format = String(req.query.format || 'json');
+    if (!['json', 'html', 'xlsx'].includes(format)) throw Object.assign(new Error('format must be json, html or xlsx'), { code: 'BAD_REQUEST' });
+    if (format === 'json') {
+      const out = await financeBankReport(reportParams(req));
+      if (!out.available) throw Object.assign(new Error(out.reason), { code: out.badRequest ? 'BAD_REQUEST' : 'NOT_LOADED' });
+      return { report: out.data };
+    }
+    const file = await financeBankReportFile(reportParams(req), format);
+    res.setHeader('Content-Type', file.headers['content-type'] || (format === 'html' ? 'text/html; charset=utf-8' : 'application/octet-stream'));
+    if (format === 'xlsx') res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    res.send(file.buffer);
+  }),
+);
 
 // ---------------------------------------------------------------- quality, overview, audit
 r.get('/joya/quality', h(async (req) => quality.report(req.joya, locsOf(req))));

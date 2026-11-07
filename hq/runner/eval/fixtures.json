@@ -1,1969 +1,2005 @@
 {
- "about": "Labelled questions for the Joya planner eval (scripts/eval.mjs). Contexts: eval/contexts.json (AREA = a GENERAL context asked in the MANPOWER area, ACCOUNTING = the same in the accounting area; today 2026-10-21, location demo-tlv = demo Tel Aviv, demo-hfa = demo Haifa, order list 100, staffing plan 35 = week 2026-10-25..31). expect: calcs = names that must all be planned ('a|b' = either); params = per calc, values the params must have; range = from/to of the dated calcs; location = location ids the calcs must use; ops = 'none' | 'some' | list of partial ops that must each match one planned op; whatIf / draft = true when required (default: must be absent); maxCalcs = most calcs allowed. request = fields set on the context's request (e.g. scope, the picker choice). Values 'a|b' accept either.",
- "fixtures": [
-  {
-   "key": "g-sales-lastweek",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה מכרנו בשבוע שעבר?",
-   "expect": {
-    "calcs": [
-     "sales_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "g-sales-tlv-lastmonth",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What were the sales in Tel Aviv last month?",
-   "expect": {
-    "calcs": [
-     "sales_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-haifa-yesterday",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה סועדים היו אתמול בחיפה?",
-   "expect": {
-    "calcs": [
-     "sales_daily|sales_summary"
-    ],
-    "range": {
-     "from": "2026-10-20",
-     "to": "2026-10-20"
-    },
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "g-why-drop",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "למה ההכנסות ירדו בחודש שעבר לעומת החודש שלפניו?",
-   "expect": {
-    "calcs": [
-     "sales_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    }
-   }
-  },
-  {
-   "key": "g-top-dishes",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "Which dishes sold best last week?",
-   "expect": {
-    "calcs": [
-     "sales_by_dish"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "g-anomalies",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "היו ימים חריגים במכירות החודש?",
-   "expect": {
-    "calcs": [
-     "sales_anomalies"
-    ],
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-20|2026-10-21"
-    }
-   }
-  },
-  {
-   "key": "g-shift-split",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How did morning and evening shifts compare in revenue last month?",
-   "expect": {
-    "calcs": [
-     "sales_by_shift"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    }
-   }
-  },
-  {
-   "key": "g-labor-pct",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה אחוז עלות העבודה בספטמבר בתל אביב?",
-   "expect": {
-    "calcs": [
-     "labor_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-planned-actual",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "Did we work more hours than planned in September?",
-   "expect": {
-    "calcs": [
-     "planned_vs_actual_hours"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    }
-   }
-  },
-  {
-   "key": "g-thursday-demand",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "תראה לי את הביקוש בימי חמישי האחרונים בערב בתל אביב",
-   "expect": {
-    "calcs": [
-     "shift_demand_recent"
-    ],
-    "params": {
-     "shift_demand_recent": {
-      "locationId": "demo-tlv",
-      "weekday": 4,
-      "shiftCode": "evening"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-shortages",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What shortages were reported recently?",
-   "expect": {
-    "calcs": [
-     "shortages"
-    ]
-   }
-  },
-  {
-   "key": "g-data-quality",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "באיזה סניף חסרים נתונים?",
-   "expect": {
-    "calcs": [
-     "data_quality"
-    ]
-   }
-  },
-  {
-   "key": "g-payroll-issues",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "Are there open payroll problems for September?",
-   "expect": {
-    "calcs": [
-     "payroll_issues"
-    ],
-    "params": {
-     "payroll_issues": {
-      "period": "2026-09"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-pending",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה מחכה לאישור שלי?",
-   "expect": {
-    "calcs": [
-     "pending_decisions"
-    ]
-   }
-  },
-  {
-   "key": "g-learned",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What has the system learned about ordering in Tel Aviv?",
-   "expect": {
-    "calcs": [
-     "item_patterns"
-    ],
-    "params": {
-     "item_patterns": {
-      "locationId": "demo-tlv"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-rules-haifa",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What staffing rules apply in Haifa?",
-   "expect": {
-    "calcs": [
-     "staffing_rules"
-    ],
-    "params": {
-     "staffing_rules": {
-      "locationId": "demo-hfa"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-stock",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה עגבניות יש לנו במלאי עכשיו?",
-   "expect": {}
-  },
-  {
-   "key": "g-too-many",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "For last week give me sales, daily sales, sales by shift, sales by dish, anomalies, labor, shortages, data quality and payroll issues.",
-   "expect": {
-    "maxCalcs": 6
-   }
-  },
-  {
-   "key": "o-set-qty",
-   "kind": "ORDER_LIST",
-   "lang": "he",
-   "question": "תעלה את חזה העוף ל-12 קילו",
-   "expect": {
-    "ops": [
-     {
-      "op": "set_qty",
-      "lineId": 1070,
-      "qty": 12
-     }
-    ]
-   }
-  },
-  {
-   "key": "o-remove",
-   "kind": "ORDER_LIST",
-   "lang": "en",
-   "question": "Remove the napkins from the list",
-   "expect": {
-    "ops": [
-     {
-      "op": "remove",
-      "lineId": 1074
-     }
-    ]
-   }
-  },
-  {
-   "key": "o-add-new",
-   "kind": "ORDER_LIST",
-   "lang": "he",
-   "question": "תוסיף 2 קילו פרמזן",
-   "expect": {
-    "ops": [
-     {
-      "op": "add",
-      "qty": 2
-     }
-    ]
-   }
-  },
-  {
-   "key": "o-two-changes",
-   "kind": "ORDER_LIST",
-   "lang": "he",
-   "question": "תוריד את הבצל ותשנה את הלימונים ל-5",
-   "expect": {
-    "ops": [
-     {
-      "op": "remove",
-      "lineId": 1062
-     },
-     {
-      "op": "set_qty",
-      "lineId": 1072,
-      "qty": 5
-     }
-    ]
-   }
-  },
-  {
-   "key": "o-why",
-   "kind": "ORDER_LIST",
-   "lang": "en",
-   "question": "Why does the system suggest 37 sourdough breads?",
-   "expect": {
-    "calcs": [
-     "order_list"
-    ],
-    "params": {
-     "order_list": {
-      "listId": 100
-     }
-    }
-   }
-  },
-  {
-   "key": "s-why",
-   "kind": "STAFFING_PLAN",
-   "lang": "en",
-   "question": "Why do we need 6 waiters on Thursday evening?",
-   "expect": {
-    "calcs": [
-     "staffing_plan_lines",
-     "staffing_forecast"
-    ],
-    "params": {
-     "staffing_plan_lines": {
-      "planId": 35,
-      "date": "2026-10-29",
-      "shiftCode": "evening"
-     }
-    }
-   }
-  },
-  {
-   "key": "s-forecast",
-   "kind": "STAFFING_PLAN",
-   "lang": "he",
-   "question": "כמה סועדים צפויים ביום שישי בבוקר?",
-   "expect": {
-    "calcs": [
-     "staffing_forecast"
-    ],
-    "params": {
-     "staffing_forecast": {
-      "planId": 35,
-      "date": "2026-10-30",
-      "shiftCode": "morning"
-     }
-    }
-   }
-  },
-  {
-   "key": "s-one-less",
-   "kind": "STAFFING_PLAN",
-   "lang": "he",
-   "question": "תוריד מלצר אחד ביום חמישי בערב",
-   "expect": {
-    "ops": [
-     {
-      "op": "set",
-      "lineId": 2120,
-      "headcount": 5
-     }
-    ]
-   }
-  },
-  {
-   "key": "s-add-runner",
-   "kind": "STAFFING_PLAN",
-   "lang": "en",
-   "question": "Add a runner on Friday morning starting at 10:00",
-   "expect": {
-    "ops": [
-     {
-      "op": "add",
-      "date": "2026-10-30",
-      "shiftCode": "morning",
-      "roleCode": "runner",
-      "start": "10:00"
-     }
-    ]
-   }
-  },
-  {
-   "key": "s-no-day",
-   "kind": "STAFFING_PLAN",
-   "lang": "en",
-   "question": "Add a waiter starting at noon",
-   "expect": {
-    "ops": "none"
-   }
-  },
-  {
-   "key": "s-what-if",
-   "kind": "STAFFING_PLAN",
-   "lang": "he",
-   "question": "תחשב מחדש עם מלצר לכל 20 סועדים",
-   "expect": {
-    "whatIf": true
-   }
-  },
-  {
-   "key": "a-people-nextweek",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה עובדים צריך בכל משמרת בשבוע הבא?",
-   "expect": {
-    "calcs": [
-     "staffing_forecast_week"
-    ]
-   }
-  },
-  {
-   "key": "a-cooks-fri-tlv",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה טבחים צריך בתל אביב ביום שישי בבוקר בשבוע הבא?",
-   "expect": {
-    "calcs": [
-     "staffing_forecast_week"
-    ],
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "a-waiters-week-nov1",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה מלצרים נצטרך בתל אביב בשבוע שמתחיל ב-1.11?",
-   "expect": {
-    "calcs": [
-     "staffing_forecast_week"
-    ],
-    "params": {
-     "staffing_forecast_week": {
-      "weekStart": "2026-11-01"
-     }
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "a-profile-sun-hfa",
-   "kind": "AREA",
-   "lang": "en",
-   "question": "What does an average Sunday morning look like in Haifa?",
-   "expect": {
-    "calcs": [
-     "shift_profile"
-    ],
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "g-profile-tlv",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "איך נראית משמרת ממוצעת בתל אביב בשלושת החודשים האחרונים?",
-   "expect": {
-    "calcs": [
-     "shift_profile"
-    ],
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "a-diners-per-waiter-tlv",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה סועדים היו לכל מלצר בתל אביב בשבוע שעבר?",
-   "expect": {
-    "calcs": [
-     "staffing_actual"
-    ],
-    "params": {
-     "staffing_actual": {
-      "role": "מלצר"
-     }
-    },
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "a-overstaffed-hfa",
-   "kind": "AREA",
-   "lang": "en",
-   "question": "Were we over-staffed in Haifa last week?",
-   "expect": {
-    "calcs": [
-     "staffing_actual"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    },
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "a-cooks-worked-sep",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה טבחים עבדו בממוצע במשמרת ערב בחיפה בספטמבר?",
-   "expect": {
-    "calcs": [
-     "staffing_actual"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "g-payments-tlv",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "איך שילמו הלקוחות בתל אביב בחודש שעבר? כמה באשראי וכמה בוולט?",
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-payments-10bis",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How much did we get through 10bis last week?",
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "g-payments-method",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "אנא הצג לי התפלגות ההכנסות לפי צורת גביה",
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ]
-   }
-  },
-  {
-   "key": "g-scope-location",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה מכרנו בשבוע שעבר?",
-   "request": {
-    "locationId": "demo-hfa",
-    "scope": {
-     "kind": "LOCATION",
-     "locationIds": [
-      "demo-hfa"
-     ]
-    }
-   },
-   "expect": {
-    "calcs": [
-     "sales_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    },
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "g-scope-company",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How did customers pay last month?",
-   "request": {
-    "scope": {
-     "kind": "COMPANY",
-     "company": "חברת דמו",
-     "locationIds": [
-      "demo-tlv"
-     ]
-    }
-   },
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-scope-override",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה סועדים היו אתמול בתל אביב?",
-   "request": {
-    "locationId": "demo-hfa",
-    "scope": {
-     "kind": "LOCATION",
-     "locationIds": [
-      "demo-hfa"
-     ]
-    }
-   },
-   "expect": {
-    "calcs": [
-     "sales_daily|sales_summary"
-    ],
-    "range": {
-     "from": "2026-10-20",
-     "to": "2026-10-20"
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-card-forecast",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה צפי הכנסות השבוע מכרטיסי אשראי?",
-   "expect": {
-    "calcs": [
-     "card_income_week"
-    ],
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "a-bank-card-forecast",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה כסף אמור להיכנס השבוע מכרטיסי אשראי?",
-   "request": {
-    "contextId": 4,
-    "area": "BANK"
-   },
-   "expect": {
-    "calcs": [
-     "card_income_week"
-    ]
-   }
-  },
-  {
-   "key": "g-card-forecast-next",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What card income do we expect next week?",
-   "expect": {
-    "calcs": [
-     "card_income_week"
-    ],
-    "params": {
-     "card_income_week": {
-      "weekStart": "2026-10-25"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-bank-balance",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה היתרה בחשבון הבנק היום?",
-   "expect": {
-    "calcs": [
-     "bank_summary"
-    ]
-   }
-  },
-  {
-   "key": "g-bank-wolt",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה העבירה וולט החודש לחשבון הבנק?",
-   "expect": {
-    "calcs": [
-     "bank_transactions|bank_summary"
-    ],
-    "params": {
-     "bank_transactions": {
-      "q": "WOLT|Wolt|wolt"
-     }
-    },
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-21"
-    }
-   }
-  },
-  {
-   "key": "g-bank-company",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה כסף נכנס ויצא בחשבון הבנק של חברת דמו בחודש שעבר?",
-   "expect": {
-    "calcs": [
-     "bank_summary"
-    ],
-    "params": {
-     "bank_summary": {
-      "companyKeys": [
-       "demo"
-      ]
-     }
-    },
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    }
-   }
-  },
-  {
-   "key": "a-bank-cards",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה הפקידו חברות האשראי לחשבון הבנק בשבוע שעבר?",
-   "request": {
-    "contextId": 4,
-    "area": "BANK"
-   },
-   "expect": {
-    "calcs": [
-     "bank_transactions|bank_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-bank-card-income",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה מכרנו באשראי בקופה בשבוע שעבר?",
-   "request": {
-    "contextId": 4,
-    "area": "BANK"
-   },
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-bank-card-vs-bank",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "השווה את הכנסות האשראי בקופה החודש למה שנכנס לבנק מחברות האשראי",
-   "request": {
-    "contextId": 4,
-    "area": "BANK"
-   },
-   "expect": {
-    "calcs": [
-     "cards_vs_bank|payments_summary"
-    ]
-   }
-  },
-  {
-   "key": "g-card-income-unclear",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה הכנסות היו מכרטיסי אשראי בשבוע שעבר?",
-   "expect": {
-    "calcs": [
-     "payments_summary",
-     "bank_transactions|bank_summary"
-    ]
-   }
-  },
-  {
-   "key": "g-card-bank-max",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה כסף קיבלנו ממקס לחשבון החודש?",
-   "expect": {
-    "calcs": [
-     "bank_transactions|bank_summary"
-    ],
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-21"
-    }
-   }
-  },
-  {
-   "key": "a-perf-card-income",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה הכנסות היו מכרטיסי אשראי בשבוע שעבר?",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "maxCalcs": 1,
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-perf-card-bank",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה נכנס לחשבון הבנק מחברות האשראי בשבוע שעבר?",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "bank_transactions|bank_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-bank-card-default",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה נכנס מכרטיסי אשראי בשבוע שעבר?",
-   "request": {
-    "contextId": 4,
-    "area": "BANK"
-   },
-   "expect": {
-    "calcs": [
-     "bank_transactions|bank_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-perf-members-club",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "כמה נכנס ממועדון חברים בשבוע שעבר?",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "g-week-this",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה מכרנו השבוע?",
-   "expect": {
-    "calcs": [
-     "sales_summary|sales_daily"
-    ],
-    "range": {
-     "from": "2026-10-18",
-     "to": "2026-10-20|2026-10-21"
-    }
-   }
-  },
-  {
-   "key": "g-week-last7",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How much did we sell in the last 7 days?",
-   "expect": {
-    "calcs": [
-     "sales_summary|sales_daily"
-    ],
-    "range": {
-     "from": "2026-10-14",
-     "to": "2026-10-20"
-    }
-   }
-  },
-  {
-   "key": "g-week-last2",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה היו המכירות בשבועיים האחרונים?",
-   "expect": {
-    "calcs": [
-     "sales_summary|sales_daily"
-    ],
-    "range": {
-     "from": "2026-10-04",
-     "to": "2026-10-17"
-    }
-   }
-  },
-  {
-   "key": "a-cards-vs-bank-weekly",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "אני רוצה שתכין טבלה ותשווה הכנסות מכרטיסי אשראי בבנק לעומת ביקום שבועית 3 חודשים אחרונים",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "cards_vs_bank"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "a-payments-weekly",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "תן לי את הכנסות האשראי לפי שבועות בחודש האחרון",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "params": {
-     "payments_summary": {
-      "group": "week"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "g-bank-monthly",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה כסף נכנס ויצא בבנק בכל חודש בשלושת החודשים האחרונים?",
-   "expect": {
-    "calcs": [
-     "bank_summary"
-    ],
-    "params": {
-     "bank_summary": {
-      "group": "month"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "a-emp-worked",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "הצג בטבלה את העובדים הפעילים שעבדו בחודש האחרון בתל אביב, את התפקידים שלהם ואת השכר השעתי",
-   "expect": {
-    "calcs": [
-     "employees"
-    ],
-    "params": {
-     "employees": {
-      "from": "2026-09-01",
-      "to": "2026-09-30"
-     }
-    },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "g-card-income-en",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How much did we sell by credit card this month?",
-   "expect": {
-    "calcs": [
-     "payments_summary"
-    ],
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-21"
-    }
-   }
-  },
-  {
-   "key": "g-emp-wage",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה השכר השעתי של דנה?",
-   "expect": {
-    "calcs": [
-     "employees"
-    ],
-    "params": {
-     "employees": {
-      "q": "דנה"
-     }
-    }
-   }
-  },
-  {
-   "key": "g-emp-role-avg",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה השכר הממוצע של מלצר?",
-   "expect": {
-    "calcs": [
-     "employees"
-    ],
-    "params": {
-     "employees": {
-      "role": "מלצר"
-     }
-    }
-   }
-  },
-  {
-   "key": "a-emp-list",
-   "kind": "AREA",
-   "lang": "en",
-   "question": "List the cooks and their wages",
-   "expect": {
-    "calcs": [
-     "employees"
-    ]
-   }
-  },
-  {
-   "key": "r-add-area",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "מעכשיו, בכל טבלת עובדים תמיין לפי מספר השעות, מהגבוה לנמוך",
-   "expect": {
-    "rule": {
-     "op": "add",
-     "area": "MANPOWER"
-    },
-    "maxCalcs": 0
-   }
-  },
-  {
-   "key": "r-add-all",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כלל חדש לכל התחומים: תמיד לכתוב סכומים בלי אגורות",
-   "expect": {
-    "rule": {
-     "op": "add",
-     "area": null
-    },
-    "maxCalcs": 0
-   }
-  },
-  {
-   "key": "r-add-en",
-   "kind": "AREA",
-   "lang": "en",
-   "question": "From now on, never count trainees as waiters",
-   "expect": {
-    "rule": {
-     "op": "add",
-     "area": "MANPOWER"
-    },
-    "maxCalcs": 0
-   }
-  },
-  {
-   "key": "r-remove",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "תבטל את הכלל על המיון לפי שעות",
-   "teamRules": [
+  "about": "Labelled questions for the Joya planner eval (scripts/eval.mjs). Contexts: eval/contexts.json (AREA = a GENERAL context asked in the MANPOWER area, ACCOUNTING = the same in the accounting area; today 2026-10-21, location demo-tlv = demo Tel Aviv, demo-hfa = demo Haifa, order list 100, staffing plan 35 = week 2026-10-25..31). expect: calcs = names that must all be planned ('a|b' = either); params = per calc, values the params must have; range = from/to of the dated calcs; location = location ids the calcs must use; ops = 'none' | 'some' | list of partial ops that must each match one planned op; whatIf / draft = true when required (default: must be absent); maxCalcs = most calcs allowed. request = fields set on the context's request (e.g. scope, the picker choice). Values 'a|b' accept either.",
+  "fixtures": [
     {
-     "id": 4,
-     "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
-     "area": "MANPOWER"
-    },
-    {
-     "id": 5,
-     "text": "סכומים בלי אגורות",
-     "area": null
-    }
-   ],
-   "expect": {
-    "rule": {
-     "op": "remove",
-     "id": 4
-    },
-    "maxCalcs": 0
-   }
-  },
-  {
-   "key": "r-edit",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "תשנה את כלל 5: סכומים מעוגלים לשקל",
-   "teamRules": [
-    {
-     "id": 4,
-     "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
-     "area": "MANPOWER"
-    },
-    {
-     "id": 5,
-     "text": "סכומים בלי אגורות",
-     "area": null
-    }
-   ],
-   "expect": {
-    "rule": {
-     "op": "edit",
-     "id": 5
-    },
-    "maxCalcs": 0
-   }
-  },
-  {
-   "key": "r-list",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "מה הכללים של הצוות?",
-   "teamRules": [
-    {
-     "id": 4,
-     "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
-     "area": "MANPOWER"
-    },
-    {
-     "id": 5,
-     "text": "סכומים בלי אגורות",
-     "area": null
-    }
-   ],
-   "expect": {
-    "calcs": [
-     "team_rules"
-    ]
-   }
-  },
-  {
-   "key": "r-once",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "הפעם תציג את העובדים שעבדו בחודש שעבר ממוינים לפי שם",
-   "expect": {
-    "calcs": [
-     "employees"
-    ]
-   }
-  },
-  {
-   "key": "v-vat-lastmonth",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "תכין לי דוח מע\"מ לחודש שעבר",
-   "expect": {
-    "calcs": [
-     "vat_report"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "v-vat-en",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "What is the income for VAT in August?",
-   "expect": {
-    "calcs": [
-     "vat_report"
-    ],
-    "range": {
-     "from": "2026-08-01",
-     "to": "2026-08-31"
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "p-weekly",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "דוח ביצועים שבועי: ממוצע ההכנסה היומי החודש מול אותו חודש בשנה שעברה",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "month_vs_last_year"
-    ],
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "p-waiters",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "ביצועי מלצרים החודש",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "waiter_performance"
-    ],
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-21"
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "p-dash",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "דשבורד יומי: הכנסות היום לפי מסעדה, סועדים, הכנסה לסועד וזיכויים",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "expect": {
-    "calcs": [
-     "daily_dashboard"
-    ],
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "p-dash-en",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "How much did each restaurant sell today, with diners and refunds?",
-   "expect": {
-    "calcs": [
-     "daily_dashboard"
-    ],
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "p-ly-en",
-   "kind": "GENERAL",
-   "lang": "en",
-   "question": "Compare our average income per day in October with October last year",
-   "expect": {
-    "calcs": [
-     "month_vs_last_year"
-    ],
-    "params": {
-     "month_vs_last_year": {
-      "month": "2026-10"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-active",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "עובדים פעילים: רשימת העובדים שעבדו החודש",
-   "request": {
-    "contextId": 2,
-    "area": "MANPOWER"
-   },
-   "expect": {
-    "calcs": [
-     "employees"
-    ],
-    "params": {
-     "employees": {
-      "from": "2026-10-01",
-      "to": "2026-10-21"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-wages",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "שכר עובדים: רשימת העובדים עם השכר והתפקידים שלהם החודש",
-   "request": {
-    "contextId": 2,
-    "area": "MANPOWER"
-   },
-   "expect": {
-    "calcs": [
-     "employees"
-    ],
-    "params": {
-     "employees": {
-      "from": "2026-10-01",
-      "to": "2026-10-21"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-tlush",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "הורדת קובץ התלושים (Excel) של החודש",
-   "request": {
-    "contextId": 2,
-    "area": "MANPOWER"
-   },
-   "expect": {
-    "calcs": [
-     "payroll_files"
-    ],
-    "noParams": {
-     "payroll_files": [
-      "month"
-     ]
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-micpal",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "ייצוא למיכפל: הורדת קובץ הייצוא של החודש",
-   "request": {
-    "contextId": 2,
-    "area": "MANPOWER"
-   },
-   "expect": {
-    "calcs": [
-     "payroll_files"
-    ],
-    "noParams": {
-     "payroll_files": [
-      "month"
-     ]
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-micpal-sep",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "תן לי את קובץ הייצוא למיכפל של ספטמבר",
-   "expect": {
-    "calcs": [
-     "payroll_files"
-    ],
-    "params": {
-     "payroll_files": {
-      "month": "2026-09"
-     }
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "m-tlush-en",
-   "kind": "AREA",
-   "lang": "en",
-   "question": "Download the payslip Excel for this month",
-   "request": {
-    "contextId": 2,
-    "area": "MANPOWER"
-   },
-   "expect": {
-    "calcs": [
-     "payroll_files"
-    ],
-    "noParams": {
-     "payroll_files": [
-      "month"
-     ]
-    },
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "h-lastyear",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "ובאותו חודש בשנה שעברה?",
-   "history": [
-    {
-     "question": "מה היו המכירות בתל אביב בחודש שעבר?",
-     "askedAt": "2026-10-21T09:00:00",
-     "calcs": [
-      {
-       "calc": "sales_summary",
-       "params": {
-        "locationIds": [
-         "demo-tlv"
+      "key": "g-sales-lastweek",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה מכרנו בשבוע שעבר?",
+      "expect": {
+        "calcs": [
+          "sales_summary"
         ],
-        "from": "2026-09-01",
-        "to": "2026-09-30"
-       }
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
       }
-     ],
-     "answer": "בספטמבר בתל אביב: הכנסות 412,300 ₪, 3,950 סועדים, ממוצע לסועד 104 ₪."
-    }
-   ],
-   "expect": {
-    "calcs": [
-     "sales_summary|month_vs_last_year|sales_daily"
-    ],
-    "location": [
-     "demo-tlv"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "h-other-place",
-   "kind": "AREA",
-   "lang": "he",
-   "question": "ובחיפה?",
-   "request": {
-    "contextId": 3,
-    "area": "PERFORMANCE"
-   },
-   "history": [
+    },
     {
-     "question": "ביצועי מלצרים החודש בתל אביב",
-     "askedAt": "2026-10-21T09:00:00",
-     "calcs": [
-      {
-       "calc": "waiter_performance",
-       "params": {
-        "locationIds": [
-         "demo-tlv"
+      "key": "g-sales-tlv-lastmonth",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What were the sales in Tel Aviv last month?",
+      "expect": {
+        "calcs": [
+          "sales_summary"
         ],
-        "from": "2026-10-01",
-        "to": "2026-10-21"
-       }
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "location": [
+          "demo-tlv"
+        ]
       }
-     ],
-     "answer": "תל אביב, 1.10–21.10: דנה 120 הזמנות, 38,400 ₪, טיפים 4,100 ₪."
-    }
-   ],
-   "expect": {
-    "calcs": [
-     "waiter_performance"
-    ],
-    "range": {
-     "from": "2026-10-01",
-     "to": "2026-10-21"
     },
-    "location": [
-     "demo-hfa"
-    ],
-    "maxCalcs": 1
-   }
-  },
-  {
-   "key": "h-by-day",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "תציג את זה לפי ימים",
-   "history": [
     {
-     "question": "כמה מכרנו בתל אביב בשבוע שעבר?",
-     "askedAt": "2026-10-21T09:00:00",
-     "calcs": [
-      {
-       "calc": "sales_summary",
-       "params": {
-        "locationIds": [
-         "demo-tlv"
+      "key": "g-haifa-yesterday",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה סועדים היו אתמול בחיפה?",
+      "expect": {
+        "calcs": [
+          "sales_daily|sales_summary"
         ],
-        "from": "2026-10-11",
-        "to": "2026-10-17"
-       }
+        "range": {
+          "from": "2026-10-20",
+          "to": "2026-10-20"
+        },
+        "location": [
+          "demo-hfa"
+        ]
       }
-     ],
-     "answer": "בשבוע 11.10–17.10 בתל אביב: הכנסות 96,200 ₪."
-    }
-   ],
-   "expect": {
-    "calcs": [
-     "sales_daily"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
     },
-    "location": [
-     "demo-tlv"
-    ]
-   }
-  },
-  {
-   "key": "h-standalone",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "כמה סועדים היו אתמול בחיפה?",
-   "history": [
     {
-     "question": "איך שילמו בתל אביב בשבוע שעבר?",
-     "askedAt": "2026-10-21T09:00:00",
-     "calcs": [
-      {
-       "calc": "payments_summary",
-       "params": {
-        "locationIds": [
-         "demo-tlv"
+      "key": "g-why-drop",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "למה ההכנסות ירדו בחודש שעבר לעומת החודש שלפניו?",
+      "expect": {
+        "calcs": [
+          "sales_summary"
         ],
-        "from": "2026-10-11",
-        "to": "2026-10-17"
-       }
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        }
       }
-     ],
-     "answer": "אשראי 62%, וולט 21%, מזומן 9%."
+    },
+    {
+      "key": "g-top-dishes",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "Which dishes sold best last week?",
+      "expect": {
+        "calcs": [
+          "sales_by_dish"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "g-anomalies",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "היו ימים חריגים במכירות החודש?",
+      "expect": {
+        "calcs": [
+          "sales_anomalies"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-20|2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "g-shift-split",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How did morning and evening shifts compare in revenue last month?",
+      "expect": {
+        "calcs": [
+          "sales_by_shift"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        }
+      }
+    },
+    {
+      "key": "g-labor-pct",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה אחוז עלות העבודה בספטמבר בתל אביב?",
+      "expect": {
+        "calcs": [
+          "labor_summary"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "g-planned-actual",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "Did we work more hours than planned in September?",
+      "expect": {
+        "calcs": [
+          "planned_vs_actual_hours"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        }
+      }
+    },
+    {
+      "key": "g-thursday-demand",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "תראה לי את הביקוש בימי חמישי האחרונים בערב בתל אביב",
+      "expect": {
+        "calcs": [
+          "shift_demand_recent"
+        ],
+        "params": {
+          "shift_demand_recent": {
+            "locationId": "demo-tlv",
+            "weekday": 4,
+            "shiftCode": "evening"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-shortages",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What shortages were reported recently?",
+      "expect": {
+        "calcs": [
+          "shortages"
+        ]
+      }
+    },
+    {
+      "key": "g-data-quality",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "באיזה סניף חסרים נתונים?",
+      "expect": {
+        "calcs": [
+          "data_quality"
+        ]
+      }
+    },
+    {
+      "key": "g-payroll-issues",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "Are there open payroll problems for September?",
+      "expect": {
+        "calcs": [
+          "payroll_issues"
+        ],
+        "params": {
+          "payroll_issues": {
+            "period": "2026-09"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-pending",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה מחכה לאישור שלי?",
+      "expect": {
+        "calcs": [
+          "pending_decisions"
+        ]
+      }
+    },
+    {
+      "key": "g-learned",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What has the system learned about ordering in Tel Aviv?",
+      "expect": {
+        "calcs": [
+          "item_patterns"
+        ],
+        "params": {
+          "item_patterns": {
+            "locationId": "demo-tlv"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-rules-haifa",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What staffing rules apply in Haifa?",
+      "expect": {
+        "calcs": [
+          "staffing_rules"
+        ],
+        "params": {
+          "staffing_rules": {
+            "locationId": "demo-hfa"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-stock",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה עגבניות יש לנו במלאי עכשיו?",
+      "expect": {}
+    },
+    {
+      "key": "g-too-many",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "For last week give me sales, daily sales, sales by shift, sales by dish, anomalies, labor, shortages, data quality and payroll issues.",
+      "expect": {
+        "maxCalcs": 6
+      }
+    },
+    {
+      "key": "o-set-qty",
+      "kind": "ORDER_LIST",
+      "lang": "he",
+      "question": "תעלה את חזה העוף ל-12 קילו",
+      "expect": {
+        "ops": [
+          {
+            "op": "set_qty",
+            "lineId": 1070,
+            "qty": 12
+          }
+        ]
+      }
+    },
+    {
+      "key": "o-remove",
+      "kind": "ORDER_LIST",
+      "lang": "en",
+      "question": "Remove the napkins from the list",
+      "expect": {
+        "ops": [
+          {
+            "op": "remove",
+            "lineId": 1074
+          }
+        ]
+      }
+    },
+    {
+      "key": "o-add-new",
+      "kind": "ORDER_LIST",
+      "lang": "he",
+      "question": "תוסיף 2 קילו פרמזן",
+      "expect": {
+        "ops": [
+          {
+            "op": "add",
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "key": "o-two-changes",
+      "kind": "ORDER_LIST",
+      "lang": "he",
+      "question": "תוריד את הבצל ותשנה את הלימונים ל-5",
+      "expect": {
+        "ops": [
+          {
+            "op": "remove",
+            "lineId": 1062
+          },
+          {
+            "op": "set_qty",
+            "lineId": 1072,
+            "qty": 5
+          }
+        ]
+      }
+    },
+    {
+      "key": "o-why",
+      "kind": "ORDER_LIST",
+      "lang": "en",
+      "question": "Why does the system suggest 37 sourdough breads?",
+      "expect": {
+        "calcs": [
+          "order_list"
+        ],
+        "params": {
+          "order_list": {
+            "listId": 100
+          }
+        }
+      }
+    },
+    {
+      "key": "s-why",
+      "kind": "STAFFING_PLAN",
+      "lang": "en",
+      "question": "Why do we need 6 waiters on Thursday evening?",
+      "expect": {
+        "calcs": [
+          "staffing_plan_lines",
+          "staffing_forecast"
+        ],
+        "params": {
+          "staffing_plan_lines": {
+            "planId": 35,
+            "date": "2026-10-29",
+            "shiftCode": "evening"
+          }
+        }
+      }
+    },
+    {
+      "key": "s-forecast",
+      "kind": "STAFFING_PLAN",
+      "lang": "he",
+      "question": "כמה סועדים צפויים ביום שישי בבוקר?",
+      "expect": {
+        "calcs": [
+          "staffing_forecast"
+        ],
+        "params": {
+          "staffing_forecast": {
+            "planId": 35,
+            "date": "2026-10-30",
+            "shiftCode": "morning"
+          }
+        }
+      }
+    },
+    {
+      "key": "s-one-less",
+      "kind": "STAFFING_PLAN",
+      "lang": "he",
+      "question": "תוריד מלצר אחד ביום חמישי בערב",
+      "expect": {
+        "ops": [
+          {
+            "op": "set",
+            "lineId": 2120,
+            "headcount": 5
+          }
+        ]
+      }
+    },
+    {
+      "key": "s-add-runner",
+      "kind": "STAFFING_PLAN",
+      "lang": "en",
+      "question": "Add a runner on Friday morning starting at 10:00",
+      "expect": {
+        "ops": [
+          {
+            "op": "add",
+            "date": "2026-10-30",
+            "shiftCode": "morning",
+            "roleCode": "runner",
+            "start": "10:00"
+          }
+        ]
+      }
+    },
+    {
+      "key": "s-no-day",
+      "kind": "STAFFING_PLAN",
+      "lang": "en",
+      "question": "Add a waiter starting at noon",
+      "expect": {
+        "ops": "none"
+      }
+    },
+    {
+      "key": "s-what-if",
+      "kind": "STAFFING_PLAN",
+      "lang": "he",
+      "question": "תחשב מחדש עם מלצר לכל 20 סועדים",
+      "expect": {
+        "whatIf": true
+      }
+    },
+    {
+      "key": "a-people-nextweek",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה עובדים צריך בכל משמרת בשבוע הבא?",
+      "expect": {
+        "calcs": [
+          "staffing_forecast_week"
+        ]
+      }
+    },
+    {
+      "key": "a-cooks-fri-tlv",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה טבחים צריך בתל אביב ביום שישי בבוקר בשבוע הבא?",
+      "expect": {
+        "calcs": [
+          "staffing_forecast_week"
+        ],
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "a-waiters-week-nov1",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה מלצרים נצטרך בתל אביב בשבוע שמתחיל ב-1.11?",
+      "expect": {
+        "calcs": [
+          "staffing_forecast_week"
+        ],
+        "params": {
+          "staffing_forecast_week": {
+            "weekStart": "2026-11-01"
+          }
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "a-profile-sun-hfa",
+      "kind": "AREA",
+      "lang": "en",
+      "question": "What does an average Sunday morning look like in Haifa?",
+      "expect": {
+        "calcs": [
+          "shift_profile"
+        ],
+        "location": [
+          "demo-hfa"
+        ]
+      }
+    },
+    {
+      "key": "g-profile-tlv",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "איך נראית משמרת ממוצעת בתל אביב בשלושת החודשים האחרונים?",
+      "expect": {
+        "calcs": [
+          "shift_profile"
+        ],
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "a-diners-per-waiter-tlv",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה סועדים היו לכל מלצר בתל אביב בשבוע שעבר?",
+      "expect": {
+        "calcs": [
+          "staffing_actual"
+        ],
+        "params": {
+          "staffing_actual": {
+            "role": "מלצר"
+          }
+        },
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "a-overstaffed-hfa",
+      "kind": "AREA",
+      "lang": "en",
+      "question": "Were we over-staffed in Haifa last week?",
+      "expect": {
+        "calcs": [
+          "staffing_actual"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        },
+        "location": [
+          "demo-hfa"
+        ]
+      }
+    },
+    {
+      "key": "a-cooks-worked-sep",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה טבחים עבדו בממוצע במשמרת ערב בחיפה בספטמבר?",
+      "expect": {
+        "calcs": [
+          "staffing_actual"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "location": [
+          "demo-hfa"
+        ]
+      }
+    },
+    {
+      "key": "g-payments-tlv",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "איך שילמו הלקוחות בתל אביב בחודש שעבר? כמה באשראי וכמה בוולט?",
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "g-payments-10bis",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How much did we get through 10bis last week?",
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "g-payments-method",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "אנא הצג לי התפלגות ההכנסות לפי צורת גביה",
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ]
+      }
+    },
+    {
+      "key": "g-scope-location",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה מכרנו בשבוע שעבר?",
+      "request": {
+        "locationId": "demo-hfa",
+        "scope": {
+          "kind": "LOCATION",
+          "locationIds": [
+            "demo-hfa"
+          ]
+        }
+      },
+      "expect": {
+        "calcs": [
+          "sales_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        },
+        "location": [
+          "demo-hfa"
+        ]
+      }
+    },
+    {
+      "key": "g-scope-company",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How did customers pay last month?",
+      "request": {
+        "scope": {
+          "kind": "COMPANY",
+          "company": "חברת דמו",
+          "locationIds": [
+            "demo-tlv"
+          ]
+        }
+      },
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "g-scope-override",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה סועדים היו אתמול בתל אביב?",
+      "request": {
+        "locationId": "demo-hfa",
+        "scope": {
+          "kind": "LOCATION",
+          "locationIds": [
+            "demo-hfa"
+          ]
+        }
+      },
+      "expect": {
+        "calcs": [
+          "sales_daily|sales_summary"
+        ],
+        "range": {
+          "from": "2026-10-20",
+          "to": "2026-10-20"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "g-card-forecast",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה צפי הכנסות השבוע מכרטיסי אשראי?",
+      "expect": {
+        "calcs": [
+          "card_income_week"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "a-bank-card-forecast",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה כסף אמור להיכנס השבוע מכרטיסי אשראי?",
+      "request": {
+        "contextId": 4,
+        "area": "BANK"
+      },
+      "expect": {
+        "calcs": [
+          "card_income_week"
+        ]
+      }
+    },
+    {
+      "key": "g-card-forecast-next",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What card income do we expect next week?",
+      "expect": {
+        "calcs": [
+          "card_income_week"
+        ],
+        "params": {
+          "card_income_week": {
+            "weekStart": "2026-10-25"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-bank-balance",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה היתרה בחשבון הבנק היום?",
+      "expect": {
+        "calcs": [
+          "bank_summary"
+        ]
+      }
+    },
+    {
+      "key": "g-bank-wolt",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה העבירה וולט החודש לחשבון הבנק?",
+      "expect": {
+        "calcs": [
+          "bank_transactions|bank_summary"
+        ],
+        "params": {
+          "bank_transactions": {
+            "q": "WOLT|Wolt|wolt"
+          }
+        },
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "g-bank-company",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה כסף נכנס ויצא בחשבון הבנק של חברת דמו בחודש שעבר?",
+      "expect": {
+        "calcs": [
+          "bank_summary"
+        ],
+        "params": {
+          "bank_summary": {
+            "companyKeys": [
+              "demo"
+            ]
+          }
+        },
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        }
+      }
+    },
+    {
+      "key": "a-bank-cards",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה הפקידו חברות האשראי לחשבון הבנק בשבוע שעבר?",
+      "request": {
+        "contextId": 4,
+        "area": "BANK"
+      },
+      "expect": {
+        "calcs": [
+          "bank_transactions|bank_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-bank-card-income",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה מכרנו באשראי בקופה בשבוע שעבר?",
+      "request": {
+        "contextId": 4,
+        "area": "BANK"
+      },
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-bank-card-vs-bank",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "השווה את הכנסות האשראי בקופה החודש למה שנכנס לבנק מחברות האשראי",
+      "request": {
+        "contextId": 4,
+        "area": "BANK"
+      },
+      "expect": {
+        "calcs": [
+          "cards_vs_bank|payments_summary"
+        ]
+      }
+    },
+    {
+      "key": "g-card-income-unclear",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה הכנסות היו מכרטיסי אשראי בשבוע שעבר?",
+      "expect": {
+        "calcs": [
+          "payments_summary",
+          "bank_transactions|bank_summary"
+        ]
+      }
+    },
+    {
+      "key": "g-card-bank-max",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה כסף קיבלנו ממקס לחשבון החודש?",
+      "expect": {
+        "calcs": [
+          "bank_transactions|bank_summary"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "a-perf-card-income",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה הכנסות היו מכרטיסי אשראי בשבוע שעבר?",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "maxCalcs": 1,
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-perf-card-bank",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה נכנס לחשבון הבנק מחברות האשראי בשבוע שעבר?",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "bank_transactions|bank_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-bank-card-default",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה נכנס מכרטיסי אשראי בשבוע שעבר?",
+      "request": {
+        "contextId": 4,
+        "area": "BANK"
+      },
+      "expect": {
+        "calcs": [
+          "bank_transactions|bank_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-perf-members-club",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "כמה נכנס ממועדון חברים בשבוע שעבר?",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "g-week-this",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה מכרנו השבוע?",
+      "expect": {
+        "calcs": [
+          "sales_summary|sales_daily"
+        ],
+        "range": {
+          "from": "2026-10-18",
+          "to": "2026-10-20|2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "g-week-last7",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How much did we sell in the last 7 days?",
+      "expect": {
+        "calcs": [
+          "sales_summary|sales_daily"
+        ],
+        "range": {
+          "from": "2026-10-14",
+          "to": "2026-10-20"
+        }
+      }
+    },
+    {
+      "key": "g-week-last2",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה היו המכירות בשבועיים האחרונים?",
+      "expect": {
+        "calcs": [
+          "sales_summary|sales_daily"
+        ],
+        "range": {
+          "from": "2026-10-04",
+          "to": "2026-10-17"
+        }
+      }
+    },
+    {
+      "key": "a-cards-vs-bank-weekly",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "אני רוצה שתכין טבלה ותשווה הכנסות מכרטיסי אשראי בבנק לעומת ביקום שבועית 3 חודשים אחרונים",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "cards_vs_bank"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "a-payments-weekly",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "תן לי את הכנסות האשראי לפי שבועות בחודש האחרון",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "params": {
+          "payments_summary": {
+            "group": "week"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "g-bank-monthly",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה כסף נכנס ויצא בבנק בכל חודש בשלושת החודשים האחרונים?",
+      "expect": {
+        "calcs": [
+          "bank_summary"
+        ],
+        "params": {
+          "bank_summary": {
+            "group": "month"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "a-emp-worked",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "הצג בטבלה את העובדים הפעילים שעבדו בחודש האחרון בתל אביב, את התפקידים שלהם ואת השכר השעתי",
+      "expect": {
+        "calcs": [
+          "employees"
+        ],
+        "params": {
+          "employees": {
+            "from": "2026-09-01",
+            "to": "2026-09-30"
+          }
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "g-card-income-en",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How much did we sell by credit card this month?",
+      "expect": {
+        "calcs": [
+          "payments_summary"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "g-emp-wage",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה השכר השעתי של דנה?",
+      "expect": {
+        "calcs": [
+          "employees"
+        ],
+        "params": {
+          "employees": {
+            "q": "דנה"
+          }
+        }
+      }
+    },
+    {
+      "key": "g-emp-role-avg",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה השכר הממוצע של מלצר?",
+      "expect": {
+        "calcs": [
+          "employees"
+        ],
+        "params": {
+          "employees": {
+            "role": "מלצר"
+          }
+        }
+      }
+    },
+    {
+      "key": "a-emp-list",
+      "kind": "AREA",
+      "lang": "en",
+      "question": "List the cooks and their wages",
+      "expect": {
+        "calcs": [
+          "employees"
+        ]
+      }
+    },
+    {
+      "key": "r-add-area",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "מעכשיו, בכל טבלת עובדים תמיין לפי מספר השעות, מהגבוה לנמוך",
+      "expect": {
+        "rule": {
+          "op": "add",
+          "area": "MANPOWER"
+        },
+        "maxCalcs": 0
+      }
+    },
+    {
+      "key": "r-add-all",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כלל חדש לכל התחומים: תמיד לכתוב סכומים בלי אגורות",
+      "expect": {
+        "rule": {
+          "op": "add",
+          "area": null
+        },
+        "maxCalcs": 0
+      }
+    },
+    {
+      "key": "r-add-en",
+      "kind": "AREA",
+      "lang": "en",
+      "question": "From now on, never count trainees as waiters",
+      "expect": {
+        "rule": {
+          "op": "add",
+          "area": "MANPOWER"
+        },
+        "maxCalcs": 0
+      }
+    },
+    {
+      "key": "r-remove",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "תבטל את הכלל על המיון לפי שעות",
+      "teamRules": [
+        {
+          "id": 4,
+          "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
+          "area": "MANPOWER"
+        },
+        {
+          "id": 5,
+          "text": "סכומים בלי אגורות",
+          "area": null
+        }
+      ],
+      "expect": {
+        "rule": {
+          "op": "remove",
+          "id": 4
+        },
+        "maxCalcs": 0
+      }
+    },
+    {
+      "key": "r-edit",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "תשנה את כלל 5: סכומים מעוגלים לשקל",
+      "teamRules": [
+        {
+          "id": 4,
+          "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
+          "area": "MANPOWER"
+        },
+        {
+          "id": 5,
+          "text": "סכומים בלי אגורות",
+          "area": null
+        }
+      ],
+      "expect": {
+        "rule": {
+          "op": "edit",
+          "id": 5
+        },
+        "maxCalcs": 0
+      }
+    },
+    {
+      "key": "r-list",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "מה הכללים של הצוות?",
+      "teamRules": [
+        {
+          "id": 4,
+          "text": "בכל טבלת עובדים למיין לפי מספר השעות, מהגבוה לנמוך",
+          "area": "MANPOWER"
+        },
+        {
+          "id": 5,
+          "text": "סכומים בלי אגורות",
+          "area": null
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "team_rules"
+        ]
+      }
+    },
+    {
+      "key": "r-once",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "הפעם תציג את העובדים שעבדו בחודש שעבר ממוינים לפי שם",
+      "expect": {
+        "calcs": [
+          "employees"
+        ]
+      }
+    },
+    {
+      "key": "v-vat-lastmonth",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "תכין לי דוח מע\"מ לחודש שעבר",
+      "expect": {
+        "calcs": [
+          "vat_report"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "v-vat-en",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "What is the income for VAT in August?",
+      "expect": {
+        "calcs": [
+          "vat_report"
+        ],
+        "range": {
+          "from": "2026-08-01",
+          "to": "2026-08-31"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "p-weekly",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "דוח ביצועים שבועי: ממוצע ההכנסה היומי החודש מול אותו חודש בשנה שעברה",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "month_vs_last_year"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "p-waiters",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "ביצועי מלצרים החודש",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "waiter_performance"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-21"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "p-dash",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "דשבורד יומי: הכנסות היום לפי מסעדה, סועדים, הכנסה לסועד וזיכויים",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "expect": {
+        "calcs": [
+          "daily_dashboard"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "p-dash-en",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "How much did each restaurant sell today, with diners and refunds?",
+      "expect": {
+        "calcs": [
+          "daily_dashboard"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "p-ly-en",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "Compare our average income per day in October with October last year",
+      "expect": {
+        "calcs": [
+          "month_vs_last_year"
+        ],
+        "params": {
+          "month_vs_last_year": {
+            "month": "2026-10"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-active",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "עובדים פעילים: רשימת העובדים שעבדו החודש",
+      "request": {
+        "contextId": 2,
+        "area": "MANPOWER"
+      },
+      "expect": {
+        "calcs": [
+          "employees"
+        ],
+        "params": {
+          "employees": {
+            "from": "2026-10-01",
+            "to": "2026-10-21"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-wages",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "שכר עובדים: רשימת העובדים עם השכר והתפקידים שלהם החודש",
+      "request": {
+        "contextId": 2,
+        "area": "MANPOWER"
+      },
+      "expect": {
+        "calcs": [
+          "employees"
+        ],
+        "params": {
+          "employees": {
+            "from": "2026-10-01",
+            "to": "2026-10-21"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-tlush",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "הורדת קובץ התלושים (Excel) של החודש",
+      "request": {
+        "contextId": 2,
+        "area": "MANPOWER"
+      },
+      "expect": {
+        "calcs": [
+          "payroll_files"
+        ],
+        "noParams": {
+          "payroll_files": [
+            "month"
+          ]
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-micpal",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "ייצוא למיכפל: הורדת קובץ הייצוא של החודש",
+      "request": {
+        "contextId": 2,
+        "area": "MANPOWER"
+      },
+      "expect": {
+        "calcs": [
+          "payroll_files"
+        ],
+        "noParams": {
+          "payroll_files": [
+            "month"
+          ]
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-micpal-sep",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "תן לי את קובץ הייצוא למיכפל של ספטמבר",
+      "expect": {
+        "calcs": [
+          "payroll_files"
+        ],
+        "params": {
+          "payroll_files": {
+            "month": "2026-09"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "m-tlush-en",
+      "kind": "AREA",
+      "lang": "en",
+      "question": "Download the payslip Excel for this month",
+      "request": {
+        "contextId": 2,
+        "area": "MANPOWER"
+      },
+      "expect": {
+        "calcs": [
+          "payroll_files"
+        ],
+        "noParams": {
+          "payroll_files": [
+            "month"
+          ]
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "h-lastyear",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "ובאותו חודש בשנה שעברה?",
+      "history": [
+        {
+          "question": "מה היו המכירות בתל אביב בחודש שעבר?",
+          "askedAt": "2026-10-21T09:00:00",
+          "calcs": [
+            {
+              "calc": "sales_summary",
+              "params": {
+                "locationIds": [
+                  "demo-tlv"
+                ],
+                "from": "2026-09-01",
+                "to": "2026-09-30"
+              }
+            }
+          ],
+          "answer": "בספטמבר בתל אביב: הכנסות 412,300 ₪, 3,950 סועדים, ממוצע לסועד 104 ₪."
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "sales_summary|month_vs_last_year|sales_daily"
+        ],
+        "location": [
+          "demo-tlv"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "h-other-place",
+      "kind": "AREA",
+      "lang": "he",
+      "question": "ובחיפה?",
+      "request": {
+        "contextId": 3,
+        "area": "PERFORMANCE"
+      },
+      "history": [
+        {
+          "question": "ביצועי מלצרים החודש בתל אביב",
+          "askedAt": "2026-10-21T09:00:00",
+          "calcs": [
+            {
+              "calc": "waiter_performance",
+              "params": {
+                "locationIds": [
+                  "demo-tlv"
+                ],
+                "from": "2026-10-01",
+                "to": "2026-10-21"
+              }
+            }
+          ],
+          "answer": "תל אביב, 1.10–21.10: דנה 120 הזמנות, 38,400 ₪, טיפים 4,100 ₪."
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "waiter_performance"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-21"
+        },
+        "location": [
+          "demo-hfa"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "h-by-day",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "תציג את זה לפי ימים",
+      "history": [
+        {
+          "question": "כמה מכרנו בתל אביב בשבוע שעבר?",
+          "askedAt": "2026-10-21T09:00:00",
+          "calcs": [
+            {
+              "calc": "sales_summary",
+              "params": {
+                "locationIds": [
+                  "demo-tlv"
+                ],
+                "from": "2026-10-11",
+                "to": "2026-10-17"
+              }
+            }
+          ],
+          "answer": "בשבוע 11.10–17.10 בתל אביב: הכנסות 96,200 ₪."
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "sales_daily"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        },
+        "location": [
+          "demo-tlv"
+        ]
+      }
+    },
+    {
+      "key": "h-standalone",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "כמה סועדים היו אתמול בחיפה?",
+      "history": [
+        {
+          "question": "איך שילמו בתל אביב בשבוע שעבר?",
+          "askedAt": "2026-10-21T09:00:00",
+          "calcs": [
+            {
+              "calc": "payments_summary",
+              "params": {
+                "locationIds": [
+                  "demo-tlv"
+                ],
+                "from": "2026-10-11",
+                "to": "2026-10-17"
+              }
+            }
+          ],
+          "answer": "אשראי 62%, וולט 21%, מזומן 9%."
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "sales_daily|sales_summary"
+        ],
+        "range": {
+          "from": "2026-10-20",
+          "to": "2026-10-20"
+        },
+        "location": [
+          "demo-hfa"
+        ]
+      }
+    },
+    {
+      "key": "f-pnl-months",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "דוח רווח והפסד לפי חודשים מתחילת השנה, לפי הספרים",
+      "expect": {
+        "calcs": [
+          "pnl"
+        ],
+        "params": {
+          "pnl": {
+            "by": "month"
+          }
+        },
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-20|2026-10-21"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-pnl-vs-lastyear",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "רווח והפסד של החודש שעבר לעומת אותו חודש בשנה שעברה",
+      "expect": {
+        "calcs": [
+          "pnl"
+        ],
+        "params": {
+          "pnl": {
+            "compare": "prev_year"
+          }
+        },
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-pnl-branch",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Profit and loss per restaurant for last month from the books",
+      "expect": {
+        "calcs": [
+          "pnl"
+        ],
+        "params": {
+          "pnl": {
+            "by": "branch"
+          }
+        },
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-cash",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מה מצב המזומנים היום ובעוד 30, 60 ו-90 יום?",
+      "expect": {
+        "calcs": [
+          "cash_position"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-suppliers",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מי 20 הספקים הגדולים השנה, ואיך זה לעומת שנה שעברה?",
+      "expect": {
+        "calcs": [
+          "spending"
+        ],
+        "params": {
+          "spending": {
+            "compare": "prev_year"
+          }
+        },
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-20|2026-10-21"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-aging-suppliers",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "למי אנחנו חייבים כסף, לפי גיל החוב?",
+      "expect": {
+        "calcs": [
+          "aging"
+        ],
+        "params": {
+          "aging": {
+            "side": "suppliers"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-aging-customers",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Which customers owe us money and for how long?",
+      "expect": {
+        "calcs": [
+          "aging"
+        ],
+        "params": {
+          "aging": {
+            "side": "customers"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-trial-balance",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מאזן בוחן להיום",
+      "expect": {
+        "calcs": [
+          "trial_balance"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-account-card",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תראה לי את הכרטסת של וואלט מתחילת השנה",
+      "expect": {
+        "calcs": [
+          "account_card|account_statement"
+        ],
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-20|2026-10-21"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-supplier-card",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "What is the status with supplier Gamla Harel: open invoices and payments?",
+      "expect": {
+        "calcs": [
+          "account_statement"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-cheques",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים עתידיים יש, ומה הסכום הכולל?",
+      "expect": {
+        "calcs": [
+          "cheques"
+        ],
+        "params": {
+          "cheques": {
+            "state": "future"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-bank-recon",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מה מצב התאמת הבנקים? כמה תנועות לא מותאמות?",
+      "expect": {
+        "calcs": [
+          "bank_reconciliation"
+        ],
+        "maxCalcs": 3
+      }
+    },
+    {
+      "key": "f-bank-recon-sections",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו תנועות בנק אין להן רישום בספרים ואילו תנועות ספרים לא הופיעו בבנק השנה?",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "maxCalcs": 3
+      }
+    },
+    {
+      "key": "f-bank-recon-report-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Give me the detailed bank reconciliation report for this year, with the cheques not yet cleared",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-bank-recon-report",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תכין לי דוח התאמת בנק מפורט לחודש אוקטובר",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-vat-books",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "כמה מע\"מ תשומות ומע\"מ עסקאות נרשמו בספרים בחודש שעבר?",
+      "expect": {
+        "calcs": [
+          "vat_summary"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-vat-register",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "דוח מע\"מ לחודש שעבר",
+      "expect": {
+        "calcs": [
+          "vat_report"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-withholding",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "לאילו ספקים אישור ניכוי במקור פג תוקף או פג ב-60 הימים הקרובים?",
+      "expect": {
+        "calcs": [
+          "withholding"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-exceptions",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Are there unposted journal entries or duplicates in the books?",
+      "expect": {
+        "calcs": [
+          "exceptions"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-status",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "האם הספרים מעודכנים? מה חסר?",
+      "expect": {
+        "calcs": [
+          "finance_status"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-sales-vs-books",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "האם כל ההכנסות של ספטמבר נרשמו בהנהלת חשבונות? השווה קופה מול ספרים",
+      "expect": {
+        "calcs": [
+          "sales_vs_books"
+        ],
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-09-30"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-cards-still-bank",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "השווה אשראי בקופה לכסף שנכנס בבנק, לפי שבועות, החודש",
+      "expect": {
+        "calcs": [
+          "cards_vs_bank"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-income-register",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "כמה הכנסות היו בשבוע שעבר?",
+      "expect": {
+        "calcs": [
+          "sales_summary|payments_summary"
+        ],
+        "range": {
+          "from": "2026-10-11",
+          "to": "2026-10-17"
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-journal-batch",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תראה לי את פקודות היומן של מנה 258",
+      "expect": {
+        "calcs": [
+          "journal_search"
+        ],
+        "params": {
+          "journal_search": {
+            "batch": 258
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-pnl-general-area",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה היה הרווח בספרים באוגוסט?",
+      "expect": {
+        "calcs": [
+          "pnl"
+        ],
+        "range": {
+          "from": "2026-08-01",
+          "to": "2026-08-31"
+        },
+        "maxCalcs": 2
+      }
     }
-   ],
-   "expect": {
-    "calcs": [
-     "sales_daily|sales_summary"
-    ],
-    "range": {
-     "from": "2026-10-20",
-     "to": "2026-10-20"
-    },
-    "location": [
-     "demo-hfa"
-    ]
-   }
-  },
-  {
-   "key": "f-pnl-months",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "דוח רווח והפסד לפי חודשים מתחילת השנה, לפי הספרים",
-   "expect": {
-    "calcs": [
-     "pnl"
-    ],
-    "params": {
-     "pnl": {
-      "by": "month"
-     }
-    },
-    "range": {
-     "from": "2026-01-01",
-     "to": "2026-10-20|2026-10-21"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-pnl-vs-lastyear",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "רווח והפסד של החודש שעבר לעומת אותו חודש בשנה שעברה",
-   "expect": {
-    "calcs": [
-     "pnl"
-    ],
-    "params": {
-     "pnl": {
-      "compare": "prev_year"
-     }
-    },
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-pnl-branch",
-   "kind": "ACCOUNTING",
-   "lang": "en",
-   "question": "Profit and loss per restaurant for last month from the books",
-   "expect": {
-    "calcs": [
-     "pnl"
-    ],
-    "params": {
-     "pnl": {
-      "by": "branch"
-     }
-    },
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-cash",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "מה מצב המזומנים היום ובעוד 30, 60 ו-90 יום?",
-   "expect": {
-    "calcs": [
-     "cash_position"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-suppliers",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "מי 20 הספקים הגדולים השנה, ואיך זה לעומת שנה שעברה?",
-   "expect": {
-    "calcs": [
-     "spending"
-    ],
-    "params": {
-     "spending": {
-      "compare": "prev_year"
-     }
-    },
-    "range": {
-     "from": "2026-01-01",
-     "to": "2026-10-20|2026-10-21"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-aging-suppliers",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "למי אנחנו חייבים כסף, לפי גיל החוב?",
-   "expect": {
-    "calcs": [
-     "aging"
-    ],
-    "params": {
-     "aging": {
-      "side": "suppliers"
-     }
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-aging-customers",
-   "kind": "ACCOUNTING",
-   "lang": "en",
-   "question": "Which customers owe us money and for how long?",
-   "expect": {
-    "calcs": [
-     "aging"
-    ],
-    "params": {
-     "aging": {
-      "side": "customers"
-     }
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-trial-balance",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "מאזן בוחן להיום",
-   "expect": {
-    "calcs": [
-     "trial_balance"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-account-card",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "תראה לי את הכרטסת של וואלט מתחילת השנה",
-   "expect": {
-    "calcs": [
-     "account_card|account_statement"
-    ],
-    "range": {
-     "from": "2026-01-01",
-     "to": "2026-10-20|2026-10-21"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-supplier-card",
-   "kind": "ACCOUNTING",
-   "lang": "en",
-   "question": "What is the status with supplier Gamla Harel: open invoices and payments?",
-   "expect": {
-    "calcs": [
-     "account_statement"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-cheques",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "אילו שיקים עתידיים יש, ומה הסכום הכולל?",
-   "expect": {
-    "calcs": [
-     "cheques"
-    ],
-    "params": {
-     "cheques": {
-      "state": "future"
-     }
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-bank-recon",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "מה מצב התאמת הבנקים? כמה תנועות לא מותאמות?",
-   "expect": {
-    "calcs": [
-     "bank_reconciliation"
-    ],
-    "maxCalcs": 3
-   }
-  },
-  {
-   "key": "f-vat-books",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "כמה מע\"מ תשומות ומע\"מ עסקאות נרשמו בספרים בחודש שעבר?",
-   "expect": {
-    "calcs": [
-     "vat_summary"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-vat-register",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "דוח מע\"מ לחודש שעבר",
-   "expect": {
-    "calcs": [
-     "vat_report"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-withholding",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "לאילו ספקים אישור ניכוי במקור פג תוקף או פג ב-60 הימים הקרובים?",
-   "expect": {
-    "calcs": [
-     "withholding"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-exceptions",
-   "kind": "ACCOUNTING",
-   "lang": "en",
-   "question": "Are there unposted journal entries or duplicates in the books?",
-   "expect": {
-    "calcs": [
-     "exceptions"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-status",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "האם הספרים מעודכנים? מה חסר?",
-   "expect": {
-    "calcs": [
-     "finance_status"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-sales-vs-books",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "האם כל ההכנסות של ספטמבר נרשמו בהנהלת חשבונות? השווה קופה מול ספרים",
-   "expect": {
-    "calcs": [
-     "sales_vs_books"
-    ],
-    "range": {
-     "from": "2026-09-01",
-     "to": "2026-09-30"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-cards-still-bank",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "השווה אשראי בקופה לכסף שנכנס בבנק, לפי שבועות, החודש",
-   "expect": {
-    "calcs": [
-     "cards_vs_bank"
-    ],
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-income-register",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "כמה הכנסות היו בשבוע שעבר?",
-   "expect": {
-    "calcs": [
-     "sales_summary|payments_summary"
-    ],
-    "range": {
-     "from": "2026-10-11",
-     "to": "2026-10-17"
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-journal-batch",
-   "kind": "ACCOUNTING",
-   "lang": "he",
-   "question": "תראה לי את פקודות היומן של מנה 258",
-   "expect": {
-    "calcs": [
-     "journal_search"
-    ],
-    "params": {
-     "journal_search": {
-      "batch": 258
-     }
-    },
-    "maxCalcs": 2
-   }
-  },
-  {
-   "key": "f-pnl-general-area",
-   "kind": "GENERAL",
-   "lang": "he",
-   "question": "מה היה הרווח בספרים באוגוסט?",
-   "expect": {
-    "calcs": [
-     "pnl"
-    ],
-    "range": {
-     "from": "2026-08-01",
-     "to": "2026-08-31"
-    },
-    "maxCalcs": 2
-   }
-  }
- ]
+  ]
 }

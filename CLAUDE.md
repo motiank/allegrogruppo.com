@@ -101,7 +101,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page). Reads `allegro_finance` only. Sections: open
   bank lines, open book lines (cheques excluded), cheques cleared (paired by cheque number + amount, else Hashavshevet's
   match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
-  Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07.
+  Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07. Also in Joya HQ (page
+  `/accounting/bank-recon` + chat calc `bank_recon_report`) through the Finance API `GET /finance/bank/report[/accounts]`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

@@ -25,6 +25,7 @@ import Settings from './pages/Settings.js';
 import Menu from './pages/Menu.js';
 import Employees from './pages/Employees.js';
 import Area, { AREAS } from './pages/Area.js';
+import BankRecon from './pages/BankRecon.js';
 
 // The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
 // With one company its line means "all" ('').
@@ -196,6 +197,7 @@ function Shell() {
         <Route path="performance" element={<Area area="performance" />} />
         <Route path="bank" element={me.isAdmin ? <Area area="bank" /> : <Navigate to="/" replace />} />
         <Route path="accounting" element={me.isAdmin ? <Area area="accounting" /> : <Navigate to="/" replace />} />
+        <Route path="accounting/bank-recon" element={me.isAdmin ? <BankRecon /> : <Navigate to="/" replace />} />
         <Route path="overview" element={me.isAdmin ? <Overview /> : <Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="orders" element={<Orders />} />

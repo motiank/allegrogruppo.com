@@ -402,7 +402,7 @@ t('the books are for the chain admin only; every finance calc is in the catalogu
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 23);
+  assert.equal(FINANCE_CALCS.size, 24);
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);

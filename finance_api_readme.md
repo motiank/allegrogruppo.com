@@ -569,6 +569,22 @@ sides and the single/many answers.
 single, 18 many). The next step is many-to-one matching, where several book lines add up to one bank line. Credit card
 deposits are the likely case, but this is not built.
 
+
+### `GET /finance/bank/report?company=[&account=][&from=][&to=][&format=json|html|xlsx]` and `GET /finance/bank/report/accounts`
+
+The detailed bank reconciliation report (דוח התאמת בנק מפורט) of the admin menu, `admin/server/modules/bankRecon.js`,
+for Joya HQ (page `/accounting/bank-recon`, calc `bank_recon_report`). Not a JSON envelope with warnings like the
+other endpoints: `format=json` → `{ data: report, meta: { company, account, from, to } }`; `html` → the Hebrew RTL page
+(`shared/bankReconHtml.js`); `xlsx` → the Excel file (`Content-Disposition: attachment`). `to` defaults to today,
+`from` to 1 January of `to`'s year, `account` to the company's first bank account. The report, as of `to`: `summary`
+(bankBalance = Hashavshevet's running balance after the last line ≤ `to`; bookBalance; bankOpen, bookOpen,
+chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
+(Hebrew), and the rows `bankOpen`, `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
+date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). "Open" =
+no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on both sides. `/bank/report/accounts` →
+`{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:
+`node --test scripts/test_bank_recon.js`.
+
 ### `GET /finance/invoices?company=&from=&to=[&account=][&q=][&type=invoice|credit][&includeUnposted=1][&limit=][&offset=]`
 
 Use case 16: "all income invoices from X in the last year". Entries of the customer invoice types. A credit note is

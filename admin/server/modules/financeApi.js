@@ -3,6 +3,8 @@ import { createRequire } from "module";
 import { financeSql } from "../sources/financePool.js";
 import { executeSql } from "../sources/dbpool.js";
 import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } from "./localApi.js";
+import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
+import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 
 // Finance API: read-only, localhost-only JSON API over allegro_finance (the Hashavshevet copy made by hash-sync),
 // for Joya HQ. Mounted at /local-api/v1/finance by server.js; documented in finance_api_readme.md.
@@ -1794,6 +1796,35 @@ export function financeErrorResponse(err) {
 const Router = () => {
   const router = express.Router();
   router.use(localOnly);
+
+  // The detailed bank reconciliation report (bankRecon.js, the admin menu's report) for Joya HQ: the same JSON,
+  // or the Hebrew HTML / Excel file. Not a `route()`: html and xlsx are not JSON envelopes.
+  const sendError = (res, err) => {
+    const known = financeErrorResponse(err);
+    if (known) return res.status(known.status).json(known.body);
+    console.error("finance-api /bank/report error:", err);
+    return res.status(500).json({ error: { code: "internal_error", message: err.message || "internal error" } });
+  };
+  router.get("/bank/report/accounts", async (req, res) => {
+    try { res.json({ data: await listBankReportAccounts(), meta: { today: today() } }); } catch (err) { sendError(res, err); }
+  });
+  router.get("/bank/report", async (req, res) => {
+    try {
+      const format = String(req.query.format || "json").toLowerCase();
+      if (!["json", "html", "xlsx"].includes(format)) throw badRequest("format must be json, html or xlsx");
+      const report = await buildBankReconReport(req.query);
+      if (format === "json") return res.json({ data: report, meta: { company: report.company.code, account: report.account.key, from: report.from, to: report.to } });
+      const stem = `bank_recon_${report.account.key}_${report.from}_${report.to}`;
+      if (format === "html") {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", `inline; filename="${stem}.html"`);
+        return res.send(renderBankReconHtml(report));
+      }
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${stem}.xlsx"; filename*=UTF-8''${stem}.xlsx`);
+      return res.send(await renderBankReconXlsx(report));
+    } catch (err) { sendError(res, err); }
+  });
 
   for (const { path, handler, company } of routes) {
     router.get(path, async (req, res) => {

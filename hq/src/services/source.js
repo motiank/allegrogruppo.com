@@ -476,3 +476,20 @@ export async function financeCompanies() {
   if (!r.available) return { available: false, reason: r.reason, companies: [] };
   return { available: true, companies: (r.data || []).map((c) => ({ code: c.code, name: c.name, allegroKey: c.allegroKey ?? null, allegroLabel: c.allegroLabel ?? null, years: c.years || [] })) };
 }
+
+/** The bank accounts the detailed bank reconciliation report can run on: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }]. */
+export async function financeBankAccounts() {
+  const r = await finance('/bank/report/accounts');
+  if (!r.available) return { available: false, reason: r.reason, companies: [], today: null };
+  return { available: true, companies: (r.data || []).filter((c) => c.banks?.length), today: r.meta?.today ?? null };
+}
+
+/** The detailed bank reconciliation report (admin bankRecon.js) as JSON: { available, data: report } or { available: false, reason }. */
+export async function financeBankReport(params) {
+  return finance('/bank/report', params);
+}
+
+/** The same report as a file: format html (the Hebrew page) or xlsx → { buffer, fileName, headers }. Never cached. */
+export async function financeBankReportFile(params, format) {
+  return getFile('/finance/bank/report', { ...params, format });
+}

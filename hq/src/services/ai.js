@@ -490,6 +490,11 @@ export const CALCS = {
     about: 'bank reconciliation (התאמת בנקים) from the books: the bank statement balance vs the book balance per bank account, the open (unmatched) amounts and lines on both sides with their age, the matched amounts that should be equal, and the gap',
     run: finCalc(fin.bankReconciliation),
   },
+  bank_recon_report: {
+    params: `{ companyKeys?, account?: "bank account key", from?: "YYYY-MM-DD" (default 1 January of to's year), to?: "YYYY-MM-DD" (default today) }`,
+    about: 'the detailed bank reconciliation report (דוח התאמת בנק מפורט) for one bank account and a period, as of its end: the summary that ties the bank balance to the book balance (open bank lines, open book lines, cheques not cleared, unexplained difference), the first rows of each section (bank without books, books without bank, cheques cleared in the period, cheques not cleared with their status) and the buttons for the full Hebrew page and the Excel file. Ask it for "דוח התאמת בנק", the three-section report, or when the user wants the report / Excel',
+    run: finCalc(fin.bankReconReport),
+  },
   bank_open_items: {
     params: '{ companyKeys?, side: "bank" | "book", minAge?: number (days), from?, to?, account?, limit? }',
     about: 'the open items of the bank reconciliation, oldest first: bank statement lines not matched to the books (side bank), or book lines of the bank account not matched to the statement (side book: cheques, transfers…)',
@@ -580,7 +585,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules

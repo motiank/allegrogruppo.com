@@ -30,7 +30,7 @@ const sum = (rows, f) => round2(rows.reduce((a, r) => a + num(f(r)), 0));
 
 // ── parameters ───────────────────────────────────────────────────────────
 
-async function companies() {
+export async function listBankReportAccounts() {
   const rows = await financeSql(
     `SELECT c.company_id, c.code, c.name FROM companies c ORDER BY c.company_id`,
   );
@@ -55,7 +55,7 @@ async function companies() {
 }
 
 export async function resolveParams(query = {}) {
-  const all = await companies();
+  const all = await listBankReportAccounts();
   const withBooks = all.filter((c) => c.banks.length);
   if (!withBooks.length) throw new ApiError(404, "not_found", "no bank lines in allegro_finance yet");
   const code = String(query.company || "").trim() || withBooks[0].code;
@@ -408,7 +408,7 @@ export function Router() {
 
   router.get("/accounts", async (req, res) => {
     try {
-      const list = await companies();
+      const list = await listBankReportAccounts();
       const to = today();
       res.json({ companies: list, defaults: { from: `${to.slice(0, 4)}-01-01`, to } });
     } catch (err) { fail(res, err); }
@@ -426,7 +426,7 @@ export function Router() {
       }
       const buf = await renderBankReconXlsx(report);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${fileStem(report)}.xlsx"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${fileStem(report)}.xlsx"; filename*=UTF-8''${fileStem(report)}.xlsx`);
       return res.send(buf);
     } catch (err) { fail(res, err); }
   });
