@@ -92,8 +92,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
   builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,
   now a root dependency) and sends the zip; nothing is stored. Guide for the Windows side: `hash-sync/windows/INSTALL.md`
-  (install.cmd → .env → check.cmd → sync-now.cmd → schedule.cmd = Task Scheduler 02:00 as SYSTEM). Not deployed yet: needs
-  `git pull`, root `npm install` (jszip), root `npm run build`, `allegro-admin.service` restart.
+  (install.cmd → .env → check.cmd → sync-now.cmd → schedule.cmd = Task Scheduler 02:00 as SYSTEM). Deployed 2026-11-07 (`5d4db47`,
+  root `npm install` + `npm run build`, `allegro-admin.service` restarted; checked with an admin login through the public URL).
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
