@@ -59,7 +59,7 @@ const useStyles = createUseStyles((theme) => ({
 }));
 
 // The main menu: the areas, each a chat (pages/Area.js); Bank only for the chain admin, Accounting for the chain admin
-// and the accountant (who sees nothing else). The detailed pages
+// and the accountant (who sees nothing else); the detailed bank reconciliation report (pages/BankRecon.js) for the chain admin. The detailed pages
 // (orders, staffing, payroll…) keep their routes, so links to them still work, but the menu does not list them.
 function navGroups(isAdmin, isAccountant) {
   if (isAccountant) return [{ key: 'joya.nav.main', items: [['/accounting', 'joya.nav.accounting']] }];
@@ -70,10 +70,15 @@ function navGroups(isAdmin, isAccountant) {
         ['/stock', 'joya.nav.stock'],
         ['/people', 'joya.nav.manpower'],
         ['/performance', 'joya.nav.performance'],
-        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting']] : []),
+        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting'], ['/accounting/bank-recon', 'joya.nav.bankRecon']] : []),
       ],
     },
   ];
+}
+
+// the lit menu item = the longest item path the current path is under ("/accounting/bank-recon" lights the report, not Accounting)
+function activeItem(items, pathname) {
+  return items.map(([p]) => p).filter((p) => pathname === p || pathname.startsWith(`${p}/`)).sort((a, b) => b.length - a.length)[0] || null;
 }
 
 function Shell() {
@@ -150,7 +155,7 @@ function Shell() {
             <div key={g.key}>
               <div className={c.group}>{t(g.key)}</div>
               {g.items.map(([path, key]) => (
-                <button key={path} className={`${c.item} ${where.pathname.startsWith(path) ? c.itemOn : ''}`} onClick={() => go(path)}>
+                <button key={path} className={`${c.item} ${activeItem(g.items, where.pathname) === path ? c.itemOn : ''}`} onClick={() => go(path)}>
                   {t(key)}
                 </button>
               ))}

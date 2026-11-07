@@ -123,6 +123,7 @@ export default {
   'joya.area.bank.s8': 'How much did we pay for VAT and National Insurance this year?',
   'joya.role.ACCOUNTANT': "Accounting",
   'joya.nav.accounting': "Accounting",
+  'joya.nav.bankRecon': "Bank reconciliation report",
   'joya.area.accounting.title': "Accounting",
   'joya.area.accounting.intro': "Ask about matching the register with the bank (credit cards, Wolt, fees) and about the accountant's books: profit and loss, suppliers, debts, trial balance, account cards, cheques and VAT. Tap the field to see suggested questions.",
   'joya.area.accounting.s1': "Compare card sales at the register with the money in the bank, by week, this month",

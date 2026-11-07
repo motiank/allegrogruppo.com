@@ -125,7 +125,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
   `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
-- **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (button above the accounting chat,
+- **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (main-menu item "דוח התאמת בנק מפורט" and a button above the accounting chat,
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).
   README → "The detailed bank reconciliation report". Eval fixtures `f-bank-recon-report*`, `f-bank-recon-sections`.
