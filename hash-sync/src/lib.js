@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
@@ -27,7 +27,8 @@ export async function connectTarget({ multipleStatements = false } = {}) {
   if (!isLocal(host) && !hasFlag('production')) throw new Error(`Refusing to use ${host} without --production`);
   const config = { host, port: Number(TARGET_DB_PORT || 3306), user, password, charset: 'utf8mb4', timezone: 'Z',
     dateStrings: true, decimalNumbers: true, multipleStatements };
-  if (ca) config.ssl = { ca: readFileSync(ca) };
+  // A relative CA path is read from the hash-sync folder, so the same .env works wherever the folder is.
+  if (ca) config.ssl = { ca: readFileSync(isAbsolute(ca) ? ca : join(ROOT, ca)) };
   const db = await mysql.createConnection(config);
   // The same rules as production, so a local test shows what production will do.
   await db.query("SET SESSION sql_mode = 'REAL_AS_FLOAT,PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ONLY_FULL_GROUP_BY,ANSI,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
@@ -35,13 +36,17 @@ export async function connectTarget({ multipleStatements = false } = {}) {
 }
 
 export function connectSource() {
-  const { HASH_MSSQL_HOST, HASH_MSSQL_PORT, HASH_MSSQL_INSTANCE, HASH_MSSQL_USER, HASH_MSSQL_PASSWORD, HASH_MSSQL_DATABASE } = process.env;
+  const { HASH_MSSQL_HOST, HASH_MSSQL_PORT, HASH_MSSQL_INSTANCE, HASH_MSSQL_USER, HASH_MSSQL_PASSWORD, HASH_MSSQL_DATABASE,
+    HASH_MSSQL_OLD_TLS } = process.env;
   // A named instance (the server's WIZSOFT) finds its own port, so a port is used only without one.
   const where = HASH_MSSQL_INSTANCE ? {} : { port: Number(HASH_MSSQL_PORT || 1433) };
+  // HASH_MSSQL_OLD_TLS=1 lets a current Node talk to an old SQL Server (2008-2014 without the TLS 1.2 update).
+  const oldTls = ['1', 'true', 'yes'].includes(String(HASH_MSSQL_OLD_TLS || '').toLowerCase());
   return new sql.ConnectionPool({
     server: HASH_MSSQL_HOST || 'localhost', ...where, user: HASH_MSSQL_USER,
     password: HASH_MSSQL_PASSWORD, database: HASH_MSSQL_DATABASE, requestTimeout: 300000,
-    options: { encrypt: true, trustServerCertificate: true, useUTC: true, instanceName: HASH_MSSQL_INSTANCE || undefined },
+    options: { encrypt: true, trustServerCertificate: true, useUTC: true, instanceName: HASH_MSSQL_INSTANCE || undefined,
+      cryptoCredentialsDetails: oldTls ? { minVersion: 'TLSv1', ciphers: 'DEFAULT:@SECLEVEL=0' } : undefined },
   }).connect();
 }
 

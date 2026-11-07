@@ -50,6 +50,7 @@ Copy `.env.example` to `.env`, then:
 
 ```
 npm install
+npm run check                                     # both connections work? (changes nothing)
 npm run schema                                    # create the database, tables and views
 node src/load.js --company pastalina --name Pastalina --snapshot-year 2026
 node src/verify.js --company pastalina --snapshot-year 2026
@@ -74,8 +75,15 @@ Linux cron, every night at 02:00:
 0 2 * * * cd /path/to/hash-sync && HASH_ENV_FILE=.env.production node src/sync.js --company pastalina --name Pastalina --production >> sync.log 2>&1
 ```
 
-Windows has no cron. Use Task Scheduler with the same command, and set `HASH_MSSQL_INSTANCE=WIZSOFT` (SQL Server
-Browser must run), or use the instance's fixed port.
+**Windows** (the usual case: the Hashavshevet server): the admin's **Downloads** page (admin role, menu "Downloads",
+`GET /admin/downloads/hash-sync-windows`) builds `hash-sync-windows-<version>.zip` from the code on the server
+(`scripts/build-windows-package.js`, jszip from the root `node_modules`; by hand: `npm run package:windows` → `dist/`).
+No passwords inside. On the Windows machine: unzip to
+`C:\hash-sync`, run `install.cmd` (Node.js check, `npm ci`, `.env`, connection check), `sync-now.cmd` for the first
+run, `schedule.cmd` for the nightly task (02:00, runs as SYSTEM). The guide is `windows/INSTALL.md`. `.env` there uses
+`HASH_MSSQL_INSTANCE=WIZSOFT` (SQL Server Browser must run) or the instance's fixed port, and `HASH_MSSQL_OLD_TLS=1` for an
+old SQL Server without TLS 1.2. `npm run check` (`src/check.js`) tests both connections and prints a hint for each
+problem; it changes nothing.
 
 Without `--snapshot-year` the current year is used. On 1 January `source_rows` starts a new copy for the new year, and the
 copy of the old year stays as it was. See `sync_runs` for each run and `sync_table_audit` for each table. A failed run

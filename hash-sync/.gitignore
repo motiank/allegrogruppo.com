@@ -2,3 +2,6 @@
 !.env.example
 .sync.lock
 *.log
+dist/
+logs/
+node-path.txt

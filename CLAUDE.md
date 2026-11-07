@@ -8,7 +8,7 @@ The Allegro group's web systems. One repo, one root `package.json` (except `hq/`
 | Admin (payroll, Beecomm, uploads, Local Data API) | `admin/` | 3021 | https://admin.allegrogruppo.com — `allegro-admin.service` |
 | Events pages (SSR, read-only) | `events/` | 3023 | events.allegrogruppo.com |
 | **Joya HQ** (the restaurants' AI headquarters) | `hq/` (own `package.json`, AI runner `hq/runner/`) | 4300 | https://hq.allegrogruppo.com — `joya-hq.service` + `joya-runner.service` |
-| Hashavshevet sync (SQL Server → MySQL `allegro_finance`, every company and year in one DB, no data dropped) | `hash-sync/` (own `package.json`) | none (by hand so far; cron planned) | `allegro_finance` on the production MySQL server (loaded 2026-11-06, Pastalina 2025–2026); dev = local `allegro_finance_dev`; source = local SQL Server 2025 Express, DB `PastaLina`; passwords and tokens not copied |
+| Hashavshevet sync (SQL Server → MySQL `allegro_finance`, every company and year in one DB, no data dropped) | `hash-sync/` (own `package.json`; Windows install package: `npm run package:windows` → `dist/`, guide `windows/INSTALL.md`) | none (by hand so far; nightly Task Scheduler job on the Hashavshevet Windows server once the package is installed) | `allegro_finance` on the production MySQL server (loaded 2026-11-06, Pastalina 2025–2026); dev = local `allegro_finance_dev`; source = local SQL Server 2025 Express, DB `PastaLina`; passwords and tokens not copied |
 
 Read the service's own docs first: `README.md` (repo), `local_api_readme.md` (the admin's Local Data API),
 `events/README.md`, `hq/CLAUDE.md` + `hq/README.md`, `hash-sync/README.md`.
@@ -88,6 +88,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   card payments and coupon orders are refused (503). The admin top bar no longer shows/polls the order-system
   dropdown (`admin/client/components/Layout.js`). To reopen: set it to false, put the dropdown back, build, restart
   `allegro.service`.
+- **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
+  `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
+  builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,
+  now a root dependency) and sends the zip; nothing is stored. Guide for the Windows side: `hash-sync/windows/INSTALL.md`
+  (install.cmd → .env → check.cmd → sync-now.cmd → schedule.cmd = Task Scheduler 02:00 as SYSTEM). Not deployed yet: needs
+  `git pull`, root `npm install` (jszip), root `npm run build`, `allegro-admin.service` restart.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
