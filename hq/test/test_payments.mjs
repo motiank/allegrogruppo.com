@@ -137,6 +137,22 @@ t('add: amount as text, a day; a past day is refused, today is fine', () => {
   assert.throws(() => normalizeOp({ op: 'add', payee: 'x', amount: 0, dueDate: today }, { today }), /amount/);
   assert.throws(() => normalizeOp({ op: 'add', payee: 'x', amount: 5 }, { today }), /needs a day/);
 });
+t('a normalised week op stays a week when it is normalised again (the proposal comes back to applyOps)', () => {
+  const once = normalizeOp({ op: 'add', payee: 'x', amount: 100, dueWeek: { year: 2026, month: 12, week: 2 } }, { today });
+  assert.deepEqual(normalizeOp(once, { today }), once);
+  const mv = normalizeOp({ op: 'move', id: 5, dueWeek: { year: 2026, month: 12, week: 2 } }, { today });
+  assert.deepEqual(normalizeOp(mv, { today }), mv);
+  assert.throws(() => normalizeOp({ op: 'add', payee: 'x', amount: 100, dueKind: 'WEEK', dueDate: '2026-10-08', dueTo: '2026-10-14' }, { today }), /has passed/);
+});
+t('add: "N payments" closes the series after the N-th one (count → until)', () => {
+  const op = normalizeOp({ op: 'add', payee: 'אימפורט', amount: 4000, repeat: { every: 'month', week: 3, count: 5 } }, { today });
+  assert.deepEqual([op.dueKind, op.dueDate, op.dueTo], ['WEEK', '2026-11-15', '2026-11-21']);
+  assert.deepEqual(op.repeat, { every: 'month', week: 3, count: 5, until: '2027-03-21' });
+  assert.equal(nextOccurrences(op.repeat, op.dueDate, 12).length, 5);
+  const byDay = normalizeOp({ op: 'add', payee: 'x', amount: 100, dueDate: '2026-12-01', repeat: { count: 3 } }, { today });
+  assert.deepEqual(byDay.repeat, { every: 'month', day: 1, count: 3, until: '2027-02-01' });
+  assert.throws(() => normalizeOp({ op: 'add', payee: 'x', amount: 100, dueDate: '2026-12-01', repeat: { count: 1 } }, { today }), /2–60/);
+});
 t('add: a week of a month; a week that passed is refused', () => {
   const op = normalizeOp({ op: 'add', payee: 'בעל הבית', amount: 20000, dueWeek: { month: '2026-12', week: 2 } }, { today });
   assert.equal(op.dueKind, 'WEEK');

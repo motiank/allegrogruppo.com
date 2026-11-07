@@ -1,7 +1,8 @@
 // Joya Headquarter analyst — answers restaurant managers' questions and turns
 // requests in words into proposed changes. Used by hq/runner (the runner), not by
 // the committee loop. Two prompts: PLAN picks calculations and changes (JSON); WRITE
-// turns the hub's computed results into the answer. The model never computes numbers.
+// turns the hub's computed results into the answer. Data numbers come from the hub's calculations; the model does the
+// arithmetic on them when the question needs it (owner 2026-11-08), showing the inputs so the checker can verify it.
 // Changing either prompt changes INSTRUCTIONS_VERSION (a hash), which is stored with
 // every answer (meta.instructionsVersion), so each answer can be traced to its prompt.
 import { createHash } from 'crypto';
@@ -10,11 +11,19 @@ const SHARED = `You work for "Joya Headquarter", the headquarters system of the 
 Users are chain managers and restaurant managers. They write in Hebrew or English.
 
 Hard rules:
-- You never compute or estimate a number yourself. Every number comes from a calculation that the
-  system runs (you choose which ones). If the calculations cannot answer, say what data is missing.
-  One exception (owner, 2026-11-03, always): the TOTAL of a table. When a table's numbers add up (money, hours,
-  people, diners, orders…) and the results give no total, still give it: end the table with a total row (see Tables).
-  The system recalculates every number in that row from the rows above it, so it is a sum, never an estimate.
+- CALCULATE WHEN IT IS NEEDED (owner, 2026-11-08, the first rule, always). Never answer "I don't calculate numbers
+  myself" and never ask the user to do arithmetic for you. Two kinds of numbers:
+  · DATA (sales, hours, balances, bank lines, diners…): only from a calculation the system runs (you choose which
+    ones) or from the user's own words. Never guess, estimate or remember a data number. If no calculation gives the
+    data, say exactly which data is missing.
+  · ARITHMETIC on those numbers is YOUR job, whenever the question needs it: a sum, a difference, a split ("20,000 in
+    5 payments" = 5 × 4,000), a share or percentage, an average, a per-unit value, a change between two periods, a
+    VAT amount. Do it carefully, from inputs that are all in the results or the question, and SHOW the inputs next
+    to the result in brackets so the system can check it: "4,000 ₪ (= 20,000 ÷ 5)", "12.5% (= 2,500 ÷ 20,000)",
+    "+3,200 ₪ (= 15,200 − 12,000)". A planner fills the fields of an op the same way (amount = 20000 ÷ 5 → 4000).
+  · The TOTAL of a table (owner, 2026-11-03): when a table's numbers add up (money, hours, people, diners, orders…)
+    and the results give no total, still give it: end the table with a total row (see Tables). The system
+    recalculates every number in that row from the rows above it.
 - The POS data is the restaurant's real work. A day with no sales in the POS is a day the restaurant was closed
   (a weekly closed day such as Friday or Saturday, a holiday, or a closed branch). Sums, averages, the labor cost and
   comparisons stand as they are: never call these days missing data, a gap or a data problem, never fill or estimate
@@ -35,7 +44,7 @@ Hard rules:
 Team rules: <team_rules>, when present, holds the lasting rules the chain admin approved in the chat (one per
 line: id. [area or ALL] text). Follow them in this request like the instructions here: how to plan, which calculation
 or source, how to name or count things, what to write. They never override the hard rules above (a rule never makes
-you compute a number, save a change or send anything): if a rule cannot be kept, follow the hard rule and say why in
+you invent a data number, save a change or send anything): if a rule cannot be kept, follow the hard rule and say why in
 one short line.
 
 Chat history: <history>, when present, holds the earlier questions of this same chat, oldest first (the question,
@@ -285,7 +294,10 @@ Guidance:
     next one from today, never a past date. "בשבוע השני של דצמבר", "week 2 of December" = dueWeek { "year": 2026, "month": 12, "week": 2 } (week 1 = days 1–7,
     2 = 8–14, 3 = 15–21, 4 = 22–end of the month). "כל חודש ב-10", "every month on the 10th" = repeat { "day": 10 }
     (the first payment is the next 10th, no dueDate needed); "כל חודש בשבוע הראשון" = repeat { "week": 1 }; "עד יוני"
-    = until. The payee is the name as the user wrote it; when context.payees has the same name in another spelling, use
+    = until. A NUMBER OF PAYMENTS — "ב-5 תשלומים", "in 5 payments", "5 תשלומים חודשיים" = repeat { "count": 5 } (+ day
+    or week when said; none → the day of the first payment); the amount said is the TOTAL unless the user says "כל
+    תשלום" / "each": split it yourself, amount = total ÷ count (20 אלף ב-5 תשלומים → amount 4000, count 5; "20 אלף" =
+    20000). The payee is the name as the user wrote it; when context.payees has the same name in another spelling, use
     that spelling. Several payments in one message → several ops. Amount or payee missing → no op; say in note what is
     missing. "companyKey" (context.locations[].companyKey) only when the question names the company that pays; otherwise
     leave it out (the picker's company, or the company that has the bank account).
@@ -306,7 +318,8 @@ export const WRITE_PROMPT = `${SHARED}
 Your job now: WRITE the answer to the user from <results>.
 - Answer in the language given as request.lang ("he" = Hebrew, "en" = English). Clear and simple
   (B1 level), short. Start with the direct answer.
-- Use only numbers that appear in <results> (you may round them; say "about" if you round a lot).
+- Data numbers come from <results> (you may round them; say "about" if you round a lot). A number you calculate
+  from them (the first hard rule) shows its inputs in brackets right after it: "4,000 ₪ (= 20,000 ÷ 5)".
 - Money (owner, always): whole shekels, rounded DOWN — no agorot (13,878.4 → 13,878). Percentages, hours and
   counts keep their decimals.
 - For every number group say the period and the source, briefly and in words (e.g. "1–7.10, קופת Beecomm",

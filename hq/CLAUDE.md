@@ -96,9 +96,15 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Manpower menu** (owner 2026-11-04): four suggestions — active employees and employee wages (`employees`, this
   month), the payslip Excel and the Micpal / Shiklulit file (`payroll_files`: last saved month, download buttons; files
   made by the admin's Local API `/payroll/tlush.xlsx`, `/payroll/import.xlsx`). README → Asking in words.
+- **Calculate when it is needed** (owner 2026-11-08, the FIRST hard rule of both prompts, keep): the model never
+  answers "אני לא מחשב סכומים בעצמי". DATA numbers come only from the calcs (never guessed); the ARITHMETIC on them
+  (sum, difference, split "20 אלף ב-5 תשלומים" → 4,000, share, average, per unit, VAT) is the model's job, shown as
+  "4,000 ₪ (= 20,000 ÷ 5)". `runner/verify.js` evaluates such brackets: all inputs known (or a count ≤ 12) and the
+  result right → the result counts as verified; otherwise it is flagged as before. The planner fills op fields the
+  same way (`repeat.count` for "N payments", amount = total ÷ count). Before this the model refused three times
+  (requests #83, #90, #137). README → Asking in words.
 - **Table totals** (owner 2026-11-03, keep): a table whose numbers add up ends with a "סה"כ" row; the system
-  recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. The only number the model
-  may "compute" — and the code replaces it anyway. README → Asking in words.
+  recalculates it from the rows (`fillTotals`), and a missing number in a table is 0. README → Asking in words.
 - **Money in whole ₪** (owner 2026-11-04, keep): amounts are shown without agorot, cut down (`floorMoney` in
   `lib/answerTables.js`: runner before `fillTotals`, chat display, Excel). %, hours, counts keep decimals. Number
   cells in answer tables align like the text (right in Hebrew), not to the other side.

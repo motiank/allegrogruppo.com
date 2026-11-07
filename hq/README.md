@@ -229,9 +229,11 @@ chain admin only. Main-menu area `/payments` (`client/pages/Payments.js`): the b
 הכל; groups overdue → today → this week → later → paid → cancelled with totals; the company when there are several;
 "the bank file is loaded up to …") and the area's chat under it (context `AREA` 6, suggestions `joya.area.payments.s1`–`s6`).
 The board is read-only: everything is said in the chat, in any area — "תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "תעביר
-עכשיו …", "בשבוע השני של דצמבר תשלם לבעל הבית 20,000", "כל חודש ב-10 לחודש …", "תזיז את תשלום #12 ל-20.11", "תשנה את
-הסכום של תשלום #12 ל-6,000", "תבטל את תשלום #12" → the planner's `payments` list (`CHANGE_FORMATS.PAYMENTS`: add /
-move / amount / cancel; dates look forward, "now" = today, a day without a month = the next such day) → `checkOps`
+עכשיו …", "בשבוע השני של דצמבר תשלם לבעל הבית 20,000", "כל חודש ב-10 לחודש …", "שלם לאימפורט 20 אלף ב-5 תשלומים בשבוע
+ה-3 בכל חודש" (= 5 payments of 4,000, `repeat.count`; the series closes after the 5th: `until`), "תזיז את תשלום #12
+ל-20.11", "תשנה את הסכום של תשלום #12 ל-6,000", "תבטל את תשלום #12" → the planner's `payments` list
+(`CHANGE_FORMATS.PAYMENTS`: add / move / amount / cancel; dates look forward, "now" = today, a day without a month = the
+next such day) → `checkOps`
 (a past day or week is refused; a known payee in another spelling takes the known spelling, `context.payees`) → proposal
 `PAYMENT_OPS` with one text line per change → **Apply** → `applyOps` (audit `PAYMENT_ADDED / MOVED / AMOUNT / CANCELLED`).
 A "week of the month" is a window: week 1 = days 1–7, 2 = 8–14, 3 = 15–21, 4 = 22–end. A monthly series is made
@@ -355,7 +357,8 @@ and most under; the shift-by-shift detail only for periods up to 14 days. An opt
 `POST /api/joya/ai/ask` → the runner plans calculations from `services/ai.js` `CALCS` (sales, labor, demand,
 plans, lists, quality, payroll issues…), **joya-hq** runs them with the user's access, the runner writes the answer
 from the results, and numbers in the answer not found in the results are listed (`meta.unverifiedNumbers`, shown as
-a warning). A change request becomes a validated proposal (same checks as the UI) that is saved only on **Apply**,
+a warning). Arithmetic the writer shows in brackets — "4,000 ₪ (= 20,000 ÷ 5)" — is checked and then counts as found
+(owner 2026-11-08: "calculate when it is needed", the first hard rule; see below). A change request becomes a validated proposal (same checks as the UI) that is saved only on **Apply**,
 logged `via = 'CHAT'`. "Recalculate with …" is a what-if: the stored rules do not change.
 
 The main menu (since 2026-10-23) has three areas, each one a chat: **מלאי ורכש** (`/stock`), **כח אדם** (`/people`),
@@ -407,6 +410,15 @@ employees…), the writer puts them in a pipe table (`| a | b |` + `|---|---|`; 
 shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table a **Download Excel** link:
 `GET /api/joya/ai/requests/:id/tables/:n.xlsx` (`src/services/answerExcel.js`, exceljs from the repo root; only the
 asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader for both sides: `lib/answerTables.js`.
+
+**Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
+(sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from
+ARITHMETIC on that data (a sum, a difference, a split into N payments, a share, an average, a per-unit value, a VAT
+amount), which it must do itself whenever the question needs it, never answering "I don't calculate numbers myself".
+It shows the inputs in brackets — "4,000 ₪ (= 20,000 ÷ 5)", "12.5% (= 2,500 ÷ 20,000)" — and `runner/verify.js`
+evaluates the bracket: every input must be a known number (or a small count up to 12) and the result must be right;
+then the result counts as verified. The planner fills the fields of an op the same way ("20 אלף ב-5 תשלומים" → a
+series of 5 payments of 4,000, `repeat.count`).
 
 **Table totals (owner, 2026-11-03, a lasting rule).** "When a table has a total and the system did not give it —
 calculate it, don't invent it; missing numbers in the table are zero." The writer ends a table whose numbers add up

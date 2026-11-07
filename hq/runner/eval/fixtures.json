@@ -2091,6 +2091,27 @@
       }
     },
     {
+      "key": "p-add-split",
+      "kind": "PAYMENTS",
+      "lang": "he",
+      "question": "שלם לאימפורט 20 אלף שח ב5 תשלומים בשבוע ה3 בכל חודש",
+      "expect": {
+        "calcs": [],
+        "maxCalcs": 0,
+        "payments": [
+          {
+            "op": "add",
+            "amount": 4000,
+            "repeat": {
+              "every": "month",
+              "week": 3,
+              "count": 5
+            }
+          }
+        ]
+      }
+    },
+    {
       "key": "p-add-next-day",
       "kind": "PAYMENTS",
       "lang": "he",

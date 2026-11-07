@@ -923,7 +923,7 @@ export const CHANGE_FORMATS = {
   ],
   // planned bank transfers (services/payments.js), in the plan's "payments" list — any chat, chain admin only
   PAYMENTS: [
-    '{ "op": "add", "payee": string, "amount": number, "dueDate"?: "YYYY-MM-DD", "dueWeek"?: { "year": YYYY, "month": 1-12, "week": 1-4 }, "repeat"?: { "every": "month", "day"?: 1-31, "week"?: 1-4, "until"?: "YYYY-MM-DD" }, "note"?: string, "companyKey"?: string (only when the question names the company) }',
+    '{ "op": "add", "payee": string, "amount": number, "dueDate"?: "YYYY-MM-DD", "dueWeek"?: { "year": YYYY, "month": 1-12, "week": 1-4 }, "repeat"?: { "every": "month", "day"?: 1-31, "week"?: 1-4, "until"?: "YYYY-MM-DD", "count"?: number (how many payments in all, 2-60) }, "note"?: string, "companyKey"?: string (only when the question names the company) }',
     '{ "op": "move", "id": number, "dueDate"?: "YYYY-MM-DD", "dueWeek"?: { "year": YYYY, "month": 1-12, "week": 1-4 }, "scope"?: "one" | "series" }',
     '{ "op": "amount", "id": number, "amount": number, "scope"?: "one" | "series" }',
     '{ "op": "cancel", "id": number, "scope"?: "one" | "series" }',

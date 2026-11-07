@@ -85,7 +85,7 @@ export function dueText(kind, dueDate, dueTo) {
   if (kind === 'WEEK' && dueTo) return `שבוע ${weekOfMonth(dueDate)} של ${Number(dueDate.slice(5, 7))}/${dueDate.slice(0, 4)} (${fmtDayMonth(dueDate)}–${fmtDayMonth(dueTo)})`;
   return fmtDate(dueDate);
 }
-const repeatText = (rule) => (!rule ? '' : rule.week ? `כל חודש בשבוע ${rule.week}` : `כל חודש ב-${rule.day} לחודש`);
+const repeatText = (rule) => (!rule ? '' : (rule.week ? `כל חודש בשבוע ${rule.week}` : `כל חודש ב-${rule.day} לחודש`) + (rule.count ? ` · ${rule.count} תשלומים` : rule.until ? ` · עד ${fmtDate(rule.until)}` : ''));
 
 // ---------------------------------------------------------------- names and the bank line (pure)
 
@@ -209,6 +209,14 @@ const scopeOf = (v) => {
 };
 /** The due part of an add / move op → { dueKind, dueDate, dueTo }; a past day or window is refused. */
 function dueOf(op, today, { optional = false } = {}) {
+  if (op.dueKind === 'WEEK' && op.dueTo) {
+    // an op that was normalised before (the proposal's ops come back to applyOps): keep its week window
+    const from = String(op.dueDate).slice(0, 10);
+    const to = String(op.dueTo).slice(0, 10);
+    if (!DATE.test(from) || !DATE.test(to) || to < from) throw err('BAD_REQUEST', 'the week window must be two dates YYYY-MM-DD');
+    if (to < today) throw err('BAD_REQUEST', `the week ${fmtDate(from)}–${fmtDate(to)} has passed (today is ${fmtDate(today)})`);
+    return { dueKind: 'WEEK', dueDate: from, dueTo: to };
+  }
   if (op.dueWeek && typeof op.dueWeek === 'object') {
     // { year: 2026, month: 12, week: 2 } (the planner: numbers only — a quoted "YYYY-MM" inside lost its closing quote) or { month: 'YYYY-MM', week }
     const dw = op.dueWeek;
@@ -245,7 +253,20 @@ function repeatOf(rep, due) {
     if (!DATE.test(u)) throw err('BAD_REQUEST', 'repeat.until must be YYYY-MM-DD');
     out.until = u;
   }
+  if (rep.count != null && rep.count !== '') {
+    const n = Number(rep.count);
+    if (!Number.isInteger(n) || n < 2 || n > 60) throw err('BAD_REQUEST', 'repeat.count (how many payments in all) must be 2–60');
+    out.count = n;
+  }
   return out;
+}
+/** A series of `count` payments ends with its last one: the rule gets `until` = the end of the count-th occurrence from the first due. */
+export function closeCount(rule, firstDue) {
+  if (!rule?.count) return rule;
+  const all = nextOccurrences(rule, firstDue, rule.count);
+  const last = all[all.length - 1];
+  const until = last ? last.dueTo || last.dueDate : firstDue;
+  return { ...rule, until: rule.until && rule.until < until ? rule.until : until };
 }
 /**
  * One op of the planner / the API, checked and in one shape (pure). known = [{ name, norm }] payees used before: the
@@ -270,7 +291,7 @@ export function normalizeOp(op, { today = todayLocal(), known = [] } = {}) {
     }
     if (!due) dueOf(op, today); // throws the explanation
     const note = op.note == null ? null : String(op.note).trim().slice(0, 1000) || null;
-    return { op: 'add', payee: same ? same.name : payee, payeeNorm: same ? same.norm : norm, amount, ...due, repeat, note };
+    return { op: 'add', payee: same ? same.name : payee, payeeNorm: same ? same.norm : norm, amount, ...due, repeat: closeCount(repeat, due.dueDate), note };
   }
   if (kind === 'move') return { op: 'move', id: intId(op.id), ...dueOf(op, today), scope: scopeOf(op.scope) };
   if (kind === 'amount') return { op: 'amount', id: intId(op.id), amount: parseAmount(op.amount), scope: scopeOf(op.scope) };

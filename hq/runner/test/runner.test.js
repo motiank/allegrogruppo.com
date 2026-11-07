@@ -145,6 +145,15 @@ await t('rounded, thousands and percentages match; invented ones do not', () => 
   assert.deepEqual(unverifiedNumbers('48,210 · 48,210.46 · 12.3% · 812 · 5.10.2026 · 12.3K', r), []);
   assert.deepEqual(unverifiedNumbers('813 and 3 and 1', r), ['813', '3']);
 });
+await t('a shown calculation is checked: known inputs and a right result pass, a wrong result or an unknown input do not', () => {
+  const r = { total: 20000, a: 15200, b: 12000, base: 2500 };
+  assert.deepEqual(unverifiedNumbers('4,000 ₪ (= 20,000 ÷ 5)', r), []);
+  assert.deepEqual(unverifiedNumbers('+3,200 ₪ (= 15,200 − 12,000)', r), []);
+  assert.deepEqual(unverifiedNumbers('12.5% (= 2,500 ÷ 20,000)', r), []);
+  assert.deepEqual(unverifiedNumbers('3,400 ₪ (= 17% × 20,000)', r, '17%'), []);
+  assert.deepEqual(unverifiedNumbers('5,000 ₪ (= 20,000 ÷ 5)', r), ['5,000']);
+  assert.deepEqual(unverifiedNumbers('4,000 ₪ (= 20,000 ÷ 5) and 3,000 ₪ (= 9,000 ÷ 3)', r), ['3,000', '9,000']);
+});
 await t('JSON is found inside extra text', () => {
   assert.deepEqual(parseJsonObject('Here: {"calcs":[]} done'), { calcs: [] });
 });
