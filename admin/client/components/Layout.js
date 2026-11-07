@@ -24,6 +24,7 @@ const Layout = ({ children }) => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/orders', label: 'Orders History' },
     { path: '/analytics', label: 'Analytics' },
+    { path: '/bank-recon', label: 'Bank reconciliation' },
   ];
 
   const getCurrentPageTitle = () => {

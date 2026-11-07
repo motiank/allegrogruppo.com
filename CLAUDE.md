@@ -96,6 +96,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `allegro_finance_dev` from `hash-sync/.env`; the mixed endpoints also read the production `allegro` DB). Deployed
   2026-11-07 (`4a88e42`, `allegro-admin.service` restarted). Joya side built the same day (`hq/src/services/finance.js`,
   chain admin only, in הנהלת חשבונות; `hq/README.md` → "The books"). Every number still carries the `not_validated` warning until the accountant checks it.
+- **Bank reconciliation report** (דוח התאמת בנק מפורט, 2026-11-07): admin menu "Bank reconciliation" (`/bank-recon`, admin role
+  only) → `GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx` (`admin/server/modules/bankRecon.js`,
+  Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page). Reads `allegro_finance` only. Sections: open
+  bank lines, open book lines (cheques excluded), cheques cleared (paired by cheque number + amount, else Hashavshevet's
+  match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
+  Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.

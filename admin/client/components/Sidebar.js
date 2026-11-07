@@ -43,6 +43,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: "/affiliates", label: "Affiliates" },
     { path: "/joya-leads", label: "Joya Event Leads" },
     { path: "/coupons", label: "Coupons" },
+    { path: "/bank-recon", label: "Bank reconciliation" },
     {
       path: "/shift-tabit",
       label: "Shift-tabit",

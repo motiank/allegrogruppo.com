@@ -10,6 +10,7 @@ import { Router as coupons } from "../../modules/coupons.js";
 import { Router as payroll } from "../../modules/payroll.js";
 import { Router as joyaLeads } from "../../modules/joyaLeads.js";
 import { Router as files } from "../../modules/files.js";
+import { Router as bankRecon } from "../../modules/bankRecon.js";
 
 const api = function () {
   var admin = express.Router();
@@ -32,6 +33,7 @@ const api = function () {
   admin.use("/payroll", payroll());
   admin.use("/joya-leads", joyaLeads());
   admin.use("/files", files());
+  admin.use("/bank-recon", bankRecon());
   return admin;
 };
 
