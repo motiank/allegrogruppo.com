@@ -76,7 +76,7 @@
         "_note": "The legal limit (invoice total with VAT) per date. Not confirmed with the accountant."
       },
       "drive": { "folder": "פסטה לינה בע״מ", "taxId": "517068607", "tolerance": 0.05, "days": 45, "recentDays": 21, "confirmed": false },
-      "_drive": "The invoice agent's Drive folder of this company (invoice-agent/README.md) and the rules of /finance/invoices/drive-check: folder = the folder name under \"Invoices\" (or any row whose our-side tax id is taxId); tolerance = the allowed difference in ₪ between the invoice total (with VAT) and the book entry; days = how far the entry date may be from the invoice date; recentDays = an invoice dated in the last N days of the books counts as pending, not missing. Not confirmed with the accountant.",
+      "_drive": "The invoice agent's Drive folder of this company (invoice-agent/README.md) and the rules of /finance/invoices/drive-check: folder = the folder name under \"Invoices\" (or any row whose our-side tax id is taxId); tolerance = the allowed difference in ₪ between the invoice total (with VAT) and the book entry; days = how near the invoice date an entry is tried first (a farther entry with the same total still counts: the date is a preference only); recentDays = an invoice dated in the last N days of the books counts as pending, not missing. Not confirmed with the accountant.",
       "validated": [],
       "_validated": "Endpoint paths the accountant has checked, e.g. [\"/trial-balance\"]. They stop carrying the not_validated warning."
     }

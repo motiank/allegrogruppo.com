@@ -5,8 +5,15 @@
 //   1. The party's account in the books = the account whose tax file number (ח.פ.) is the invoice's party tax id.
 //      No such account → status `no_account` (the supplier / customer is not opened in Hashavshevet with that number).
 //   2. Among the invoice-type entries of that account, an entry with the same total (with VAT, ±tolerance, sign
-//      ignored: a credit note is minus in the books) dated within `days` of the invoice date → `booked`. When several
-//      fit, the one whose reference ends with the invoice number's digits wins, then the nearest date.
+//      ignored: a credit note is minus in the books) within `days` of the invoice date → `booked`. Among several, the
+//      one whose reference ends with the invoice number's digits wins, then the nearest date.
+//      The date is not a reason by itself to say "missing" (owner 2026-11-08: "I don't care when it was booked"): an
+//      entry with that total booked LATER, with any delay, also counts — when the reference confirms the number, or
+//      when the amount is a one-off (one such invoice of the party in Drive and one such entry on the account). An
+//      entry dated before the invoice (beyond the window) is never it — the invoice did not exist yet — unless the
+//      reference carries its number (a misread date). A recurring amount
+//      (rent, a monthly fee) stays inside the window: on real data the unlimited match took January's rent entry for
+//      September's missing invoice and hid the gap.
 //   3. Else an entry of that account whose reference ends with the invoice number (4+ digits) but another amount →
 //      `amount_differs` (the books hold the document with a different total: check which is right).
 //   4. Else, an invoice dated after `booksUpTo - recentDays` → `pending` (the bookkeeper has probably not entered it
@@ -78,26 +85,44 @@ export function matchInvoices(invoices, entries, accountsByTax, { booksUpTo = nu
       results[i] = { ...pick, account };
     }
   };
-  // pass 1: amount + date, the reference decides between several
+  const gap = (e, x) => (e.date && x.date ? daysBetween(e.date, x.date) : Infinity);
+  const byAmount = (maxGap, how, howWithNumber) => (x, mine) => {
+    const fit = mine.filter((e) => fits(x, e) && gap(e, x) <= maxGap);
+    if (!fit.length) return null;
+    fit.sort((a, b) => Number(referenceFits(x.number, b.reference, b.reference2, b.reference3)) - Number(referenceFits(x.number, a.reference, a.reference2, a.reference3)) || gap(a, x) - gap(b, x));
+    const e = fit[0];
+    return { status: 'booked', entry: e, how: referenceFits(x.number, e.reference, e.reference2, e.reference3) ? howWithNumber : how };
+  };
+  // pass 1: the same total near the invoice date (the reference decides between several)
+  invoices.forEach((inv, i) => pass(i, inv, byAmount(days, 'amount and date', 'amount, date and number')));
+  // pass 2: the same total booked LATER (any delay) — only when the number confirms it or the amount is a one-off on
+  // both sides. An entry dated before the invoice (beyond the window) is not that invoice unless its reference says so.
+  const invoiceKey = (x) => `${normDigits(x.party_tax_id)}|${Math.abs(Number(x.total)).toFixed(2)}`;
+  const sameInvoices = new Map();
+  for (const x of invoices) sameInvoices.set(invoiceKey(x), (sameInvoices.get(invoiceKey(x)) || 0) + 1);
   invoices.forEach((inv, i) =>
     pass(i, inv, (x, mine) => {
-      const fit = mine.filter((e) => fits(x, e) && e.date && x.date && daysBetween(e.date, x.date) <= days);
+      const notBefore = x.date ? addDaysIso(x.date, -days) : null;
+      const same = mine.filter((e) => fits(x, e) && (!notBefore || (e.date && e.date >= notBefore) || referenceFits(x.number, e.reference, e.reference2, e.reference3)));
+      if (!same.length) return null;
+      const oneOff = sameInvoices.get(invoiceKey(x)) === 1 && mine.filter((e) => fits(x, e)).length === 1;
+      const fit = same.filter((e) => oneOff || referenceFits(x.number, e.reference, e.reference2, e.reference3));
       if (!fit.length) return null;
-      fit.sort((a, b) => Number(referenceFits(x.number, b.reference, b.reference2, b.reference3)) - Number(referenceFits(x.number, a.reference, a.reference2, a.reference3)) || daysBetween(a.date, x.date) - daysBetween(b.date, x.date));
+      fit.sort((a, b) => Number(referenceFits(x.number, b.reference, b.reference2, b.reference3)) - Number(referenceFits(x.number, a.reference, a.reference2, a.reference3)) || gap(a, x) - gap(b, x));
       const e = fit[0];
-      return { status: 'booked', entry: e, how: referenceFits(x.number, e.reference, e.reference2, e.reference3) ? 'amount, date and number' : 'amount and date' };
+      return { status: 'booked', entry: e, how: referenceFits(x.number, e.reference, e.reference2, e.reference3) ? 'amount and number (another date)' : 'amount, a one-off (another date)' };
     }),
   );
-  // pass 2: the number is there with another amount
+  // pass 3: the number is there with another amount — a weak sign (the books keep only the last digits), so only near the date
   invoices.forEach((inv, i) =>
     pass(i, inv, (x, mine) => {
-      const fit = mine.filter((e) => referenceFits(x.number, e.reference, e.reference2, e.reference3) && e.date && x.date && daysBetween(e.date, x.date) <= days * 2);
+      const fit = mine.filter((e) => referenceFits(x.number, e.reference, e.reference2, e.reference3) && gap(e, x) <= days * 2);
       if (!fit.length) return null;
-      fit.sort((a, b) => daysBetween(a.date, x.date) - daysBetween(b.date, x.date));
+      fit.sort((a, b) => gap(a, x) - gap(b, x));
       return { status: 'amount_differs', entry: fit[0], how: 'number found, the amount is different' };
     }),
   );
-  // pass 3: nothing
+  // pass 4: nothing
   const recentFrom = booksUpTo ? addDaysIso(booksUpTo, -recentDays) : null;
   invoices.forEach((inv, i) => {
     if (results[i]) return;

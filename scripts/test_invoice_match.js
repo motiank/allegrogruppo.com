@@ -32,6 +32,30 @@ test("booked by amount and date; the reference decides between two entries of th
   assert.equal(r.results[0].how, "amount, date and number");
 });
 
+test("far from the date: a one-off amount or a confirming number still counts; a recurring amount does not take another month's entry", () => {
+  const entries = [
+    entry({ transId: 21, accountKey: "500040", amount: 14000, date: "2026-03-05", reference2: 0 }),
+    entry({ transId: 22, accountKey: "500040", amount: 14000, date: "2026-04-05", reference2: 0 }),
+    entry({ transId: 23, accountKey: "500040", amount: 500, date: "2026-09-01", reference2: 0 }),
+    entry({ transId: 24, accountKey: "500040", amount: 777, date: "2026-01-10", reference2: 5555 }),
+    entry({ transId: 25, accountKey: "500040", amount: 777, date: "2026-02-10", reference2: 6666 }),
+  ];
+  const list = [
+    inv({ number: "301", date: "2026-04-01", total: 14000, party_tax_id: "512293200" }), // April first in the index
+    inv({ number: "300", date: "2026-03-01", total: 14000, party_tax_id: "512293200" }),
+    inv({ number: "302", date: "2026-09-01", total: 14000, party_tax_id: "512293200" }), // September's rent: no entry → missing, not January's
+    inv({ number: "150", date: "2025-09-01", total: 500, party_tax_id: "512293200" }), // a one-off, booked a year later
+    inv({ number: "15555", date: "2026-08-01", total: 777, party_tax_id: "512293200" }), // recurring 777, but the number confirms January's entry
+    inv({ number: "60032", date: "2026-07-29", total: 550, party_tax_id: "512293200" }), // a yearly fee: last year's entry is not this invoice
+  ];
+  entries.push(entry({ transId: 26, accountKey: "500040", amount: 550, date: "2025-07-23", reference2: 18 }));
+  const r = matchInvoices(list, entries, accounts, { booksUpTo: "2026-11-03" });
+  assert.deepEqual(statuses(r), ["booked", "booked", "not_booked", "booked", "booked", "not_booked"]);
+  assert.deepEqual(r.results.map((x) => x.entry?.transId ?? null), [22, 21, null, 23, 24, null]);
+  assert.equal(r.results[3].how, "amount, a one-off (another date)");
+  assert.equal(r.results[4].how, "amount and number (another date)");
+});
+
 test("a credit note matches a minus entry; one entry serves one invoice only", () => {
   const entries = [entry({ transId: 5, accountKey: "500003", amount: -33, date: "2026-10-12", reference2: 6113 })];
   const list = [

@@ -7,7 +7,7 @@ import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } fro
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees } from "./chequePayees.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
-import { matchInvoices, booksFlag, flagChanged, normDigits, addDaysIso, STATUSES } from "../../../shared/invoiceMatch.js";
+import { matchInvoices, booksFlag, flagChanged, normDigits, STATUSES } from "../../../shared/invoiceMatch.js";
 
 // Finance API: read-only, localhost-only JSON API over allegro_finance (the Hashavshevet copy made by hash-sync),
 // for Joya HQ. Mounted at /local-api/v1/finance by server.js; documented in finance_api_readme.md.
@@ -1672,14 +1672,15 @@ function driveFolderOf(ctx, indexes) {
   return indexes.find((x) => !x.unmatched && ((d.folder && x.name === d.folder) || (tax && x.index.invoices.some((inv) => ourTaxId(inv) === tax)))) || null;
 }
 
-async function driveEntries(ctx, from, to) {
+// every invoice-type entry of the company (all years): the date is only a preference in the match, so no date limit here
+async function driveEntries(ctx) {
   const it = ctx.rules.invoiceTypes;
   const types = [...new Set([...(it.supplier || []), ...(it.customer || []), ...(it.customerCredit || [])])];
   const params = { companyId: ctx.companyId };
   const rows = await financeSql(
     `SELECT e.fiscal_year, e.trans_id, e.trans_type, e.status, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS d, e.amount, e.debit_account, e.credit_account,
             e.reference, e.reference2, e.reference3, e.tax_alloc_number, e.description
-       FROM journal_entries e WHERE e.company_id = :companyId AND e.deleted_at IS NULL AND ${inList("e.trans_type", types, params, "t")} ${rangeSql("e.value_date", from, to, params)}
+       FROM journal_entries e WHERE e.company_id = :companyId AND e.deleted_at IS NULL AND ${inList("e.trans_type", types, params, "t")}
       ORDER BY e.value_date, e.trans_id`,
     params,
   );
@@ -1717,7 +1718,7 @@ async function driveCheck(ctx, facts, { from, to, direction = "all", flag = true
   const rules = { tolerance: 0.05, days: 45, recentDays: 21, ...(ctx.rules.drive || {}) };
   const booksUpTo = facts.dataUpTo || null;
   const invoices = folder.index.invoices.filter((inv) => inv.date >= from && inv.date <= to && (direction === "all" || inv.direction === direction));
-  const entries = await driveEntries(ctx, addDaysIso(from, -rules.days * 2), addDaysIso(to, rules.days * 2));
+  const entries = await driveEntries(ctx);
   const suppliers = accountsByTaxId(ctx, ctx.rules.balanceGroups.suppliers || [500]);
   const customers = accountsByTaxId(ctx, [...(ctx.rules.balanceGroups.customers || [200, 210])]);
   const anyAccount = accountsByTaxId(ctx, [...new Set([...ctx.accounts.values()].map((a) => a.group))]);
@@ -1773,7 +1774,7 @@ async function driveCheck(ctx, facts, { from, to, direction = "all", flag = true
       counts, totals, flag, flagged, recheck, rules: { tolerance: rules.tolerance, days: rules.days, recentDays: rules.recentDays, confirmed: rules.confirmed === true },
       booksWithoutDocument: { ...(direction !== "income" ? { supplier: noDoc("supplier") } : {}), ...(direction !== "expense" ? { customer: noDoc("customer") } : {}) },
       unmatchedFolder: unmatched ? { count: unmatched.index.invoices.length, note: "invoices of no company of ours (config/companies.json of the agent)" } : null,
-      statuses: { booked: "an entry of the party's account with this total (with VAT) within the date window; matched = true in the Drive index", amount_differs: "the invoice number is in the books with another total", pending: `dated in the last ${rules.recentDays} days of the books: probably not entered yet`, not_booked: "no entry of this account with this total or number: missing in the books", no_account: "no account in Hashavshevet with the party's tax id" },
+      statuses: { booked: "an entry of the party's account with this total (with VAT) near the invoice date; or booked later with any delay when the reference confirms the number or the amount is a one-off on both sides; matched = true in the Drive index", amount_differs: "the invoice number is in the books with another total", pending: `dated in the last ${rules.recentDays} days of the books: probably not entered yet`, not_booked: "no entry of this account with this total or number: missing in the books", no_account: "no account in Hashavshevet with the party's tax id" },
     },
   };
 }

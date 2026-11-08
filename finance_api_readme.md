@@ -706,11 +706,11 @@ time and the books' date) — unless `flag=0`. The agent keeps these flags when 
 `from`–`to` are **invoice dates** (default: 1 January of this year to today). The company's Drive folder is
 `drive.folder` / `drive.taxId` of `shared/finance_map.json` (section 5).
 
-Match rules (`drive` block of the finance map: `tolerance` 0.05 ₪, `days` 45, `recentDays` 21; not confirmed):
+Match rules (`drive` block of the finance map: `tolerance` 0.05 ₪, `days` 45 = the window tried first, `recentDays` 21; not confirmed):
 
 | `status` | Meaning |
 |---|---|
-| `booked` | An entry of the invoice types on the party's account (the account whose ח.פ. is the invoice's party tax id) with the same total (with VAT, sign ignored: a credit note is minus) within `days` of the invoice date. Several fit → the one whose reference ends with the invoice number (Hashavshevet keeps the last digits in `reference2`), then the nearest date. |
+| `booked` | An entry of the invoice types on the party's account (the account whose ח.פ. is the invoice's party tax id) with the same total (with VAT, sign ignored: a credit note is minus) within `days` of the invoice date. Several fit → the one whose reference ends with the invoice number (Hashavshevet keeps the last digits in `reference2`), then the nearest date. The date alone never makes an invoice "missing" (owner 2026-11-08): an entry with that total booked **later, with any delay**, also counts when the reference confirms the number, or when the amount is a one-off (one such invoice of the party in Drive, one such entry on the account); an entry dated before the invoice is never it, unless the reference carries its number. A recurring amount (rent, a monthly fee) stays inside the window — on real data the unlimited match took January's rent entry for September's missing invoice and hid the gap. |
 | `amount_differs` | The invoice number is on the account with another total. |
 | `pending` | Not found, and the invoice is dated in the last `recentDays` days of the books (`dataUpTo`): probably not entered yet. |
 | `not_booked` | Not found, older than that: missing in the books. |
