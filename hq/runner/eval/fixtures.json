@@ -2014,6 +2014,74 @@
       }
     },
     {
+      "key": "f-drive-missing",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו חשבוניות ספקים מהדרייב עדיין לא נקלטו בחשבשבת?",
+      "expect": {
+        "calcs": [
+          "invoice_check"
+        ],
+        "maxCalcs": 1,
+        "params": {
+          "invoice_check": {
+            "status": "not_booked",
+            "direction": "expense"
+          }
+        }
+      }
+    },
+    {
+      "key": "f-drive-state",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מה המצב של החשבוניות מהמייל מול הספרים השנה?",
+      "expect": {
+        "calcs": [
+          "invoice_check"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "f-drive-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Which invoices from Drive are missing in the books since September?",
+      "expect": {
+        "calcs": [
+          "invoice_check"
+        ],
+        "maxCalcs": 1,
+        "params": {
+          "invoice_check": {
+            "status": "not_booked"
+          }
+        },
+        "range": {
+          "from": "2026-09-01",
+          "to": "2026-10-20|2026-10-21"
+        }
+      }
+    },
+    {
+      "key": "f-drive-supplier",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "החשבוניות של דורגז מהדרייב נקלטו בהנהלת חשבונות?",
+      "expect": {
+        "calcs": [
+          "invoice_check"
+        ],
+        "maxCalcs": 1,
+        "params": {
+          "invoice_check": {
+            "q": "דורגז"
+          }
+        }
+      }
+    },
+    {
       "key": "p-add-date",
       "kind": "PAYMENTS",
       "lang": "he",

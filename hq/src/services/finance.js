@@ -372,6 +372,21 @@ export async function allocationNumbers(companies, p = {}) {
   });
 }
 
+/** The invoice agent's Drive invoices against the books: which are booked in Hashavshevet (flagged in Drive), which are missing. */
+export async function invoiceCheck(companies, p = {}) {
+  const limit = clamp(p.limit, LIMITS.invoices, 500);
+  const status = p.status == null || p.status === '' || p.status === 'all' ? {} : { status: Array.isArray(p.status) ? p.status.join(',') : String(p.status) };
+  const direction = p.direction && p.direction !== 'all' ? { direction: String(p.direction) } : {};
+  const params = { ...dates(p, { required: false }), ...direction, ...status, ...textOf(p, 'q'), ...(p.recheck ? { recheck: 1 } : {}), limit };
+  return result('invoice_check', params, await perCompany(companies, '/invoices/drive-check', params, (d, m) => ({
+    shown: d.length, count: m.total, driveInvoices: m.driveInvoices, from: m.from, to: m.to, booksUpTo: m.booksUpTo, driveUpdatedAt: m.driveUpdatedAt,
+    counts: m.counts, totals: m.totals, flagged: m.flagged, rules: m.rules, booksWithoutDocument: m.booksWithoutDocument, unmatchedFolder: m.unmatchedFolder, statuses: m.statuses, rows: d,
+  })), {
+    source: "the invoice agent's Google Drive index (every invoice from the accountant's mailbox) against the Hashavshevet books (allegro_finance), through the Allegro admin Finance API; the match is written back into Drive (books.matched)",
+    note: 'status booked = in the books (an entry of the party with the same total, with VAT, near the date); pending = too new for the books (probably not entered yet); not_booked = missing in the books; amount_differs = the number is booked with another total; no_account = the party has no account with that tax id in Hashavshevet. counts / totals cover every Drive invoice of the period; rows are the ones asked for (status). booksWithoutDocument = book entries of the period with no Drive document (count and amount; the agent files only invoices that reach the mailbox)',
+  });
+}
+
 /** Salary entries in the books (group 720) against the payslip gross of the admin's payroll, per branch, for one month. */
 export async function payrollCheck(companies, p = {}) {
   if (!MONTH.test(String(p.month || ''))) throw bad('month must be YYYY-MM');

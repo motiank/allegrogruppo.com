@@ -389,6 +389,11 @@
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
     },
     {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
+    },
+    {
      "name": "payroll_check",
      "params": "{ companyKeys?, month: \"YYYY-MM\", locationIds? }",
      "about": "the salary expense posted in the books (group 720) against the payslip gross of the admin payroll (saved, or built from Tabit), per branch for one month, with the difference; the books have no 2026 salaries (no_salary_expense)"
@@ -822,6 +827,11 @@
      "name": "allocation_numbers",
      "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), missingOnly?: boolean, minAmount?: number, account?, limit? }",
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
+    },
+    {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
     },
     {
      "name": "payroll_check",
@@ -1418,6 +1428,11 @@
      "name": "allocation_numbers",
      "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), missingOnly?: boolean, minAmount?: number, account?, limit? }",
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
+    },
+    {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
     },
     {
      "name": "payroll_check",
@@ -2815,6 +2830,11 @@
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
     },
     {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
+    },
+    {
      "name": "payroll_check",
      "params": "{ companyKeys?, month: \"YYYY-MM\", locationIds? }",
      "about": "the salary expense posted in the books (group 720) against the payslip gross of the admin payroll (saved, or built from Tabit), per branch for one month, with the difference; the books have no 2026 salaries (no_salary_expense)"
@@ -3249,6 +3269,11 @@
      "name": "allocation_numbers",
      "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), missingOnly?: boolean, minAmount?: number, account?, limit? }",
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
+    },
+    {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
     },
     {
      "name": "payroll_check",
@@ -3686,6 +3711,11 @@
      "name": "allocation_numbers",
      "params": "{ companyKeys?, from: \"YYYY-MM-DD\", to?: \"YYYY-MM-DD\" (default today), missingOnly?: boolean, minAmount?: number, account?, limit? }",
      "about": "allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period"
+    },
+    {
+     "name": "invoice_check",
+     "params": "{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: \"expense\" | \"income\", status?: \"not_booked\" | \"pending\" | \"amount_differs\" | \"no_account\" | \"booked\" | \"all\" (default all; several: \"not_booked,amount_differs\"), q?: \"part of a supplier / customer name or an invoice number\", limit? }",
+     "about": "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document"
     },
     {
      "name": "payroll_check",

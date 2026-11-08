@@ -536,6 +536,11 @@ export const CALCS = {
     about: 'allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period',
     run: finCalc(fin.allocationNumbers),
   },
+  invoice_check: {
+    params: '{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: "expense" | "income", status?: "not_booked" | "pending" | "amount_differs" | "no_account" | "booked" | "all" (default all; several: "not_booked,amount_differs"), q?: "part of a supplier / customer name or an invoice number", limit? }',
+    about: "the invoices the invoice agent filed in the accountant's Google Drive (every invoice that reached the mailbox) against the books: which are already booked in Hashavshevet (and flagged so in Drive), which are missing in the books (not_booked), too new (pending), booked with another total (amount_differs) or of a party with no account (no_account); counts and totals per status, the list asked for, and how many book entries of the period have no Drive document",
+    run: finCalc(fin.invoiceCheck),
+  },
   payroll_check: {
     params: '{ companyKeys?, month: "YYYY-MM", locationIds? }',
     about: 'the salary expense posted in the books (group 720) against the payslip gross of the admin payroll (saved, or built from Tabit), per branch for one month, with the difference; the books have no 2026 salaries (no_salary_expense)',
@@ -594,7 +599,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'invoice_check', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules

@@ -6,6 +6,8 @@ import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } f
 import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees } from "./chequePayees.js";
+import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
+import { matchInvoices, booksFlag, flagChanged, normDigits, addDaysIso, STATUSES } from "../../../shared/invoiceMatch.js";
 
 // Finance API: read-only, localhost-only JSON API over allegro_finance (the Hashavshevet copy made by hash-sync),
 // for Joya HQ. Mounted at /local-api/v1/finance by server.js; documented in finance_api_readme.md.
@@ -37,6 +39,7 @@ const DEFAULT_RULES = {
   branches: [],
   intercompany: [],
   allocationNumber: { thresholds: [] },
+  drive: null, // { folder, taxId, tolerance, days, recentDays }: the invoice agent's Drive folder of this company (readme → /invoices/drive-check)
   validated: [],
 };
 
@@ -1652,6 +1655,171 @@ route("/allocation-numbers", async (req, ctx) => {
   if (missingOnly) data = data.filter((x) => x.status !== "ok");
   return { data: data.slice(offset, offset + limit), meta: { from, to, minAmount: minAmount ?? "by date (finance_map allocationNumber)", thresholds, thresholdsConfirmed: ctx.rules.allocationNumber?.confirmed === true, missingOnly, accounts: accounts.length ? accounts : "all", limit, offset, total: data.length, counts, invoiceTypes: types, note: "a value of 5 digits or more counts as a real number; the accountant must say what the others are" }, codes: ["unposted_entries"], range: { from, to } };
 });
+
+// ── Drive invoices against the books (owner 2026-11-08) ─────────────────
+// The invoice agent files every invoice from the accountant's mailbox in Drive, with one index.json per company
+// (invoice-agent/README.md). This check reads that index, matches each invoice with an entry of the books
+// (shared/invoiceMatch.js: the party's account by tax id, the total with VAT, the date, the reference) and writes
+// the result back into the index row (`books`, the flag) — so a Drive invoice that is already in Hashavshevet is
+// marked, and the ones that are not can be listed.
+
+const DRIVE_STATUS_ORDER = ["not_booked", "amount_differs", "pending", "no_account", "booked"];
+const ourTaxId = (inv) => normDigits(inv.direction === "income" ? inv.from_tax_id : inv.to_tax_id);
+
+function driveFolderOf(ctx, indexes) {
+  const d = ctx.rules.drive || {};
+  const tax = normDigits(d.taxId);
+  return indexes.find((x) => !x.unmatched && ((d.folder && x.name === d.folder) || (tax && x.index.invoices.some((inv) => ourTaxId(inv) === tax)))) || null;
+}
+
+async function driveEntries(ctx, from, to) {
+  const it = ctx.rules.invoiceTypes;
+  const types = [...new Set([...(it.supplier || []), ...(it.customer || []), ...(it.customerCredit || [])])];
+  const params = { companyId: ctx.companyId };
+  const rows = await financeSql(
+    `SELECT e.fiscal_year, e.trans_id, e.trans_type, e.status, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS d, e.amount, e.debit_account, e.credit_account,
+            e.reference, e.reference2, e.reference3, e.tax_alloc_number, e.description
+       FROM journal_entries e WHERE e.company_id = :companyId AND e.deleted_at IS NULL AND ${inList("e.trans_type", types, params, "t")} ${rangeSql("e.value_date", from, to, params)}
+      ORDER BY e.value_date, e.trans_id`,
+    params,
+  );
+  const supplierTypes = new Set(it.supplier || []);
+  return rows.map((r) => {
+    const side = supplierTypes.has(r.trans_type) ? "supplier" : "customer";
+    const accountKey = side === "supplier" ? r.credit_account : r.debit_account;
+    return {
+      year: r.fiscal_year, transId: r.trans_id, type: r.trans_type, posted: r.status === 1, date: r.d, amount: round2(r.amount), side, accountKey,
+      accountName: ctx.account(accountKey).name, reference: r.reference, reference2: r.reference2, reference3: r.reference3, allocationNumber: r.tax_alloc_number || null, description: r.description,
+    };
+  });
+}
+
+function accountsByTaxId(ctx, groups) {
+  const out = new Map();
+  for (const a of ctx.accounts.values()) {
+    const tax = normDigits(a.taxFileNum);
+    if (!tax || !groups.includes(a.group)) continue;
+    if (!out.has(tax)) out.set(tax, { accountKey: a.accountKey, name: a.name });
+  }
+  return out;
+}
+
+/**
+ * @param {object} o  { from, to (invoice dates), direction: "all" | "expense" | "income", flag: boolean (write the flags), recheck: boolean }
+ * @returns {{ rows, meta }} rows = every Drive invoice of the period with its status; meta.counts / totals per status; meta.flagged = rows written now
+ */
+async function driveCheck(ctx, facts, { from, to, direction = "all", flag = true, recheck = false, unmatchedLimit = 30 }) {
+  const why = driveUnavailable();
+  if (why) throw new ApiError(503, "drive_unavailable", why);
+  const indexes = await listCompanyIndexes();
+  const folder = driveFolderOf(ctx, indexes);
+  if (!folder) throw new ApiError(404, "not_found", `no Drive folder of the invoice agent for company ${ctx.code} (finance_map drive.folder / drive.taxId; folders: ${indexes.map((x) => x.name).join(", ") || "none"})`);
+  const rules = { tolerance: 0.05, days: 45, recentDays: 21, ...(ctx.rules.drive || {}) };
+  const booksUpTo = facts.dataUpTo || null;
+  const invoices = folder.index.invoices.filter((inv) => inv.date >= from && inv.date <= to && (direction === "all" || inv.direction === direction));
+  const entries = await driveEntries(ctx, addDaysIso(from, -rules.days * 2), addDaysIso(to, rules.days * 2));
+  const suppliers = accountsByTaxId(ctx, ctx.rules.balanceGroups.suppliers || [500]);
+  const customers = accountsByTaxId(ctx, [...(ctx.rules.balanceGroups.customers || [200, 210])]);
+  const anyAccount = accountsByTaxId(ctx, [...new Set([...ctx.accounts.values()].map((a) => a.group))]);
+  const withFallback = (m) => new Map([...anyAccount, ...m]);
+  const opts = { booksUpTo, tolerance: rules.tolerance, days: rules.days, recentDays: rules.recentDays, recheck };
+  const expense = invoices.filter((i) => i.direction === "expense");
+  const income = invoices.filter((i) => i.direction === "income");
+  const used = new Set();
+  const results = new Map();
+  const run = (list, side, accounts) => {
+    const r = matchInvoices(list, entries.filter((e) => e.side === side), accounts, opts);
+    list.forEach((inv, i) => results.set(inv, r.results[i]));
+    for (const k of r.used) used.add(k);
+  };
+  run(expense, "supplier", withFallback(suppliers));
+  run(income, "customer", withFallback(customers));
+
+  const checkedAt = new Date().toISOString();
+  const flags = new Map();
+  const rows = invoices.map((inv) => {
+    const r = results.get(inv);
+    const next = booksFlag(r, { checkedAt, booksUpTo });
+    if (flagChanged(inv.books, next)) flags.set(inv.drive_file_id, next);
+    const e = r.entry;
+    return {
+      number: inv.number, date: inv.date, direction: inv.direction, docType: inv.doc_type || null, party: inv.party_folder, partyTaxId: inv.party_tax_id || null,
+      total: round2(inv.total), currency: inv.currency || "ILS", allocationNumber: inv.allocation_number || null, driveFileId: inv.drive_file_id, file: inv.file, filedAt: inv.filed_at || null,
+      status: r.status, how: r.how, account: r.account ? { accountKey: r.account.accountKey, name: r.account.name ?? ctx.account(r.account.accountKey).name } : null,
+      entry: e ? { year: e.year, transId: e.transId, type: e.type, posted: e.posted, date: e.date, amount: e.amount, reference: e.reference2 || e.reference || e.reference3 || null, allocationNumber: e.allocationNumber } : null,
+      flaggedBefore: inv.books ? { status: inv.books.status, checkedAt: inv.books.checkedAt } : null,
+    };
+  });
+  rows.sort((a, b) => DRIVE_STATUS_ORDER.indexOf(a.status) - DRIVE_STATUS_ORDER.indexOf(b.status) || b.date.localeCompare(a.date));
+  let flagged = 0;
+  if (flag && flags.size) flagged = await writeFlags(folder.indexId, flags);
+
+  const counts = Object.fromEntries(STATUSES.map((st) => [st, rows.filter((r) => r.status === st).length]));
+  const totals = Object.fromEntries(STATUSES.map((st) => [st, round2(rows.filter((r) => r.status === st).reduce((s, r) => s + num(r.total), 0))]));
+  // the other side: book entries of the period with no Drive document
+  const noDoc = (side) => {
+    const list = entries.filter((e) => e.side === side && e.date >= from && e.date <= to && !used.has(`${e.year}:${e.transId}`));
+    return {
+      count: list.length,
+      amount: round2(list.reduce((s, e) => s + num(e.amount), 0)),
+      rows: list.slice(0, unmatchedLimit).map((e) => ({ year: e.year, transId: e.transId, type: e.type, posted: e.posted, date: e.date, amount: e.amount, accountKey: e.accountKey, name: e.accountName, reference: e.reference2 || e.reference || e.reference3 || null, allocationNumber: e.allocationNumber, description: e.description })),
+    };
+  };
+  const unmatched = indexes.find((x) => x.unmatched);
+  return {
+    rows,
+    meta: {
+      from, to, direction, booksUpTo, driveFolder: folder.name, driveUpdatedAt: folder.index.updated_at || null, driveChecked: checkedAt, driveInvoices: rows.length,
+      counts, totals, flag, flagged, recheck, rules: { tolerance: rules.tolerance, days: rules.days, recentDays: rules.recentDays, confirmed: rules.confirmed === true },
+      booksWithoutDocument: { ...(direction !== "income" ? { supplier: noDoc("supplier") } : {}), ...(direction !== "expense" ? { customer: noDoc("customer") } : {}) },
+      unmatchedFolder: unmatched ? { count: unmatched.index.invoices.length, note: "invoices of no company of ours (config/companies.json of the agent)" } : null,
+      statuses: { booked: "an entry of the party's account with this total (with VAT) within the date window; matched = true in the Drive index", amount_differs: "the invoice number is in the books with another total", pending: `dated in the last ${rules.recentDays} days of the books: probably not entered yet`, not_booked: "no entry of this account with this total or number: missing in the books", no_account: "no account in Hashavshevet with the party's tax id" },
+    },
+  };
+}
+
+route("/invoices/drive-check", async (req, ctx, facts) => {
+  const year = today().slice(0, 4);
+  const { from, to } = dateRange(req, { required: true, defaultFrom: `${year}-01-01` });
+  const direction = oneOf(req, "direction", ["all", "expense", "income"], "all");
+  const wanted = csv(req.query.status);
+  const unknown = wanted.filter((s) => !STATUSES.includes(s));
+  if (unknown.length) throw badRequest(`status must be one of ${STATUSES.join(", ")}`);
+  const q = String(req.query.q || "").trim();
+  const flag = req.query.flag == null || req.query.flag === "" ? true : ["1", "true", "yes"].includes(String(req.query.flag).toLowerCase());
+  const { limit, offset } = paging(req);
+  const { rows, meta } = await driveCheck(ctx, facts, { from, to, direction, flag, recheck: flag && flagReq(req, "recheck"), unmatchedLimit: positiveInt(req, "unmatchedLimit", 30) });
+  let data = rows;
+  if (wanted.length) data = data.filter((r) => wanted.includes(r.status));
+  if (q) data = data.filter((r) => String(r.party || "").includes(q) || String(r.number || "").includes(q));
+  return { data: data.slice(offset, offset + limit), meta: { ...meta, status: wanted.length ? wanted : "all", q: q || null, limit, offset, total: data.length }, codes: ["unposted_entries"], range: { from, to } };
+});
+const flagReq = flag;
+
+/** The daily job (server.js, INVOICE_DRIVE_AUTO=1): checks this year's Drive invoices of every company that has a Drive folder and writes the flags. */
+export async function driveCheckAll({ log = console } = {}) {
+  const out = [];
+  const why = driveUnavailable();
+  if (why) {
+    log.warn?.(`[invoice-drive] skipped: ${why}`);
+    return out;
+  }
+  for (const co of await loadCompanies()) {
+    const rules = FINANCE_MAP.companies?.[co.code] || {};
+    if (!rules.drive) continue;
+    try {
+      const ctx = await companyContext({ query: { company: co.code } });
+      const facts = await companyFacts(ctx);
+      const { meta } = await driveCheck(ctx, facts, { from: `${today().slice(0, 4)}-01-01`, to: today(), flag: true });
+      log.info?.(`[invoice-drive] ${co.code}: ${meta.driveInvoices} invoices, ${JSON.stringify(meta.counts)}, ${meta.flagged} flags written`);
+      out.push({ company: co.code, status: "ok", counts: meta.counts, flagged: meta.flagged });
+    } catch (e) {
+      log.error?.(`[invoice-drive] ${co.code}: ${e.message}`);
+      out.push({ company: co.code, status: "error", error: e.message });
+    }
+  }
+  return out;
+}
 
 route("/payroll-check", async (req, ctx) => {
   const month = requireMonth(req);

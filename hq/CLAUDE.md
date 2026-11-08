@@ -140,6 +140,13 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
   `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
+- **Drive invoices against the books** (2026-11-08, owner): calc `invoice_check` (`fin.invoiceCheck` → the admin's
+  `/finance/invoices/drive-check`): the invoice agent's Drive index (every invoice from the accountant's mailbox) matched
+  with Hashavshevet entries by the admin (`shared/invoiceMatch.js`), the flag `books.matched` written back into Drive by
+  the admin (the owner: "access to the drive through the API on the admin"). Routing words in the PLAN prompt
+  (חשבוניות שלא נקלטו / מהדרייב / מהמייל מול הספרים → invoice_check, never customer_invoices / allocation_numbers);
+  WRITE format "Drive invoices against the books". Eval `f-drive-*` 4/4. The admin needs the agent's Google files
+  (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN`), else the calc answers "not available" with the reason.
 - **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (not in the menu — the chat answers it (suggestion 9 of the accounting area) and the buttons under the answer open the page;
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).

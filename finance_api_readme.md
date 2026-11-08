@@ -188,6 +188,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 21 | Allocation numbers | `/allocation-numbers` | The legal limits per date are not confirmed |
 | 22 | Salary entries compared with payroll | `/payroll-check` | No 2026 salaries in the books; payroll data from April 2026 |
 | 23 | Exceptions | `/exceptions` | "Wrong account" has no rule yet |
+| 25 | Drive invoices (the invoice agent) against the books, with a flag written back into Drive | `/invoices/drive-check` | Added 2026-11-08; the match rules are not confirmed by the accountant |
 | 24 | Change history | `/changes` | Hashavshevet logs account changes, not journal edits |
 
 ---
@@ -690,6 +691,56 @@ without a real number. `meta.counts` counts everything in the range.
 Of the filled values, only 294 posted supplier invoices (317 entries of all kinds) look like a real number. The
 accountant must say what the others are (1,911 are the value `0`). The limits in `finance_map.json` (25,000 from May
 2024, 20,000 from 2025, 10,000 from 2026) are **not confirmed** (`meta.thresholdsConfirmed`).
+
+### `GET /finance/invoices/drive-check?company=[&from=][&to=][&direction=all|expense|income][&status=][&q=][&flag=1|0][&recheck=1][&unmatchedLimit=][&limit=][&offset=]`
+
+Use case 25 (owner 2026-11-08). The **invoice agent** (`invoice-agent/`) files every invoice that reaches the
+accountant's mailbox in her Google Drive, one `index.json` per company (`Invoices/<company>/index.json`: number,
+party, tax ids, total with VAT, date, allocation number, Drive file id). This endpoint reads that index **through the
+Google Drive API with the agent's own login** (`admin/server/modules/invoiceDrive.js`; settings `INVOICE_DRIVE_CREDENTIALS`,
+`INVOICE_DRIVE_TOKEN`, `INVOICE_DRIVE_ROOT`; scope `drive.file`, so only what the agent created is visible), compares
+each invoice with the books (`shared/invoiceMatch.js`) and **writes the result back into the index row** as `books`
+(`matched: true|false`, `status`, the book entry's year, transId, date, amount, reference, allocation number, the check
+time and the books' date) — unless `flag=0`. The agent keeps these flags when it files new invoices.
+
+`from`–`to` are **invoice dates** (default: 1 January of this year to today). The company's Drive folder is
+`drive.folder` / `drive.taxId` of `shared/finance_map.json` (section 5).
+
+Match rules (`drive` block of the finance map: `tolerance` 0.05 ₪, `days` 45, `recentDays` 21; not confirmed):
+
+| `status` | Meaning |
+|---|---|
+| `booked` | An entry of the invoice types on the party's account (the account whose ח.פ. is the invoice's party tax id) with the same total (with VAT, sign ignored: a credit note is minus) within `days` of the invoice date. Several fit → the one whose reference ends with the invoice number (Hashavshevet keeps the last digits in `reference2`), then the nearest date. |
+| `amount_differs` | The invoice number is on the account with another total. |
+| `pending` | Not found, and the invoice is dated in the last `recentDays` days of the books (`dataUpTo`): probably not entered yet. |
+| `not_booked` | Not found, older than that: missing in the books. |
+| `no_account` | No account in Hashavshevet carries the party's tax id (also when the agent read our own company as the party). |
+
+One entry serves one invoice. An invoice flagged `booked` before keeps its entry (`recheck=1` matches everything again).
+
+Rows (`data`, sorted not_booked → amount_differs → pending → no_account → booked, newest first; filter with `status`
+= one or several, `direction`, `q` = part of the party name or the number):
+
+```json
+{ "number": "94879045", "date": "2026-08-31", "direction": "expense", "docType": "tax_invoice", "party": "דורגז החדשה בע״מ", "partyTaxId": "512293200",
+  "total": 6219.31, "currency": "ILS", "allocationNumber": "20260915084915690", "driveFileId": "1aB…", "file": "expense/דורגז החדשה בע״מ/94879045.pdf",
+  "status": "booked", "how": "amount, date and number", "account": { "accountKey": "500040", "name": "דורגז החדשה בע\"מ" },
+  "entry": { "year": 2026, "transId": 17660, "type": "ח18", "posted": true, "date": "2026-08-31", "amount": 6219.31, "reference": 9045, "allocationNumber": "258085172" },
+  "flaggedBefore": null }
+```
+
+`meta`: `counts` and `totals` per status over **every** Drive invoice of the period (`driveInvoices`), `booksUpTo`,
+`driveUpdatedAt`, `flagged` (rows written to Drive now), `rules`, `statuses` (the meanings), `unmatchedFolder` (the
+agent's `_unmatched` folder: invoices of no company of ours) and `booksWithoutDocument` — the other side: invoice-type
+entries of the period that no Drive invoice matched (`count`, `amount`, the first `unmatchedLimit` rows per side).
+Pasta Lina, 2026 to 2026-11-08: 567 Drive invoices — 369 booked, 35 pending, 140 not booked, 23 without an account;
+2,414 supplier entries of the books have no Drive document (the agent only sees what reaches the mailbox, since
+2026-01-01, and it started on 2026-11-05).
+
+Errors: `503 drive_unavailable` when the two Google files are missing on the server; `404 not_found` when the company
+has no Drive folder. The admin runs this check for every company with a `drive` block **daily at 06:45**
+(`INVOICE_DRIVE_AUTO=1`, `driveCheckAll` in `server.js`), so the flags in Drive stay current. Pure rules test:
+`node --test scripts/test_invoice_match.js`.
 
 ### `GET /finance/payroll-check?company=&month=[&branch=]`
 

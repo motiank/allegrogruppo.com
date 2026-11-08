@@ -32,7 +32,7 @@ const managementModule = await import("./auth/management.js");
 const managementRouter = managementModule.default;
 const { Router: orderSystemRouter } = await import("./modules/orderSystem.js");
 const { Router: localApiRouter } = await import("./modules/localApi.js");
-const { Router: financeApiRouter } = await import("./modules/financeApi.js");
+const { Router: financeApiRouter, driveCheckAll } = await import("./modules/financeApi.js");
 
 const app = express();
 const PORT = process.env.ADMIN_PORT || 3021;
@@ -155,6 +155,24 @@ app.listen(PORT, () => {
   );
 
   console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
+
+  // The invoice agent's Drive invoices against the books (owner 2026-11-08): every morning the admin matches this
+  // year's invoices of every company that has a Drive folder (shared/finance_map.json drive) and writes the flag
+  // into index.json (financeApi.js driveCheckAll). Only where INVOICE_DRIVE_AUTO=1 (the production server).
+  if (process.env.INVOICE_DRIVE_AUTO === "1") {
+    cron.schedule(
+      "45 6 * * *",
+      async () => {
+        try {
+          for (const r of await driveCheckAll()) console.log(`[Cron] Drive invoices ${r.company}: ${r.status} ${r.error || `${JSON.stringify(r.counts)}, ${r.flagged} flags`}`);
+        } catch (e) {
+          console.error(`[Cron] Drive invoices error: ${e.message}`);
+        }
+      },
+      { timezone: "Asia/Jerusalem" },
+    );
+    console.log("[Cron] Drive invoices check scheduled daily at 06:45");
+  }
 
   // Tabit Shift attendance → tabit_shifts, the employee list → shift_employees and the work plan of this and
   // next week → tabit_rota, daily after the business day ends (06:00). Only where

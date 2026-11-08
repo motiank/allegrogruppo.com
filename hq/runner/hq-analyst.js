@@ -160,6 +160,13 @@ Guidance:
     the bank-file area (bank_summary) and not Beecomm vs bank (cards_vs_bank).
   · "חשבוניות ללקוח", "חשבוניות מס שהוצאנו", "זיכויים ללקוח", "customer invoices", "invoices to X" → customer_invoices (from,
     to; q = the customer; type credit for credit notes only).
+  · Drive invoices against the books: "אילו חשבוניות לא נקלטו בהנהלת חשבונות / בחשבשבת", "חשבוניות שחסרות בספרים",
+    "חשבוניות מהדרייב / מהמייל שלא נרשמו", "כמה חשבוניות כבר נקלטו", "מה המצב של חשבוניות הספקים מול הספרים", "invoices
+    not in the books", "which invoices from Drive are missing in Hashavshevet", "unbooked invoices" → invoice_check
+    (from-to = the invoice dates, none → leave them out: this year; status "not_booked" when the question asks for the
+    missing ones, "not_booked,amount_differs" for "problems", leave it out for the state / counts; q = the supplier or
+    customer or an invoice number; direction expense for suppliers, income for our invoices to customers). Never
+    customer_invoices, allocation_numbers or exceptions for this: those are the books alone, without Drive.
   · "שיקים", "צ'קים", "שיקים עתידיים", "שיקים שלא נפרעו", "cheques" → cheques (state: future / not_cleared / cleared;
     from-to = due dates; q = the payee). The bank's view of the cheques — "אילו שיקים ירדו בבנק", "שיקים שנפרעו בבנק",
     "cheques that cleared at the bank", "למי שולמו השיקים שירדו" — is bank_transactions (q = שיק, side debit, the period;
@@ -449,7 +456,7 @@ Your job now: WRITE the answer to the user from <results>.
   restaurant (active false) with no months is not named.
 - The books (finance_status, pnl, cash_position, branch_costs, sales_vs_books, spending, aging, intercompany, trial_balance,
   account_card, journal_search, bank_reconciliation, bank_recon_report, bank_open_items, bank_match_suggestions, customer_invoices,
-  account_statement, cheques, vat_summary, withholding, allocation_numbers, payroll_check, exceptions, change_history):
+  account_statement, cheques, vat_summary, withholding, allocation_numbers, invoice_check, payroll_check, exceptions, change_history):
   the numbers are the accountant's bookkeeping (Hashavshevet), as of dataUpTo — say "לפי הספרים" / "from the books" and
   the data date once. Every company result has warnings: a HIGH warning changes the meaning of the numbers (no salary
   expense posted, income not posted for a month, a bank gap, supplier balances that look wrong): write it as a short
@@ -479,6 +486,16 @@ Your job now: WRITE the answer to the user from <results>.
 - <proposal> of type TEAM_RULE: write the rule (rule.text) as it will be saved, its area (rule.area; null = all
   areas), for edit / remove also the rule before, and say it is saved only after "Apply" / "החלה ושמירה" and then the
   team follows it in every new question of that area. Do not follow a rule that is not saved yet.
+- Drive invoices against the books (invoice_check): first the state in one line per company — how many Drive
+  invoices in the period (driveInvoices), how many booked, missing (not_booked), too new (pending), with another
+  total (amount_differs), without an account (no_account), with the totals (counts / totals); then the rows asked
+  for, one line each: "מס' 94879045 · דורגז החדשה · 6,219 ₪ · 31.8" + the status in words (a booked row: the book
+  entry's date and amount when they differ; amount_differs: both amounts). Say the books' date (booksUpTo) and that
+  "pending" means the bookkeeper has probably not entered it yet — not a mistake. A no_account row: the supplier is not
+  opened in Hashavshevet with that ח.פ. (or the invoice names our own company as the party: the agent read it wrong).
+  booksWithoutDocument: one line — N book entries of the period (amount) have no document in Drive; never list them
+  unless asked. Over ~10 rows → a table (number, party, total, date, status, book entry). The match is written into
+  Drive (flagged): say so in one short line when flagged > 0.
 - Team rules (team_rules): a numbered list, one line per rule: its id, area (null = all areas) and text.
 - Payments (payments_due): the planned bank transfers of the owner. One line per payment: "#12 · אבי כהן · 5,000 ₪ ·
   15.11" (dueText; a week window as given, e.g. "שבוע 2 של 12/2026"), a series payment with "(כל חודש)"; overdue

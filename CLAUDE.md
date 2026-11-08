@@ -88,6 +88,14 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   card payments and coupon orders are refused (503). The admin top bar no longer shows/polls the order-system
   dropdown (`admin/client/components/Layout.js`). To reopen: set it to false, put the dropdown back, build, restart
   `allegro.service`.
+- **Drive invoices against the books** (2026-11-08, owner): Finance API `GET /finance/invoices/drive-check`
+  (`admin/server/modules/financeApi.js` + `invoiceDrive.js`, rules `shared/invoiceMatch.js`, `shared/finance_map.json` →
+  `drive`): the admin reads the invoice agent's `index.json` files from the accountant's Google Drive with the agent's
+  own login (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN` in the admin `.env`), matches each invoice with a Hashavshevet
+  entry (party account by ח.פ., total with VAT, date, reference) and writes the flag `books.matched` back into Drive; daily
+  06:45 where `INVOICE_DRIVE_AUTO=1`. Joya calc `invoice_check` (chain admin). Tests `scripts/test_invoice_match.js`,
+  `scripts/test_finance_api.js`. The agent runs on the owner's machine (cron every 15 min, connected 2026-11-05, 611
+  Pasta Lina invoices filed by 2026-11-08); its filing keeps the flags.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
   `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
   builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,
