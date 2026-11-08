@@ -853,6 +853,25 @@ async function chatHistory(access, r) {
   });
 }
 
+/**
+ * The chat this request belongs to, for the runner's live session (runner/session.js): its key (same scope as
+ * chatHistory) and the ids of its earlier answered questions, newest first — so the runner sees when a question was
+ * deleted or asked again and starts a new session.
+ */
+async function chatOf(access, r) {
+  if (!r.id || !access.username) return null;
+  const rows = await q(
+    `SELECT id FROM joya_ai_requests
+      WHERE username=:u AND context_kind=:k AND id < :id AND status='ANSWERED'
+        ${r.context_id != null ? 'AND context_id=:c' : 'AND context_id IS NULL'}
+        ${r.context_kind === 'GENERAL' ? (r.location_id != null ? 'AND location_id=:l' : 'AND location_id IS NULL') : ''}
+      ORDER BY id DESC LIMIT 50`,
+    { u: access.username, k: r.context_kind, id: r.id, c: r.context_id, l: r.location_id },
+  );
+  const key = [access.username, r.context_kind, r.context_id ?? '-', r.context_kind === 'GENERAL' ? (r.location_id ?? '-') : '-'].join(':');
+  return { key, priorIds: rows.map((x) => Number(x.id)) };
+}
+
 /** The context for a request row (or a row-like object: the runner eval builds fixed contexts with it). */
 export async function buildContext(access, r) {
   const today = todayLocal();
@@ -900,6 +919,8 @@ export async function buildContext(access, r) {
     teamRules: (await teamRules(r.context_kind === 'AREA' ? AREAS[r.context_id] : null)).map((x) => ({ id: x.id, text: x.text, area: x.area })),
     // the earlier questions of this chat (the runner gives them apart from the data, in <history>)
     history: await chatHistory(access, r),
+    // the chat for the runner's live session (not given to the model)
+    chat: await chatOf(access, r),
     // the payees of earlier payments (chain admin): the planner reuses their spelling in a payment op
     ...(access.isAdmin ? { payees: (await payments.payees(scope?.companyKey ?? null, 50).catch(() => [])).map((x) => x.name) } : {}),
     limits: { maxCalcs: MAX_CALCS },

@@ -17,6 +17,14 @@ Flow for one request (`runner.js`):
 7. `POST …/:id/answer` with `meta.unverifiedNumbers` and `meta.instructionsVersion` (a hash of both prompts,
    so every answer can be traced to the prompt that wrote it). A proposal waits for the user's Apply in the app.
 
+**Live chat sessions** (`session.js`, 2026-11-08): the questions of one chat (same user and chat area; the general
+chat also the same restaurant) go to the same two `claude` processes, which stay alive between questions (stream-json
+on stdin/stdout), so the model keeps the conversation. Later questions send only what changed in the context, and the
+planner also gets the previous answer. A session closes after 30 minutes with no question, past 150K tokens, when a
+question of the chat was deleted or asked again, or when a request fails; at most 6 live sessions (the oldest idle
+one closes first; when all are busy the question uses one-time calls). A new session starts from the hub's
+`<history>`. Env: `JOYA_LIVE_SESSIONS` (6, 0 = off), `JOYA_SESSION_IDLE_MIN` (30), `JOYA_SESSION_MAX_TOKENS` (150000).
+
 At most `context.limits.maxCalcs` calculations run per request (`MAX_CALCS` in joya-hq `services/ai.js`, 6).
 Extra ones come back as errors, so the answer can say what was left out.
 

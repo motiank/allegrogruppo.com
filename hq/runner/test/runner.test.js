@@ -2,6 +2,7 @@
 import assert from 'assert/strict';
 import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt, cleanPlan } from '../runner.js';
 import { unverifiedNumbers } from '../verify.js';
+import { ChatSessions } from '../session.js';
 
 let passed = 0;
 const t = async (name, fn) => {
@@ -171,6 +172,99 @@ await t('the plan keeps the payment ops (objects only) and sends them to compute
   assert.deepEqual(compute[2].payments, [{ op: 'add', payee: 'אבי כהן', amount: 5000, dueDate: '2026-11-15' }]);
   assert.ok(writer.calls[0].includes('<proposal>') && writer.calls[0].includes('PAYMENT_OPS'));
   assert.deepEqual(out.unverified, []); // the amount and the date are in the proposal preview
+});
+
+// live sessions (session.js) with fake live models
+function liveHub(state) {
+  const calls = [];
+  return {
+    calls,
+    async get(p) {
+      const id = Number(p.split('/')[4]);
+      return { request: { id, question: `q${id}`, lang: 'he', contextKind: 'AREA' }, today: '2026-11-08', locations: [{ id: 1, name: 'A' }], shifts: [], roles: [], calculations: [{ name: 'trial_balance' }], object: null, history: state.history || [], chat: { key: 'u:AREA:5:-', priorIds: [...state.answered].reverse() } };
+    },
+    async post(p, body) {
+      calls.push(['POST', p, body]);
+      if (p.endsWith('/claim')) return { claimed: true };
+      if (p.endsWith('/compute')) return { results: [{ calc: 'trial_balance', params: {}, result: { debit: state.debit ?? 298000 } }], proposal: null };
+      if (p.endsWith('/answer') && !body.failed) state.answered.push(Number(p.split('/')[4]));
+      return { ok: true };
+    },
+  };
+}
+function livePool() {
+  const made = [];
+  const pool = new ChatSessions({
+    maxSessions: 2,
+    makeModel: (role) => {
+      const m = { role, alive: true, contextTokens: 0, calls: [], close() { this.alive = false; }, async call(prompt) { this.calls.push(prompt); return { text: role === 'plan' ? '{"calcs":[{"calc":"trial_balance","params":{}}]}' : 'חובה 298,000' }; } };
+      made.push(m);
+      return m;
+    },
+  });
+  return { pool, made };
+}
+await t('live session: the second question goes to the same processes, with only the changed context', async () => {
+  const state = { answered: [], history: [{ question: 'old', calcs: [] }] };
+  const hub = liveHub(state);
+  const { pool, made } = livePool();
+  await handle({ id: 10, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  await handle({ id: 11, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  assert.equal(made.length, 2); // one planner, one writer
+  const [planner, writer] = made;
+  assert.equal(planner.calls.length, 2);
+  assert.ok(planner.calls[0].includes('<history>') && planner.calls[0].includes('trial_balance'));
+  assert.ok(!planner.calls[1].includes('<history>'));
+  assert.ok(planner.calls[1].includes('"sameAsBefore"') && !planner.calls[1].includes('"calculations":['));
+  assert.ok(planner.calls[1].includes('q11'));
+  assert.ok(planner.calls[1].includes('<previous_answer>') && planner.calls[1].includes('298,000'));
+  assert.equal(writer.calls.length, 2);
+  assert.deepEqual(state.answered, [10, 11]);
+});
+await t('live session: a number of an earlier result of the conversation is known', async () => {
+  const state = { answered: [] };
+  const hub = liveHub(state);
+  const { pool } = livePool();
+  await handle({ id: 20, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  state.debit = 5; // the second question's results no longer have 298,000
+  const out = await handle({ id: 21, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  assert.deepEqual(out.unverified, []);
+});
+await t('live session: a deleted or re-asked question starts a new session', async () => {
+  const state = { answered: [] };
+  const hub = liveHub(state);
+  const { pool, made } = livePool();
+  await handle({ id: 30, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  await handle({ id: 31, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  state.answered = [30]; // 31 deleted
+  await handle({ id: 32, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  assert.equal(made.length, 4);
+  assert.equal(made[0].alive, false);
+  assert.ok(made[2].calls[0].includes('"calculations":[')); // the new session gets the full context
+});
+await t('live session pool: idle sessions close, the oldest idle one makes room', async () => {
+  let now = 0;
+  const made = [];
+  const pool = new ChatSessions({ maxSessions: 2, idleMs: 1000, now: () => now, makeModel: () => (made.push({ alive: true, contextTokens: 0, close() { this.alive = false; } }), made.at(-1)) });
+  const a = pool.open({ key: 'a', priorIds: [] }, 1);
+  pool.done(a, 1, { answered: true });
+  now = 10;
+  const b = pool.open({ key: 'b', priorIds: [] }, 2);
+  pool.done(b, 2, { answered: true });
+  pool.open({ key: 'c', priorIds: [] }, 3); // full → a (oldest idle) closes
+  assert.equal(pool.sessions.has('a'), false);
+  assert.equal(made[0].alive, false);
+  now = 5000;
+  pool.sweep(); // b is idle → closed; c is busy → kept
+  assert.deepEqual([...pool.sessions.keys()], ['c']);
+});
+await t('live session: a failed request closes the session', async () => {
+  const state = { answered: [] };
+  const hub = liveHub(state);
+  const pool = new ChatSessions({ makeModel: () => ({ alive: true, contextTokens: 0, close() { this.alive = false; }, async call() { throw new Error('boom'); } }) });
+  const out = await handle({ id: 40, hub, planner: model('x'), writer: model('x'), sessions: pool, log: {} });
+  assert.equal(out.failed, true);
+  assert.equal(pool.sessions.size, 0);
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

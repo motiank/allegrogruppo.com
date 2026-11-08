@@ -380,6 +380,12 @@ characters (`ai.js` `chatHistory`, `runner.js` `historyBlock`). So a short follo
 "per day") keeps its period, restaurants and topic and runs the calcs again; a question that stands alone ignores it.
 Numbers are never taken from history. A deleted question leaves the history.
 
+**Live chat sessions (2026-11-08).** On top of that, the runner keeps each chat's conversation alive in the model
+(`runner/session.js`, see `runner/README.md`): the questions of one chat go to the same `claude` processes, so the
+model remembers the whole chat — also a question 10 questions back ("explain the 298K debit" after a trial balance and
+several other questions). `<history>` is now only the start of a new session (after 30 minutes with no question, a
+deleted or re-asked question, a runner restart or a deploy).
+
 **The performance menu (owner, 2026-11-04)** — the ביצועים area suggests only three reports:
 - **Weekly performance report** → calc `month_vs_last_year` (`analytics.monthVsLastYear`): per restaurant and for the
   chain, this month's average income per day (up to yesterday) vs the same month last year, the change in %, and the

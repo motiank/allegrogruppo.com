@@ -90,6 +90,15 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Chat history** (2026-11-04, the owner felt "context is lost"): `buildContext` adds `history` (the last 3 answered
   questions of the same user + chat, last 3 hours; calcs + params, cut answers) → `<history>` in both prompts. Eval
   fixtures `h-*` take `history`. README → Asking in words.
+- **Live chat sessions** (2026-11-08, owner: "keeping the session alive"): `runner/session.js`. Each chat (user +
+  context kind + context id, GENERAL also + restaurant = `chat.key` from `chatOf` in `ai.js`) keeps one planner and
+  one writer `claude -p --input-format stream-json` process alive; prompts go in on stdin, answers come back on
+  stdout, turn after turn. Later turns send only the changed context (`sameAsBefore`), no `<history>`, and the
+  planner gets `<previous_answer>`; the number check also accepts the session's earlier results. A session closes
+  after 30 min idle, past 150K tokens, when the chat changed (`priorIds`: a question deleted / asked again /
+  answered without it) or when a request fails; at most 6 live (~230 MB each process). Then the next question starts
+  a new session from `<history>`. Env `JOYA_LIVE_SESSIONS` (0 = off), `JOYA_SESSION_IDLE_MIN`,
+  `JOYA_SESSION_MAX_TOKENS`. Measured: first turn ~$0.09, later turns ~$0.005–0.02 and ~2 s per plan.
 - **Performance menu** (owner 2026-11-04): only three suggestions — `month_vs_last_year`, `waiter_performance`,
   `daily_dashboard` (README → Asking in words). The dashboard is live only where the admin has the Beecomm backoffice
   key (`BCOM_BO_*`); the production server's `.env` does not have it yet → it shows the last stored day.

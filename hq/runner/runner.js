@@ -40,28 +40,54 @@ export function historyBlock(ctx, { withAnswers = false } = {}) {
   return ['<history>', JSON.stringify(items), '</history>'];
 }
 
-export function planPrompt(ctx) {
-  const { teamRules, history, ...data } = ctx;
+/**
+ * The context as JSON. In a live session (`sent` = what this conversation was given before, part by part) a part that
+ * did not change is left out and named in "sameAsBefore": the model has it from an earlier message.
+ */
+function contextJson(data, sent) {
+  if (!sent) return JSON.stringify(data);
+  const out = {};
+  const same = [];
+  for (const [k, v] of Object.entries(data)) {
+    const j = JSON.stringify(v ?? null);
+    if (k !== 'request' && sent[k] === j) same.push(k);
+    else {
+      out[k] = v;
+      sent[k] = j;
+    }
+  }
+  if (same.length) out.sameAsBefore = same;
+  return JSON.stringify(out);
+}
+
+const PREVIOUS_ANSWER_CHARS = 1500;
+const cut = (t) => (t.length > PREVIOUS_ANSWER_CHARS ? `${t.slice(0, PREVIOUS_ANSWER_CHARS)} …` : t);
+
+// live: { sent, first, previousAnswer } — a live session: only the changed context; the history only in its first message
+export function planPrompt(ctx, live = null) {
+  const { teamRules, history, chat, ...data } = ctx;
   return [
     'Plan the answer to this request. Reply with the JSON object only.',
     ...rulesBlock(ctx),
-    ...historyBlock(ctx),
+    ...(!live || live.first ? historyBlock(ctx) : []),
+    // a live session: the answer the user got for the previous message (the planner did not see it)
+    ...(live?.previousAnswer ? ['<previous_answer>', cut(live.previousAnswer), '</previous_answer>'] : []),
     '<context>',
-    JSON.stringify(data),
+    contextJson(data, live?.sent),
     '</context>',
   ].join('\n');
 }
 
-export function writePrompt(ctx, computed, plan) {
+export function writePrompt(ctx, computed, plan, live = null) {
   const parts = [
     `request.lang = ${ctx.request.lang}`,
     ...rulesBlock(ctx),
-    ...historyBlock(ctx, { withAnswers: true }),
+    ...(!live || live.first ? historyBlock(ctx, { withAnswers: true }) : []),
     '<request>',
     JSON.stringify({ question: ctx.request.question, contextKind: ctx.request.contextKind, today: ctx.today }),
     '</request>',
     '<context>',
-    JSON.stringify({ locations: ctx.locations, roles: ctx.roles, shifts: ctx.shifts, object: ctx.object }),
+    contextJson({ locations: ctx.locations, roles: ctx.roles, shifts: ctx.shifts, object: ctx.object }, live?.sent),
     '</context>',
     '<results>',
     JSON.stringify(trimResults(computed.results || [])),
@@ -92,43 +118,64 @@ export function cleanPlan(plan) {
  * @param {object} p
  * @param {number} p.id
  * @param {object} p.hub      { get(path), post(path, body) } → parsed JSON
- * @param {object} p.planner  { call(prompt) → { text } }
+ * @param {object} p.planner  { call(prompt) → { text } } — one-time calls
  * @param {object} p.writer   { call(prompt) → { text } }
+ * @param {object} [p.sessions]  ChatSessions (session.js): the live sessions; without it every call is one-time
  * @param {string} [p.instructionsVersion]  stored with the answer
  */
-export async function handle({ id, hub, planner, writer, log = console, instructionsVersion = null }) {
+export async function handle({ id, hub, planner, writer, sessions = null, log = console, instructionsVersion = null }) {
   const started = Date.now();
   const claimed = await hub.post(`/joya/ai/runner/${id}/claim`, {});
   if (!claimed?.claimed) return { skipped: true };
   try {
     const ctx = await hub.get(`/joya/ai/runner/${id}/context`);
-    let p = await planner.call(planPrompt(ctx));
-    let cost = p.costUsd ?? 0;
-    let raw;
-    try {
-      raw = parseJsonObject(p.text);
-    } catch (e) {
-      // one retry with the error, then give up
-      p = await planner.call(`${planPrompt(ctx)}\n\nYour previous reply was not valid JSON (${e.message}). Reply with the JSON object only.`);
-      cost += p.costUsd ?? 0;
-      raw = parseJsonObject(p.text);
-    }
-    const plan = cleanPlan(raw);
-    const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule, payments: plan.payments });
-    const w = await writer.call(writePrompt(ctx, computed, plan));
-    cost += w.costUsd ?? 0;
-    // money in whole ₪, cut down; table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)
-    const { text: answer, totals } = fillTotals(floorMoney(String(w.text || '').trim()));
-    const unverified = unverifiedNumbers(answer, totals, computed.results, computed.proposal, ctx.request.question, ctx.today, ctx.object, ctx.shifts, ctx.locations);
-    await hub.post(`/joya/ai/runner/${id}/answer`, {
-      answer,
-      meta: { durationMs: Date.now() - started, model: w.model ?? null, instructionsVersion, costUsd: cost, calcs: plan.calcs.map((c) => c.calc), teamRules: (ctx.teamRules || []).map((r) => r.id), unverifiedNumbers: unverified, plannerNote: plan.note },
+    if (!sessions || !ctx.chat?.key) return await answerOne({ id, ctx, hub, planner, writer, log, instructionsVersion, started });
+    // the questions of one chat go one after the other through its live session
+    return await sessions.run(ctx.chat.key, async () => {
+      const s = sessions.open(ctx.chat, id);
+      if (!s) return answerOne({ id, ctx, hub, planner, writer, log, instructionsVersion, started });
+      let out;
+      try {
+        out = await answerOne({ id, ctx, hub, planner: s.planner, writer: s.writer, live: s, log, instructionsVersion, started });
+      } finally {
+        sessions.done(s, id, out?.answered ? { answered: true, results: out.results, answer: out.answer } : { answered: false });
+      }
+      return out;
     });
-    log.info?.(`[joya] #${id} answered in ${Date.now() - started} ms (${plan.calcs.length} calcs${computed.proposal ? ', proposal' : ''}${unverified.length ? `, ${unverified.length} unverified numbers` : ''})`);
-    return { answered: true, unverified };
   } catch (e) {
     log.error?.(`[joya] #${id} failed: ${e.message}`);
     await hub.post(`/joya/ai/runner/${id}/answer`, { failed: true, error: e.message.slice(0, 500) }).catch(() => {});
     return { failed: true, error: e.message };
   }
+}
+
+// live: the chat's live session ({ sent, turns, pastResults }) — the model already has the earlier questions
+async function answerOne({ id, ctx, hub, planner, writer, live = null, log, instructionsVersion, started }) {
+  const lv = live ? { sent: live.sent.plan, first: live.turns === 0, previousAnswer: live.lastAnswer } : null;
+  let p = await planner.call(planPrompt(ctx, lv));
+  let cost = p.costUsd ?? 0;
+  let raw;
+  try {
+    raw = parseJsonObject(p.text);
+  } catch (e) {
+    // one retry with the error, then give up (a live session has the request already)
+    const again = `Your previous reply was not valid JSON (${e.message}). Reply with the JSON object only.`;
+    p = await planner.call(live ? again : `${planPrompt(ctx)}\n\n${again}`);
+    cost += p.costUsd ?? 0;
+    raw = parseJsonObject(p.text);
+  }
+  const plan = cleanPlan(raw);
+  const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule, payments: plan.payments });
+  const w = await writer.call(writePrompt(ctx, computed, plan, live ? { sent: live.sent.write, first: live.turns === 0 } : null));
+  cost += w.costUsd ?? 0;
+  // money in whole ₪, cut down; table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)
+  const { text: answer, totals } = fillTotals(floorMoney(String(w.text || '').trim()));
+  // in a live session the answer may also quote the results of the earlier questions of the conversation
+  const unverified = unverifiedNumbers(answer, totals, computed.results, live?.pastResults ?? [], computed.proposal, ctx.request.question, ctx.today, ctx.object, ctx.shifts, ctx.locations);
+  await hub.post(`/joya/ai/runner/${id}/answer`, {
+    answer,
+    meta: { durationMs: Date.now() - started, model: w.model ?? null, instructionsVersion, costUsd: cost, calcs: plan.calcs.map((c) => c.calc), teamRules: (ctx.teamRules || []).map((r) => r.id), unverifiedNumbers: unverified, plannerNote: plan.note, ...(live ? { liveTurn: live.turns + 1 } : {}) },
+  });
+  log.info?.(`[joya] #${id} answered in ${Date.now() - started} ms (${plan.calcs.length} calcs${computed.proposal ? ', proposal' : ''}${unverified.length ? `, ${unverified.length} unverified numbers` : ''}${live ? `, live turn ${live.turns + 1}` : ''})`);
+  return { answered: true, unverified, answer, results: trimResults(computed.results || []) };
 }
