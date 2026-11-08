@@ -372,19 +372,52 @@ export async function allocationNumbers(companies, p = {}) {
   });
 }
 
-/** The invoice agent's Drive invoices against the books: which are booked in Hashavshevet (flagged in Drive), which are missing. */
-export async function invoiceCheck(companies, p = {}) {
+// Missing invoices (owner 2026-11-08): "which invoices are not booked yet" is ONE question with several channels to
+// look in. The first channel is the invoice agent's Drive index (every invoice that reached the accountant's mailbox);
+// more channels come later (e.g. bank debits with no invoice in the books). The answer is built per channel, so the
+// user asks about missing invoices and gets the Drive list as one part of it — never has to ask "about Drive".
+const INVOICE_CHANNELS = {
+  drive: {
+    title: "the invoices that reached the accountant's mailbox (filed in Drive by the invoice agent)",
+    titleHe: 'החשבוניות שהגיעו למייל של הנהלת החשבונות (תויקו בדרייב)',
+    async run(companies, p, limit) {
+      const status = p.status == null || p.status === '' || p.status === 'all' ? {} : { status: Array.isArray(p.status) ? p.status.join(',') : String(p.status) };
+      const direction = p.direction && p.direction !== 'all' ? { direction: String(p.direction) } : {};
+      const params = { ...dates(p, { required: false }), ...direction, ...status, ...textOf(p, 'q'), ...(p.recheck ? { recheck: 1 } : {}), limit };
+      const cos = await perCompany(companies, '/invoices/drive-check', params, (d, m) => ({
+        shown: d.length, count: m.total, driveInvoices: m.driveInvoices, from: m.from, to: m.to, booksUpTo: m.booksUpTo, driveUpdatedAt: m.driveUpdatedAt,
+        counts: m.counts, totals: m.totals, flagged: m.flagged, rules: m.rules, booksWithoutDocument: m.booksWithoutDocument, unmatchedFolder: m.unmatchedFolder, statuses: m.statuses, rows: d,
+      }));
+      return {
+        params,
+        companies: [...cos],
+        ...(cos.notLoaded ? { notLoaded: cos.notLoaded } : {}),
+        note: 'status booked = in the books (an entry of the party with the same total, with VAT); pending = too new for the books (probably not entered yet); not_booked = missing in the books; amount_differs = the number is booked with another total; no_account = the party has no account with that tax id in Hashavshevet. counts / totals cover every invoice of this channel in the period; rows are the ones asked for (status). The match is written back into Drive (books.matched). booksWithoutDocument = book entries of the period that no invoice of this channel matched (count and amount)',
+      };
+    },
+  },
+};
+const PLANNED_CHANNELS = 'not connected yet: bank debits and card charges with no invoice in the books, supplier statements';
+
+/** Invoices not booked yet in Hashavshevet, from every channel the system can check — today the Drive channel. */
+export async function missingInvoices(companies, p = {}) {
   const limit = clamp(p.limit, LIMITS.invoices, 500);
-  const status = p.status == null || p.status === '' || p.status === 'all' ? {} : { status: Array.isArray(p.status) ? p.status.join(',') : String(p.status) };
-  const direction = p.direction && p.direction !== 'all' ? { direction: String(p.direction) } : {};
-  const params = { ...dates(p, { required: false }), ...direction, ...status, ...textOf(p, 'q'), ...(p.recheck ? { recheck: 1 } : {}), limit };
-  return result('invoice_check', params, await perCompany(companies, '/invoices/drive-check', params, (d, m) => ({
-    shown: d.length, count: m.total, driveInvoices: m.driveInvoices, from: m.from, to: m.to, booksUpTo: m.booksUpTo, driveUpdatedAt: m.driveUpdatedAt,
-    counts: m.counts, totals: m.totals, flagged: m.flagged, rules: m.rules, booksWithoutDocument: m.booksWithoutDocument, unmatchedFolder: m.unmatchedFolder, statuses: m.statuses, rows: d,
-  })), {
-    source: "the invoice agent's Google Drive index (every invoice from the accountant's mailbox) against the Hashavshevet books (allegro_finance), through the Allegro admin Finance API; the match is written back into Drive (books.matched)",
-    note: 'status booked = in the books (an entry of the party with the same total, with VAT, near the date); pending = too new for the books (probably not entered yet); not_booked = missing in the books; amount_differs = the number is booked with another total; no_account = the party has no account with that tax id in Hashavshevet. counts / totals cover every Drive invoice of the period; rows are the ones asked for (status). booksWithoutDocument = book entries of the period with no Drive document (count and amount; the agent files only invoices that reach the mailbox)',
-  });
+  const wanted = Array.isArray(p.channels) && p.channels.length ? p.channels.map(String) : Object.keys(INVOICE_CHANNELS);
+  const unknown = wanted.filter((k) => !INVOICE_CHANNELS[k]);
+  if (unknown.length) throw bad(`unknown channel ${unknown.join(', ')} (channels: ${Object.keys(INVOICE_CHANNELS).join(', ')})`);
+  const channels = [];
+  for (const key of wanted) {
+    const ch = INVOICE_CHANNELS[key];
+    channels.push({ channel: key, title: ch.title, titleHe: ch.titleHe, ...(await ch.run(companies, p, limit)) });
+  }
+  return {
+    report: 'missing_invoices',
+    source: 'the Hashavshevet books (allegro_finance) through the Allegro admin Finance API, checked against each channel; the first channel is the invoice agent\'s Google Drive index',
+    params: { ...dates(p, { required: false }), direction: p.direction || 'all', status: p.status || 'all', channels: wanted },
+    channels,
+    otherChannels: PLANNED_CHANNELS,
+    note: 'the answer is per channel: each channel is one part of it, named by its title; the same invoice may appear in more than one channel later',
+  };
 }
 
 /** Salary entries in the books (group 720) against the payslip gross of the admin's payroll, per branch, for one month. */

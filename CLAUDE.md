@@ -93,7 +93,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `drive`): the admin reads the invoice agent's `index.json` files from the accountant's Google Drive with the agent's
   own login (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN` in the admin `.env`), matches each invoice with a Hashavshevet
   entry (party account by ח.פ., total with VAT, date, reference) and writes the flag `books.matched` back into Drive; daily
-  06:45 where `INVOICE_DRIVE_AUTO=1`. Joya calc `invoice_check` (chain admin). Tests `scripts/test_invoice_match.js`,
+  06:45 where `INVOICE_DRIVE_AUTO=1`. Joya calc `missing_invoices` (chain admin; "invoices not booked yet", one part per channel — Drive is the first channel, not the only one). Tests `scripts/test_invoice_match.js`,
   `scripts/test_finance_api.js`. The agent runs on the owner's machine (cron every 15 min, connected 2026-11-05, 611
   Pasta Lina invoices filed by 2026-11-08); its filing keeps the flags. Deployed 2026-11-08 (`3cce655`): the Google files live in `/home/twit/.secrets/invoice-drive/` on the droplet (the admin runs as user `twit`), `allegro-admin`, `joya-hq` and `joya-runner` restarted.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,

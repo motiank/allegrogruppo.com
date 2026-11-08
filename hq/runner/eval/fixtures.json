@@ -2020,11 +2020,11 @@
       "question": "אילו חשבוניות ספקים מהדרייב עדיין לא נקלטו בחשבשבת?",
       "expect": {
         "calcs": [
-          "invoice_check"
+          "missing_invoices"
         ],
         "maxCalcs": 1,
         "params": {
-          "invoice_check": {
+          "missing_invoices": {
             "status": "not_booked",
             "direction": "expense"
           }
@@ -2038,7 +2038,7 @@
       "question": "מה המצב של החשבוניות מהמייל מול הספרים השנה?",
       "expect": {
         "calcs": [
-          "invoice_check"
+          "missing_invoices"
         ],
         "maxCalcs": 1
       }
@@ -2050,11 +2050,11 @@
       "question": "Which invoices from Drive are missing in the books since September?",
       "expect": {
         "calcs": [
-          "invoice_check"
+          "missing_invoices"
         ],
         "maxCalcs": 1,
         "params": {
-          "invoice_check": {
+          "missing_invoices": {
             "status": "not_booked"
           }
         },
@@ -2071,12 +2071,47 @@
       "question": "החשבוניות של דורגז מהדרייב נקלטו בהנהלת חשבונות?",
       "expect": {
         "calcs": [
-          "invoice_check"
+          "missing_invoices"
         ],
         "maxCalcs": 1,
         "params": {
-          "invoice_check": {
+          "missing_invoices": {
             "q": "דורגז"
+          }
+        }
+      }
+    },
+    {
+      "key": "f-missing-expense",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אני מחפש חשבוניות הוצאה שעדיין לא נרשמו בספרים",
+      "expect": {
+        "calcs": [
+          "missing_invoices"
+        ],
+        "maxCalcs": 1,
+        "params": {
+          "missing_invoices": {
+            "status": "not_booked",
+            "direction": "expense"
+          }
+        }
+      }
+    },
+    {
+      "key": "f-missing-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Which invoices are not booked yet?",
+      "expect": {
+        "calcs": [
+          "missing_invoices"
+        ],
+        "maxCalcs": 1,
+        "params": {
+          "missing_invoices": {
+            "status": "not_booked"
           }
         }
       }

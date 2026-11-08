@@ -694,7 +694,7 @@ accountant must say what the others are (1,911 are the value `0`). The limits in
 
 ### `GET /finance/invoices/drive-check?company=[&from=][&to=][&direction=all|expense|income][&status=][&q=][&flag=1|0][&recheck=1][&unmatchedLimit=][&limit=][&offset=]`
 
-Use case 25 (owner 2026-11-08). The **invoice agent** (`invoice-agent/`) files every invoice that reaches the
+Use case 25 (owner 2026-11-08). In Joya this is the first **channel** of the question "which invoices are not booked yet" (calc `missing_invoices`, one part of the answer per channel; more channels will follow). The **invoice agent** (`invoice-agent/`) files every invoice that reaches the
 accountant's mailbox in her Google Drive, one `index.json` per company (`Invoices/<company>/index.json`: number,
 party, tax ids, total with VAT, date, allocation number, Drive file id). This endpoint reads that index **through the
 Google Drive API with the agent's own login** (`admin/server/modules/invoiceDrive.js`; settings `INVOICE_DRIVE_CREDENTIALS`,
