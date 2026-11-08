@@ -737,7 +737,7 @@ Pasta Lina, 2026 to 2026-11-08: 567 Drive invoices — 369 booked, 35 pending, 1
 2,414 supplier entries of the books have no Drive document (the agent only sees what reaches the mailbox, since
 2026-01-01, and it started on 2026-11-05).
 
-Errors: `503 drive_unavailable` when the two Google files are missing on the server; `404 not_found` when the company
+Production: the files are `/home/twit/.secrets/invoice-drive/{credentials,token}.json` (the admin service runs as user `twit`, so `/root` is not readable to it), set in the root `.env` (deployed 2026-11-08). Errors: `503 drive_unavailable` when the two Google files are missing or unreadable on the server; `404 not_found` when the company
 has no Drive folder. The admin runs this check for every company with a `drive` block **daily at 06:45**
 (`INVOICE_DRIVE_AUTO=1`, `driveCheckAll` in `server.js`), so the flags in Drive stay current. Pure rules test:
 `node --test scripts/test_invoice_match.js`.

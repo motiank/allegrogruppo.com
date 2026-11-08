@@ -146,7 +146,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   the admin (the owner: "access to the drive through the API on the admin"). Routing words in the PLAN prompt
   (חשבוניות שלא נקלטו / מהדרייב / מהמייל מול הספרים → invoice_check, never customer_invoices / allocation_numbers);
   WRITE format "Drive invoices against the books". Eval `f-drive-*` 4/4. The admin needs the agent's Google files
-  (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN`), else the calc answers "not available" with the reason.
+  (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN`), else the calc answers "not available" with the reason. Deployed 2026-11-08 (`3cce655`).
 - **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (not in the menu — the chat answers it (suggestion 9 of the accounting area) and the buttons under the answer open the page;
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).

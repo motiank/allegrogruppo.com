@@ -95,7 +95,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   entry (party account by ח.פ., total with VAT, date, reference) and writes the flag `books.matched` back into Drive; daily
   06:45 where `INVOICE_DRIVE_AUTO=1`. Joya calc `invoice_check` (chain admin). Tests `scripts/test_invoice_match.js`,
   `scripts/test_finance_api.js`. The agent runs on the owner's machine (cron every 15 min, connected 2026-11-05, 611
-  Pasta Lina invoices filed by 2026-11-08); its filing keeps the flags.
+  Pasta Lina invoices filed by 2026-11-08); its filing keeps the flags. Deployed 2026-11-08 (`3cce655`): the Google files live in `/home/twit/.secrets/invoice-drive/` on the droplet (the admin runs as user `twit`), `allegro-admin`, `joya-hq` and `joya-runner` restarted.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
   `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
   builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,
