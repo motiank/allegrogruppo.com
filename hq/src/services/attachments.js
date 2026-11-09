@@ -1,5 +1,5 @@
-// A file attached to a chat question (owner 2026-11-10: "השוואת כרטסת — the user uploads the supplier's or customer's
-// statement, PDF or Excel, and clicks send"). The server turns it into TEXT here, nothing else: the planner (Claude,
+// A file attached to a chat question with the paperclip (owner 2026-11-10: "השוואת כרטסת — the user attaches the supplier's
+// or customer's statement, PDF or Excel, in the chat and sends"). The server turns it into TEXT here, nothing else: the planner (Claude,
 // through the runner) reads the text from context.attachment and extracts the rows. Joya keeps only the text
 // (joya_ai_requests.meta_json.attachment), not the file.
 //   Excel / CSV → one block per sheet, tab-separated cells (exceljs from the repo root, like answerExcel.js)

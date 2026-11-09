@@ -12,8 +12,6 @@ import dataHe from './data.he.js';
 import dataEn from './data.en.js';
 import paymentsHe from './payments.he.js';
 import paymentsEn from './payments.en.js';
-import statementsHe from './statements.he.js';
-import statementsEn from './statements.en.js';
 
-export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe, ...paymentsHe, ...statementsHe };
-export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn, ...paymentsEn, ...statementsEn };
+export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe, ...paymentsHe };
+export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn, ...paymentsEn };

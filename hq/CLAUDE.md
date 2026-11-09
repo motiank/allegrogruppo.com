@@ -142,11 +142,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
   `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
-- **Statement compare** (2026-11-10, owner): page `/statements` (area 7, chain admin) — the party's כרטסת (PDF / xlsx / csv)
-  → `POST /joya/ai/ask-file` → text in `meta_json.attachment` (`src/services/attachments.js`; PDF via `pdftotext` when
+- **Statement compare** (2026-11-10, owner: "part of the chat", no menu item, no dialog): in the accounting chat (suggestion
+  s18) the party's כרטסת (PDF / xlsx / csv) is attached with the paperclip → `POST /joya/ai/ask-file` → text in `meta_json.attachment` (`src/services/attachments.js`; PDF via `pdftotext` when
   installed, else `pdf-parse` — root dependency, Node 18 build) → the planner extracts the rows (PLAN "STATEMENT COMPARE")
   → calc `statement_compare` (`/ledger` + `shared/statementCompare.js`) → only the differences (WRITE "Statement compare").
-  `ChatArea` got `pushRef` for pages that create the question themselves. Tests `scripts/test_statement_compare.js`; eval `st-*`.
+  `ChatArea`: a PDF anywhere / an Excel in the accounting chat = the next question's attachment (chip), other files = the import flow. Tests `scripts/test_statement_compare.js`; eval `st-*`.
   Deployed 2026-11-10 (`7e38e6e`: poppler-utils installed on the droplet, root `npm install`, hq built, joya-hq + joya-runner restarted).
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode

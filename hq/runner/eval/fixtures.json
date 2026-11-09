@@ -1342,7 +1342,7 @@
     },
     {
       "key": "st-supplier-xlsx",
-      "kind": "STATEMENTS",
+      "kind": "ACCOUNTING",
       "lang": "he",
       "question": "צירפתי כרטסת שקיבלנו מספק. השווה אותה לכרטסת שלנו בספרים והצג רק את ההבדלים.",
       "attachment": {
@@ -1365,7 +1365,7 @@
     },
     {
       "key": "st-customer-pdf",
-      "kind": "STATEMENTS",
+      "kind": "ACCOUNTING",
       "lang": "he",
       "question": "צירפתי כרטסת שקיבלנו מלקוח. השווה אותה לכרטסת שלנו בספרים והצג רק את ההבדלים. השם בספרים: פייזר.",
       "attachment": {

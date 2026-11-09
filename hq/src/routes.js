@@ -296,7 +296,7 @@ for (const step of ['recognize', 'import']) {
 
 // ---------------------------------------------------------------- AI (user side)
 r.post('/joya/ai/ask', h(async (req) => ({ request: await ai.ask(req.joya, req.body || {}) })));
-// a question with a file (the statements page): multipart form — question, contextKind, contextId, companyKey, lang, file
+// a question with a file (the chat's paperclip — a supplier's / customer's statement to compare): multipart form — question, contextKind, contextId, companyKey, lang, file
 r.post(
   '/joya/ai/ask-file',
   (req, res, next) => askUpload(req, res, (e) => (e ? next(Object.assign(new Error(e.code === 'LIMIT_FILE_SIZE' ? 'the file is bigger than 15 MB' : e.message), { code: 'BAD_REQUEST' })) : next())),

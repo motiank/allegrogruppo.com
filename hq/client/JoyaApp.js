@@ -27,7 +27,6 @@ import Employees from './pages/Employees.js';
 import Area, { AREAS } from './pages/Area.js';
 import BankRecon from './pages/BankRecon.js';
 import Payments from './pages/Payments.js';
-import Statements from './pages/Statements.js';
 
 // The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
 // With one company its line means "all" ('').
@@ -73,7 +72,7 @@ function navGroups(isAdmin, isAccountant) {
         ['/stock', 'joya.nav.stock'],
         ['/people', 'joya.nav.manpower'],
         ['/performance', 'joya.nav.performance'],
-        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting'], ['/statements', 'joya.nav.statements'], ['/payments', 'joya.nav.payments']] : []),
+        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting'], ['/payments', 'joya.nav.payments']] : []),
       ],
     },
   ];
@@ -202,7 +201,6 @@ function Shell() {
         <Route path="accounting" element={me.isAdmin ? <Area area="accounting" /> : <Navigate to="/" replace />} />
         <Route path="accounting/bank-recon" element={me.isAdmin ? <BankRecon /> : <Navigate to="/" replace />} />
         <Route path="payments" element={me.isAdmin ? <Payments /> : <Navigate to="/" replace />} />
-        <Route path="statements" element={me.isAdmin ? <Statements /> : <Navigate to="/" replace />} />
         <Route path="overview" element={me.isAdmin ? <Overview /> : <Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="orders" element={<Orders />} />

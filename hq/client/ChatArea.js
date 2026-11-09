@@ -5,12 +5,14 @@
 // (or picked with the paperclip) are read with the Allegro admin's upload code and imported on "Import" (FileDrop.js).
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
-import { api, qs } from './api.js';
+import { api, qs, ApiError } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { ErrorBox, fmtWhen } from './ui.js';
 import { Answer, matchSuggestions } from './AskBox.js';
 import { useJoya } from './context.js';
 import { useWindowDrop, DropOverlay, useUploads, UploadCard } from './FileDrop.js';
+
+const ACCOUNTING_AREA = 5; // src/services/ai.js AREAS
 
 const useStyles = createUseStyles((theme) => ({
   start: { minHeight: 'calc(100vh - 190px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 680, margin: '0 auto', width: '100%' },
@@ -126,6 +128,7 @@ const useStyles = createUseStyles((theme) => ({
     '&:first-child': { borderTop: 0 },
   },
   active: { background: 'rgba(127,127,127,0.16)' },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', padding: '0.2rem 0.55rem', margin: '0 0 0.35rem', borderRadius: 999, background: theme.surface2 || theme.surface, border: `1px solid ${theme.border}`, maxWidth: '100%', '& b': { fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, '& button': { border: 0, background: 'none', cursor: 'pointer', color: theme.textSecondary, padding: 0, lineHeight: 1 } },
   attach: {
     flex: 'none',
     width: 44,
@@ -161,7 +164,7 @@ const EditIcon = () => (
 );
 
 // draft: { text, n } — "edit" on a question box puts its text in the field (n changes on every click)
-function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, draft }) {
+function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, draft, attached = null, onRemoveAttached = null }) {
   const { t, isRtl } = useT();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -191,8 +194,10 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, d
     requestAnimationFrame(() => el.setSelectionRange(draft.text.length, draft.text.length));
   }, [draft]);
 
+  // with a file attached the question may be empty (the chat sends the default question for it)
+  const canSend = (typed || attached) && !busy;
   const send = async () => {
-    if (!typed || busy) return;
+    if (!canSend) return;
     if (await onSend(typed)) setText('');
     setOpen(false);
   };
@@ -219,6 +224,14 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, d
 
   return (
     <div className={classes.composer}>
+      {attached ? (
+        <div className={classes.chip} dir="auto">
+          📎 <b title={attached.name}>{attached.name}</b>
+          <button type="button" onClick={onRemoveAttached} aria-label={t('joya.ask.attachRemove')} title={t('joya.ask.attachRemove')}>
+            ✕
+          </button>
+        </div>
+      ) : null}
       <div className={classes.row}>
         {onFiles ? (
           <>
@@ -244,7 +257,7 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, d
           rows={1}
           dir="auto"
           value={text}
-          placeholder={t('joya.area.placeholder')}
+          placeholder={attached ? t('joya.ask.attachPlaceholder') : t('joya.area.placeholder')}
           aria-label={t('joya.area.askTitle')}
           aria-expanded={show}
           aria-autocomplete="list"
@@ -257,7 +270,7 @@ function Composer({ classes, docked, suggestions, pool, busy, onSend, onFiles, d
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
         />
-        <button type="button" className={classes.send} disabled={busy || !typed} onClick={send} aria-label={t('joya.ask.send')} title={t('joya.ask.send')}>
+        <button type="button" className={classes.send} disabled={!canSend} onClick={send} aria-label={t('joya.ask.send')} title={t('joya.ask.send')}>
           <SendIcon rtl={isRtl} />
         </button>
       </div>
@@ -329,7 +342,7 @@ function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
 const PAGE = 10;
 const KEEP = 100;
 
-export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], onChanged = null, pushRef = null }) {
+export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], onChanged = null }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
@@ -351,9 +364,20 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const top = useRef(null);
   const contextKind = 'AREA';
   const { uploads, add: addFiles, run: importFiles, remove: removeUpload } = useUploads();
+  // a file for the QUESTION (a supplier's / customer's statement to compare with the books, owner 2026-11-10): a PDF
+  // anywhere, or an Excel / CSV in the accounting chat, is attached to the next question (POST /ai/ask-file); every
+  // other file goes to the admin's import flow (useUploads: bank files, Tabit reports…)
+  const [attached, setAttached] = useState(null);
+  const forQuestion = (f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf' || (contextId === ACCOUNTING_AREA && /\.(xlsx|csv)$/i.test(f.name));
+  const takeFiles = (files) => {
+    const q = files.find(forQuestion);
+    if (q) setAttached(q);
+    const rest = files.filter((f) => f !== q);
+    if (rest.length) addFiles(rest);
+  };
   const dragging = useWindowDrop((files) => {
     scrollDown.current = true;
-    addFiles(files);
+    takeFiles(files);
   });
 
   // the newest page; the older questions already loaded stay (a refresh while one is being answered)
@@ -439,7 +463,24 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
     setBusy(true);
     setErr(null);
     try {
-      const { request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, companyKey: locationId == null ? companyKey : null, lang } });
+      let request;
+      if (attached) {
+        const form = new FormData();
+        form.append('file', attached, attached.name);
+        form.append('question', question || t('joya.ask.attachDefault'));
+        form.append('contextKind', contextKind);
+        form.append('contextId', String(contextId));
+        if (locationId) form.append('locationId', locationId);
+        else if (companyKey) form.append('companyKey', companyKey);
+        form.append('lang', lang);
+        const res = await fetch('/api/joya/ai/ask-file', { method: 'POST', body: form, credentials: 'same-origin' });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new ApiError(res.status, data);
+        request = data.request;
+        setAttached(null);
+      } else {
+        ({ request } = await api('/ai/ask', { method: 'POST', body: { question, contextKind, contextId, locationId, companyKey: locationId == null ? companyKey : null, lang } }));
+      }
       scrollDown.current = true;
       setItems((xs) => [request, ...(xs || [])]);
       return true;
@@ -450,13 +491,6 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
       setBusy(false);
     }
   };
-  // a page that creates the question itself (the statements page's upload form) pushes it here
-  if (pushRef) {
-    pushRef.current = (request) => {
-      scrollDown.current = true;
-      setItems((xs) => [request, ...(xs || [])]);
-    };
-  }
   // ↻: the same box is answered again (the server clears the answer; the 3-second refresh shows the new one)
   const retry = async (id) => {
     setErr(null);
@@ -479,7 +513,7 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   };
 
   if (items == null) return <ErrorBox error={err} />;
-  const composer = <Composer classes={classes} docked={items.length + uploads.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} onFiles={addFiles} draft={draft} />;
+  const composer = <Composer classes={classes} docked={items.length + uploads.length > 0} suggestions={suggestions} pool={pool} busy={busy} onSend={send} onFiles={takeFiles} draft={draft} attached={attached} onRemoveAttached={() => setAttached(null)} />;
   const overlay = dragging ? <DropOverlay /> : null;
 
   if (!items.length && !uploads.length)

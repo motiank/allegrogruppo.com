@@ -608,7 +608,7 @@ const shape = (r) => ({
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS', 7: 'STATEMENTS' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
@@ -684,7 +684,6 @@ async function contextAllowed(access, kind, id) {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
     if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
     if (AREAS[id] === 'PAYMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the payments area is for the chain admin only');
-    if (AREAS[id] === 'STATEMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the statements area is for the chain admin only');
     if (AREAS[id] === 'ACCOUNTING' && !access.accounting) throw err('FORBIDDEN', 'the accounting area is for the chain admin and the accountant only');
     if (access.role === 'ACCOUNTANT' && AREAS[id] !== 'ACCOUNTING') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
     return null;
@@ -706,7 +705,7 @@ export async function ask(access, { question, locationId = null, companyKey = nu
     if (!(await listLocations(access)).some((l) => (l.company?.key ?? '') === key)) throw err('FORBIDDEN', 'no access to the requested company');
     meta = { scope: { companyKey: key } };
   }
-  // a file turned into text by services/attachments.js (the statements page): the planner reads it from context.attachment
+  // a file turned into text by services/attachments.js (the chat's paperclip, POST /ai/ask-file): the planner reads it from context.attachment
   if (attachment && typeof attachment === 'object' && attachment.text) meta = { ...(meta || {}), attachment };
   if (access.role === 'ACCOUNTANT' && contextKind !== 'AREA') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
   if (contextKind !== 'GENERAL') await contextAllowed(access, contextKind, contextId);
@@ -946,7 +945,7 @@ export async function buildContext(access, r) {
     // the payees of earlier payments (chain admin): the planner reuses their spelling in a payment op
     ...(access.isAdmin ? { payees: (await payments.payees(scope?.companyKey ?? null, 50).catch(() => [])).map((x) => x.name) } : {}),
     limits: { maxCalcs: MAX_CALCS },
-    // the text of a file attached to the question (the statements page); without the text itself in the request list
+    // the text of a file attached to the question (the chat's paperclip); without the text itself in the request list
     ...(parseJson(r.meta_json)?.attachment ? { attachment: parseJson(r.meta_json).attachment } : {}),
     // a file answer (plan.file): the rows of the results go into a Google Sheet in the owner's Drive folder
     files: sheetsUnavailable() ? { sheet: false, why: sheetsUnavailable() } : { sheet: true },

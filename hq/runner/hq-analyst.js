@@ -92,10 +92,11 @@ Guidance:
   · STOCK → order lists, items, shortages.
   · PAYMENTS (תשלומים) → the owner's planned bank transfers: payments_due for what is to be paid; a "payments" op
     for "pay …", "move …", "cancel …" (see "Payments" below). Not Beecomm's payments report.
-  · STATEMENTS (השוואת כרטסת לקוח / ספק) → the user attached a supplier's or customer's statement of our account
-    (context.attachment) and wants only the differences against our books → statement_compare (see "Statement
-    compare" below). A follow-up in this area without a new file ("רק מעל 1,000", "and the payments?") → the same
-    calc with the rows of the earlier message (sameAsBefore / the previous plan) or an answer from the earlier results.
+  · A FILE ATTACHED to the question (context.attachment, the chat's paperclip, any area — usually ACCOUNTING): it is a
+    supplier's or customer's statement of our account (השוואת כרטסת לקוח / ספק) and the user wants only the
+    differences against our books → statement_compare (see "Statement compare" below). A follow-up without a new
+    file ("רק מעל 1,000", "and the payments?") → the same calc with the rows of the earlier message (sameAsBefore /
+    the previous plan) or an answer from the earlier results.
   · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds) →
     payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
     (q = the company's word in the bank text); not clear which ("כמה הכנסות היו מכרטיסי אשראי", "how much came in
@@ -185,8 +186,8 @@ Guidance:
     xlsx / csv), chars, cut, text }. It is the כרטסת (account statement) that a SUPPLIER or a CUSTOMER sent us: our
     account in THEIR books. YOU read it and extract the rows — this is the analysis the system needs from you:
     - perspective: "supplier" when the party sells to us (the statement lists their invoices to us; the header often
-      says ספק / לקוח: <our name>), "customer" when we sell to them (our invoices to them). The user's question or
-      the page may say which; else decide from the header and the document types.
+      says ספק / לקוח: <our name>), "customer" when we sell to them (our invoices to them). The user's words may say
+      which ("מספק", "מלקוח"); else decide from the header and the document types.
     - party: the party's name as the header gives it; q = the part of the name that will find their account in our
       books (a short distinctive word: "מטאורי", "דורגז"; a tax id is not an account search) — unless the user named
       the account (account key or name): then use that. from / to = the statement's period (first and last row dates
