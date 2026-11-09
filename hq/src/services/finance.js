@@ -5,6 +5,7 @@
 // books have real gaps (no 2026 salaries, no income after August 2026, a bank gap…), and the writer must show a
 // `high` warning next to the number it affects.
 import { finance, financeCompanies } from './source.js';
+import { compareStatements } from '../../../shared/statementCompare.js';
 
 const SOURCE = 'the Hashavshevet books (allegro_finance), through the Allegro admin Finance API; posted entries only unless said otherwise; data as of the last nightly sync (dataUpTo)';
 // a real calendar day (2026-02-30 and 2026-13-01 are refused)
@@ -323,6 +324,28 @@ export async function supplierInvoices(companies, p = {}) {
   const params = { side: 'supplier', ...dates(p), ...textOf(p, 'account'), ...textOf(p, 'q'), ...oneOf(p, 'type', ['invoice', 'credit']), ...flagOf(p, 'includeUnposted'), limit, ...(p.offset ? { offset: Number(p.offset) || 0 } : {}) };
   return result('supplier_invoices', params, await perCompany(companies, '/invoices', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, dates: m.dates, rows: d })), {
     note: 'amount WITH VAT, a supplier credit note is minus (type credit); date = the invoice date, entryDate = the day the bookkeeper entered it in Hashavshevet (תאריך הזנה), docNumber = the invoice number as Hashavshevet keeps it (often the last digits only); expenseAccount / expenseName = where the expense was booked; these are the BOOKS only — not Drive, not the mailbox (for invoices missing in the books use missing_invoices)',
+  });
+}
+
+/**
+ * A supplier's or customer's statement of us (the rows the planner extracted from the attached file) against our account
+ * card in the books — only the differences (owner 2026-11-10, shared/statementCompare.js). p: { account | q (the party),
+ * from, to (the statement's period), theirs: { perspective: 'supplier' | 'customer', party?, openingBalance?, closingBalance?,
+ * rows: [{ date, reference, description, debit, credit }] }, days?, tolerance? }.
+ */
+export async function statementCompare(companies, p = {}) {
+  const theirs = p.theirs && typeof p.theirs === 'object' ? p.theirs : null;
+  if (!theirs || !Array.isArray(theirs.rows) || !theirs.rows.length) throw bad('theirs.rows (the rows of the attached statement) are needed');
+  const params = { ...dates(p), ...textOf(p, 'account'), ...textOf(p, 'q'), ...flagOf(p, 'includeUnposted'), limit: EXPORT_MAX };
+  if (!params.account && !params.q) throw bad('account (the account key) or q (part of the party name) is needed');
+  const days = clamp(p.days, 45, 365), tolerance = p.tolerance == null ? 0.05 : Math.max(0, Number(p.tolerance) || 0);
+  const perspective = theirs.perspective === 'customer' ? 'customer' : 'supplier';
+  return result('statement_compare', { ...params, perspective, days, tolerance, theirsRows: theirs.rows.length }, await perCompany(companies, '/ledger', params, (d, m) => {
+    if (m.ambiguous) return { ambiguous: true, accounts: m.accounts };
+    const cmp = compareStatements({ ...theirs, perspective }, { lines: d || [], openingBalance: m.openingBalance, closingBalance: m.closingBalance }, { days, tolerance });
+    return { account: m.account, period: { from: m.from, to: m.to }, ours: { lines: m.total, openingBalance: m.openingBalance, closingBalance: m.closingBalance }, theirs: { party: theirs.party ?? null, rows: theirs.rows.length, openingBalance: theirs.openingBalance ?? null, closingBalance: theirs.closingBalance ?? null }, ...cmp };
+  }), {
+    note: 'only the differences are listed: onlyTheirs = in their statement and not in our books, onlyOurs = in our books and not in their statement, amountDiffers = the same document with another amount; kind charge = an invoice (raises the debt), payment = money or a credit note; balance = the debt in one direction (debt says which), theirs as they give it, ours from our books, difference = theirs − ours, explainedByDifferences = what the listed differences add up to, unexplained = the rest (opening balance, lines outside the period)',
   });
 }
 

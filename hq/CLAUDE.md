@@ -142,6 +142,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
   `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
+- **Statement compare** (2026-11-10, owner): page `/statements` (area 7, chain admin) — the party's כרטסת (PDF / xlsx / csv)
+  → `POST /joya/ai/ask-file` → text in `meta_json.attachment` (`src/services/attachments.js`; PDF via `pdftotext` when
+  installed, else `pdf-parse` — root dependency, Node 18 build) → the planner extracts the rows (PLAN "STATEMENT COMPARE")
+  → calc `statement_compare` (`/ledger` + `shared/statementCompare.js`) → only the differences (WRITE "Statement compare").
+  `ChatArea` got `pushRef` for pages that create the question themselves. Tests `scripts/test_statement_compare.js`; eval `st-*`.
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

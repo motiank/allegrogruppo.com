@@ -329,7 +329,7 @@ function Card({ r, classes, busy, onDelete, onChanged, onResend, onEdit }) {
 const PAGE = 10;
 const KEEP = 100;
 
-export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], onChanged = null }) {
+export default function ChatArea({ contextId, locationId = null, title, intro, suggestions = [], onChanged = null, pushRef = null }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t, lang } = useT();
@@ -450,6 +450,13 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
       setBusy(false);
     }
   };
+  // a page that creates the question itself (the statements page's upload form) pushes it here
+  if (pushRef) {
+    pushRef.current = (request) => {
+      scrollDown.current = true;
+      setItems((xs) => [request, ...(xs || [])]);
+    };
+  }
   // ↻: the same box is answered again (the server clears the answer; the 3-second refresh shows the new one)
   const retry = async (id) => {
     setErr(null);

@@ -110,6 +110,8 @@ function contextFor(f) {
   Object.assign(ctx.request, { question: f.question, lang: f.lang || 'he' });
   // f.request: fields to set on the request, e.g. the picker scope
   if (f.request) Object.assign(ctx.request, f.request);
+  // f.attachment: a file attached to the question, as the server gives it (the statements page): { name, kind, chars, cut, text }
+  if (f.attachment) ctx.attachment = { ...f.attachment, chars: f.attachment.text.length, cut: false };
   // f.teamRules: the team rules this question is asked with
   if (f.teamRules) ctx.teamRules = f.teamRules;
   // f.history: the earlier questions of the chat ({ question, calcs: [{ calc, params }], answer? })

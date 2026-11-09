@@ -104,6 +104,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `/home/twit/.secrets/invoice-drive/`; hq runs as `twit`). Finance API `GET /finance/invoices?side=supplier` (+ `entryDate`
   on both sides) and Joya calc `supplier_invoices`: the books' supplier invoices with the entry date. Tests
   `scripts/test_finance_api.js`, `hq/test/test_joya_lib.mjs`; eval `x-file-*`, `f-supplier-*`. Needs an hq client build on deploy.
+- **Statement compare — השוואת כרטסת לקוח / ספק** (2026-11-10, owner): Joya main-menu page `/statements` (chain admin): the
+  user attaches the party's כרטסת (PDF with text, .xlsx or CSV), the server keeps only its text (`hq/src/services/attachments.js`:
+  `pdftotext -layout` when installed on the server, else `pdf-parse` — new root dependency, `npm install` on deploy), the AI
+  planner extracts the rows, calc `statement_compare` pulls our account card (`/finance/ledger`) and `shared/statementCompare.js`
+  returns only the differences (missing on each side, amount differs, the balance gap). hq README → "Statement compare".
+  Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
+  on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
   `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
   builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,

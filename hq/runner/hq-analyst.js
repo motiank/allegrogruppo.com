@@ -92,6 +92,10 @@ Guidance:
   · STOCK → order lists, items, shortages.
   · PAYMENTS (תשלומים) → the owner's planned bank transfers: payments_due for what is to be paid; a "payments" op
     for "pay …", "move …", "cancel …" (see "Payments" below). Not Beecomm's payments report.
+  · STATEMENTS (השוואת כרטסת לקוח / ספק) → the user attached a supplier's or customer's statement of our account
+    (context.attachment) and wants only the differences against our books → statement_compare (see "Statement
+    compare" below). A follow-up in this area without a new file ("רק מעל 1,000", "and the payments?") → the same
+    calc with the rows of the earlier message (sameAsBefore / the previous plan) or an answer from the earlier results.
   · No area (a page's chat): card / Wolt income — what was SOLD at the register (by brand, tips, refunds) →
     payments_summary; what was RECEIVED in the account (Max, Isracard, Amex, Wolt deposits) → the bank
     (q = the company's word in the bank text); not clear which ("כמה הכנסות היו מכרטיסי אשראי", "how much came in
@@ -120,7 +124,7 @@ Guidance:
   branches" named in the question overrides the scope.
 - The books (Hashavshevet, the accountant's bookkeeping; finance_status, pnl, cash_position, branch_costs, sales_vs_books,
   spending, aging, intercompany, trial_balance, account_card, journal_search, bank_reconciliation, bank_recon_report, bank_open_items,
-  bank_match_suggestions, customer_invoices, supplier_invoices, account_statement, cheques, vat_summary, withholding, allocation_numbers,
+  bank_match_suggestions, customer_invoices, supplier_invoices, statement_compare, account_statement, cheques, vat_summary, withholding, allocation_numbers,
   payroll_check, exceptions, change_history — chain admin only; in any area when the question is about the books,
   and the default for accounting words in the ACCOUNTING area). They are per COMPANY: companyKeys =
   context.locations[].companyKey of the companies named; none named → leave companyKeys out (the picker's company).
@@ -177,6 +181,29 @@ Guidance:
     out for the state / counts; q = the supplier or customer or an invoice number; direction expense for suppliers /
     expense invoices, income for our invoices to customers). Never customer_invoices, allocation_numbers or
     exceptions for this: those are the books alone, without any channel.
+  · STATEMENT COMPARE (owner 2026-11-10). context.attachment = a file the user attached, as text: { name, kind (pdf /
+    xlsx / csv), chars, cut, text }. It is the כרטסת (account statement) that a SUPPLIER or a CUSTOMER sent us: our
+    account in THEIR books. YOU read it and extract the rows — this is the analysis the system needs from you:
+    - perspective: "supplier" when the party sells to us (the statement lists their invoices to us; the header often
+      says ספק / לקוח: <our name>), "customer" when we sell to them (our invoices to them). The user's question or
+      the page may say which; else decide from the header and the document types.
+    - party: the party's name as the header gives it; q = the part of the name that will find their account in our
+      books (a short distinctive word: "מטאורי", "דורגז"; a tax id is not an account search) — unless the user named
+      the account (account key or name): then use that. from / to = the statement's period (first and last row dates
+      when no period is printed).
+    - rows: EVERY line of the statement, in order: { date: "YYYY-MM-DD" (Israeli dates are DD/MM/YYYY), reference:
+      the document number (אסמכתא / מס' מסמך / חשבונית; "" when none), description (the text: סוג מסמך + פרטים),
+      debit, credit (numbers, no commas; the column headers tell which is which: חובה = debit, זכות = credit; a single
+      amount column with a sign: plus = debit) }. Skip header, subtotal, "יתרה" running-balance values (not a row),
+      page footers. Keep opening / closing balance lines OUT of rows: give them as openingBalance / closingBalance
+      (plus = the debt as the party shows it; "יתרה לתשלום", "יתרת חוב", "ח'" / "ז'" marks: ח' = debit).
+    - Excel text: lines are tab-separated cells (### = the sheet name); PDF text: columns aligned by spaces, Hebrew
+      may read right-to-left or reversed — the numbers and dates are reliable, the words less.
+    - attachment.cut true = the text was cut at 150k characters: say so in the note (the compare is partial).
+    Plan ONE calc: statement_compare { q | account, from, to, theirs: { perspective, party, openingBalance,
+    closingBalance, rows } } — no limit, no other calcs (the account card, aging etc. are inside it). Big statements
+    (hundreds of rows) are fine: the whole rows list goes in the plan. With a file and no attachment text (chars 0 or
+    an error) → say so in the note and plan nothing.
   · FILES (owner 2026-11-09). A FILE answer in three cases: (1) the user asks for a file — "לאקסל", "ב-XL", "באקסל",
     "קובץ", "גיליון", "להוריד", "לייצא", "Excel", "a sheet", "export", "download", "put them all in a file"; (2) the
     user asks for a whole list that is too big for the chat — more than ~150 rows: "כל החשבוניות מתחילת השנה", "כל
@@ -483,7 +510,7 @@ Your job now: WRITE the answer to the user from <results>.
   partial month (partial) and an OPEN restaurant (active true) with no data in a month — a missing report; a closed
   restaurant (active false) with no months is not named.
 - The books (finance_status, pnl, cash_position, branch_costs, sales_vs_books, spending, aging, intercompany, trial_balance,
-  account_card, journal_search, bank_reconciliation, bank_recon_report, bank_open_items, bank_match_suggestions, customer_invoices, supplier_invoices,
+  account_card, journal_search, bank_reconciliation, bank_recon_report, bank_open_items, bank_match_suggestions, customer_invoices, supplier_invoices, statement_compare,
   account_statement, cheques, vat_summary, withholding, allocation_numbers, missing_invoices, payroll_check, exceptions, change_history):
   the numbers are the accountant's bookkeeping (Hashavshevet), as of dataUpTo — say "לפי הספרים" / "from the books" and
   the data date once. Every company result has warnings: a HIGH warning changes the meaning of the numbers (no salary
@@ -551,6 +578,17 @@ Your job now: WRITE the answer to the user from <results>.
   table as usual (its rows limit still holds) and the lines about the file. <file_error> (no <file>): say in one
   line that the file could not be made and why (code FILE_UNAVAILABLE = the Drive folder or the Google login is not
   set up on the server; NO_ROWS = the results have no rows), then answer with the table as usual.
+- Statement compare (statement_compare, השוואת כרטסת): ONLY the differences, never the matched lines. First one line:
+  the party (account.name), the period, how many lines each side had and how many matched (counts). Then the balance
+  in one line: their closing balance vs ours (balance.theirs, balance.ours — both as "the debt", debt says which way),
+  the difference, and whether the listed differences explain it (explainedByDifferences, unexplained ≠ 0 → say the
+  rest is before the period or in the opening balance). Then up to three tables, each only when it has rows, with
+  a title line before it: "בכרטסת שלהם ולא בספרים שלנו" (onlyTheirs), "בספרים שלנו ולא בכרטסת שלהם" (onlyOurs),
+  "אותו מסמך, סכום שונה" (amountDiffers) — columns: תאריך, אסמכתא, פרטים, סוג (חיוב / תשלום from kind), סכום
+  (amountDiffers: סכום אצלם, סכום אצלנו, הפרש); a total row for the amounts. ambiguous true → several accounts fit
+  the party name: list them (accounts) and ask which one (account key); no table. No differences at all → say the
+  statement and the books agree for the period (counts.matched lines) in two lines. Hebrew words: חיוב = charge,
+  תשלום / זיכוי = payment.
 - Supplier invoices (supplier_invoices): the books' entries. A table (up to the rows limit): מס' חשבונית, ספק, סכום,
   תאריך חשבונית (date), תאריך הזנה (entryDate), חשבון הוצאה (expenseName), תיאור — the total row; say count and amount
   of the whole selection when shown < count, and that these are the books (not Drive). docNumber can be the last digits

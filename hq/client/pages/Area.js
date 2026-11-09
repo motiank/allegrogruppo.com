@@ -17,6 +17,8 @@ export const AREAS = {
   accounting: { id: 5, suggestions: 8, adminSuggestions: 9 },
   // the payments area (chain admin): its page is pages/Payments.js (the board + this chat)
   payments: { id: 6, suggestions: 6 },
+  // statement compare (chain admin): its page is pages/Statements.js (the upload form + this chat)
+  statements: { id: 7, suggestions: 3 },
 };
 
 export default function Area({ area }) {

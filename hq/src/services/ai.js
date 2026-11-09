@@ -517,6 +517,11 @@ export const CALCS = {
     about: 'supplier (expense) invoices and credit notes (minus) as the BOOKS hold them, with VAT: the invoice date, the day it was entered in Hashavshevet (entryDate), number, supplier, amount, the expense account and group, batch, description; the count and total of the selection. The books only — not Drive, not the mailbox',
     run: finCalc(fin.supplierInvoices),
   },
+  statement_compare: {
+    params: '{ companyKeys?, account? | q: "part of the party name" (one of the two), from, to (the statement period), theirs: { perspective: "supplier" | "customer", party?, openingBalance?, closingBalance?, rows: [{ date: "YYYY-MM-DD", reference, description, debit, credit }] }, days?: 45, tolerance?: 0.05 }',
+    about: "השוואת כרטסת: a supplier's or customer's statement of us (the rows you extract from context.attachment) against our account card in the books — only the differences: onlyTheirs (in their statement, missing in our books), onlyOurs (in our books, missing in theirs), amountDiffers, matched counts, and the balance gap (theirs − ours, explained by the differences). perspective supplier = their statement of us as their customer (we owe them); customer = their statement of us as their supplier",
+    run: finCalc(fin.statementCompare),
+  },
   account_statement: {
     params: '{ companyKeys?, account?: "account key", q?: "part of the name" (one of the two), from?, to? }',
     about: 'the card of one supplier or customer (כרטיס ספק / לקוח): invoices, credit notes, payments and other lines of the period, the open items with their age, the balance (plus = owed) and totals; several accounts match → ambiguous (ask which one)',
@@ -580,6 +585,9 @@ export function catalogue() {
 
 // ---------------------------------------------------------------- requests (user side)
 
+// the attachment's text stays on the server (it can be 150k characters); the client gets what it is
+const metaForClient = (m) => (m?.attachment ? { ...m, attachment: { ...m.attachment, text: undefined } } : m);
+
 const shape = (r) => ({
   id: r.id,
   username: r.username,
@@ -593,19 +601,19 @@ const shape = (r) => ({
   proposal: parseJson(r.proposal_json),
   proposalStatus: r.proposal_status,
   error: r.error,
-  meta: parseJson(r.meta_json),
+  meta: metaForClient(parseJson(r.meta_json)),
   lang: r.lang,
   createdAt: r.created_at,
   answeredAt: r.answered_at,
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS', 7: 'STATEMENTS' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
@@ -676,6 +684,7 @@ async function contextAllowed(access, kind, id) {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
     if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
     if (AREAS[id] === 'PAYMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the payments area is for the chain admin only');
+    if (AREAS[id] === 'STATEMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the statements area is for the chain admin only');
     if (AREAS[id] === 'ACCOUNTING' && !access.accounting) throw err('FORBIDDEN', 'the accounting area is for the chain admin and the accountant only');
     if (access.role === 'ACCOUNTANT' && AREAS[id] !== 'ACCOUNTING') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
     return null;
@@ -685,7 +694,7 @@ async function contextAllowed(access, kind, id) {
   return null;
 }
 
-export async function ask(access, { question, locationId = null, companyKey = null, contextKind = 'GENERAL', contextId = null, lang = 'he' }) {
+export async function ask(access, { question, locationId = null, companyKey = null, contextKind = 'GENERAL', contextId = null, lang = 'he', attachment = null }) {
   if (!String(question || '').trim()) throw err('BAD_REQUEST', 'the question is empty');
   if (String(question).length > 2000) throw err('BAD_REQUEST', 'the question is too long');
   if (!['GENERAL', 'ORDER_LIST', 'STAFFING_PLAN', 'AREA'].includes(contextKind)) throw err('BAD_REQUEST', 'bad context');
@@ -697,6 +706,8 @@ export async function ask(access, { question, locationId = null, companyKey = nu
     if (!(await listLocations(access)).some((l) => (l.company?.key ?? '') === key)) throw err('FORBIDDEN', 'no access to the requested company');
     meta = { scope: { companyKey: key } };
   }
+  // a file turned into text by services/attachments.js (the statements page): the planner reads it from context.attachment
+  if (attachment && typeof attachment === 'object' && attachment.text) meta = { ...(meta || {}), attachment };
   if (access.role === 'ACCOUNTANT' && contextKind !== 'AREA') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
   if (contextKind !== 'GENERAL') await contextAllowed(access, contextKind, contextId);
   const id = (
@@ -935,6 +946,8 @@ export async function buildContext(access, r) {
     // the payees of earlier payments (chain admin): the planner reuses their spelling in a payment op
     ...(access.isAdmin ? { payees: (await payments.payees(scope?.companyKey ?? null, 50).catch(() => [])).map((x) => x.name) } : {}),
     limits: { maxCalcs: MAX_CALCS },
+    // the text of a file attached to the question (the statements page); without the text itself in the request list
+    ...(parseJson(r.meta_json)?.attachment ? { attachment: parseJson(r.meta_json).attachment } : {}),
     // a file answer (plan.file): the rows of the results go into a Google Sheet in the owner's Drive folder
     files: sheetsUnavailable() ? { sheet: false, why: sheetsUnavailable() } : { sheet: true },
     changeFormats: CHANGE_FORMATS,

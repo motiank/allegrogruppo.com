@@ -24,6 +24,9 @@ import * as work from './services/work.js';
 import * as ai from './services/ai.js';
 import * as payments from './services/payments.js';
 import { answerTableXlsx } from './services/answerExcel.js';
+import multer from 'multer';
+import { extractAttachment, MAX_FILE_BYTES } from './services/attachments.js';
+const askUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 1 } }).single('file');
 import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
@@ -293,6 +296,19 @@ for (const step of ['recognize', 'import']) {
 
 // ---------------------------------------------------------------- AI (user side)
 r.post('/joya/ai/ask', h(async (req) => ({ request: await ai.ask(req.joya, req.body || {}) })));
+// a question with a file (the statements page): multipart form — question, contextKind, contextId, companyKey, lang, file
+r.post(
+  '/joya/ai/ask-file',
+  (req, res, next) => askUpload(req, res, (e) => (e ? next(Object.assign(new Error(e.code === 'LIMIT_FILE_SIZE' ? 'the file is bigger than 15 MB' : e.message), { code: 'BAD_REQUEST' })) : next())),
+  h(async (req) => {
+    const f = req.file;
+    if (!f) throw Object.assign(new Error('a file is needed'), { code: 'BAD_REQUEST' });
+    const name = Buffer.from(String(f.originalname || ''), 'latin1').toString('utf8'); // multer reads names as latin1
+    const attachment = await extractAttachment({ name, mime: f.mimetype, buffer: f.buffer });
+    const b = req.body || {};
+    return { request: await ai.ask(req.joya, { question: b.question, contextKind: b.contextKind, contextId: b.contextId == null || b.contextId === '' ? null : Number(b.contextId), companyKey: b.companyKey || null, locationId: b.locationId || null, lang: b.lang, attachment }) };
+  }),
+);
 r.get('/joya/ai/requests', h(async (req) => ({ requests: await ai.listRequests(req.joya, { contextKind: req.query.contextKind, contextId: req.query.contextId, limit: req.query.limit, beforeId: req.query.beforeId }) })));
 r.get('/joya/ai/requests/:id', h(async (req) => ({ request: await ai.getRequest(req.joya, id(req)) })));
 r.post('/joya/ai/requests/:id/apply', h(async (req) => ai.applyProposal(req.joya, id(req))));

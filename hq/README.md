@@ -452,6 +452,25 @@ client keep it), the chat shows **one link under the answer** (`AskBox.js` → `
 table as usual. `context.files.sheet` tells the planner whether files are possible. Works for any calculation in any
 area. Eval `x-file-*`.
 
+**Statement compare — השוואת כרטסת לקוח / ספק (owner 2026-11-10).** Main-menu page `/statements` (chain admin,
+`client/pages/Statements.js`, area 7 `STATEMENTS`): the user attaches the statement a supplier or a customer sent (PDF
+with text, Excel .xlsx or CSV, up to 15 MB), picks the side (a supplier = we are their customer; a customer = we are
+their supplier), optionally the party's name in our books and a note, and clicks Send. `POST /api/joya/ai/ask-file`
+(multipart, multer from the repo root) turns the file into TEXT (`src/services/attachments.js`: Excel → tab-separated
+lines per sheet with exceljs; PDF → `pdftotext -layout` when installed, else `pdf-parse`; a scanned PDF is refused)
+and creates a normal chat request with `meta_json.attachment` { name, kind, chars, cut, text } — the file itself is not
+kept, and the client never gets the text. The runner's context carries `attachment`; the PLAN prompt ("STATEMENT
+COMPARE") makes the planner read it and extract every row ({ date, reference, description, debit, credit }), the
+perspective, the party, the period and the balances, and plan one calc `statement_compare` (`fin.statementCompare`):
+it pulls our account card from the Finance API `/ledger` (the party by `q` or `account`, every line of the period) and
+`shared/statementCompare.js` compares — both sides as the same two kinds of events (charge = an invoice, payment = money
+or a credit note; the column that is the charge depends on the side), one-to-one matching by amount + document number,
+then amount + date (45 days), then a one-off amount at any date — and returns ONLY the differences: `onlyTheirs`,
+`onlyOurs`, `amountDiffers`, the counts, and the balance gap in one direction (the debt), with how much of it the
+listed differences explain. The writer (WRITE "Statement compare") shows one line of counts, one of balances and up to
+three tables; several accounts fit the name → it lists them and asks. Follow-up questions stay in the page's chat.
+Tests: `node --test scripts/test_statement_compare.js`; eval `st-*` (fixtures carry an `attachment`).
+
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from
 ARITHMETIC on that data (a sum, a difference, a split into N payments, a share, an average, a per-unit value, a VAT
