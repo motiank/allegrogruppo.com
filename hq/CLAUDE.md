@@ -86,6 +86,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, minus the הקפה payments
   (invoiced to the customer; owner 2026-11-09), minus 20% of חבר only (both "PRIVATE LABEL BRAND" brands; not מולטיפס,
   owner), VAT 18/118. Rules and rates in `src/lib/vatRules.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
+  Deployed 2026-11-09 (`91f0192`, with the `missing_invoices` per-channel answer of `23d11a7`).
 - **Chat paging** (owner 2026-11-04): 10 questions per page, older on scroll up; a chat keeps its newest 100
   (`CHAT_KEEP`, older rows are DELETED on the next question). README → Asking in words.
 - **Chat history** (2026-11-04, the owner felt "context is lost"): `buildContext` adds `history` (the last 3 answered
