@@ -190,11 +190,15 @@ The staffing plan is exported as a **CSV for Tabit**. Nothing is sent to a suppl
 **Monthly VAT report (owner, 2026-11-03)** — calc `vat_report` (`analytics.vatReport`), from the Beecomm payments
 (`/beecomm/payments/stored`): income = all payments in the Z, paid − refunded (Beecomm's "סה״כ"). It has no tips:
 the card tips are inside the card rows, but the workers get them in cash from the register, so the cash row is lower by
-them — never subtract `service` again (it was, until the fix of 2026-11-03); 20% of the payments of חבר (credit
-brand "PRIVATE LABEL BRAND - חבר") is deducted — only חבר; מולטיפס is not (owner, 2026-11-03, changed the first
-version); income for VAT = income − deduction; VAT = 18/118 of it. Per month, per restaurant, per company, in total.
-Owner's answers: מועדון חברים = חבר (no other club brand is deducted); without tips; show the VAT. Checked 2026-11-03
-against Beecomm's payments report: פסטלינה רמת החייל, August 2026 = 736,391, same as Beecomm's "סה״כ".
+them — never subtract `service` again (it was, until the fix of 2026-11-03). Then (owner, 2026-11-09): the הקפה
+payments (`hakafa`, payment type 5, Beecomm's "סה״כ הקפה") are taken out — a customer who pays later gets a tax invoice
+from us, so that money is reported for VAT through the invoice, not through the register; and 20% of the payments of
+חבר (`hever`: the credit brands "PRIVATE LABEL BRAND - חבר" AND "PRIVATE LABEL BRAND" — both are חבר, owner 2026-11-09)
+is deducted — Hever's commission, which Hever does not invoice; only חבר, מולטיפס is not (owner, 2026-11-03, changed
+the first version); income for VAT = income − hakafa − deduction; VAT = 18/118 of it. Per month, per restaurant, per
+company, in total. Rules in `hq/src/lib/vatRules.js` (pure, tested in `test/test_joya_lib.mjs`). Owner's answers:
+מועדון חברים = חבר (no other club brand is deducted); without tips; show the VAT. Checked 2026-11-03 against Beecomm's
+payments report: פסטלינה רמת החייל, August 2026 income = 736,391, same as Beecomm's "סה״כ".
 **The books (owner 2026-11-07)** — the accountant's bookkeeping in Hashavshevet, copied nightly by `hash-sync` into the
 `allegro_finance` database and served by the admin's **Finance API** (`/local-api/v1/finance/*`, `../finance_api_readme.md`,
 built and deployed 2026-11-07). Joya reads it through `source.finance()` / `source.financeCompanies()` and the

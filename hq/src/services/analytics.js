@@ -5,6 +5,7 @@
 import { q, ymd, inList } from '../db.js';
 import { addDays, daysBetween } from '../lib/recommend.js';
 import { median } from '../lib/demand.js';
+import { addRow, blankSums, vatLine, VAT_RULE, VAT_RATE_PCT, VAT_DEDUCT_PCT } from '../lib/vatRules.js';
 import { effectiveAttendance } from './attendance.js';
 import { listShifts } from './master.js';
 import { shiftWindow } from '../lib/demand.js';
@@ -644,21 +645,17 @@ export async function cardIncomeWeek(locationIds, weekStart, today) {
   };
 }
 
-// ---------------------------------------------------------------- monthly VAT report (owner, 2026-11-03)
-// The income for VAT, per month, from the Beecomm payments report: all payments in the Z (paid − refunded; their
-// total has no tips, see paymentsSummary); the payments of חבר (the credit brand "PRIVATE LABEL BRAND - חבר") count
-// only 80% — 20% is deducted before the total; VAT = 18/118 of what is left. Only חבר — not מולטיפס (owner, 2026-11-03).
-export const VAT_RATE_PCT = 18;
-export const VAT_DEDUCT_PCT = 20;
-const isHever = (r) => r.type === CREDIT_TYPE && /חבר/.test(String(r.brand || ''));
+// ---------------------------------------------------------------- monthly VAT report (owner, 2026-11-03, 2026-11-09)
+// The income for VAT, per month, from the Beecomm payments report. The rules (what is income, הקפה taken out, 20% of
+// חבר deducted, VAT 18/118) are in lib/vatRules.js — pure, unit-tested in test/test_joya_lib.mjs.
+export { VAT_RATE_PCT, VAT_DEDUCT_PCT };
 
 /**
  * @param {string[]} locationIds
  * @param {Map<string, { name, company }>} info  location id → its name and company (for the per-company sums)
  */
 export async function vatReport(locationIds, from, to, info = new Map()) {
-  const months = new Map();
-  const blank = (pp) => ({ from: pp.from, to: pp.to, income: 0, hever: 0, days: new Set() });
+  const blank = (pp) => ({ from: pp.from, to: pp.to, ...blankSums(), days: new Set() });
   const perLoc = [];
   let reason = null;
   for (const loc of locationIds) {
@@ -675,28 +672,14 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
       const m = byMonth.get(pp.key) || blank(pp);
       byMonth.set(pp.key, m);
       m.days.add(r.date);
-      const net = r.charges - r.refunded;
-      if (r.brand == null) m.income += net;
-      if (isHever(r)) m.hever += net;
+      addRow(m, r);
     }
     perLoc.push({ locationId: loc, name: info.get(String(loc))?.name ?? null, company: info.get(String(loc))?.company ?? null, active: info.get(String(loc))?.active ?? null, available: true, byMonth });
   }
-  const line = (m, days) => {
-    const deduction = (m.hever * VAT_DEDUCT_PCT) / 100;
-    const vatIncome = m.income - deduction;
-    const vat = (vatIncome * VAT_RATE_PCT) / (100 + VAT_RATE_PCT);
-    return {
-      income: r2(m.income),
-      hever: r2(m.hever),
-      deduction: r2(deduction),
-      vatIncome: r2(vatIncome),
-      vat: r2(vat),
-      vatIncomeBeforeVat: r2(vatIncome - vat),
-      ...(days != null ? { daysWithData: days } : {}),
-    };
-  };
+  const line = (m, days) => ({ ...vatLine(m), ...(days != null ? { daysWithData: days } : {}) });
   const add = (a, m) => {
     a.income += m.income;
+    a.hakafa += m.hakafa;
     a.hever += m.hever;
     return a;
   };
@@ -729,7 +712,7 @@ export async function vatReport(locationIds, from, to, info = new Map()) {
   return {
     period: { from, to },
     source: 'Beecomm payments report via Allegro (/beecomm/payments/stored): payments in the Z (paid − refunded = Beecomm "סה״כ"; the Z total has no tips: card tips were paid to the workers from the cash register)',
-    rule: `income = all payments in the Z without tips; ${VAT_DEDUCT_PCT}% of the חבר payments (credit brand "PRIVATE LABEL BRAND - חבר") is deducted (deduction) — only חבר, not מולטיפס; vatIncome = income − deduction; vat = vatIncome × ${VAT_RATE_PCT}/${100 + VAT_RATE_PCT} (VAT ${VAT_RATE_PCT}% included); vatIncomeBeforeVat = vatIncome − vat (owner, 2026-11-03)`,
+    rule: VAT_RULE,
     vatRatePct: VAT_RATE_PCT,
     deductPct: VAT_DEDUCT_PCT,
     ...(reason ? { missing: reason } : {}),

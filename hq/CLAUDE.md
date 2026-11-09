@@ -83,8 +83,9 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   and Σ(paid − refunded) = the Z total = dish sales (checked all branches, Aug 2026). `paymentsSummary` charges =
   paid − refunded (Beecomm "סה״כ"), tips apart in `service` / `totalService`; `card_income_week` amount = card
   charges − card tips, `tips` apart; `cards_vs_bank` uses the card charges with their tips (the bank gets them).
-- **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, 20% of חבר only (not
-  מולטיפס, owner) deducted, VAT 18/118. Rates in `analytics.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
+- **Monthly VAT report** (2026-11-03, calc `vat_report`): Beecomm payments in the Z without tips, minus the הקפה payments
+  (invoiced to the customer; owner 2026-11-09), minus 20% of חבר only (both "PRIVATE LABEL BRAND" brands; not מולטיפס,
+  owner), VAT 18/118. Rules and rates in `src/lib/vatRules.js` (`VAT_RATE_PCT`, `VAT_DEDUCT_PCT`). README → Data map.
 - **Chat paging** (owner 2026-11-04): 10 questions per page, older on scroll up; a chat keeps its newest 100
   (`CHAT_KEEP`, older rows are DELETED on the next question). README → Asking in words.
 - **Chat history** (2026-11-04, the owner felt "context is lost"): `buildContext` adds `history` (the last 3 answered

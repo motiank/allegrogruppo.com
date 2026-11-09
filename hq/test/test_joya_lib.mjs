@@ -7,6 +7,7 @@ import { computeSlot, learnedAdjustments, validateRule } from '../src/lib/staffi
 import { recommend, convert } from '../src/lib/recommend.js';
 import { splitAnswer, cellNumber, fillTotals, floorMoney } from '../lib/answerTables.js';
 import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
+import { addRow, blankSums, vatLine, isHever, isHakafa } from '../src/lib/vatRules.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -378,6 +379,40 @@ t('answer tables: a pipe table becomes a table block between the text; numbers a
   assert.equal(cellNumber('1,23'), null);
 });
 
+// ---- the VAT report rules (owner 2026-11-03 / 2026-11-09): הקפה out, 20% of both PRIVATE LABEL BRAND brands deducted
+t('vatRules: both PRIVATE LABEL BRAND brands are חבר, מולטיפס and the card brands are not; הקפה = the type-5 total row', () => {
+  assert.equal(isHever({ type: 1, brand: 'PRIVATE LABEL BRAND - חבר' }), true);
+  assert.equal(isHever({ type: 1, brand: 'PRIVATE LABEL BRAND' }), true);
+  assert.equal(isHever({ type: 1, brand: 'private label brand ' }), true);
+  assert.equal(isHever({ type: 1, brand: 'VISA' }), false);
+  assert.equal(isHever({ type: 24, brand: 'BUYME' }), false);
+  assert.equal(isHever({ type: 1, brand: null }), false);
+  assert.equal(isHakafa({ type: 5, brand: null }), true);
+  assert.equal(isHakafa({ type: 1, brand: null }), false);
+});
+t('vatRules: a month — income from the type totals only, הקפה taken out, 20% of חבר deducted, VAT 18/118', () => {
+  const rows = [
+    { type: 1, brand: null, charges: 1200, refunded: 200 }, // credit total 1000 (the brand rows below are inside it)
+    { type: 1, brand: 'VISA', charges: 500, refunded: 0 },
+    { type: 1, brand: 'PRIVATE LABEL BRAND - חבר', charges: 300, refunded: 0 },
+    { type: 1, brand: 'PRIVATE LABEL BRAND', charges: 100, refunded: 0 },
+    { type: 1, brand: 'MASTERCARD', charges: 300, refunded: 200 },
+    { type: 2, brand: null, charges: 400, refunded: 0 }, // cash
+    { type: 5, brand: null, charges: 250, refunded: 50 }, // הקפה 200 → out
+    { type: 24, brand: null, charges: 100, refunded: 0 }, // מולטיפס: income, no deduction
+  ];
+  const m = rows.reduce(addRow, blankSums());
+  assert.deepEqual(m, { income: 1700, hakafa: 200, hever: 400 });
+  const l = vatLine(m);
+  assert.equal(l.income, 1700);
+  assert.equal(l.hakafa, 200);
+  assert.equal(l.hever, 400);
+  assert.equal(l.deduction, 80);
+  assert.equal(l.vatIncome, 1420); // 1700 − 200 − 80
+  assert.equal(l.vat, Math.round((1420 * 18) / 118 * 100) / 100);
+  assert.equal(Math.round((l.vatIncomeBeforeVat + l.vat) * 100) / 100, 1420);
+});
+
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);
 
 console.log('finance (the books)');
@@ -402,7 +437,7 @@ t('the books are for the chain admin only; every finance calc is in the catalogu
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 25);
+  assert.equal(FINANCE_CALCS.size, 26); // 2026-11-08: + missing_invoices
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);

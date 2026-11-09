@@ -451,8 +451,10 @@ Your job now: WRITE the answer to the user from <results>.
   (total). A restaurant with noData: "אין נתונים". fromOrders: the Z is not closed yet, the numbers come from the
   orders. No tips.
 - VAT report (vat_report, owner's rule — say it in one line): income = all Beecomm payments in the Z without tips;
-  20% of the חבר payments only (not מולטיפס) is deducted; income for VAT = income − deduction; VAT 18% inside it (vat).
-  One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, חבר, ניכוי 20%,
+  the הקפה payments (hakafa) are taken out — they are invoiced to the customer, so their VAT is reported through the
+  invoice; 20% of the חבר payments (hever: the two PRIVATE LABEL BRAND brands; not מולטיפס) is deducted — Hever's
+  commission, not invoiced; income for VAT = income − hakafa − deduction; VAT 18% inside it (vat).
+  One table, one row per company (one restaurant asked: per month), columns: הכנסות ללא טיפים, הקפה, חבר, ניכוי 20%,
   הכנסה למע"מ, מע"מ 18%, לפני מע"מ — from companies[].months (several months: one row per company and month, or per
   month for one company); then the total row. Restaurants of a company only when asked (locations[].months). Note a
   partial month (partial) and an OPEN restaurant (active true) with no data in a month — a missing report; a closed

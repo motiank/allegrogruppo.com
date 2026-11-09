@@ -270,7 +270,7 @@ export const CALCS = {
   vat_report: {
     params: '{ locationIds?, from, to }  (whole months: from = the 1st, to = the last day or today)',
     about:
-      'the monthly VAT report (דוח מע"מ): per month, per restaurant, per company and in total — the income from Beecomm (all payments in the Z, without tips), the payments of חבר and the 20% deducted from them (only חבר, not מולטיפס), the income for VAT (income − deduction), the VAT inside it (18/118) and the income before VAT; daysWithData per restaurant and month',
+      'the monthly VAT report (דוח מע"מ): per month, per restaurant, per company and in total — the income from Beecomm (all payments in the Z, without tips), the הקפה payments (hakafa, taken out: they are invoiced to the customer), the payments of חבר (hever, both PRIVATE LABEL BRAND brands) and the 20% deducted from them (only חבר, not מולטיפס), the income for VAT (income − hakafa − deduction), the VAT inside it (18/118) and the income before VAT; daysWithData per restaurant and month',
     run: async (a, p) => {
       const info = new Map((await listLocations(a)).map((l) => [String(l.id), { name: l.name, company: l.company?.label ?? null, active: l.active }]));
       return analytics.vatReport(locs(a, p), ...range(p), info);
