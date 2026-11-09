@@ -1235,6 +1235,112 @@
       }
     },
     {
+      "key": "x-file-suppliers",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אנא הוצא לי את כל החשבוניות של הספקים (הוצאות) שיש לנו במערכת ב XL עם תאריך הזנה ותאריך הוצאה וכל הפרטים שיש לנו",
+      "expect": {
+        "calcs": [
+          "supplier_invoices"
+        ],
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-21"
+        },
+        "file": {
+          "kind": "sheet"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "x-file-noshow",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אני מבקש שלא תציג לי את חשבוניות הספקים שבספרים - רק תכניס לאקסל להורדה ותכניס את כולן מתחילת השנה עד עכשיו",
+      "expect": {
+        "calcs": [
+          "supplier_invoices"
+        ],
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-21"
+        },
+        "file": {
+          "kind": "sheet",
+          "show": false
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "x-file-en",
+      "kind": "GENERAL",
+      "lang": "en",
+      "question": "Export all the customer invoices of 2026 to a sheet",
+      "expect": {
+        "calcs": [
+          "customer_invoices"
+        ],
+        "range": {
+          "from": "2026-01-01",
+          "to": "2026-10-21"
+        },
+        "file": {
+          "kind": "sheet"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "f-supplier-books",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו חשבוניות ספקים נרשמו בספרים באוקטובר?",
+      "expect": {
+        "calcs": [
+          "supplier_invoices"
+        ],
+        "range": {
+          "from": "2026-10-01",
+          "to": "2026-10-31"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "f-supplier-table",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "כמה חשבוניות של מטאורי יש בספרים מתחילת השנה?",
+      "expect": {
+        "calcs": [
+          "supplier_invoices"
+        ],
+        "params": {
+          "supplier_invoices": {
+            "q": "מטאורי"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "x-file-share",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תכין לי את רשימת השיקים העתידיים ותשתף אותה עם רואה החשבון",
+      "expect": {
+        "calcs": [
+          "cheques"
+        ],
+        "file": {
+          "kind": "sheet"
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
       "key": "v-vat-lastmonth",
       "kind": "AREA",
       "lang": "he",

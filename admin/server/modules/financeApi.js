@@ -1449,36 +1449,59 @@ route("/bank/suggestions", async (req, ctx) => {
   };
 });
 
+// Customer invoices (side=customer, default) or supplier invoices (side=supplier, owner 2026-11-09: "the invoices that
+// are in the books — only in the books"). Dates (Hashavshevet): date = ValueDate (the invoice's date), entryDate =
+// IssueDate (the day the entry was keyed in — "תאריך הזנה"; on 2,744 of 2,774 supplier invoices of 2026 it differs from
+// the date), dueDate = DueDate, thirdDate = DatF3 (תאריך 3). Hashavshevet keeps a supplier invoice's number (its last
+// digits) in reference2, so docNumber = reference2, else reference.
 route("/invoices", async (req, ctx) => {
   const { from, to } = dateRange(req, { required: true });
+  const side = oneOf(req, "side", ["customer", "supplier"], "customer");
   const type = oneOf(req, "type", ["invoice", "credit"], null);
   const accounts = optionalAccounts(req, ctx);
   const q = String(req.query.q ?? "").trim() || null;
   const { limit, offset } = paging(req);
   const includeUnposted = flag(req, "includeUnposted");
-  const inv = ctx.rules.invoiceTypes.customer || [], cr = ctx.rules.invoiceTypes.customerCredit || [];
-  const types = type === "invoice" ? inv : type === "credit" ? cr : [...inv, ...cr];
+  const supplier = side === "supplier";
+  // a supplier credit note is a supplier-invoice entry with a minus amount (102 of 2,756 in 2026), not a type of its own
+  const inv = supplier ? ctx.rules.invoiceTypes.supplier || [] : ctx.rules.invoiceTypes.customer || [];
+  const cr = supplier ? [] : ctx.rules.invoiceTypes.customerCredit || [];
+  const types = supplier ? inv : type === "invoice" ? inv : type === "credit" ? cr : [...inv, ...cr];
   const params = { companyId: ctx.companyId };
   const where = [`e.company_id = :companyId`, `e.deleted_at IS NULL`, inList("e.trans_type", types, params, "t"), rangeSql("e.value_date", from, to, params).replace(/^AND /, "")];
+  if (supplier && type) where.push(type === "credit" ? "e.amount < 0" : "e.amount >= 0");
   if (!includeUnposted) where.push("e.status = 1");
-  const accExpr = `IF(${inList("e.trans_type", cr, params, "c")}, e.credit_account, e.debit_account)`;
+  // the party's account: a customer invoice debits the customer (a credit note credits it); a supplier invoice credits the supplier
+  const accExpr = supplier ? "e.credit_account" : cr.length ? `IF(${inList("e.trans_type", cr, params, "c")}, e.credit_account, e.debit_account)` : "e.debit_account";
   if (accounts.length) where.push(inList(accExpr, accounts, params, "a"));
-  if (q) { params.q = `%${q}%`; where.push(`(e.debit_name LIKE :q OR e.credit_name LIKE :q OR e.description LIKE :q)`); }
+  if (q) { params.q = `%${q}%`; where.push(`(e.debit_name LIKE :q OR e.credit_name LIKE :q OR e.description LIKE :q OR e.details LIKE :q)`); }
   const [cnt] = await financeSql(`SELECT COUNT(*) AS n FROM journal_entries e WHERE ${where.join(" AND ")}`, params);
   const rows = await financeSql(
-    `SELECT e.fiscal_year, e.trans_id, e.trans_type, e.reference, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS d, DATE_FORMAT(e.due_date, '%Y-%m-%d') AS due, e.amount, e.status, e.description, e.document_id, e.tax_alloc_number,
-            ${accExpr} AS acc
+    `SELECT e.fiscal_year, e.trans_id, e.batch_no, e.trans_type, e.reference, e.reference2, e.reference3, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS d, DATE_FORMAT(e.due_date, '%Y-%m-%d') AS due,
+            DATE_FORMAT(e.third_date, '%Y-%m-%d') AS d3, DATE_FORMAT(e.issue_date, '%Y-%m-%d') AS entered, e.amount, e.status, e.description, e.details, e.document_id, e.tax_alloc_number,
+            e.debit_account, e.debit_name, e.credit_account, e.credit_name, ${accExpr} AS acc
        FROM journal_entries e WHERE ${where.join(" AND ")} ORDER BY e.value_date, e.trans_id LIMIT ${limit} OFFSET ${offset}`,
     params,
   );
   const register = ctx.rules.balanceGroups.registerCustomers || [];
+  const signed = cr.length ? `IF(${inList("e.trans_type", cr, params, "c")}, -e.amount, e.amount)` : "e.amount";
   const data = rows.map((r) => {
     const a = ctx.account(r.acc);
-    const credit = cr.includes(r.trans_type);
-    return { year: r.fiscal_year, transId: r.trans_id, docNumber: r.reference, date: r.d, dueDate: r.due, kind: register.includes(a.group) ? "register" : "customer", accountKey: r.acc, customerName: a.name, type: credit ? "credit" : "invoice", typeCode: r.trans_type, amount: round2(credit ? -num(r.amount) : num(r.amount)), posted: r.status === 1, description: r.description, documentId: r.document_id || null, allocationNumber: r.tax_alloc_number || null };
+    const credit = supplier ? num(r.amount) < 0 : cr.includes(r.trans_type);
+    const common = { year: r.fiscal_year, transId: r.trans_id, batch: r.batch_no, date: r.d, entryDate: r.entered, dueDate: r.due, thirdDate: r.d3, accountKey: r.acc, type: credit ? "credit" : "invoice", typeCode: r.trans_type, amount: round2(credit && !supplier ? -num(r.amount) : num(r.amount)), posted: r.status === 1, description: r.description, details: r.details || null, documentId: r.document_id || null, allocationNumber: r.tax_alloc_number || null };
+    if (supplier) {
+      const expense = ctx.account(r.debit_account);
+      return { ...common, docNumber: r.reference2 || r.reference || null, kind: "supplier", supplierName: a.name ?? r.credit_name ?? null, expenseAccount: r.debit_account, expenseName: expense.name ?? r.debit_name ?? null, expenseGroup: expense.groupName ?? null };
+    }
+    return { ...common, docNumber: r.reference, kind: register.includes(a.group) ? "register" : "customer", customerName: a.name };
   });
-  const [tot] = await financeSql(`SELECT SUM(IF(${inList("e.trans_type", cr, params, "c")}, -e.amount, e.amount)) AS amount FROM journal_entries e WHERE ${where.join(" AND ")}`, params);
-  return { data, meta: { from, to, type: type || "all", accounts: accounts.length ? accounts : "all", q, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(tot?.amount), withVat: true }, codes: ["income_not_posted", "before_data_start", "unposted_entries"], range: { from, to } };
+  const [tot] = await financeSql(`SELECT SUM(${signed}) AS amount FROM journal_entries e WHERE ${where.join(" AND ")}`, params);
+  return {
+    data,
+    meta: { from, to, side, type: type || "all", accounts: accounts.length ? accounts : "all", q, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(tot?.amount), withVat: true, dates: "date = the invoice date (ValueDate), entryDate = the day it was entered in Hashavshevet (IssueDate), dueDate, thirdDate (DatF3)" },
+    codes: supplier ? ["before_data_start", "unposted_entries"] : ["income_not_posted", "before_data_start", "unposted_entries"],
+    range: { from, to },
+  };
 });
 
 route("/statement", async (req, ctx) => {

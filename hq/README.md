@@ -209,7 +209,11 @@ by adding them to `ACCOUNTANT_CALCS`). The default source for accounting words i
 source in any area when the question says "בספרים" / "from the books"; "הכנסות" alone stays Beecomm. Every result has
 `companies[].warnings` from the admin, `high` first: no salary expense in 2026, income not posted after August 2026, a bank
 gap of 6.16 million, supplier balances that look wrong, "not checked by the accountant yet" — the writer puts a `high`
-warning as a "⚠" line next to the numbers it affects (WRITE prompt, "The books"). Amounts are without VAT except supplier
+warning as a "⚠" line next to the numbers it affects (WRITE prompt, "The books"). **Supplier invoices as the books hold
+them** (owner 2026-11-09, calc `supplier_invoices`, `GET /finance/invoices?side=supplier`): the invoice date, the entry
+date (`entryDate`, the day the bookkeeper keyed it in), supplier, number (the last digits, as Hashavshevet keeps it),
+amount with VAT (a credit note minus), the expense account and the batch — "חשבוניות ספקים / הוצאה שבספרים", "תאריך
+הזנה ותאריך הוצאה"; never `missing_invoices` for it (that one compares Drive with the books). Amounts are without VAT except supplier
 invoices, customer invoices and cheques. `vat_summary` (the books) is not `vat_report` (Beecomm). An account named by
 text (`q`) that matches several accounts comes back `ambiguous` with the matches, and the answer asks which one. The
 accounting menu suggests 8 more questions for the chain admin (`joya.area.accounting.s9`–`s16`). **Missing invoices
@@ -428,6 +432,25 @@ employees…), the writer puts them in a pipe table (`| a | b |` + `|---|---|`; 
 shows it as a table (`client/AskBox.js` → `AnswerBody`), and under every table a **Download Excel** link:
 `GET /api/joya/ai/requests/:id/tables/:n.xlsx` (`src/services/answerExcel.js`, exceljs from the repo root; only the
 asking user; numbers as numbers, the sheet right-to-left for Hebrew). One reader for both sides: `lib/answerTables.js`.
+
+**Files to Drive (owner 2026-11-09).** The Excel link serves the table that is on the screen. When the user asks for a
+FILE ("לאקסל", "ב-XL", "קובץ", "גיליון", "export"), for a whole list that is too big for the chat (more than ~150 rows:
+"כל החשבוניות מתחילת השנה", "all the bank lines of the year") or for something to SHARE ("תשתף עם רואה החשבון", "a link
+I can send"), the planner adds `"file": { "kind": "sheet", "title", "show", "columns"? }` to the plan (PLAN prompt →
+"FILES"; `show` false = the user does not want the table in the chat; `columns` only when the user names the fields).
+The hub (`ai.js` `compute`) then runs the same calculations in **export mode** (`params.export = true`: the finance lists
+take every row the admin can give, `finance.js` `limitOf` / `EXPORT_MAX` 5000, instead of the chat's first rows), builds
+one workbook from the results — every list of objects in them is a tab, nested objects flattened, a result with no
+list becomes a key / value tab (`src/lib/sheetTabs.js` `tabsOf`, pure, tested) plus a last tab "Joya" with the
+question and the calculations — and uploads it to the owner's Drive folder **with conversion to a Google Sheet**
+(`src/services/sheets.js`, Drive API only, no Sheets API: the invoice agent's Google login, the accountant's account,
+`INVOICE_DRIVE_CREDENTIALS` / `INVOICE_DRIVE_TOKEN`, scope drive.file; the folder id in `JOYA_SHEETS_FOLDER`, shared
+with that account). The file stays with the request (`meta_json.file`: url, name, tabs, rows; `answer()` and the
+client keep it), the chat shows **one link under the answer** (`AskBox.js` → `SheetFile`), and the writer gets `<file>`
+(what is inside, how many rows) and writes 2–4 lines, no table when `show` is false, never a URL (WRITE prompt →
+"FILE ANSWERS"); `<file_error>` (folder or login not set up: `FILE_UNAVAILABLE`; no rows: `NO_ROWS`) → one line and the
+table as usual. `context.files.sheet` tells the planner whether files are possible. Works for any calculation in any
+area. Eval `x-file-*`.
 
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from

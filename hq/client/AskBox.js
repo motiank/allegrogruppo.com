@@ -232,6 +232,26 @@ function FileButton({ href, label, classes }) {
   );
 }
 
+/** A file answer: the Google Sheet the system made in the owner's Drive folder (meta.file), or why it could not. */
+function SheetFile({ r, classes }) {
+  const { t } = useT();
+  const f = r.meta?.file;
+  const e = r.meta?.fileError;
+  if (!f && !e) return null;
+  if (!f) return <div className={classes.warn}>⚠ {t('joya.ask.file.sheetFailed')} {e.message}</div>;
+  return (
+    <div className={classes.files}>
+      <a className={classes.fileBtn} href={f.url} target="_blank" rel="noopener noreferrer">
+        📄 {t('joya.ask.file.sheet')}
+      </a>
+      <span dir="auto">
+        {f.name} · {t('joya.ask.file.sheetRows', { rows: f.rows })}
+        {f.tabs?.length > 1 ? ` · ${f.tabs.map((x) => `${x.name} (${x.rows})`).join(', ')}` : ''}
+      </span>
+    </div>
+  );
+}
+
 /** The payroll files of a payroll_files calc: per location, the payslip Excel and the payroll-software file. */
 function PayrollFiles({ r, classes }) {
   const { t } = useT();
@@ -305,6 +325,7 @@ export function Answer({ r, onChanged, head = true }) {
       {r.status === 'ANSWERED' && (
         <>
           <AnswerBody r={r} classes={classes} />
+          <SheetFile r={r} classes={classes} />
           <PayrollFiles r={r} classes={classes} />
       <BankReconFiles r={r} classes={classes} />
           {unverified.length ? (

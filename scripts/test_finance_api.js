@@ -642,6 +642,31 @@ describe("endpoints", () => {
       assert.deepEqual(acc.data.map((i) => i.accountKey), acc.data.map(() => "200033"));
       assert.ok(r.codes.includes("income_not_posted"));
     });
+    test("GET /invoices?side=supplier: the books' supplier invoices with the entry date (owner 2026-11-09)", async () => {
+      const r = await ok(`/invoices?company=${COMPANY}&from=2026-01-01&to=2026-11-07&side=supplier&limit=5000`);
+      assert.equal(r.meta.side, "supplier");
+      assert.ok(r.meta.total > 2000 && r.data.length === r.meta.total, `all rows in one page: ${r.data.length} of ${r.meta.total}`);
+      assert.ok(r.data.every((i) => i.kind === "supplier" && i.posted && i.supplierName && i.expenseAccount));
+      // a supplier credit note = a minus amount on the same entry types
+      assert.ok(r.data.every((i) => (i.type === "credit") === i.amount < 0));
+      const cr = await ok(`/invoices?company=${COMPANY}&from=2026-01-01&to=2026-11-07&side=supplier&type=credit`);
+      assert.ok(cr.meta.total > 50 && cr.data.every((i) => i.type === "credit" && i.amount < 0));
+      const inv = await ok(`/invoices?company=${COMPANY}&from=2026-01-01&to=2026-11-07&side=supplier&type=invoice&limit=1`);
+      assert.equal(inv.meta.total + cr.meta.total, r.meta.total);
+      assert.ok(r.data.every((i) => /^\d{4}-\d{2}-\d{2}$/.test(i.date) && (i.entryDate == null || /^\d{4}-\d{2}-\d{2}$/.test(i.entryDate))));
+      assert.ok(r.data.filter((i) => i.entryDate && i.entryDate !== i.date).length > r.data.length / 2, "the entry date is a different day from the invoice date on most entries");
+      close(r.meta.amount, sum(r.data, (i) => i.amount));
+      assert.ok(r.data.every((i) => ["ח18", "תצ", "ת23", "חק", "ת"].includes(i.typeCode)));
+      const q = await ok(`/invoices?company=${COMPANY}&from=2026-10-01&to=2026-10-31&side=supplier&q=מטאורי`);
+      assert.ok(q.data.length > 0 && q.data.every((i) => i.supplierName.includes("מטאורי")));
+      const acc = await ok(`/invoices?company=${COMPANY}&from=2026-01-01&to=2026-11-07&side=supplier&account=${q.data[0].accountKey}`);
+      assert.ok(acc.data.every((i) => i.accountKey === q.data[0].accountKey));
+      await fail(`/invoices?company=${COMPANY}&from=2026-01-01&side=sideways`, 400, "bad_request");
+      // the customer side is unchanged, plus the entry date
+      const c = await ok(`/invoices?company=${COMPANY}&from=2026-01-01&to=2026-10-31&limit=1`);
+      assert.equal(c.meta.side, "customer");
+      assert.ok(c.data[0].entryDate && c.data[0].customerName);
+    });
     test("GET /statement: supplier and customer, open items tie to the balance, kinds", async () => {
       const s = await ok(`/statement?company=${COMPANY}&account=500059&from=2026-09-01`);
       const d = s.data;

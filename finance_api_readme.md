@@ -595,11 +595,23 @@ no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on
 `{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:
 `node --test scripts/test_bank_recon.js`.
 
-### `GET /finance/invoices?company=&from=&to=[&account=][&q=][&type=invoice|credit][&includeUnposted=1][&limit=][&offset=]`
+### `GET /finance/invoices?company=&from=&to=[&side=customer|supplier][&account=][&q=][&type=invoice|credit][&includeUnposted=1][&limit=][&offset=]`
 
-Use case 16: "all income invoices from X in the last year". Entries of the customer invoice types. A credit note is
-minus. `amount` includes VAT. Posted and dated in 2026 until October: 129 documents (128 of fiscal year 2026, and one
-dated 2026 that hash-sync keeps in year 2024), 14.6 million.
+Use case 16: "all income invoices from X in the last year". Entries of the customer invoice types (`side=customer`,
+the default). A credit note is minus. `amount` includes VAT. Posted and dated in 2026 until October: 129 documents
+(128 of fiscal year 2026, and one dated 2026 that hash-sync keeps in year 2024), 14.6 million.
+
+**`side=supplier` (owner 2026-11-09: "the invoices that are in the books — only in the books").** The supplier invoice
+types (`ח18`, `תצ`, `ת23`, `חק`, `ת`); the supplier is the credit account, the expense account is the debit side
+(`expenseAccount`, `expenseName`, `expenseGroup`); `kind` = `supplier`; `supplierName`. A supplier credit note is an
+entry of the same types with a minus amount (`type` = `credit`, 102 of 2,756 in 2026; `type=credit` / `type=invoice`
+filter by the sign). `docNumber` = `reference2`, else `reference` — Hashavshevet keeps the invoice number's last digits
+there. 2026 until 2026-11-07: 2,756 entries, 9.38 million. `q` also searches `details`.
+
+**Dates (both sides).** `date` = Hashavshevet's ValueDate (the invoice's date), **`entryDate`** = IssueDate (the day the
+bookkeeper entered it — "תאריך הזנה"; on 2,744 of 2,774 supplier invoices of 2026 it differs from the date), `dueDate` =
+DueDate (= the date on all but 3), `thirdDate` = DatF3. Also `batch` (the batch number) and `details`. `meta.dates`
+repeats this.
 
 Many of these are monthly register entries, not invoices to a real customer. `kind` shows which: `register` for
 accounts in group 210, and `customer` for the others.

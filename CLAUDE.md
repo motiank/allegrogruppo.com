@@ -96,6 +96,14 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   06:45 where `INVOICE_DRIVE_AUTO=1`. Joya calc `missing_invoices` (chain admin; "invoices not booked yet", one part per channel — Drive is the first channel, not the only one). Tests `scripts/test_invoice_match.js`,
   `scripts/test_finance_api.js`. The agent runs on the owner's machine (cron every 15 min, connected 2026-11-05, 611
   Pasta Lina invoices filed by 2026-11-08); its filing keeps the flags. Deployed 2026-11-08 (`3cce655`): the Google files live in `/home/twit/.secrets/invoice-drive/` on the droplet (the admin runs as user `twit`), `allegro-admin`, `joya-hq` and `joya-runner` restarted.
+- **Files to Drive + supplier invoices from the books** (2026-11-09, owner): Joya makes a Google Sheet in the owner's Drive
+  folder when the user asks for a file, for a list too big for the chat, or for something to share — any calculation, any
+  area (`hq/src/services/sheets.js`, `hq/src/lib/sheetTabs.js`, plan `file`, hq README → "Files to Drive"); the Excel link
+  under a chat table stays. Uses the invoice agent's Google login (accountant@allegrogruppo.com, `INVOICE_DRIVE_*`) and the
+  folder id `JOYA_SHEETS_FOLDER` — both must be in `hq/.env` on the droplet (the admin's files are in
+  `/home/twit/.secrets/invoice-drive/`; hq runs as `twit`). Finance API `GET /finance/invoices?side=supplier` (+ `entryDate`
+  on both sides) and Joya calc `supplier_invoices`: the books' supplier invoices with the entry date. Tests
+  `scripts/test_finance_api.js`, `hq/test/test_joya_lib.mjs`; eval `x-file-*`, `f-supplier-*`. Needs an hq client build on deploy.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
   `admin/client/pages/Downloads.js`). `GET /admin/downloads` lists the install packages, `GET /admin/downloads/hash-sync-windows`
   builds the Hashavshevet sync Windows package from the deployed repo (`hash-sync/scripts/build-windows-package.js` + jszip,

@@ -22,6 +22,10 @@ const LIMITS = { recon: 15, aging: 30, trialBalance: 120, ledger: 150, journal: 
 const bad = (m) => Object.assign(new Error(m), { code: 'BAD_REQUEST' });
 const num = (v) => (v == null || v === '' ? null : Number(v));
 const clamp = (v, d, max) => Math.min(Math.max(Number(v) || d, 1), max);
+// A file answer (ai.js compute with a plan `file`: the rows go into a Google Sheet, owner 2026-11-09) takes every row the
+// admin can give (its MAX_LIMIT), the chat only the first rows: p.export = true raises the cap of every list below.
+export const EXPORT_MAX = 5000;
+const limitOf = (p, d, max) => (p?.export ? EXPORT_MAX : clamp(p.limit, d, max));
 
 /** The dated params of a report: from and to as YYYY-MM-DD (to defaults to today on the admin side). */
 export function dates(p, { required = true } = {}) {
@@ -178,7 +182,7 @@ export async function spending(companies, p = {}) {
 export async function aging(companies, p = {}) {
   const side = oneOf(p, 'side', ['customers', 'suppliers']).side;
   if (!side) throw bad('side must be customers or suppliers');
-  const limit = clamp(p.limit, LIMITS.aging, 300);
+  const limit = limitOf(p, LIMITS.aging, 300);
   const q = textOf(p, 'q').q;
   const params = { side, ...asOf(p), ...flagOf(p, 'excludeGroupCompanies'), ...textOf(p, 'account') };
   return result('aging', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/aging', params, (d, m) => {
@@ -200,7 +204,7 @@ export async function intercompany(companies, p = {}) {
 
 /** Trial balance (מאזן בוחן) at a date: debit, credit and balance per account; with from, the movement of that period and the opening balance. */
 export async function trialBalance(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.trialBalance, 600);
+  const limit = limitOf(p, LIMITS.trialBalance, 600);
   const q = textOf(p, 'q').q;
   const params = { ...asOf(p), ...(p.from ? dates({ from: p.from }) : {}), ...textOf(p, 'group') };
   return result('trial_balance', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/trial-balance', params, (d, m) => {
@@ -213,7 +217,7 @@ export async function trialBalance(companies, p = {}) {
 
 /** The account card (כרטסת) of one account: its lines with a running balance, opening and closing balance. */
 export async function accountCard(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.ledger, 500);
+  const limit = limitOf(p, LIMITS.ledger, 500);
   const params = { ...dates(p), ...textOf(p, 'account'), ...textOf(p, 'q'), ...flagOf(p, 'includeUnposted'), limit, ...(p.offset ? { offset: Number(p.offset) || 0 } : {}) };
   if (!params.account && !params.q) throw bad('account (the account key) or q (part of the account name) is needed');
   return result('account_card', params, await perCompany(companies, '/ledger', params, (d, m) => ({
@@ -228,7 +232,7 @@ export async function journalSearch(companies, p = {}) {
     if (!Number.isInteger(year) || !Number.isInteger(transId)) throw bad('year and transId must be numbers');
     return result('journal_search', { year, transId }, await perCompany(companies, `/journal/${year}/${transId}`, {}, (d, m) => ({ entry: d, debit: m.debit, credit: m.credit })));
   }
-  const limit = clamp(p.limit, LIMITS.journal, 500);
+  const limit = limitOf(p, LIMITS.journal, 500);
   const params = { ...dates(p, { required: false }), ...textOf(p, 'batch'), ...textOf(p, 'reference'), ...textOf(p, 'account'), ...textOf(p, 'type'), ...textOf(p, 'q'), ...oneOf(p, 'posted', ['0', '1']), limit };
   if (!params.from && !params.to && !params.batch && !params.reference && !params.account && !params.q && !params.type) throw bad('give a period, batch, reference, account, type or text to search');
   return result('journal_search', params, await perCompany(companies, '/journal', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, entries: d })), {
@@ -284,7 +288,7 @@ export async function bankReconReport(companies, p = {}) {
 export async function bankOpenItems(companies, p = {}) {
   const side = oneOf(p, 'side', ['bank', 'book']).side;
   if (!side) throw bad('side must be bank or book');
-  const limit = clamp(p.limit, LIMITS.open, 500);
+  const limit = limitOf(p, LIMITS.open, 500);
   const params = { side, ...dates(p, { required: false }), ...textOf(p, 'account'), ...(p.minAge != null ? { minAge: Number(p.minAge) || 0 } : {}), ...flagOf(p, 'includeUnposted'), limit };
   return result('bank_open_items', params, await perCompany(companies, '/bank/open', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, rows: d })), {
     note: 'bank side: direction in / out, money in is plus, a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet); book side: side debit / credit on the bank account; ageDays = days since the line',
@@ -293,7 +297,7 @@ export async function bankOpenItems(companies, p = {}) {
 
 /** Suggested matches for open bank lines: one bank line to one book line with the same amount and direction. Suggestions only. */
 export async function bankMatchSuggestions(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.suggestions, 300);
+  const limit = limitOf(p, LIMITS.suggestions, 300);
   const params = { ...textOf(p, 'account'), ...(p.days != null ? { days: Number(p.days) || 0 } : {}), ...(p.minAmount != null ? { minAmount: Number(p.minAmount) || 0 } : {}), limit };
   return result('bank_match_suggestions', params, await perCompany(companies, '/bank/suggestions', params, (d, m) => ({ shown: d.length, count: m.total, openBankLines: m.openBankLines, openBookLines: m.openBookLines, single: m.single, many: m.many, rows: d })), {
     note: 'nothing is matched by this: the accountant matches in Hashavshevet; confidence single = one candidate, many = several; one-to-one only (a bank line that sums several book lines gets no suggestion)',
@@ -302,10 +306,23 @@ export async function bankMatchSuggestions(companies, p = {}) {
 
 /** Customer invoices and credit notes (with VAT), with the kind register (the monthly register entries) or customer. */
 export async function customerInvoices(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.invoices, 500);
+  const limit = limitOf(p, LIMITS.invoices, 500);
   const params = { ...dates(p), ...textOf(p, 'account'), ...textOf(p, 'q'), ...oneOf(p, 'type', ['invoice', 'credit']), ...flagOf(p, 'includeUnposted'), limit };
   return result('customer_invoices', params, await perCompany(companies, '/invoices', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, rows: d })), {
-    note: 'amount WITH VAT, a credit note is minus; kind register = the monthly entry of the cash register (not a real customer), customer = a real customer; docNumber = the invoice number',
+    note: 'amount WITH VAT, a credit note is minus; kind register = the monthly entry of the cash register (not a real customer), customer = a real customer; docNumber = the invoice number; entryDate = the day it was entered in Hashavshevet',
+  });
+}
+
+/**
+ * Supplier invoices as the books hold them (owner 2026-11-09: "the invoices that are in the books — only in the books"),
+ * with VAT: the invoice date, the day it was entered in Hashavshevet (entryDate), the supplier, the expense account, the
+ * number, the batch and the description. The whole year goes into a file (export); the chat shows the first rows.
+ */
+export async function supplierInvoices(companies, p = {}) {
+  const limit = limitOf(p, LIMITS.invoices, 500);
+  const params = { side: 'supplier', ...dates(p), ...textOf(p, 'account'), ...textOf(p, 'q'), ...oneOf(p, 'type', ['invoice', 'credit']), ...flagOf(p, 'includeUnposted'), limit, ...(p.offset ? { offset: Number(p.offset) || 0 } : {}) };
+  return result('supplier_invoices', params, await perCompany(companies, '/invoices', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, dates: m.dates, rows: d })), {
+    note: 'amount WITH VAT, a supplier credit note is minus (type credit); date = the invoice date, entryDate = the day the bookkeeper entered it in Hashavshevet (תאריך הזנה), docNumber = the invoice number as Hashavshevet keeps it (often the last digits only); expenseAccount / expenseName = where the expense was booked; these are the BOOKS only — not Drive, not the mailbox (for invoices missing in the books use missing_invoices)',
   });
 }
 
@@ -325,7 +342,7 @@ export async function accountStatement(companies, p = {}) {
 
 /** Issued cheques: future, cleared (matched to the bank), not cleared; returned is not available yet. */
 export async function cheques(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.cheques, 500);
+  const limit = limitOf(p, LIMITS.cheques, 500);
   const q = textOf(p, 'q').q;
   const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), limit: q ? 5000 : limit };
   return result('cheques', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/cheques', params, (d, m) => {
@@ -365,7 +382,7 @@ export async function withholding(companies, p = {}) {
 
 /** Allocation numbers (מספר הקצאה) on supplier invoices: which invoices need one and which have a real one. */
 export async function allocationNumbers(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.allocation, 500);
+  const limit = limitOf(p, LIMITS.allocation, 500);
   const params = { ...dates(p), ...flagOf(p, 'missingOnly'), ...(p.minAmount != null ? { minAmount: Number(p.minAmount) || 0 } : {}), ...textOf(p, 'account'), limit };
   return result('allocation_numbers', params, await perCompany(companies, '/allocation-numbers', params, (d, m) => ({ shown: d.length, count: m.total, counts: m.counts, thresholds: m.thresholds, thresholdsConfirmed: m.thresholdsConfirmed, rows: d })), {
     note: 'required = the invoice total (with VAT) is at or over the legal limit of its date (the limits are not confirmed yet); status ok = a real number, missing = none, suspect = a short or odd value',
@@ -401,7 +418,7 @@ const PLANNED_CHANNELS = 'not connected yet: bank debits and card charges with n
 
 /** Invoices not booked yet in Hashavshevet, from every channel the system can check — today the Drive channel. */
 export async function missingInvoices(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.invoices, 500);
+  const limit = limitOf(p, LIMITS.invoices, 500);
   const wanted = Array.isArray(p.channels) && p.channels.length ? p.channels.map(String) : Object.keys(INVOICE_CHANNELS);
   const unknown = wanted.filter((k) => !INVOICE_CHANNELS[k]);
   if (unknown.length) throw bad(`unknown channel ${unknown.join(', ')} (channels: ${Object.keys(INVOICE_CHANNELS).join(', ')})`);
@@ -431,7 +448,7 @@ export async function payrollCheck(companies, p = {}) {
 
 /** Exceptions in the books: unposted entries, future-dated entries, possible duplicates, expense lines without a branch. */
 export async function exceptions(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.exceptions, 500);
+  const limit = limitOf(p, LIMITS.exceptions, 500);
   const params = { ...oneOf(p, 'type', ['unposted', 'future_dated', 'possible_duplicate', 'missing_branch', 'wrong_account']), ...dates(p, { required: false }), limit };
   return result('exceptions', params, await perCompany(companies, '/exceptions', params, (d, m) => ({ shown: d.length, count: m.total, counts: m.counts, notAvailable: m.notAvailable, from: m.from, to: m.to, rows: d, note: m.note })), {
     note: 'counts = how many of each type; possible_duplicate is a wide rule (same accounts, amount and reference) and can be a real repeat; wrong_account has no rule yet',
@@ -440,7 +457,7 @@ export async function exceptions(companies, p = {}) {
 
 /** Change history in Hashavshevet: account changes (who, when, field, old and new value), logins, 874 runs, and what each night\'s sync changed. */
 export async function changeHistory(companies, p = {}) {
-  const limit = clamp(p.limit, LIMITS.changes, 500);
+  const limit = limitOf(p, LIMITS.changes, 500);
   const params = { ...dates(p), ...oneOf(p, 'kind', ['account', 'login', 'sync', 'vat_run']), ...textOf(p, 'account'), limit };
   return result('change_history', params, await perCompany(companies, '/changes', params, (d, m) => ({ shown: d.length, count: m.total, counts: m.counts, rows: d, note: m.note })), {
     note: 'Hashavshevet logs account changes and logins, not journal edits; kind sync shows what the nightly copy found changed, from 6 November 2026 on',

@@ -6,11 +6,12 @@ import { fillTotals, floorMoney } from '../lib/answerTables.js';
 
 const MAX_RESULT_CHARS = 60_000;
 
-function trimResults(results) {
+// keep = rows per list when the result is big (60); a file answer that is not shown in the chat keeps only 10
+function trimResults(results, keep = 60) {
   return results.map((r) => {
     const s = JSON.stringify(r.result ?? null);
-    if (s.length <= MAX_RESULT_CHARS) return r;
-    return { ...r, result: JSON.parse(JSON.stringify(r.result, (k, v) => (Array.isArray(v) && v.length > 60 ? [...v.slice(0, 60), `… ${v.length - 60} more rows`] : v))) };
+    if (s.length <= MAX_RESULT_CHARS && keep >= 60) return r;
+    return { ...r, result: JSON.parse(JSON.stringify(r.result, (k, v) => (Array.isArray(v) && v.length > keep ? [...v.slice(0, keep), `… ${v.length - keep} more rows (all of them are in the file)`] : v))) };
   });
 }
 
@@ -90,11 +91,14 @@ export function writePrompt(ctx, computed, plan, live = null) {
     contextJson({ locations: ctx.locations, roles: ctx.roles, shifts: ctx.shifts, object: ctx.object }, live?.sent),
     '</context>',
     '<results>',
-    JSON.stringify(trimResults(computed.results || [])),
+    JSON.stringify(trimResults(computed.results || [], computed.file && !computed.file.show ? 10 : undefined)),
     '</results>',
   ];
   if (computed.proposal) parts.push('<proposal>', JSON.stringify({ type: computed.proposal.type, op: computed.proposal.op, rule: computed.proposal.rule, before: computed.proposal.before, preview: computed.proposal.preview, text: computed.proposal.text, note: computed.proposal.note, company: computed.proposal.company, ops: computed.proposal.ops }), '</proposal>');
   if (computed.proposalError) parts.push('<proposal_error>', JSON.stringify(computed.proposalError), '</proposal_error>');
+  // a file answer: the sheet that was made (the chat shows its link under the answer) or why it was not
+  if (computed.file) parts.push('<file>', JSON.stringify({ kind: computed.file.kind, name: computed.file.name, rows: computed.file.rows, tabs: computed.file.tabs, show: computed.file.show }), '</file>');
+  if (computed.fileError) parts.push('<file_error>', JSON.stringify(computed.fileError), '</file_error>');
   if (plan.note) parts.push(`planner note: ${plan.note}`);
   parts.push('Write the answer now (plain text, with a table only as the rules say).');
   return parts.join('\n');
@@ -110,6 +114,8 @@ export function cleanPlan(plan) {
     draft: typeof p.draft === 'string' ? p.draft : null,
     rule: p.rule && typeof p.rule === 'object' && !Array.isArray(p.rule) ? p.rule : null,
     payments: Array.isArray(p.payments) ? p.payments.filter((o) => o && typeof o === 'object') : null,
+    // a file answer: { kind: 'sheet', title?, show? } — the rows go into a Google Sheet, the chat gets the link
+    file: p.file && typeof p.file === 'object' && !Array.isArray(p.file) ? { kind: 'sheet', title: typeof p.file.title === 'string' ? p.file.title : null, show: p.file.show === true, columns: Array.isArray(p.file.columns) ? p.file.columns : null } : null,
     note: typeof p.note === 'string' ? p.note : null,
   };
 }
@@ -165,7 +171,7 @@ async function answerOne({ id, ctx, hub, planner, writer, live = null, log, inst
     raw = parseJsonObject(p.text);
   }
   const plan = cleanPlan(raw);
-  const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule, payments: plan.payments });
+  const computed = await hub.post(`/joya/ai/runner/${id}/compute`, { calcs: plan.calcs, ops: plan.ops, whatIf: plan.whatIf, draft: plan.draft, rule: plan.rule, payments: plan.payments, file: plan.file });
   const w = await writer.call(writePrompt(ctx, computed, plan, live ? { sent: live.sent.write, first: live.turns === 0 } : null));
   cost += w.costUsd ?? 0;
   // money in whole ₪, cut down; table totals are recalculated by the system from the table's rows; missing numbers in a table are 0 (owner)

@@ -20,6 +20,7 @@ import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
 import * as fin from './finance.js';
+import { createSheet, sheetsUnavailable } from './sheets.js';
 import * as payments from './payments.js';
 import * as source from './source.js';
 import { attendanceReport, clockRows } from './attendance.js';
@@ -511,6 +512,11 @@ export const CALCS = {
     about: 'customer invoices and credit notes from the books (with VAT): date, number, customer, amount, kind customer / register (the monthly register entries are not real customers); the total of the selection',
     run: finCalc(fin.customerInvoices),
   },
+  supplier_invoices: {
+    params: `{ companyKeys?, ${FIN_PERIOD}, q?: "part of the supplier name", account?, type?: "invoice" | "credit", includeUnposted?, limit? }`,
+    about: 'supplier (expense) invoices and credit notes (minus) as the BOOKS hold them, with VAT: the invoice date, the day it was entered in Hashavshevet (entryDate), number, supplier, amount, the expense account and group, batch, description; the count and total of the selection. The books only — not Drive, not the mailbox',
+    run: finCalc(fin.supplierInvoices),
+  },
   account_statement: {
     params: '{ companyKeys?, account?: "account key", q?: "part of the name" (one of the two), from?, to? }',
     about: 'the card of one supplier or customer (כרטיס ספק / לקוח): invoices, credit notes, payments and other lines of the period, the open items with their age, the balance (plus = owed) and totals; several accounts match → ambiguous (ask which one)',
@@ -599,7 +605,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
@@ -929,6 +935,8 @@ export async function buildContext(access, r) {
     // the payees of earlier payments (chain admin): the planner reuses their spelling in a payment op
     ...(access.isAdmin ? { payees: (await payments.payees(scope?.companyKey ?? null, 50).catch(() => [])).map((x) => x.name) } : {}),
     limits: { maxCalcs: MAX_CALCS },
+    // a file answer (plan.file): the rows of the results go into a Google Sheet in the owner's Drive folder
+    files: sheetsUnavailable() ? { sheet: false, why: sheetsUnavailable() } : { sheet: true },
     changeFormats: CHANGE_FORMATS,
     object,
   };
@@ -960,13 +968,15 @@ export const CHANGE_FORMATS = {
  * Run the model's plan: calculations with the user's access, and validation of the
  * proposed change. Errors are returned per calculation (the model can explain them).
  */
-export async function compute(id, { calcs = [], ops = null, whatIf = null, rule = null, payments: paymentOps = null }) {
+export async function compute(id, { calcs = [], ops = null, whatIf = null, rule = null, payments: paymentOps = null, file = null }) {
   const { r, access: user } = await requestAccess(id);
   const scope = await scopeOf(user, r);
   const access = scope?.locationIds.length ? { ...user, scopeIds: scope.locationIds } : user;
   if (r.status !== 'THINKING') throw err('CONFLICT', 'request is not open');
   const results = [];
   const list = Array.isArray(calcs) ? calcs : [];
+  // a file answer (owner 2026-11-09): every row of the lists goes into a Google Sheet, so the calcs run in export mode
+  const wantFile = file && typeof file === 'object' && !Array.isArray(file) ? { kind: 'sheet', title: typeof file.title === 'string' ? file.title.slice(0, 80) : null, show: file.show === true, columns: Array.isArray(file.columns) ? file.columns.filter((c) => typeof c === 'string').slice(0, 60) : null } : null;
   for (const [i, c] of list.entries()) {
     if (i >= MAX_CALCS) {
       results.push({ calc: c?.calc, params: c?.params, error: `not run: at most ${MAX_CALCS} calculations per request` });
@@ -982,7 +992,7 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
       continue;
     }
     try {
-      results.push({ calc: c.calc, params: c.params || {}, result: await def.run(access, c.params || {}) });
+      results.push({ calc: c.calc, params: c.params || {}, result: await def.run(access, wantFile ? { ...(c.params || {}), export: true } : c.params || {}) });
     } catch (e) {
       results.push({ calc: c.calc, params: c.params, error: e.message });
     }
@@ -1010,13 +1020,25 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
   } catch (e) {
     proposalError = { code: e.code || 'ERROR', message: e.message, details: e.details || null };
   }
-  await q(`UPDATE joya_ai_requests SET calcs_json=:c, proposal_json=:p, proposal_status=:s WHERE id=:id`, {
+  let made = null;
+  let fileError = null;
+  if (wantFile) {
+    try {
+      made = { ...(await createSheet({ title: wantFile.title, question: r.question, lang: r.lang, today: todayLocal(), calcs: results.map((x) => ({ calc: x.calc, params: x.params })), columns: wantFile.columns }, results)), show: wantFile.show };
+    } catch (e) {
+      fileError = { code: e.code || 'ERROR', message: e.message };
+    }
+  }
+  // the file stays with the request (meta_json.file; answer() keeps it) — the chat shows the link under the answer
+  const meta = parseJson(r.meta_json) || {};
+  await q(`UPDATE joya_ai_requests SET calcs_json=:c, proposal_json=:p, proposal_status=:s, meta_json=:m WHERE id=:id`, {
     c: JSON.stringify(results),
     p: proposal ? JSON.stringify(proposal) : null,
     s: proposal ? 'PENDING' : null,
+    m: JSON.stringify({ ...meta, ...(made ? { file: made } : {}), ...(fileError ? { fileError } : {}) }),
     id,
   });
-  return { results, proposal, proposalError };
+  return { results, proposal, proposalError, file: made, fileError };
 }
 
 const toOrderOp = (o) => (o.op === 'add' ? { op: 'add', ingredientId: o.ingredientId, name: o.name, qty: o.qty, unit: o.unit, note: o.note } : { op: o.op, lineId: o.lineId, qty: o.qty, note: o.note });
@@ -1026,8 +1048,8 @@ export async function answer(id, { answer: text, failed = false, error = null, m
   const r = await one(`SELECT * FROM joya_ai_requests WHERE id=:id`, { id });
   if (!r) throw err('NOT_FOUND', 'not found');
   if (r.status !== 'THINKING') throw err('CONFLICT', 'already answered');
-  const scope = parseJson(r.meta_json)?.scope;
-  if (scope) meta = { ...(meta || {}), scope };
+  const kept = parseJson(r.meta_json) || {};
+  if (kept.scope || kept.file || kept.fileError) meta = { ...(meta || {}), ...(kept.scope ? { scope: kept.scope } : {}), ...(kept.file ? { file: kept.file } : {}), ...(kept.fileError ? { fileError: kept.fileError } : {}) };
   await q(`UPDATE joya_ai_requests SET status=:s, answer_text=:a, error=:e, meta_json=:m, answered_at=NOW() WHERE id=:id`, {
     s: failed ? 'FAILED' : 'ANSWERED',
     a: failed ? null : String(text || '').slice(0, 20000),

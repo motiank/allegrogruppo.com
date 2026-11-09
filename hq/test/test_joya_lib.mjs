@@ -8,6 +8,7 @@ import { recommend, convert } from '../src/lib/recommend.js';
 import { splitAnswer, cellNumber, fillTotals, floorMoney } from '../lib/answerTables.js';
 import { shiftOfCheck, loadByShift, shiftProfile, learnRatios, forecastShifts, staffingActual } from '../src/lib/shiftModel.js';
 import { addRow, blankSums, vatLine, isHever, isHakafa } from '../src/lib/vatRules.js';
+import { tabsOf, flattenRow, cleanName, cellDate } from '../src/lib/sheetTabs.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -413,6 +414,33 @@ t('vatRules: a month — income from the type totals only, הקפה taken out, 2
   assert.equal(Math.round((l.vatIncomeBeforeVat + l.vat) * 100) / 100, 1420);
 });
 
+// ---- file answers (owner 2026-11-09): every row list of the results becomes a sheet tab
+t('sheetTabs: row lists become tabs, biggest first; containers, warnings and plain lists are not tabs; nested objects flatten', () => {
+  const results = [
+    { calc: 'supplier_invoices', params: {}, result: { report: 'supplier_invoices', warnings: [{ code: 'x' }], companies: [{ company: 'פסטה לינה', count: 3, rows: [{ docNumber: 143, date: '2026-01-01', amount: 2152, supplierName: 'מיט', extra: { a: 1 } }, { docNumber: 144, date: '2026-01-02', amount: 10, tags: ['x', 'y'] }] }] } },
+    { calc: 'missing_invoices', params: {}, result: { channels: [{ channel: 'drive', companies: [{ company: 'PL', statuses: ['a'], rows: [{ n: 1 }, { n: 2 }, { n: 3 }] }] }], otherChannels: 'x' } },
+    { calc: 'failed', error: 'boom' },
+  ];
+  const tabs = tabsOf(results);
+  assert.deepEqual(tabs.map((x) => [x.name, x.rows.length, x.calc]), [['drive · PL', 3, 'missing_invoices'], ['פסטה לינה', 2, 'supplier_invoices']]);
+  assert.deepEqual(tabs[1].columns, ['docNumber', 'date', 'amount', 'supplierName', 'extra.a', 'tags']);
+  assert.equal(tabs[1].rows[1].tags, 'x; y');
+  assert.deepEqual(flattenRow({ a: { b: { c: 1 } }, d: null }), { 'a.b.c': 1, d: null });
+  assert.equal(cleanName('a/b:c*[d]?'), 'a b c d');
+  assert.equal(cleanName('x'.repeat(40)).length, 31);
+  assert.equal(cellDate('2026-11-09').toISOString(), '2026-11-09T00:00:00.000Z');
+  assert.equal(cellDate('2026-11-09 10:00:00').toISOString(), '2026-11-09T00:00:00.000Z');
+  assert.equal(cellDate('מיט 2'), null);
+  assert.equal(cellDate(2026), null);
+  // no list at all → a key / value tab, so any data can go into a sheet
+  const kv = tabsOf([{ calc: 'x', result: { total: 5, note: 'n', warnings: [{ a: 1 }], sub: { a: 1 } } }]);
+  assert.deepEqual(kv.map((t) => [t.name, t.columns, t.rows]), [['x', ['key', 'value'], [{ key: 'total', value: 5 }, { key: 'note', value: 'n' }, { key: 'sub.a', value: 1 }]]]);
+});
+t('sheetTabs: two lists with the same name get different tab names', () => {
+  const tabs = tabsOf([{ calc: 'a', result: { x: { rows: [{ v: 1 }] }, y: { rows: [{ v: 2 }] } } }]);
+  assert.deepEqual(tabs.map((x) => x.name), ['a', 'a 2']);
+});
+
 console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);
 
 console.log('finance (the books)');
@@ -437,7 +465,7 @@ t('the books are for the chain admin only; every finance calc is in the catalogu
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 26); // 2026-11-08: + missing_invoices
+  assert.equal(FINANCE_CALCS.size, 27); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);

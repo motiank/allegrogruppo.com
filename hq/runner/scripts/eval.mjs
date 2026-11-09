@@ -90,6 +90,10 @@ function grade(f, plan) {
   } else if (e.payments === 'some') {
     if (!pays.length) fails.push('no payment ops');
   } else if (pays.length) fails.push(`unexpected payment ops ${JSON.stringify(pays)}`);
+  // file: a file answer (partial: { kind: 'sheet', show: false }); absent = no file
+  if (e.file) {
+    if (!partial(plan.file, e.file)) fails.push(`file ${JSON.stringify(plan.file)} ≠ ${JSON.stringify(e.file)}`);
+  } else if (plan.file) fails.push(`unexpected file ${JSON.stringify(plan.file)}`);
   // rule: a partial team-rule change that must match; absent = no rule change
   if (e.rule) {
     if (!partial(plan.rule, e.rule)) fails.push(`rule ${JSON.stringify(plan.rule)} ≠ ${JSON.stringify(e.rule)}`);

@@ -142,6 +142,15 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   115 cases all pass (one real miss, labor % → `branch_costs`, fixed in the prompt; 15 cases failed once on a transient
   `claude` CLI update mid-run and passed on re-run). The INQUIRY fixtures and the prompt's `draft` line were removed. Open: the accountant's access (decision 1), the
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
+- **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
+  file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
+  (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in
+  the results (`src/lib/sheetTabs.js` `tabsOf`) and uploads it as a Google Sheet to the owner's folder `JOYA_SHEETS_FOLDER`
+  with the invoice agent's login (accountant@, `INVOICE_DRIVE_*`); `meta_json.file` → one link under the answer
+  (`SheetFile`); writer rules "FILE ANSWERS"; the table's Excel link stays as it was. Eval `x-file-*`. README → "Files to Drive".
+- **Supplier invoices from the books** (2026-11-09, owner): calc `supplier_invoices` (`fin.supplierInvoices`, Finance API
+  `/invoices?side=supplier`: date, `entryDate`, supplier, expense account, credit notes minus) — "חשבוניות ספקים שבספרים",
+  "תאריך הזנה ותאריך הוצאה"; the planner never uses `missing_invoices` for it. Eval `f-supplier-*`.
 - **Missing invoices** (2026-11-08, owner): calc `missing_invoices` (`fin.missingInvoices`) = "which invoices are not
   booked yet", answered PER CHANNEL (`INVOICE_CHANNELS` in `finance.js`; the owner: Drive is the first channel, not the
   only one, and it must be transparent — the user asks about missing expense invoices and the Drive list is one part
