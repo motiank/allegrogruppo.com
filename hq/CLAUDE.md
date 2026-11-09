@@ -148,6 +148,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   the results (`src/lib/sheetTabs.js` `tabsOf`) and uploads it as a Google Sheet to the owner's folder `JOYA_SHEETS_FOLDER`
   with the invoice agent's login (accountant@, `INVOICE_DRIVE_*`); `meta_json.file` → one link under the answer
   (`SheetFile`); writer rules "FILE ANSWERS"; the table's Excel link stays as it was. Eval `x-file-*`. README → "Files to Drive".
+  Deployed 2026-11-09 (`17809f0`: hq/.env on the droplet got the three settings, hq built, admin + joya restarted).
 - **Supplier invoices from the books** (2026-11-09, owner): calc `supplier_invoices` (`fin.supplierInvoices`, Finance API
   `/invoices?side=supplier`: date, `entryDate`, supplier, expense account, credit notes minus) — "חשבוניות ספקים שבספרים",
   "תאריך הזנה ותאריך הוצאה"; the planner never uses `missing_invoices` for it. Eval `f-supplier-*`.
