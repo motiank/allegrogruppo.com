@@ -488,17 +488,19 @@ on the cheque, amount). `net` is the amount on the cheque, `amount` is before wi
 `scripts/test_priority_cheques.js`, `scripts/test_cheque_payees.js`; eval `pc-*`.
 
 **Fixed files in Drive (owner 2026-11-11: "merge into one table the Priority and Hashavshevet cheques, create an Excel on
-the Drive and provide the link — a fixed file that is updated all the time").** `src/services/fixedSheets.js`: a Google
-Sheet per key in the owner's Drive folder that keeps its id and link; the server rewrites it in place
+the Drive and provide the link — a fixed file that is updated all the time"; then: "no schedule and no service for that,
+upon demand: if I ask to see future cheques, Joya updates the file and provides the link").** `src/services/fixedSheets.js`:
+a Google Sheet per key in the owner's Drive folder that keeps its id and link; Joya rewrites it in place ON DEMAND
 (`upsertFixedSheet` in `sheets.js`: the file is found by `appProperties.joyaFixed = key`, which scope drive.file can
-read because the app made it, then `files.update` with the new workbook) every `JOYA_FIXED_SHEETS_EVERY_MIN` minutes
-(default 60; 0 = off; first run 2 minutes after start, `startFixedSheets()` in `server.js`) and on request. The link and
-the last refresh live in `joya_settings` → `fixedSheets`, so the chat answers without Drive. Key `cheques` = "שיקים –
-חשבשבת + פריוריטי · Joya": Finance API `/cheques/all` per finance company, one tab per company with Hebrew columns
-(`CHEQUE_COLUMNS`, `chequeRowHe`), the last tab "Joya" says when it was refreshed and the counts. Calc `cheques_file`
-(chain admin; `refresh: true` rebuilds now) returns the record and the chat shows the button "פתח את הקובץ הקבוע
-בדרייב" under the answer (`SheetFile`, `meta.file.fixed`); the writer never writes the URL. Suggestion
-`joya.area.accounting.s19`. Made 2026-11-11 from the owner's machine (4,343 rows, same file on refresh); eval `x-cheques-file*`.
+read because the app made it, then `files.update` with the new workbook; no timer, no service). The link and the last
+refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים – חשבשבת + פריוריטי · Joya": Finance API
+`/cheques/all` per finance company, one tab per company with Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`), the last
+tab "Joya" says when it was refreshed and the counts. Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
+"תעדכן את קובץ השיקים") rebuilds the file and returns the record; and every `cheques` question with state `future`
+("שיקים עתידיים", "שקלפ") rebuilds it too (`refreshForAnswer`) and adds `file` to its result. Either way the chat shows the
+button "פתח את הקובץ הקבוע בדרייב" under the answer (`SheetFile`, `meta.file.fixed`); the writer never writes the URL. A
+failed rebuild keeps the last good link and says so. Suggestion `joya.area.accounting.s19`. Made 2026-11-11 from the
+owner's machine (4,343 rows, same file on refresh); eval `x-cheques-file*`, `f-shaklap`.
 
 **Future cheques by day (owner 2026-11-11: "when I ask to see future cheques, put them in a table grouped by day and sum
 each day").** שקלפ = שיקים לפרעון = the future cheques (PLAN routing word → `cheques` state `future`). The `cheques`

@@ -12,7 +12,6 @@ import log from './lib/log.js';
 import { getDbPool } from './lib/dbpool.js';
 import sessionRoutes from './src/sessionRoutes.js';
 import joyaRoutes from './src/routes.js';
-import { startFixedSheets } from './src/services/fixedSheets.js';
 
 process.on('unhandledRejection', (reason) => {
   log.fatal({ err: reason instanceof Error ? reason : new Error(String(reason)) }, 'unhandledRejection');
@@ -65,7 +64,4 @@ app.use((err, req, res, _next) => {
 
 const PORT = Number(process.env.JOYA_HQ_PORT || process.env.PORT || 4300);
 const HOST = process.env.JOYA_HQ_HOST || '127.0.0.1';
-app.listen(PORT, HOST, () => {
-  log.info(`Joya Headquarter listening on ${HOST}:${PORT}`);
-  startFixedSheets(); // the fixed Drive files (the cheques sheet), refreshed every hour
-});
+app.listen(PORT, HOST, () => log.info(`Joya Headquarter listening on ${HOST}:${PORT}`));

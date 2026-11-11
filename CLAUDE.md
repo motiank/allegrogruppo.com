@@ -121,9 +121,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   eval `pc-*`. No DB table. Deployed 2026-11-11 (`ff83715`: pull, `allegro-admin`, `joya-hq`, `joya-runner` restarted).
   **One table + a fixed Drive file** (same day, owner): Finance API `GET /finance/cheques/all` (`admin/server/modules/chequesAll.js`:
   Hashavshevet's cheques module + Priority, one row per cheque, joined by number + amount, `bankDate` from the statement) and
-  Joya's fixed Google Sheet "שיקים – חשבשבת + פריוריטי · Joya" in the owner's temp folder, rewritten in place every hour
-  (`hq/src/services/fixedSheets.js`, `JOYA_FIXED_SHEETS_EVERY_MIN`; record in `joya_settings`); calc `cheques_file` gives the
-  button. hq README → "Fixed files in Drive". Needs an hq client build on deploy.
+  Joya's fixed Google Sheet "שיקים – חשבשבת + פריוריטי · Joya" in the owner's temp folder, rewritten in place ON DEMAND
+  (owner: no schedule) — by calc `cheques_file` and by every future-cheques question (`hq/src/services/fixedSheets.js`; record
+  in `joya_settings`); the button is under the answer. hq README → "Fixed files in Drive". Needs an hq client build on deploy.
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,

@@ -530,17 +530,24 @@ export const CALCS = {
   },
   cheques: {
     params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", number?: "a cheque number, or several comma-separated", limit? }',
-    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today = שיקים לפרעון = שקלפ; cleared = matched to the bank; not_cleared = due and not matched), with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number; returned cheques are not available yet',
-    run: finCalc(fin.cheques),
+    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today = שיקים לפרעון = שקלפ; cleared = matched to the bank; not_cleared = due and not matched), with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number; returned cheques are not available yet. With state future the fixed cheques file in Drive (every cheque, Hashavshevet + Priority) is rebuilt too and its button is shown under the answer (owner 2026-11-11)',
+    run: async (a, p) => {
+      const out = await finCalc(fin.cheques)(a, p);
+      // the owner asked to SEE the future cheques → Joya also refreshes the fixed Drive file and gives the link
+      if (p?.state === 'future' && !p?.export && a.isAdmin) {
+        const f = await fixedSheets.refreshForAnswer('cheques', { by: a.username });
+        out.fixedFile = f.fixedFile;
+        out.file = { name: f.name, updatedAt: f.updatedAt ?? null, rows: f.rows ?? null, counts: f.counts ?? null, error: f.error ?? null, note: 'the fixed cheques file in Drive (Hashavshevet + Priority, one row per cheque) was rebuilt for this answer; the chat shows its button under the answer — do not write the link' };
+      }
+      return out;
+    },
   },
   cheques_file: {
-    params: '{ refresh?: boolean (true = rebuild the file now, before answering) }',
-    about: 'the FIXED Google Sheet in the owner\'s Drive folder with every cheque of the company in one table — Hashavshevet\'s cheques module and the Priority history merged, one row per cheque, with the day the bank paid it; the same file and link every time, refreshed automatically every hour. Returns the link (shown as a button under the answer), when it was last refreshed, the rows and the counts per source. For "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "תעדכן את קובץ השיקים" (refresh true), "שיקים של חשבשבת ופריוריטי ביחד"; not for a list in the chat (cheques / priority_cheques)',
-    run: async (a, p) => {
+    params: '{}',
+    about: 'rebuilds NOW the FIXED Google Sheet in the owner\'s Drive folder with every cheque of the company in one table — Hashavshevet\'s cheques module and the Priority history merged, one row per cheque, with the day the bank paid it — and returns it: the same file and link every time (shown as a button under the answer), the refresh time, the rows and the counts per source. For "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "תעדכן את קובץ השיקים", "שיקים של חשבשבת ופריוריטי ביחד". A question about the FUTURE cheques (cheques, state future) refreshes this file by itself — do not add cheques_file to it',
+    run: async (a) => {
       if (!a.isAdmin) throw err('FORBIDDEN', 'the books (finance data) are for the chain admin only');
-      const rec = p?.refresh === true || p?.refresh === 'true' ? await fixedSheets.refreshFixedSheet('cheques', { by: a.username }) : await fixedSheets.fixedSheetInfo('cheques');
-      const { url, id, ...rest } = rec;
-      return { report: 'cheques_file', ...rest, fixedFile: rec.made ? { kind: 'sheet', fixed: true, id, url, name: rec.name, rows: rec.rows, tabs: rec.tabs, updatedAt: rec.updatedAt, createdAt: rec.updatedAt } : null, note: 'the chat shows the file button under the answer — do not write the link; the file is replaced in place (same link) every refreshEveryMin minutes and on refresh true' };
+      return { report: 'cheques_file', ...(await fixedSheets.refreshForAnswer('cheques', { by: a.username })), note: 'the chat shows the file button under the answer — do not write the link; the file was rebuilt for this answer (same link every time)' };
     },
   },
   priority_cheques: {

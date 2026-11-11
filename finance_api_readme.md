@@ -700,7 +700,7 @@ numbers start at 15917): 1,665 + 2,678 = 4,343 rows. `bankDate` = the day the ba
 line with that number and amount); a Priority-only cheque is `cleared` when the bank paid it, else `future` /
 `not_cleared` by its date. `from`/`to` filter `dueDate` (no range limit). `meta.counts` = `{ total, hashavshevet,
 priority, both, bankPaid }` and `meta.totals` = `{ amount, future, cleared, not_cleared }` over every cheque. Joya HQ
-keeps this table as a **fixed Google Sheet** in the owner's Drive folder, refreshed every hour (hq README → "Fixed files").
+keeps this table as a **fixed Google Sheet** in the owner's Drive folder, rebuilt on demand (hq README → "Fixed files in Drive").
 
 ```json
 { "source": "priority", "cheque": 10337, "payee": "שיווק א.א עפולה צ.א בע\"מ", "amount": 14389, "dueDate": "2025-07-03", "issueDate": "2025-06-03", "state": "cleared",

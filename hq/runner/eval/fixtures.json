@@ -1317,11 +1317,6 @@
         "calcs": [
           "cheques_file"
         ],
-        "noParams": {
-          "cheques_file": [
-            "refresh"
-          ]
-        },
         "maxCalcs": 1
       }
     },
@@ -1334,11 +1329,6 @@
         "calcs": [
           "cheques_file"
         ],
-        "params": {
-          "cheques_file": {
-            "refresh": true
-          }
-        },
         "maxCalcs": 1
       }
     },
@@ -2053,7 +2043,7 @@
             "state": "future"
           }
         },
-        "maxCalcs": 2
+        "maxCalcs": 1
       }
     },
     {

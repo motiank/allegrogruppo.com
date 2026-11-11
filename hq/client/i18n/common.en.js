@@ -143,7 +143,7 @@ export default {
   'joya.area.accounting.s16': "Which future cheques are there, and what is the total?",
   'joya.area.accounting.s17': "Are the books up to date? What is missing?",
   'joya.area.accounting.s18': "Customer / supplier statement compare: attach the statement you received (📎, PDF or Excel) and send — only the differences against the books are shown",
-  'joya.area.accounting.s19': "The full cheques file — Hashavshevet and Priority in one sheet in Drive (fixed link, refreshed every hour)",
+  'joya.area.accounting.s19': "The full cheques file — Hashavshevet and Priority in one sheet in Drive (fixed link, rebuilt on every request)",
   'joya.bankRecon.title': "Detailed bank reconciliation report",
   'joya.bankRecon.account': "Bank account",
   'joya.bankRecon.from': "From",

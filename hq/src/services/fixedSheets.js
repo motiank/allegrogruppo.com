@@ -1,14 +1,14 @@
-// Fixed files in the owner's Drive folder — one Google Sheet per key, the SAME file every time, rewritten on a
-// schedule and on request (owner 2026-11-11: "merge into one table the Priority and Hashavshevet cheques, create an
-// Excel on the Drive and give the link; a fixed file that is updated all the time"). The link and the last refresh
-// are kept in joya_settings ("fixedSheets"), so the chat answers without a Drive call.
+// Fixed files in the owner's Drive folder — one Google Sheet per key, the SAME file every time, rewritten ON DEMAND
+// (owner 2026-11-11: "merge into one table the Priority and Hashavshevet cheques, create an Excel on the Drive and
+// give the link; a fixed file that is updated all the time" — then: "no schedule and no service for that: upon
+// demand. If I ask to see future cheques, Joya updates the file and provides the link"). The link and the last
+// refresh are kept in joya_settings ("fixedSheets").
 //
 // Keys today: cheques = every cheque of the company (Finance API /cheques/all: Hashavshevet's cheques module +
 // the Priority file, one row per cheque, with the day the bank paid it), one tab per finance company.
 import { finance, financeCompanies } from './source.js';
 import { sheetsUnavailable, workbookFromTabs, upsertFixedSheet } from './sheets.js';
 import { getConfig, updateConfig, err } from '../db.js';
-import log from '../../lib/log.js';
 
 const SETTING = 'fixedSheets';
 const SOURCE_HE = { hashavshevet: 'חשבשבת', priority: 'פריוריטי', both: 'חשבשבת + פריוריטי' };
@@ -55,15 +55,29 @@ export const FIXED_SHEETS = {
   },
 };
 
-export const refreshEveryMin = () => Number(process.env.JOYA_FIXED_SHEETS_EVERY_MIN ?? 60) || 0;
-
 /** The record kept for a key: { kind, fixed, key, id, url, name, rows, tabs, counts, dataUpTo, updatedAt, error }, or a stub when it was never made. */
 export async function fixedSheetInfo(key) {
   const def = FIXED_SHEETS[key];
   if (!def) throw err('NOT_FOUND', `no fixed file "${key}"`);
   const all = await getConfig(SETTING, {});
   const rec = all[key] || null;
-  return { key, name: def.name, about: def.about, refreshEveryMin: refreshEveryMin(), unavailable: sheetsUnavailable(), ...(rec || { made: false, note: 'the file was not made yet: ask with refresh true, or wait for the next scheduled refresh' }) };
+  return { key, name: def.name, about: def.about, unavailable: sheetsUnavailable(), ...(rec || { made: false, note: 'the file was not made yet' }) };
+}
+
+/**
+ * The record for an answer: the file rebuilt now; when the rebuild fails, the last good record with the error, so the
+ * chat still has a link. → { ...record, fixedFile } where fixedFile is what compute() puts under the answer.
+ */
+export async function refreshForAnswer(key, { by } = {}) {
+  let rec;
+  try {
+    rec = await refreshFixedSheet(key, { by });
+  } catch (e) {
+    rec = { ...(await fixedSheetInfo(key)), error: { code: e.code || 'ERROR', message: e.message } };
+  }
+  const { url, id, ...rest } = rec;
+  const fixedFile = rec.made ? { kind: 'sheet', fixed: true, id, url, name: rec.name, rows: rec.rows, tabs: rec.tabs, updatedAt: rec.updatedAt, createdAt: rec.updatedAt } : null;
+  return { ...rest, fixedFile };
 }
 
 /** Rebuilds the file and replaces it in Drive (same link). The record is saved even when it fails (last good link + error). */
@@ -82,36 +96,10 @@ export async function refreshFixedSheet(key, { by = 'joya' } = {}) {
       counts: built.counts, dataUpTo: built.dataUpTo, updatedAt: new Date().toISOString(), updatedBy: by, ms: Date.now() - t0, error: null,
     };
     await updateConfig(SETTING, {}, by, (cur) => ({ ...cur, [key]: rec }));
-    return { key, name: def.name, about: def.about, refreshEveryMin: refreshEveryMin(), unavailable: null, ...rec };
+    return { key, name: def.name, about: def.about, unavailable: null, ...rec };
   } catch (e) {
     const error = { at: new Date().toISOString(), code: e.code || 'ERROR', message: e.message };
     await updateConfig(SETTING, {}, by, (cur) => ({ ...cur, [key]: { ...(cur[key] || { made: false }), error } })).catch(() => {});
     throw e;
   }
-}
-
-let timer = null;
-/** The schedule: every JOYA_FIXED_SHEETS_EVERY_MIN minutes (default 60; 0 = off), first run 2 minutes after start. */
-export function startFixedSheets() {
-  const every = refreshEveryMin();
-  const why = sheetsUnavailable();
-  if (!every || why) {
-    log.info(`fixed sheets: not scheduled (${why || 'JOYA_FIXED_SHEETS_EVERY_MIN=0'})`);
-    return null;
-  }
-  const run = async () => {
-    for (const key of Object.keys(FIXED_SHEETS)) {
-      try {
-        const r = await refreshFixedSheet(key, { by: 'scheduler' });
-        log.info(`fixed sheet ${key}: ${r.rows} rows, ${r.ms} ms → ${r.url}`);
-      } catch (e) {
-        log.warn(`fixed sheet ${key} failed: ${e.message}`);
-      }
-    }
-  };
-  setTimeout(run, 2 * 60 * 1000).unref();
-  timer = setInterval(run, every * 60 * 1000);
-  timer.unref();
-  log.info(`fixed sheets: every ${every} min (${Object.keys(FIXED_SHEETS).join(', ')})`);
-  return timer;
 }
