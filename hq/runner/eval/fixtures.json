@@ -2006,6 +2006,23 @@
       }
     },
     {
+      "key": "f-shaklap",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "כמה שקלפ יש לנו ומתי הם יורדים?",
+      "expect": {
+        "calcs": [
+          "cheques"
+        ],
+        "params": {
+          "cheques": {
+            "state": "future"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
       "key": "f-cheques",
       "kind": "ACCOUNTING",
       "lang": "he",

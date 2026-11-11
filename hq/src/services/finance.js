@@ -374,13 +374,28 @@ const numbersOf = (p, k) => {
 export async function cheques(companies, p = {}) {
   const limit = limitOf(p, LIMITS.cheques, 500);
   const q = textOf(p, 'q').q;
-  const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), ...numbersOf(p, 'number'), limit: q ? 5000 : limit };
+  // every row is fetched (≤ 5000): the day groups and their sums must cover the whole selection, not the shown rows
+  const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), ...numbersOf(p, 'number'), limit: EXPORT_MAX };
   return result('cheques', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/cheques', params, (d, m) => {
     const rows = byName(d, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
-    return { ...shown(rows, limit, q ? rows.length : m.total), totals: m.totals, notAvailable: m.notAvailable, note: m.note };
+    return { ...shown(rows, limit, q ? rows.length : m.total), byDay: chequesByDay(rows), totals: m.totals, notAvailable: m.notAvailable, note: m.note };
   }), {
-    note: 'from / to filter the due date; number = the cheque number(s); state future = due after today, cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet',
+    note: 'from / to filter the due date; number = the cheque number(s); state future = due after today, cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet. byDay = the same cheques grouped by due date, with the count and the sum of each day (over every cheque of the selection, not only the shown rows)',
   });
+}
+
+/** The cheques grouped by due date, soonest first: { dueDate, count, amount, cheques: [{ reference, payee, amount }] }. */
+export function chequesByDay(rows) {
+  const days = new Map();
+  for (const c of rows) {
+    const k = c.dueDate || 'no date';
+    if (!days.has(k)) days.set(k, { dueDate: k, count: 0, amount: 0, cheques: [] });
+    const d = days.get(k);
+    d.count += 1;
+    d.amount = Math.round((d.amount + (Number(c.amount) || 0)) * 100) / 100;
+    d.cheques.push({ reference: c.reference ?? null, payee: c.payee || c.accountName || null, amount: c.amount });
+  }
+  return [...days.values()].sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
 }
 
 /** The cheques written in Priority before Hashavshevet (history, a constant file): by number, supplier, amount, dates. */

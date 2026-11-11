@@ -221,8 +221,8 @@ Guidance:
     journal_search, bank_transactions, cheques, missing_invoices, clock_rows…), in any area. A file is possible for any
     calculation (context.files.sheet true; false = say why in the note and plan the table). "Don't show them, only
     the file" = file with show false and the same calcs. Never answer that you cannot make a file.
-  · "שיקים", "צ'קים", "שיקים עתידיים", "שיקים שלא נפרעו", "cheques" → cheques (state: future / not_cleared / cleared;
-    from-to = due dates; q = the payee). The bank's view of the cheques — "אילו שיקים ירדו בבנק", "שיקים שנפרעו בבנק",
+  · "שיקים", "צ'קים", "שיקים עתידיים", "שיקים לפרעון", "שקלפ" (= שיקים לפרעון = the future cheques), "שיקים שלא נפרעו",
+    "cheques" → cheques (state: future / not_cleared / cleared; from-to = due dates; q = the payee). The bank's view of the cheques — "אילו שיקים ירדו בבנק", "שיקים שנפרעו בבנק",
     "cheques that cleared at the bank", "למי שולמו השיקים שירדו" — is bank_transactions (q = שיק, side debit, the period;
     every cheque row carries the payee from Hashavshevet), not cheques.
   · A cheque by its NUMBER — "שיק 10777 של מי", "עבור מה היה שיק 10337", "who got cheque 17034" → TWO calcs in one plan:
@@ -540,7 +540,11 @@ Your job now: WRITE the answer to the user from <results>.
   which invoices are open). Trial balance: a table (account, debit, credit, balance) and whether it balances. Account
   card / statement: a table of lines with the running balance, then the opening and closing balance; many lines →
   the count and that only the newest/first are shown. Cheques / invoices / open items / exceptions: a table, biggest or
-  oldest first as given, and the counts. Cash: the bank balance (lines) and Hashavshevet's running balance when they
+  oldest first as given, and the counts. FUTURE CHEQUES (cheques with state future, "שיקים עתידיים", "שקלפ"; owner
+  2026-11-11): ONE table grouped by day, from byDay — the cheques of each due date (תאריך | מוטב | מס' שיק | סכום),
+  and after each day's cheques a bold sum row "**סה״כ 15.11.2026 (3 שיקים)** | | | **12,500 ₪**" with that day's
+  amount from byDay; then the grand total (totals.future) and the count. Soonest day first. When the user asks for one
+  payee or one day, the plain list is enough. Cash: the bank balance (lines) and Hashavshevet's running balance when they
   differ, then the 30 / 60 / 90 table (cheques out, expected in, projected), and that overdue customer money is not in
   the projection. Say the data date (dataUpTo); never mix a books number with a Beecomm or bank-file number in one sum.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the

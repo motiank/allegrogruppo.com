@@ -487,6 +487,13 @@ has to be entered in Hashavshevet, the report counts them in a note apart from t
 on the cheque, amount). `net` is the amount on the cheque, `amount` is before withholding tax. Tests
 `scripts/test_priority_cheques.js`, `scripts/test_cheque_payees.js`; eval `pc-*`.
 
+**Future cheques by day (owner 2026-11-11: "when I ask to see future cheques, put them in a table grouped by day and sum
+each day").** שקלפ = שיקים לפרעון = the future cheques (PLAN routing word → `cheques` state `future`). The `cheques`
+result carries `byDay` (`chequesByDay` in `src/services/finance.js`: every cheque of the selection grouped by due date,
+soonest first, with the day's count and sum — computed by the system, so the verifier knows the numbers), and the WRITE
+rule "FUTURE CHEQUES" shows one table (תאריך | מוטב | מס' שיק | סכום) with a bold sum row after each day and the grand
+total. Eval `f-shaklap`, `f-cheques`.
+
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from
 ARITHMETIC on that data (a sum, a difference, a split into N payments, a share, an average, a per-unit value, a VAT

@@ -497,6 +497,16 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   await assert.rejects(() => payrollCheck([], { month: '2026-13' }), /month must be/);
   await assert.rejects(() => journalSearch([], {}), /give a period/);
   await assert.rejects(() => cheques([], { state: 'lost' }), /state must be/);
+  // the day groups: soonest day first, each day's count and sum, the payee from the account when the cheque has none
+  const { chequesByDay } = await import('../src/services/finance.js');
+  const days = chequesByDay([
+    { reference: 3, payee: 'ג', amount: 100.5, dueDate: '2026-12-01' },
+    { reference: 1, payee: 'א', amount: 200, dueDate: '2026-11-15' },
+    { reference: 2, payee: null, accountName: 'ב', amount: 0.1, dueDate: '2026-11-15' },
+  ]);
+  assert.deepEqual(days.map((d) => [d.dueDate, d.count, d.amount]), [['2026-11-15', 2, 200.1], ['2026-12-01', 1, 100.5]]);
+  assert.deepEqual(days[0].cheques.map((c) => c.payee), ['א', 'ב']);
+  assert.deepEqual(chequesByDay([]), []);
   // with no companies nothing is read: an empty, well-formed result
   const empty = await cheques([], { state: 'future' });
   assert.deepEqual([empty.report, empty.companies], ['cheques', []]);

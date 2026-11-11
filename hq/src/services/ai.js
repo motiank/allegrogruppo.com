@@ -529,7 +529,7 @@ export const CALCS = {
   },
   cheques: {
     params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", number?: "a cheque number, or several comma-separated", limit? }',
-    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today; cleared = matched to the bank; not_cleared = due and not matched), with totals per state; number = one cheque by its number; returned cheques are not available yet',
+    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today = שיקים לפרעון = שקלפ; cleared = matched to the bank; not_cleared = due and not matched), with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number; returned cheques are not available yet',
     run: finCalc(fin.cheques),
   },
   priority_cheques: {
