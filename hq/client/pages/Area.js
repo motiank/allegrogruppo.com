@@ -13,8 +13,8 @@ export const AREAS = {
   people: { id: 2, suggestions: 4 },
   performance: { id: 3, suggestions: 3 },
   bank: { id: 4, suggestions: 8 },
-  // the accounting area: 8 register-vs-bank questions for everyone in it, then 10 about the books (chain admin only; the first is the detailed bank reconciliation report, the last the statement compare with an attached file)
-  accounting: { id: 5, suggestions: 8, adminSuggestions: 10 },
+  // the accounting area: 8 register-vs-bank questions for everyone in it, then 11 about the books (chain admin only; the first is the detailed bank reconciliation report, then the statement compare with an attached file, the last the fixed cheques file)
+  accounting: { id: 5, suggestions: 8, adminSuggestions: 11 },
   // the payments area (chain admin): its page is pages/Payments.js (the board + this chat)
   payments: { id: 6, suggestions: 6 },
 };

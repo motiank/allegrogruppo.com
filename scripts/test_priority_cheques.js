@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PRIORITY_CHEQUES, PRIORITY_CHEQUES_META, priorityChequesByNumber, searchPriorityCheques } from "../admin/server/modules/priorityCheques.js";
+import { mergeCheques } from "../admin/server/modules/chequesAll.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -61,4 +62,35 @@ test("search: by number, name, invoice number, amount, dates, paging", () => {
   assert.equal(searchPriorityCheques({ from: "2027-01-01" }).total, 35, "post-dated cheques to 2029");
   assert.equal(searchPriorityCheques({ q: "no such supplier" }).total, 0);
   assert.equal(searchPriorityCheques({}).total, 2678);
+});
+
+test("mergeCheques: one row per cheque, both sides joined by number + amount, the bank day", () => {
+  const hash = [
+    { reference: 17034, payee: "אלון", amount: 4720, dueDate: "2026-11-08", issueDate: null, originalDate: "2026-09-08", state: "future", account: "500201", accountName: "אלון עו\"ד", chequeId: 1 },
+    { reference: 10337, payee: "שיווק", amount: 14389, dueDate: "2025-07-03", issueDate: "2025-06-03", state: "cleared", account: "500076", accountName: "שיווק", chequeId: 2 },
+    { reference: 10777, payee: "קפלן", amount: 1110.84, dueDate: "2025-05-14", state: "not_cleared", account: "108", accountName: "קפלן", chequeId: 3 },
+  ];
+  const priority = [
+    ...priorityChequesByNumber([10337, 10777]).values(),
+  ].flat();
+  const bank = [
+    { reference: "10777", amount: 16878, date: "2025-09-03" },
+    { reference: "10777", amount: 16878, date: "2025-09-05" },
+    { reference: "0017034", amount: 4720, date: "2026-11-09" },
+    { reference: "x", amount: 1, date: "2025-01-01" },
+  ];
+  const m = mergeCheques({ hash, priority, bank, today: "2025-08-01" });
+  assert.deepEqual(m.counts, { total: 4, hashavshevet: 1, priority: 1, both: 2, bankPaid: 2 });
+  const by = Object.fromEntries(m.rows.map((r) => [`${r.cheque}|${r.amount}`, r]));
+  assert.equal(by["10337|14389"].source, "both");
+  assert.equal(by["10337|14389"].priorityPayment, "CH25000351");
+  assert.equal(by["10337|14389"].invoices, "9473, 9100, 8528, 8156");
+  assert.equal(by["10337|14389"].state, "cleared", "Hashavshevet's state stays");
+  assert.equal(by["10777|1110.84"].source, "both", "the same number and amount → one row");
+  assert.deepEqual([by["10777|16878"].source, by["10777|16878"].state, by["10777|16878"].bankDate], ["priority", "cleared", "2025-09-03"], "another amount → its own row, paid by the bank (earliest day)");
+  assert.deepEqual([by["17034|4720"].source, by["17034|4720"].bankDate], ["hashavshevet", "2026-11-09"]);
+  assert.deepEqual(m.rows.map((r) => r.cheque), [10777, 10337, 10777, 17034], "by due date");
+  const r2 = (n) => Math.round(n * 100) / 100;
+  assert.equal(m.totals.amount, r2(4720 + 14389 + 1110.84 + 16878));
+  assert.equal(mergeCheques({ hash: [], priority: [{ payment: "T1", cheque: null, supplier: "x", net: 5, amount: 5, withholding: 0, chequeDate: "2026-01-01", payDate: "2026-01-01", lines: [] }], bank: [], today: "2025-01-01" }).rows[0].state, "future");
 });

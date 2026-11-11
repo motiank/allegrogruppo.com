@@ -5,8 +5,9 @@ import { executeSql } from "../sources/dbpool.js";
 import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } from "./localApi.js";
 import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
-import { addChequePayees } from "./chequePayees.js";
-import { searchPriorityCheques, PRIORITY_CHEQUES_META } from "./priorityCheques.js";
+import { addChequePayees, isChequeLine } from "./chequePayees.js";
+import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
+import { mergeCheques } from "./chequesAll.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
 import { matchInvoices, booksFlag, flagChanged, normDigits, STATUSES } from "../../../shared/invoiceMatch.js";
 
@@ -1556,6 +1557,37 @@ route("/cheques", async (req, ctx) => {
   return {
     data: filtered.slice(offset, offset + limit).map(({ cleared, ...c }) => c),
     meta: { state: state || "all", accounts: accounts.length ? accounts : "all", from: from || null, to: hasRange ? to : null, ...(numbers.length ? { number: numbers } : {}), limit, offset, total: filtered.length, totals, notAvailable: ["returned"], note: "returned cheques cannot be found yet; the accountant must say how they are recorded" },
+    codes: ["bank_gap"],
+  };
+});
+
+// ── every cheque, Hashavshevet + Priority in one table (readme → /cheques/all) ──
+route("/cheques/all", async (req, ctx) => {
+  const { from, to } = dateRange(req, { required: false, maxDays: 0 });
+  const hasRange = Boolean(from || req.query.to);
+  const source = oneOf(req, "source", ["hashavshevet", "priority", "both"], null);
+  const state = oneOf(req, "state", ["future", "cleared", "not_cleared"], null);
+  const { limit, offset } = paging(req);
+  const hash = await chequeRows(ctx);
+  const priority = ctx.rules.allegroKey === PRIORITY_CHEQUES_META.company ? PRIORITY_CHEQUES : [];
+  const params = { companyId: ctx.companyId };
+  const bankRows = ctx.bankAccounts.length
+    ? await financeSql(
+        `SELECT reference, details, ABS(signed_amount) AS amount, DATE_FORMAT(line_date, '%Y-%m-%d') AS d FROM bank_lines
+          WHERE company_id = :companyId AND deleted_at IS NULL AND details LIKE '%שיק%' AND ${inList("account_key", ctx.bankAccounts, params, "b")}`,
+        params,
+      )
+    : [];
+  const bank = bankRows.filter((b) => isChequeLine(b.details)).map((b) => ({ reference: b.reference, amount: b.amount, date: b.d }));
+  const merged = mergeCheques({ hash, priority, bank, today: today() });
+  const filtered = merged.rows.filter((x) => (!hasRange || ((!from || (x.dueDate && x.dueDate >= from)) && (!to || (x.dueDate && x.dueDate <= to)))) && (!source || x.source === source) && (!state || x.state === state));
+  return {
+    data: filtered.slice(offset, offset + limit),
+    meta: {
+      from: from || null, to: hasRange ? to : null, source, state, limit, offset, total: filtered.length, counts: merged.counts, totals: merged.totals,
+      priority: priority.length ? { builtAt: PRIORITY_CHEQUES_META.builtAt, count: PRIORITY_CHEQUES_META.count } : null,
+      note: "one row per cheque: Hashavshevet's cheques module and the Priority file merged by number + amount (source both); dueDate = the date on the cheque, bankDate = the day the bank paid it (a statement cheque line with that number and amount); amount = the amount on the cheque; counts and totals cover every cheque, not the filter",
+    },
     codes: ["bank_gap"],
   };
 });

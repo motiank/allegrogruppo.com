@@ -465,7 +465,7 @@ t('the books are for the chain admin only; every finance calc is in the catalogu
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 29); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques
+  assert.equal(FINANCE_CALCS.size, 30); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques, cheques_file
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);
@@ -507,6 +507,13 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   assert.deepEqual(days.map((d) => [d.dueDate, d.count, d.amount]), [['2026-11-15', 2, 200.1], ['2026-12-01', 1, 100.5]]);
   assert.deepEqual(days[0].cheques.map((c) => c.payee), ['א', 'ב']);
   assert.deepEqual(chequesByDay([]), []);
+  // the fixed cheques sheet: Hebrew columns in the sheet's order, labels for source and state, empty withholding left blank
+  const { chequeRowHe, CHEQUE_COLUMNS, FIXED_SHEETS } = await import('../src/services/fixedSheets.js');
+  const he = chequeRowHe({ cheque: 10337, payee: 'שיווק', amount: 14389, dueDate: '2025-07-03', issueDate: '2025-06-03', state: 'cleared', bankDate: '2025-07-04', source: 'both', account: '500076', accountName: 'שיווק בע"מ', supplierAccount: '200076', priorityPayment: 'CH25000351', grossAmount: 14389, withholding: 0, invoices: '9473, 9100', details: null });
+  assert.deepEqual(Object.keys(he), CHEQUE_COLUMNS);
+  assert.deepEqual([he['מצב'], he['מקור'], he['ניכוי מס'], he['נפרע בבנק'], he['חשבוניות']], ['נפרע', 'חשבשבת + פריוריטי', null, '2025-07-04', '9473, 9100']);
+  assert.equal(chequeRowHe({ state: 'future', source: 'priority', withholding: 88.5 })['ניכוי מס'], 88.5);
+  assert.ok(FIXED_SHEETS.cheques.name.includes('Joya'));
   // with no companies nothing is read: an empty, well-formed result
   const empty = await cheques([], { state: 'future' });
   assert.deepEqual([empty.report, empty.companies], ['cheques', []]);

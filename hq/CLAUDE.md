@@ -154,6 +154,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   cheque lookup names bank cheque lines from it when Hashavshevet has nothing (`payeeSource: "priority"`, report note), and
   calc `priority_cheques` (Finance API `/cheques/priority`; `cheques` got `number`) answers cheque questions; PLAN "A cheque
   by its NUMBER" plans both. README → "Priority cheques". Tests `scripts/test_priority_cheques.js`; eval `pc-*`. Deployed 2026-11-11 (`ff83715`, services restarted, no build).
+- **Fixed files in Drive** (2026-11-11, owner: "one table of the Priority and Hashavshevet cheques, an Excel on the Drive, a fixed
+  file updated all the time"): `src/services/fixedSheets.js` + `upsertFixedSheet` (`sheets.js`) rewrite the same Google Sheet
+  (found by `appProperties.joyaFixed`) every `JOYA_FIXED_SHEETS_EVERY_MIN` min (default 60) from `server.js`; record in
+  `joya_settings.fixedSheets`; key `cheques` = Finance API `/cheques/all` (`admin/server/modules/chequesAll.js`). Calc
+  `cheques_file` (+ `refresh`), button under the answer (`meta.file.fixed`), suggestion s19 (adminSuggestions 11). README →
+  "Fixed files in Drive". Needs an hq client build on deploy.
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

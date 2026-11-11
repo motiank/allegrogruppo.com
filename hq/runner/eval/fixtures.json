@@ -1309,6 +1309,40 @@
       }
     },
     {
+      "key": "x-cheques-file",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תן לי את הקישור לקובץ השיקים המלא של חשבשבת ופריוריטי",
+      "expect": {
+        "calcs": [
+          "cheques_file"
+        ],
+        "noParams": {
+          "cheques_file": [
+            "refresh"
+          ]
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "x-cheques-file-refresh",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Refresh the cheques sheet in Drive and give me the link",
+      "expect": {
+        "calcs": [
+          "cheques_file"
+        ],
+        "params": {
+          "cheques_file": {
+            "refresh": true
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
       "key": "pc-number",
       "kind": "ACCOUNTING",
       "lang": "he",

@@ -272,7 +272,7 @@ describe("endpoints", () => {
   test("route list covers the readme", () => {
     const want = ["/companies", "/status", "/accounts", "/branches", "/pnl", "/cash", "/branch-costs", "/sales-vs-books", "/spending", "/aging", "/intercompany",
       "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/suggestions", "/invoices", "/statement",
-      "/cheques", "/cheques/priority", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
+      "/cheques", "/cheques/priority", "/cheques/all", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
     assert.deepEqual(financeRoutes().sort(), want.sort());
   });
 
@@ -730,6 +730,27 @@ describe("endpoints", () => {
       assert.equal(paged.meta.total, 2678, "a range of years is allowed: the file is small");
       await fail(`/cheques/priority?company=${COMPANY}&cheque=x`, 400, "bad_request");
       await fail(`/cheques/priority?company=${COMPANY}&amount=abc`, 400, "bad_request");
+    });
+    test("GET /cheques/all: Hashavshevet + Priority in one table", async () => {
+      const all = await ok(`/cheques/all?company=${COMPANY}&limit=5000`);
+      const c = all.meta.counts;
+      assert.equal(c.total, all.data.length);
+      assert.equal(c.hashavshevet + c.priority + c.both, c.total);
+      assert.equal(c.hashavshevet + c.both, 1665, "every Hashavshevet cheque is in the table once");
+      assert.equal(c.priority + c.both, 2678, "every Priority cheque is in the table once");
+      assert.equal(c.both, 0, "the two sources do not overlap on the local copy: Hashavshevet's numbers start at 15917");
+      assert.ok(c.bankPaid > 2000, "most cheques were paid by the bank");
+      assert.ok(all.data.every((x, i, a) => i === 0 || String(a[i - 1].dueDate || "9999") <= String(x.dueDate || "9999")), "by due date");
+      const p = all.data.find((x) => x.cheque === 10337);
+      assert.equal(p.invoices, "9473, 9100, 8528, 8156");
+      assert.ok(["future", "cleared", "not_cleared"].includes(p.state));
+      close(all.meta.totals.amount, all.data.reduce((s, x) => s + x.amount, 0));
+      const fut = await ok(`/cheques/all?company=${COMPANY}&state=future&source=priority&limit=5000`);
+      assert.ok(fut.data.every((x) => x.state === "future" && x.source === "priority" && x.dueDate > TODAY));
+      const ranged = await ok(`/cheques/all?company=${COMPANY}&from=2025-06-01&to=2025-06-30&limit=5000`);
+      assert.ok(ranged.data.length > 0 && ranged.data.every((x) => x.dueDate >= "2025-06-01" && x.dueDate <= "2025-06-30"));
+      assert.equal(ranged.meta.counts.total, c.total, "counts cover everything");
+      await fail(`/cheques/all?company=${COMPANY}&source=excel`, 400, "bad_request");
     });
     test("GET /vat and /vat/issues", async () => {
       const r = await ok(`/vat?company=${COMPANY}&from=2026-07-01&to=2026-08-31`);

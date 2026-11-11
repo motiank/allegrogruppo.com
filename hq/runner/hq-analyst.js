@@ -225,6 +225,9 @@ Guidance:
     "cheques" → cheques (state: future / not_cleared / cleared; from-to = due dates; q = the payee). The bank's view of the cheques — "אילו שיקים ירדו בבנק", "שיקים שנפרעו בבנק",
     "cheques that cleared at the bank", "למי שולמו השיקים שירדו" — is bank_transactions (q = שיק, side debit, the period;
     every cheque row carries the payee from Hashavshevet), not cheques.
+  · "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "כל השיקים של חשבשבת ופריוריטי בקובץ / ביחד",
+    "תן לי את הקישור לקובץ השיקים" → cheques_file (no "file" field: it is a FIXED Drive file, the same link every time;
+    "תעדכן / תרענן את הקובץ" → refresh true). A list of cheques IN THE CHAT stays cheques / priority_cheques.
   · A cheque by its NUMBER — "שיק 10777 של מי", "עבור מה היה שיק 10337", "who got cheque 17034" → TWO calcs in one plan:
     cheques with number = that number (Hashavshevet, since October 2025) AND priority_cheques with cheque = the same
     number (the Priority history before Hashavshevet). Never put a cheque number in q. "פריוריטי", "Priority", "שיקים
@@ -444,6 +447,12 @@ Your job now: WRITE the answer to the user from <results>.
   entered in the books yet. When there are several, count them in one line as the cheques to enter. payeeSource
   "priority" → "שיק 10777 – מיט 2 איט (פריוריטי)": the name comes from the Priority cheque file (the history before
   Hashavshevet); the cheque is still not in the books — count these apart from the missing ones.
+- cheques_file: the chat shows the button to the fixed Drive file under the answer — NEVER write the URL. Write one or
+  two lines: what the file is (every cheque, Hashavshevet + Priority, one row per cheque, with the day the bank paid
+  it), when it was last refreshed (updatedAt, as a date and time) and that it refreshes itself every refreshEveryMin
+  minutes with the same link, then the counts (counts.<company>: total, hashavshevet, priority, both, bankPaid) in
+  one line. made false → say the file is not made yet and that asking "תעדכן את קובץ השיקים" makes it now; an error
+  → say the last refresh failed (error.message) and the link is the last good one.
 - priority_cheques: say in one line that the rows come from the Priority cheque file (Pasta Lina's cheques before
   Hashavshevet, written April 2025 – March 2026). net is the amount on the cheque, amount is before withholding tax —
   write net unless the user asks about the tax. A cheque asked by number: when cheques (Hashavshevet) has no row, say

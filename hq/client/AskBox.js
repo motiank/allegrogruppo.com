@@ -242,11 +242,12 @@ function SheetFile({ r, classes }) {
   return (
     <div className={classes.files}>
       <a className={classes.fileBtn} href={f.url} target="_blank" rel="noopener noreferrer">
-        📄 {t('joya.ask.file.sheet')}
+        📄 {t(f.fixed ? 'joya.ask.file.fixedSheet' : 'joya.ask.file.sheet')}
       </a>
       <span dir="auto">
         {f.name} · {t('joya.ask.file.sheetRows', { rows: f.rows })}
         {f.tabs?.length > 1 ? ` · ${f.tabs.map((x) => `${x.name} (${x.rows})`).join(', ')}` : ''}
+        {f.fixed && f.updatedAt ? ` · ${t('joya.ask.file.updatedAt', { at: new Date(f.updatedAt).toLocaleString(undefined, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) })}` : ''}
       </span>
     </div>
   );

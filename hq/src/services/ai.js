@@ -22,6 +22,7 @@ import * as bank from './bank.js';
 import * as fin from './finance.js';
 import { createSheet, sheetsUnavailable } from './sheets.js';
 import * as payments from './payments.js';
+import * as fixedSheets from './fixedSheets.js';
 import * as source from './source.js';
 import { attendanceReport, clockRows } from './attendance.js';
 import { recentSameWeekday } from './demand.js';
@@ -532,6 +533,16 @@ export const CALCS = {
     about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today = שיקים לפרעון = שקלפ; cleared = matched to the bank; not_cleared = due and not matched), with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number; returned cheques are not available yet',
     run: finCalc(fin.cheques),
   },
+  cheques_file: {
+    params: '{ refresh?: boolean (true = rebuild the file now, before answering) }',
+    about: 'the FIXED Google Sheet in the owner\'s Drive folder with every cheque of the company in one table — Hashavshevet\'s cheques module and the Priority history merged, one row per cheque, with the day the bank paid it; the same file and link every time, refreshed automatically every hour. Returns the link (shown as a button under the answer), when it was last refreshed, the rows and the counts per source. For "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "תעדכן את קובץ השיקים" (refresh true), "שיקים של חשבשבת ופריוריטי ביחד"; not for a list in the chat (cheques / priority_cheques)',
+    run: async (a, p) => {
+      if (!a.isAdmin) throw err('FORBIDDEN', 'the books (finance data) are for the chain admin only');
+      const rec = p?.refresh === true || p?.refresh === 'true' ? await fixedSheets.refreshFixedSheet('cheques', { by: a.username }) : await fixedSheets.fixedSheetInfo('cheques');
+      const { url, id, ...rest } = rec;
+      return { report: 'cheques_file', ...rest, fixedFile: rec.made ? { kind: 'sheet', fixed: true, id, url, name: rec.name, rows: rec.rows, tabs: rec.tabs, updatedAt: rec.updatedAt, createdAt: rec.updatedAt } : null, note: 'the chat shows the file button under the answer — do not write the link; the file is replaced in place (same link) every refreshEveryMin minutes and on refresh true' };
+    },
+  },
   priority_cheques: {
     params: '{ companyKeys?, cheque?: "a cheque number, or several comma-separated", q?: "part of the supplier name, the details or an invoice number", amount?: number, supplierAccount?, from?, to?, dateField?: "chequeDate" (default, the date on the cheque) | "payDate", limit? }',
     about: 'the cheques Pasta Lina wrote in Priority BEFORE Hashavshevet (history, April 2025 – March 2026, cheque dates up to 2029; a constant file): cheque number, supplier, the date on the cheque, the payment date, amount before withholding tax, withholding, net = the amount on the cheque, and the invoices it paid. For a cheque the books do not know (a bank line "לא נמצא בחשבשבת" / payeeSource missing or priority), "what was cheque N for", old cheques of a supplier, or a question that says Priority / פריוריטי; cheques written in Hashavshevet are in cheques',
@@ -618,7 +629,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
@@ -1039,7 +1050,13 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
   }
   let made = null;
   let fileError = null;
-  if (wantFile) {
+  // a fixed Drive file (cheques_file): its link goes under the answer like a made file; the model does not see the URL
+  for (const x of results) {
+    if (!x.result?.fixedFile) continue;
+    if (!made) made = { ...x.result.fixedFile, show: true };
+    delete x.result.fixedFile;
+  }
+  if (wantFile && !made) {
     try {
       made = { ...(await createSheet({ title: wantFile.title, question: r.question, lang: r.lang, today: todayLocal(), calcs: results.map((x) => ({ calc: x.calc, params: x.params })), columns: wantFile.columns }, results)), show: wantFile.show };
     } catch (e) {

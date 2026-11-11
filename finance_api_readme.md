@@ -182,7 +182,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 15 | Suggested bank matches | `/bank/suggestions` | One-to-one only: 44 of 758 open lines within 30 days |
 | 16 | Customer invoices, credit notes, receipts | `/invoices`, `/statement` | |
 | 17 | Supplier card, open invoices, payments | `/statement` | Only 75 of 250 suppliers use matching |
-| 18 | Issued cheques | `/cheques`, `/cheques/priority` | "Returned" cannot be found yet. `/cheques/priority` = the Priority history before Hashavshevet (a file, not the DB) |
+| 18 | Issued cheques | `/cheques`, `/cheques/priority`, `/cheques/all` | "Returned" cannot be found yet. `/cheques/priority` = the Priority history before Hashavshevet (a file, not the DB); `/cheques/all` = both in one table |
 | 19 | VAT check and the 874 report | `/vat`, `/vat/issues` | Book totals; 874 data is not understood yet |
 | 20 | Tax deducted at source, certificates | `/withholding` | |
 | 21 | Allocation numbers | `/allocation-numbers` | The legal limits per date are not confirmed |
@@ -688,6 +688,25 @@ net). On the local copy 1,002 of the 1,398 bank cheque lines that Hashavshevet d
 `amount` is before withholding tax, `net` is what is written on the cheque (`amount − withholding`); a payment with
 several rows in Priority has its rows in `lines` (a minus line is a credit taken off). A cheque number can appear
 twice (10777 was written to two payees). Test: `node --test scripts/test_priority_cheques.js` (no database).
+
+### `GET /finance/cheques/all?company=[&source=hashavshevet|priority|both][&state=future|cleared|not_cleared][&from=][&to=][&limit=][&offset=]`
+
+Owner 2026-11-11: "merge the Priority and Hashavshevet cheques into one table". Every cheque of the company, one row
+each, by due date (`admin/server/modules/chequesAll.js`, `mergeCheques`): the rows of `/cheques` (`source`
+`hashavshevet`) and the Priority file (`priority`). The same number AND amount (±0.01) on both sides is one row
+(`both`: Hashavshevet's fields plus Priority's `supplierAccount`, `priorityPayment`, `grossAmount`, `withholding`,
+`invoices`); the same number with another amount stays two rows. On the local copy the two never meet (Hashavshevet's
+numbers start at 15917): 1,665 + 2,678 = 4,343 rows. `bankDate` = the day the bank paid it (the first statement cheque
+line with that number and amount); a Priority-only cheque is `cleared` when the bank paid it, else `future` /
+`not_cleared` by its date. `from`/`to` filter `dueDate` (no range limit). `meta.counts` = `{ total, hashavshevet,
+priority, both, bankPaid }` and `meta.totals` = `{ amount, future, cleared, not_cleared }` over every cheque. Joya HQ
+keeps this table as a **fixed Google Sheet** in the owner's Drive folder, refreshed every hour (hq README → "Fixed files").
+
+```json
+{ "source": "priority", "cheque": 10337, "payee": "שיווק א.א עפולה צ.א בע\"מ", "amount": 14389, "dueDate": "2025-07-03", "issueDate": "2025-06-03", "state": "cleared",
+  "bankDate": "2025-07-03", "account": null, "accountName": null, "chequeId": null, "supplierAccount": "200076", "priorityPayment": "CH25000351",
+  "grossAmount": 14389, "withholding": 0, "invoices": "9473, 9100, 8528, 8156", "details": "חש. ספק מרכזת" }
+```
 
 ### `GET /finance/vat?company=&from=&to=[&includeUnposted=1]`
 
