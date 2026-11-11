@@ -514,7 +514,10 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   assert.deepEqual(futureChequesRange('2026-12-15'), { from: '2026-12-15', to: '2027-03-31' });
   assert.deepEqual(futureChequesRange('2027-11-01'), { from: '2027-11-01', to: '2028-02-29' });
   // the file's tabs: a summary, then a tab per month with a sum row per day and a month total; far years one tab each
-  const { chequeTabs, SUMMARY_COLUMNS } = await import('../src/services/fixedSheets.js');
+  const { chequeTabs, SUMMARY_COLUMNS, chequesWindow } = await import('../src/services/fixedSheets.js');
+  assert.deepEqual(chequesWindow({}, '2026-11-11'), { from: '2026-11-11', to: '2027-02-28', defaultRange: true });
+  assert.deepEqual(chequesWindow({ from: '2026-12-01', to: '2026-12-31' }, '2026-11-11'), { from: '2026-12-01', to: '2026-12-31', defaultRange: false });
+  assert.deepEqual(chequesWindow({ to: '2026-12-31' }, '2026-11-11'), { from: '2026-11-11', to: '2026-12-31', defaultRange: false });
   const tabs = chequeTabs([
     { cheque: 2, payee: 'ב', amount: 200, dueDate: '2026-11-15', state: 'future', source: 'hashavshevet' },
     { cheque: 1, payee: 'א', amount: 100, dueDate: '2026-11-15', state: 'future', source: 'priority' },
@@ -525,7 +528,7 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   ], { today: '2026-11-11' });
   assert.deepEqual(tabs.map((t) => t.name), ['סיכום', '2025-06', '2026-11', '2029']);
   assert.deepEqual(tabs[0].columns, SUMMARY_COLUMNS);
-  assert.deepEqual(tabs[0].rows.map((r) => [r['חודש'], r['שיקים'], r['סכום']]), [['06.2025', 1, 10], ['11.2026', 3, 350], ['2029', 2, 3], ['סה״כ', 6, 363]]);
+  assert.deepEqual(tabs[0].rows.map((r) => [r['חודש'], r['שיקים'], r['סכום'], r['מזה פריוריטי']]), [['06.2025', 1, 10, 10], ['11.2026', 3, 350, 100], ['2029', 2, 3, 0], ['סה״כ', 6, 363, 110]]);
   const nov = tabs[2].rows;
   assert.deepEqual(nov.map((r) => r["מס' שיק"] ?? r['מוטב']), [1, 2, 'סה״כ 15.11.2026 – 2 שיקים', 3, 'סה״כ 20.11.2026 – 1 שיקים', 'סה״כ 11.2026 – 3 שיקים']);
   assert.deepEqual(nov.filter((r) => r._style).map((r) => [r._style, r['סכום']]), [['total', 300], ['total', 50], ['grand', 350]]);

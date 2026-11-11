@@ -535,19 +535,20 @@ export const CALCS = {
       const out = await finCalc(fin.cheques)(a, p);
       // the owner asked to SEE the future cheques → Joya also refreshes the fixed Drive file and gives the link
       if (p?.state === 'future' && !p?.export && a.isAdmin) {
-        const f = await fixedSheets.refreshForAnswer('cheques', { by: a.username });
+        const f = await fixedSheets.refreshForAnswer('cheques', { by: a.username, from: out.params?.from, to: out.params?.to });
         out.fixedFile = f.fixedFile;
-        out.file = { name: f.name, updatedAt: f.updatedAt ?? null, rows: f.rows ?? null, counts: f.counts ?? null, error: f.error ?? null, note: 'the fixed cheques file in Drive (Hashavshevet + Priority, one row per cheque) was rebuilt for this answer; the chat shows its button under the answer — do not write the link' };
+        out.file = { name: f.name, window: f.window ?? null, updatedAt: f.updatedAt ?? null, rows: f.rows ?? null, counts: f.counts ?? null, error: f.error ?? null, note: 'the fixed cheques file in Drive (the future cheques of this window only, a tab per month) was rebuilt for this answer; the chat shows its button under the answer — do not write the link' };
       }
       return out;
     },
   },
   cheques_file: {
-    params: '{}',
-    about: 'rebuilds NOW the FIXED Google Sheet in the owner\'s Drive folder with every cheque of the company in one table — Hashavshevet\'s cheques module and the Priority history merged, one row per cheque, with the day the bank paid it — and returns it: the same file and link every time (shown as a button under the answer), the refresh time, the rows and the counts per source. For "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "תעדכן את קובץ השיקים", "שיקים של חשבשבת ופריוריטי ביחד". A question about the FUTURE cheques (cheques, state future) refreshes this file by itself — do not add cheques_file to it',
-    run: async (a) => {
+    params: '{ from?, to? (the window of the file; without them today → the end of the third month ahead) }',
+    about: 'rebuilds NOW the FIXED Google Sheet in the owner\'s Drive folder with the FUTURE cheques (שיקים לפרעון) of the window — Hashavshevet\'s cheques module and the Priority history in one table, a tab per month grouped by day with a sum per day and a month total — and returns it: the same file and link every time (shown as a button under the answer), the window, the refresh time, the rows and the counts per source. For "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "תעדכן את קובץ השיקים". A question about the FUTURE cheques (cheques, state future) refreshes this file by itself with the same window — do not add cheques_file to it',
+    run: async (a, p) => {
       if (!a.isAdmin) throw err('FORBIDDEN', 'the books (finance data) are for the chain admin only');
-      return { report: 'cheques_file', ...(await fixedSheets.refreshForAnswer('cheques', { by: a.username })), note: 'the chat shows the file button under the answer — do not write the link; the file was rebuilt for this answer (same link every time)' };
+      const w = fin.dates(p || {}, { required: false });
+      return { report: 'cheques_file', ...(await fixedSheets.refreshForAnswer('cheques', { by: a.username, from: w.from, to: w.to })), note: 'the chat shows the file button under the answer — do not write the link; the file was rebuilt for this answer (same link every time) with the cheques of window only' };
     },
   },
   priority_cheques: {

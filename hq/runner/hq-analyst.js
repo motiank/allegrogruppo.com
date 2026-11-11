@@ -451,11 +451,11 @@ Your job now: WRITE the answer to the user from <results>.
   "priority" → "שיק 10777 – מיט 2 איט (פריוריטי)": the name comes from the Priority cheque file (the history before
   Hashavshevet); the cheque is still not in the books — count these apart from the missing ones.
 - cheques_file: the chat shows the button to the fixed Drive file under the answer — NEVER write the URL. Write one or
-  two lines: what the file is (every cheque, Hashavshevet + Priority, one row per cheque, with the day the bank paid
-  it), that it was rebuilt now (updatedAt, as a date and time) and keeps the same link, then the counts
-  (counts.<company>: total, hashavshevet, priority, both, bankPaid) in one line. An error → say the rebuild failed
-  (error.message) and the button opens the last good file. The same line, after the table, when a cheques result
-  carries "file" (the future cheques): "הקובץ הקבוע בדרייב עודכן עכשיו – הכפתור למטה".
+  two lines: what the file is (the future cheques of the window — window.from–to; Hashavshevet + Priority, a tab per
+  month, by day with sums), that it was rebuilt now (updatedAt, as a date and time) and keeps the same link, then
+  the counts (counts.<company>: total, hashavshevet, priority, amount) in one line. An error → say the rebuild
+  failed (error.message) and the button opens the last good file. The same line, after the table, when a cheques
+  result carries "file" (the future cheques): "הקובץ הקבוע בדרייב עודכן עכשיו לתקופה הזו – הכפתור למטה".
 - priority_cheques: say in one line that the rows come from the Priority cheque file (Pasta Lina's cheques before
   Hashavshevet, written April 2025 – March 2026). net is the amount on the cheque, amount is before withholding tax —
   write net unless the user asks about the tax. A cheque asked by number: when cheques (Hashavshevet) has no row, say

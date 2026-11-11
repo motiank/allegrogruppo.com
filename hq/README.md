@@ -493,15 +493,18 @@ upon demand: if I ask to see future cheques, Joya updates the file and provides 
 a Google Sheet per key in the owner's Drive folder that keeps its id and link; Joya rewrites it in place ON DEMAND
 (`upsertFixedSheet` in `sheets.js`: the file is found by `appProperties.joyaFixed = key`, which scope drive.file can
 read because the app made it, then `files.update` with the new workbook; no timer, no service). The link and the last
-refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים – חשבשבת + פריוריטי · Joya": Finance API
-`/cheques/all` per finance company, laid out by `chequeTabs` (owner: "a sheet per month, grouped by day, and a month
-total"): a first tab "סיכום" (one line per month: cheques, amount, of which future / paid / not paid, and a total line),
-then one tab per month — the cheques of each due date, a bold sum row after each day, a shaded month-total row at the
-end — and, from the second year after today, one tab per year (the books carry a monthly series to 2036; 42 tabs on
-2026-11-11, 5,043 lines). Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`); the last tab "Joya" says when it was refreshed,
-the counts and the layout. Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
-"תעדכן את קובץ השיקים") rebuilds the file and returns the record; and every `cheques` question with state `future`
-("שיקים עתידיים", "שקלפ") rebuilds it too (`refreshForAnswer`) and adds `file` to its result. Either way the chat shows the
+refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים לפרעון · Joya" — ONLY the future cheques of the
+window the user asked for (owner: "display according to the user request, 3 months by default, only" — not the
+history): `chequesWindow` = the request's from/to, else `futureChequesRange(today)`; Finance API `/cheques/all` with
+`state=future` and the window, per finance company, laid out by `chequeTabs` (owner: "a sheet per month, grouped by day,
+and a month total"): a first tab "סיכום" (one line per month: cheques, amount, of which Priority, and a total line), then
+one tab per month — the cheques of each due date, a bold sum row after each day, a shaded month-total row at the end
+(a window longer than two years gets one tab per year beyond that). Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`);
+the last tab "Joya" says the window, when it was refreshed and the counts. The default window on 2026-11-11: 133
+cheques, 5 tabs (סיכום, 2026-11 … 2027-02). Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
+"תעדכן את קובץ השיקים"; `from`/`to` optional) rebuilds the file and returns the record; and every `cheques` question
+with state `future` ("שיקים עתידיים", "שקלפ") rebuilds it too with the SAME window as the answer (`refreshForAnswer`) and
+adds `file` to its result. Either way the chat shows the
 button "פתח את הקובץ הקבוע בדרייב" under the answer (`SheetFile`, `meta.file.fixed`); the writer never writes the URL. A
 failed rebuild keeps the last good link and says so. Suggestion `joya.area.accounting.s19`. Made 2026-11-11 from the
 owner's machine (4,343 rows, same file on refresh); eval `x-cheques-file*`, `f-shaklap`.
