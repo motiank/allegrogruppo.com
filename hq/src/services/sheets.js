@@ -72,6 +72,12 @@ function writeTab(wb, t, he) {
   });
   for (const r of t.rows.slice(0, MAX_ROWS)) {
     const x = ws.addRow(t.columns.map((k) => cellDate(r[k]) ?? (r[k] === true ? 'yes' : r[k] === false ? 'no' : r[k] ?? null)));
+    // a sum row (_style total = a day, grand = the whole tab): bold, shaded
+    if (r._style) {
+      x.font = { bold: true };
+      if (r._style === 'grand') x.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } }; c.border = { top: { style: 'thin' } }; });
+      else x.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; });
+    }
     t.columns.forEach((k, i) => {
       const cell = x.getCell(i + 1);
       if (cellDate(r[k])) cell.numFmt = 'dd.mm.yyyy';

@@ -27,22 +27,75 @@ export function chequeRowHe(x) {
   };
 }
 
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const dmy = (d) => (d ? `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}` : '');
+const my = (m) => `${m.slice(5, 7)}.${m.slice(0, 4)}`;
+export const SUMMARY_COLUMNS = ['חודש', 'שיקים', 'סכום', 'מזה עתידיים', 'מזה נפרעו', 'מזה לא נפרעו'];
+
+/**
+ * The tabs of the cheques file (owner 2026-11-11: "a sheet per month, grouped by day, and a month total"): first a
+ * summary tab (one line per month), then one tab per month — the cheques of each due date, a bold sum row after each
+ * day, a shaded total row for the month. Months after the end of next year are one tab per YEAR (the books carry a
+ * monthly series to 2036; one tab each would be 140 tabs). `prefix` names the company when the file has several.
+ */
+export function chequeTabs(rows, { today, prefix = '' } = {}) {
+  const yearTabsFrom = `${Number(String(today).slice(0, 4)) + 2}`; // 2026 → months of 2026 and 2027 one by one, 2028+ per year
+  const groups = new Map(); // tab key → rows
+  for (const x of rows) {
+    const d = x.dueDate || '';
+    const k = !d ? 'ללא תאריך' : d.slice(0, 4) >= yearTabsFrom ? d.slice(0, 4) : d.slice(0, 7);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(x);
+  }
+  const keys = [...groups.keys()].sort();
+  const summary = [];
+  const tabs = [];
+  const grand = { n: 0, amount: 0, future: 0, cleared: 0, not_cleared: 0 };
+  for (const k of keys) {
+    const list = groups.get(k).slice().sort((a, b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')) || (a.cheque ?? 0) - (b.cheque ?? 0));
+    const out = [];
+    let day = null, dayN = 0, daySum = 0, n = 0, sum = 0;
+    const byState = { future: 0, cleared: 0, not_cleared: 0 };
+    const flushDay = () => { if (day != null && dayN) out.push({ 'מוטב': `סה״כ ${dmy(day)} – ${dayN} שיקים`, 'סכום': r2(daySum), _style: 'total' }); };
+    for (const x of list) {
+      if (x.dueDate !== day) { flushDay(); day = x.dueDate; dayN = 0; daySum = 0; }
+      out.push(chequeRowHe(x));
+      dayN += 1; daySum += x.amount || 0; n += 1; sum += x.amount || 0;
+      byState[x.state] = (byState[x.state] || 0) + (x.amount || 0);
+    }
+    flushDay();
+    const label = /^\d{4}-\d{2}$/.test(k) ? my(k) : k;
+    out.push({ 'מוטב': `סה״כ ${label} – ${n} שיקים`, 'סכום': r2(sum), _style: 'grand' });
+    tabs.push({ name: `${prefix}${k}`.slice(0, 31), columns: CHEQUE_COLUMNS, rows: out });
+    summary.push({ 'חודש': label, 'שיקים': n, 'סכום': r2(sum), 'מזה עתידיים': r2(byState.future), 'מזה נפרעו': r2(byState.cleared), 'מזה לא נפרעו': r2(byState.not_cleared) });
+    grand.n += n; grand.amount += sum; grand.future += byState.future; grand.cleared += byState.cleared; grand.not_cleared += byState.not_cleared;
+  }
+  summary.push({ 'חודש': 'סה״כ', 'שיקים': grand.n, 'סכום': r2(grand.amount), 'מזה עתידיים': r2(grand.future), 'מזה נפרעו': r2(grand.cleared), 'מזה לא נפרעו': r2(grand.not_cleared), _style: 'grand' });
+  return [{ name: `${prefix}סיכום`.slice(0, 31), columns: SUMMARY_COLUMNS, rows: summary }, ...tabs];
+}
+
 async function buildCheques() {
   const fc = await financeCompanies();
   if (!fc.available) throw Object.assign(new Error(fc.reason || 'the Finance API is not available'), { code: 'NO_ROWS' });
+  const today = new Date().toISOString().slice(0, 10);
+  const loaded = [];
+  for (const co of fc.companies) {
+    const r = await finance('/cheques/all', { company: co.code, limit: 5000 });
+    if (r.available && r.data?.length) loaded.push({ co, r });
+  }
+  if (!loaded.length) throw Object.assign(new Error('no cheques to put in the file (no finance company loaded)'), { code: 'NO_ROWS' });
   const tabs = [];
   const counts = {};
   const about = [];
   let dataUpTo = null;
-  for (const co of fc.companies) {
-    const r = await finance('/cheques/all', { company: co.code, limit: 5000 });
-    if (!r.available || !r.data?.length) continue;
-    tabs.push({ name: (co.allegroLabel || co.name || co.code).slice(0, 31), columns: CHEQUE_COLUMNS, rows: r.data.map(chequeRowHe) });
+  for (const { co, r } of loaded) {
+    const label = co.allegroLabel || co.name || co.code;
+    tabs.push(...chequeTabs(r.data, { today, prefix: loaded.length > 1 ? `${label.slice(0, 10)} ` : '' }));
     counts[co.code] = { ...r.meta.counts, totals: r.meta.totals };
     dataUpTo = r.meta.sync?.dataUpTo ?? dataUpTo;
-    about.push([co.allegroLabel || co.name, `${r.meta.counts.total} שיקים: חשבשבת ${r.meta.counts.hashavshevet}, פריוריטי ${r.meta.counts.priority}, בשניהם ${r.meta.counts.both}; נפרעו בבנק ${r.meta.counts.bankPaid}`]);
+    about.push([label, `${r.meta.counts.total} שיקים: חשבשבת ${r.meta.counts.hashavshevet}, פריוריטי ${r.meta.counts.priority}, בשניהם ${r.meta.counts.both}; נפרעו בבנק ${r.meta.counts.bankPaid}`]);
   }
-  if (!tabs.length) throw Object.assign(new Error('no cheques to put in the file (no finance company loaded)'), { code: 'NO_ROWS' });
+  about.push(['מבנה', 'גיליון "סיכום" (שורה לחודש), ואז גיליון לכל חודש: השיקים לפי יום, שורת סה״כ אחרי כל יום, וסה״כ לחודש בסוף; מ-2028 גיליון לשנה']);
   return { tabs, counts, dataUpTo, about };
 }
 

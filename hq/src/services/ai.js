@@ -530,7 +530,7 @@ export const CALCS = {
   },
   cheques: {
     params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", number?: "a cheque number, or several comma-separated", limit? }',
-    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today = שיקים לפרעון = שקלפ; cleared = matched to the bank; not_cleared = due and not matched), with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number; returned cheques are not available yet. With state future the fixed cheques file in Drive (every cheque, Hashavshevet + Priority) is rebuilt too and its button is shown under the answer (owner 2026-11-11)',
+    about: 'issued cheques (שיקים): payee, amount, due date, state, with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number. state future = the cheques to be paid (שיקים לפרעון, שקלפ): Hashavshevet AND the Priority history together (source per row), and WITHOUT from/to the window is today to the end of the third month ahead (the owner\'s default — leave the dates out unless the user says a period); the fixed cheques file in Drive is rebuilt too and its button is shown under the answer. Other states (cleared = matched to the bank; not_cleared = due and not matched) are Hashavshevet only; returned cheques are not available yet',
     run: async (a, p) => {
       const out = await finCalc(fin.cheques)(a, p);
       // the owner asked to SEE the future cheques → Joya also refreshes the fixed Drive file and gives the link

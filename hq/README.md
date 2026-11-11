@@ -494,8 +494,12 @@ a Google Sheet per key in the owner's Drive folder that keeps its id and link; J
 (`upsertFixedSheet` in `sheets.js`: the file is found by `appProperties.joyaFixed = key`, which scope drive.file can
 read because the app made it, then `files.update` with the new workbook; no timer, no service). The link and the last
 refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים – חשבשבת + פריוריטי · Joya": Finance API
-`/cheques/all` per finance company, one tab per company with Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`), the last
-tab "Joya" says when it was refreshed and the counts. Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
+`/cheques/all` per finance company, laid out by `chequeTabs` (owner: "a sheet per month, grouped by day, and a month
+total"): a first tab "סיכום" (one line per month: cheques, amount, of which future / paid / not paid, and a total line),
+then one tab per month — the cheques of each due date, a bold sum row after each day, a shaded month-total row at the
+end — and, from the second year after today, one tab per year (the books carry a monthly series to 2036; 42 tabs on
+2026-11-11, 5,043 lines). Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`); the last tab "Joya" says when it was refreshed,
+the counts and the layout. Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
 "תעדכן את קובץ השיקים") rebuilds the file and returns the record; and every `cheques` question with state `future`
 ("שיקים עתידיים", "שקלפ") rebuilds it too (`refreshForAnswer`) and adds `file` to its result. Either way the chat shows the
 button "פתח את הקובץ הקבוע בדרייב" under the answer (`SheetFile`, `meta.file.fixed`); the writer never writes the URL. A
@@ -503,11 +507,16 @@ failed rebuild keeps the last good link and says so. Suggestion `joya.area.accou
 owner's machine (4,343 rows, same file on refresh); eval `x-cheques-file*`, `f-shaklap`.
 
 **Future cheques by day (owner 2026-11-11: "when I ask to see future cheques, put them in a table grouped by day and sum
-each day").** שקלפ = שיקים לפרעון = the future cheques (PLAN routing word → `cheques` state `future`). The `cheques`
-result carries `byDay` (`chequesByDay` in `src/services/finance.js`: every cheque of the selection grouped by due date,
-soonest first, with the day's count and sum — computed by the system, so the verifier knows the numbers), and the WRITE
-rule "FUTURE CHEQUES" shows one table (תאריך | מוטב | מס' שיק | סכום) with a bold sum row after each day and the grand
-total. Eval `f-shaklap`, `f-cheques`.
+each day"; "שקלפ without dates = from now 3 months, till the end of the third month").** שקלפ = שיקים לפרעון = the
+future cheques (PLAN routing word → `cheques` state `future`, and NO from/to when the user says no period). With state
+`future` the calc reads the merged table (Finance API `/cheques/all`: Hashavshevet's cheques module AND the Priority
+history — the post-dated Priority cheques, rent for example, count too; `source` per row) in the window from–to, and
+without dates the window is `futureChequesRange(today)`: today → the last day of the month three months ahead
+(2026-11-11 → 2027-02-28; `params.defaultRange: true`, the writer says it). The result carries `byDay` (`chequesByDay`:
+every cheque of the window grouped by due date, soonest first, with the day's count and sum — computed by the system, so
+the verifier knows the numbers), `totals.future` (the window) and `allFuture.amount` (every future cheque, any date); the
+WRITE rule "FUTURE CHEQUES" shows the window, one table (תאריך | מוטב | מס' שיק | סכום, "(פריוריטי)" after a Priority
+payee) with a bold sum row after each day, the window's total and the all-dates total. Eval `f-shaklap`, `f-cheques`.
 
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from

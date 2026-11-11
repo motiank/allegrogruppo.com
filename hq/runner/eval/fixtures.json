@@ -2043,6 +2043,12 @@
             "state": "future"
           }
         },
+        "noParams": {
+          "cheques": [
+            "from",
+            "to"
+          ]
+        },
         "maxCalcs": 1
       }
     },

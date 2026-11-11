@@ -507,6 +507,29 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   assert.deepEqual(days.map((d) => [d.dueDate, d.count, d.amount]), [['2026-11-15', 2, 200.1], ['2026-12-01', 1, 100.5]]);
   assert.deepEqual(days[0].cheques.map((c) => c.payee), ['א', 'ב']);
   assert.deepEqual(chequesByDay([]), []);
+  // the default window of the future cheques: today → the end of the third month ahead (owner 2026-11-11)
+  const { futureChequesRange } = await import('../src/services/finance.js');
+  assert.deepEqual(futureChequesRange('2026-11-11'), { from: '2026-11-11', to: '2027-02-28' });
+  assert.deepEqual(futureChequesRange('2026-11-30'), { from: '2026-11-30', to: '2027-02-28' });
+  assert.deepEqual(futureChequesRange('2026-12-15'), { from: '2026-12-15', to: '2027-03-31' });
+  assert.deepEqual(futureChequesRange('2027-11-01'), { from: '2027-11-01', to: '2028-02-29' });
+  // the file's tabs: a summary, then a tab per month with a sum row per day and a month total; far years one tab each
+  const { chequeTabs, SUMMARY_COLUMNS } = await import('../src/services/fixedSheets.js');
+  const tabs = chequeTabs([
+    { cheque: 2, payee: 'ב', amount: 200, dueDate: '2026-11-15', state: 'future', source: 'hashavshevet' },
+    { cheque: 1, payee: 'א', amount: 100, dueDate: '2026-11-15', state: 'future', source: 'priority' },
+    { cheque: 3, payee: 'ג', amount: 50, dueDate: '2026-11-20', state: 'future', source: 'hashavshevet' },
+    { cheque: 4, payee: 'ד', amount: 10, dueDate: '2025-06-01', state: 'cleared', source: 'priority' },
+    { cheque: 5, payee: 'ה', amount: 1, dueDate: '2029-03-01', state: 'future', source: 'hashavshevet' },
+    { cheque: 6, payee: 'ו', amount: 2, dueDate: '2029-07-01', state: 'future', source: 'hashavshevet' },
+  ], { today: '2026-11-11' });
+  assert.deepEqual(tabs.map((t) => t.name), ['סיכום', '2025-06', '2026-11', '2029']);
+  assert.deepEqual(tabs[0].columns, SUMMARY_COLUMNS);
+  assert.deepEqual(tabs[0].rows.map((r) => [r['חודש'], r['שיקים'], r['סכום']]), [['06.2025', 1, 10], ['11.2026', 3, 350], ['2029', 2, 3], ['סה״כ', 6, 363]]);
+  const nov = tabs[2].rows;
+  assert.deepEqual(nov.map((r) => r["מס' שיק"] ?? r['מוטב']), [1, 2, 'סה״כ 15.11.2026 – 2 שיקים', 3, 'סה״כ 20.11.2026 – 1 שיקים', 'סה״כ 11.2026 – 3 שיקים']);
+  assert.deepEqual(nov.filter((r) => r._style).map((r) => [r._style, r['סכום']]), [['total', 300], ['total', 50], ['grand', 350]]);
+  assert.equal(nov[0]['מקור'], 'פריוריטי');
   // the fixed cheques sheet: Hebrew columns in the sheet's order, labels for source and state, empty withholding left blank
   const { chequeRowHe, CHEQUE_COLUMNS, FIXED_SHEETS } = await import('../src/services/fixedSheets.js');
   const he = chequeRowHe({ cheque: 10337, payee: 'שיווק', amount: 14389, dueDate: '2025-07-03', issueDate: '2025-06-03', state: 'cleared', bankDate: '2025-07-04', source: 'both', account: '500076', accountName: 'שיווק בע"מ', supplierAccount: '200076', priorityPayment: 'CH25000351', grossAmount: 14389, withholding: 0, invoices: '9473, 9100', details: null });

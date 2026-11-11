@@ -370,17 +370,49 @@ const numbersOf = (p, k) => {
   return { [k]: list.join(',') };
 };
 
-/** Issued cheques: future, cleared (matched to the bank), not cleared; returned is not available yet. */
+/**
+ * The window of "the future cheques" when the user gives no dates (owner 2026-11-11: "from now 3 months, till the end
+ * of the third month"): today → the last day of the month three months ahead (2026-11-11 → 2027-02-28).
+ */
+export function futureChequesRange(today) {
+  const [y, m] = String(today).split('-').map(Number);
+  const end = new Date(Date.UTC(y, m - 1 + 3 + 1, 0)); // day 0 of the month after (month + 3) = its last day
+  return { from: String(today), to: end.toISOString().slice(0, 10) };
+}
+
+/**
+ * Issued cheques: future, cleared (matched to the bank), not cleared; returned is not available yet. The FUTURE
+ * cheques come from the merged table (/cheques/all: Hashavshevet + the Priority history, so the post-dated Priority
+ * cheques count too) and, without dates, from today to the end of the third month ahead.
+ */
 export async function cheques(companies, p = {}) {
   const limit = limitOf(p, LIMITS.cheques, 500);
   const q = textOf(p, 'q').q;
+  const state = oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']).state;
+  const numbers = numbersOf(p, 'number').number?.split(',') || null;
+  if (state === 'future') {
+    const given = dates(p, { required: false });
+    const range = given.from || given.to ? given : { ...futureChequesRange(p.today || new Date().toISOString().slice(0, 10)), defaultRange: true };
+    const params = { state: 'future', from: range.from, ...(range.to ? { to: range.to } : {}), limit: EXPORT_MAX };
+    const account = textOf(p, 'account').account;
+    return result('cheques', { ...params, limit, ...(range.defaultRange ? { defaultRange: true } : {}), ...(q ? { q } : {}), ...(numbers ? { number: numbers.join(',') } : {}), ...(account ? { account } : {}) }, await perCompany(companies, '/cheques/all', params, (d, m) => {
+      let rows = d.map((x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, source: x.source, account: x.account, accountName: x.accountName }));
+      rows = byName(rows, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
+      if (numbers) rows = rows.filter((r) => numbers.includes(String(r.reference)));
+      if (account) rows = rows.filter((r) => r.account === account);
+      const sum = Math.round(rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) * 100) / 100;
+      return { ...shown(rows, limit, rows.length), byDay: chequesByDay(rows), totals: { future: { count: rows.length, amount: sum } }, allFuture: m.totals ? { amount: m.totals.future } : null, note: 'Hashavshevet + Priority (source per row); dueDate = the date on the cheque' };
+    }), {
+      note: `the future cheques (שיקים לפרעון, שקלפ): every cheque with a date after today in the window from–to, from Hashavshevet's cheques module AND the Priority history (source per row: hashavshevet / priority)${range.defaultRange ? '; no dates were given, so the window is the default — today to the end of the third month ahead (say it)' : ''}. byDay = the same cheques grouped by due date with the count and the sum of each day (over every cheque of the window, not only the shown rows); totals.future = the window; allFuture.amount = every future cheque, any date`,
+    });
+  }
   // every row is fetched (≤ 5000): the day groups and their sums must cover the whole selection, not the shown rows
-  const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), ...numbersOf(p, 'number'), limit: EXPORT_MAX };
+  const params = { ...(state ? { state } : {}), ...dates(p, { required: false }), ...textOf(p, 'account'), ...numbersOf(p, 'number'), limit: EXPORT_MAX };
   return result('cheques', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/cheques', params, (d, m) => {
     const rows = byName(d, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
     return { ...shown(rows, limit, q ? rows.length : m.total), byDay: chequesByDay(rows), totals: m.totals, notAvailable: m.notAvailable, note: m.note };
   }), {
-    note: 'from / to filter the due date; number = the cheque number(s); state future = due after today, cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet. byDay = the same cheques grouped by due date, with the count and the sum of each day (over every cheque of the selection, not only the shown rows)',
+    note: 'from / to filter the due date; number = the cheque number(s); state cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet. byDay = the same cheques grouped by due date, with the count and the sum of each day (over every cheque of the selection, not only the shown rows)',
   });
 }
 

@@ -125,6 +125,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   (owner: no schedule) — by calc `cheques_file` and by every future-cheques question (`hq/src/services/fixedSheets.js`; record
   in `joya_settings`); the button is under the answer. hq README → "Fixed files in Drive". Deployed 2026-11-11 (`0b74fba`: hq
   built, `allegro-admin`, `joya-hq`, `joya-runner` restarted; the server's login rebuilt the same file, id `1TlHB1H0…h4E`).
+  Owner's rules for שקלפ (future cheques, same day): no dates = today → the end of the third month ahead; the chat shows one
+  table by day with a sum per day; the Drive file = a summary tab + a tab per month, day sums and a month total
+  (`hq/src/services/fixedSheets.js` `chequeTabs`, `finance.js` `futureChequesRange`; hq README → "Future cheques by day").
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
