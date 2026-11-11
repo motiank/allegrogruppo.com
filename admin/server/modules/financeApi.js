@@ -6,6 +6,7 @@ import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } f
 import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees } from "./chequePayees.js";
+import { searchPriorityCheques, PRIORITY_CHEQUES_META } from "./priorityCheques.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
 import { matchInvoices, booksFlag, flagChanged, normDigits, STATUSES } from "../../../shared/invoiceMatch.js";
 
@@ -1544,15 +1545,44 @@ route("/cheques", async (req, ctx) => {
   const { from, to } = dateRange(req, { required: false });
   const hasRange = Boolean(from || req.query.to);
   const { limit, offset } = paging(req);
-  const all = await chequeRows(ctx, { accounts, from, to: hasRange ? to : null });
+  const numbers = csv(req.query.number).map((n) => (/^\d+$/.test(n) ? Number(n) : NaN));
+  if (numbers.some(Number.isNaN)) throw badRequest("number must be a comma-separated list of cheque numbers");
+  let all = await chequeRows(ctx, { accounts, from, to: hasRange ? to : null });
+  if (numbers.length) all = all.filter((c) => numbers.includes(Number(c.reference)));
   const totals = {};
   for (const c of all) { totals[c.state] = totals[c.state] || { count: 0, amount: 0 }; totals[c.state].count += 1; totals[c.state].amount = round2(totals[c.state].amount + c.amount); }
   const now = today();
   const filtered = state == null ? all : state === "due" ? all.filter((c) => c.dueDate && c.dueDate <= now) : state === "returned" ? [] : all.filter((c) => c.state === state);
   return {
     data: filtered.slice(offset, offset + limit).map(({ cleared, ...c }) => c),
-    meta: { state: state || "all", accounts: accounts.length ? accounts : "all", from: from || null, to: hasRange ? to : null, limit, offset, total: filtered.length, totals, notAvailable: ["returned"], note: "returned cheques cannot be found yet; the accountant must say how they are recorded" },
+    meta: { state: state || "all", accounts: accounts.length ? accounts : "all", from: from || null, to: hasRange ? to : null, ...(numbers.length ? { number: numbers } : {}), limit, offset, total: filtered.length, totals, notAvailable: ["returned"], note: "returned cheques cannot be found yet; the accountant must say how they are recorded" },
     codes: ["bank_gap"],
+  };
+});
+
+// ── cheques written in Priority (readme → /cheques/priority) ─────────────
+// The history before Hashavshevet, from shared/priority_cheques.json (priorityCheques.js) — not the finance DB.
+route("/cheques/priority", async (req, ctx) => {
+  const source = PRIORITY_CHEQUES_META;
+  if (ctx.rules.allegroKey !== source.company) return { data: [], meta: { total: 0, source, note: `the Priority cheque file belongs to ${source.company}; ${ctx.code} has no Priority history` } };
+  const cheque = csv(req.query.cheque);
+  if (cheque.some((n) => !/^\d+$/.test(n))) throw badRequest("cheque must be a comma-separated list of cheque numbers");
+  const q = String(req.query.q ?? "").trim() || null;
+  const supplierAccount = String(req.query.supplierAccount ?? "").trim() || null;
+  const amountRaw = String(req.query.amount ?? "").trim();
+  if (amountRaw && !Number.isFinite(Number(amountRaw))) throw badRequest("amount must be a number");
+  const dateField = oneOf(req, "dateField", ["chequeDate", "payDate"], "chequeDate");
+  const { from, to } = dateRange(req, { required: false, maxDays: 0 });
+  const hasRange = Boolean(from || req.query.to);
+  const { limit, offset } = paging(req);
+  const r = searchPriorityCheques({ cheque: cheque.length ? cheque : null, q, supplierAccount, amount: amountRaw ? Number(amountRaw) : null, from, to: hasRange ? to : null, dateField, limit, offset });
+  return {
+    data: r.rows,
+    meta: {
+      cheque: cheque.length ? cheque.map(Number) : null, q, supplierAccount, amount: amountRaw ? Number(amountRaw) : null, dateField, from: from || null, to: hasRange ? to : null,
+      limit, offset, total: r.total, totals: r.totals, source,
+      note: "cheques written in Priority before Hashavshevet (history, a constant file): amount = before withholding tax, net = the amount on the cheque, lines = the invoices it paid; cheques written in Hashavshevet are in /cheques",
+    },
   };
 });
 

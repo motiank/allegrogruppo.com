@@ -109,6 +109,16 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `pdftotext -layout` when installed on the server, else `pdf-parse` — new root dependency, `npm install` on deploy), the AI
   planner extracts the rows, calc `statement_compare` pulls our account card (`/finance/ledger`) and `shared/statementCompare.js`
   returns only the differences (missing on each side, amount differs, the balance gap). hq README → "Statement compare".
+- **Priority cheque file** (2026-11-11, owner: "all the cheques created in Priority… use it when you need more info about
+  cheques and you don't have it in our books or the bank details; a constant file, our history, no updates; e.g. בהתאמות
+  בנקים"): `shared/priority_cheques.json` (2,678 Pasta Lina cheques written in Priority, April 2025 – March 2026, with the
+  invoices each paid) built by `node scripts/priority_cheques_import.js` from `scripts/data/priority-cheque.xlsx`. Read by
+  `admin/server/modules/priorityCheques.js`: the cheque lookup's third source (`payeeSource` `priority` — the bank recon
+  report, `/finance/bank/open`, `/bank/suggestions`, the Local Data API's stored bank rows, Joya's bank chat; on the local
+  copy it names 1,002 of the 1,398 bank cheques Hashavshevet does not know) and the Finance API `GET /finance/cheques/priority`
+  (+ `number=` on `/cheques`) behind Joya's calc `priority_cheques` ("שיק 10777 של מי?" asks Hashavshevet and Priority
+  together). Tests `scripts/test_priority_cheques.js` (no DB), `scripts/test_cheque_payees.js`, `scripts/test_finance_api.js`;
+  eval `pc-*`. No DB table, nothing to deploy but the code (admin + Joya restart).
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
@@ -136,7 +146,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
-  else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
+  else the Priority cheque file = `priority` (2026-11-11), else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

@@ -8,13 +8,18 @@
 //      hand-written cheques): the name on the other side of the entry. The reference of an entry is a free field —
 //      bank-fee entries (0.25 ₪, "עמלות") copy the cheque number too — so without the amount the name is only a guess
 //      and is not used;
-//   3. nothing — the cheque is not in Hashavshevet yet. The line gets payee null and payeeSource "missing": that
+//   3. the Priority cheque file (shared/priority_cheques.json — every cheque written in Priority before Hashavshevet,
+//      April 2025 – March 2026; history, constant): the supplier of that cheque number, the amount on the cheque
+//      (`net`) first when a number was used twice. payeeSource "priority": the name is known, the cheque is still
+//      not in Hashavshevet;
+//   4. nothing — the cheque is not in Hashavshevet yet. The line gets payee null and payeeSource "missing": that
 //      is the cheque the bookkeeper still has to enter (the loop the owner wants to close).
 // The lookup runs when the lines are shown (not stored): the name is in Hashavshevet before the cheque clears, and a
 // cheque entered late shows its name the next time the list opens. Every caller must survive a finance DB that is
 // down — `addChequePayees` then leaves the rows as they are and reports it in `meta.payees`.
 import { createRequire } from "module";
 import { financeSql } from "../sources/financePool.js";
+import { priorityChequesByNumber, PRIORITY_CHEQUES_META } from "./priorityCheques.js";
 
 const require = createRequire(import.meta.url);
 const FINANCE_MAP = require("../../../shared/finance_map.json");
@@ -31,14 +36,15 @@ const chequeNo = (reference) => {
 };
 const amt = (v) => (v == null ? null : Math.abs(Number(v)));
 const same = (a, b) => a != null && b != null && Math.abs(a - b) < 0.005;
-const PAYEE_SOURCE = { cheques: "cheques", journal: "journal", missing: "missing" };
+const PAYEE_SOURCE = { cheques: "cheques", journal: "journal", priority: "priority", missing: "missing" };
 
 /**
- * The candidates for the payee of each cheque number of one company: the cheques module first, then journal entries.
+ * The candidates for the payee of each cheque number of one company: the cheques module first, then journal entries,
+ * then (Pasta Lina only) the Priority cheque file.
  * @param {number} companyId  allegro_finance company id
  * @param {Array<{reference:any}|number|string>} refs  cheque numbers (strings or ints)
  * @param {{bankAccounts?: string[]}} [opt]  the company's bank account keys (looked up when missing)
- * @returns {Promise<Map<string, Array<{payee:string, amount:number|null, source:'cheques'|'journal', chequeId?:number, dueDate?:string, transId?:number}>>>}
+ * @returns {Promise<Map<string, Array<{payee:string, amount:number|null, source:'cheques'|'journal'|'priority', chequeId?:number, dueDate?:string, transId?:number, payment?:string, chequeDate?:string}>>>}
  *          keyed by the cheque number as a plain string; numbers not found are absent. Resolve one line with `pickPayee`.
  */
 export async function chequePayees(companyId, refs, { bankAccounts } = {}) {
@@ -64,12 +70,20 @@ export async function chequePayees(companyId, refs, { bankAccounts } = {}) {
   // 2. the journal entry with that reference on the bank account (only for numbers the module does not know)
   const rest = numbers.filter((n) => !out.has(String(n)));
   if (!rest.length) return out;
+  // 3. the Priority file — pushed after the journal candidates, so with the same amount Hashavshevet's name wins
+  const priority = companyId === (await financeCompanyId(PRIORITY_CHEQUES_META.company)) ? priorityChequesByNumber(rest) : new Map();
+  const pushPriority = () => {
+    for (const [no, list] of priority) for (const c of list) push(no, { payee: c.supplier, amount: c.net, source: PAYEE_SOURCE.priority, payment: c.payment, chequeDate: c.chequeDate });
+  };
   let banks = bankAccounts;
   if (!banks) {
     const rows = await financeSql(`SELECT DISTINCT account_key FROM bank_lines WHERE company_id = :companyId AND deleted_at IS NULL`, { companyId });
     banks = rows.map((r) => r.account_key);
   }
-  if (!banks.length) return out;
+  if (!banks.length) {
+    pushPriority();
+    return out;
+  }
   const p2 = { companyId };
   const nlist = rest.map((n, i) => ((p2[`r${i}`] = n), `:r${i}`)).join(",");
   const blist = banks.map((b, i) => ((p2[`b${i}`] = b), `:b${i}`)).join(",");
@@ -85,18 +99,19 @@ export async function chequePayees(companyId, refs, { bankAccounts } = {}) {
     const name = banks.includes(e.credit_account) ? e.debit_name : e.credit_name;
     if (name) push(e.reference, { payee: name, amount: amt(e.amount), source: PAYEE_SOURCE.journal, transId: e.trans_id });
   }
+  pushPriority();
   return out;
 }
 
 /**
- * The candidate for one bank line: the one with the same amount; else the oldest cheque of the module with that number
- * (the number names the payee even when the amount differs, e.g. a cheque corrected after it was written); a journal
- * entry with another amount is not used (null → "missing").
+ * The candidate for one bank line: the one with the same amount; else the oldest cheque of the module with that number,
+ * else the Priority cheque with that number (a cheque number names the payee even when the amount differs, e.g. a
+ * cheque corrected after it was written); a journal entry with another amount is not used (null → "missing").
  */
 export function pickPayee(candidates, amount) {
   if (!candidates?.length) return null;
   const a = amt(amount);
-  return candidates.find((c) => same(a, c.amount)) || candidates.find((c) => c.source === PAYEE_SOURCE.cheques) || null;
+  return candidates.find((c) => same(a, c.amount)) || candidates.find((c) => c.source === PAYEE_SOURCE.cheques) || candidates.find((c) => c.source === PAYEE_SOURCE.priority) || null;
 }
 
 const companyIdCache = new Map(); // finance company code → company_id
@@ -114,12 +129,13 @@ export async function financeCompanyId(key) {
 }
 
 /**
- * Adds `payee` and `payeeSource` ("cheques" | "journal" | "missing") to the cheque lines of `rows` (other rows are
- * left alone). Rows of several companies are grouped by `company(row)`; a finance DB error leaves the rows unchanged.
- * @returns {Promise<{found:number, missing:number, lines:number, error?:string}>}  what happened, for `meta.payees`
+ * Adds `payee` and `payeeSource` ("cheques" | "journal" | "priority" | "missing") to the cheque lines of `rows` (other
+ * rows are left alone). Rows of several companies are grouped by `company(row)`; a finance DB error leaves the rows
+ * unchanged. `found` counts every named line, `priority` those named by the Priority file only (not in Hashavshevet).
+ * @returns {Promise<{lines:number, found:number, priority:number, missing:number, error?:string}>}  what happened, for `meta.payees`
  */
 export async function addChequePayees(rows, { company, text = (r) => r.details, reference = (r) => r.reference, amount = (r) => r.amount, bankAccounts } = {}) {
-  const stats = { lines: 0, found: 0, missing: 0 };
+  const stats = { lines: 0, found: 0, priority: 0, missing: 0 };
   const groups = new Map(); // company key → cheque rows
   for (const r of rows || []) {
     if (!isChequeLine(text(r)) || !chequeNo(reference(r))) continue;
@@ -139,6 +155,7 @@ export async function addChequePayees(rows, { company, text = (r) => r.details, 
           r.payee = hit.payee;
           r.payeeSource = hit.source;
           stats.found++;
+          if (hit.source === PAYEE_SOURCE.priority) stats.priority++;
         } else {
           r.payee = null;
           r.payeeSource = PAYEE_SOURCE.missing;

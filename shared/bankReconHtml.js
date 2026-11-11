@@ -145,9 +145,10 @@ function summary(r) {
 
 const olderClass = (row, from) => (row.date && from && String(row.date) < String(from) ? "older" : "");
 
-// the beneficiary of a cheque line (payee from Hashavshevet; "missing" = the cheque is not in Hashavshevet yet)
+// the beneficiary of a cheque line (payee from Hashavshevet; "priority" = named by the Priority cheque file, the
+// history before Hashavshevet; "missing" = the cheque is not in Hashavshevet yet)
 export const PAYEE_MISSING = "לא נמצא בחשבשבת";
-export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payee || "");
+export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payeeSource === "priority" && x.payee ? `${x.payee} (פריוריטי)` : x.payee || "");
 
 function bankOpenTable(r) {
   const rows = r.bankOpen || [];

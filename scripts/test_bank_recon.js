@@ -58,7 +58,8 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     assert.equal(s.unexplained, 0, "Hashavshevet's matches should explain the whole gap");
     // Cheque lines of section 1 carry the beneficiary (or "missing"); the summary counts them.
     const chq = r.bankOpen.filter((x) => /^שיק/.test(x.details));
-    assert.ok(chq.every((x) => ["cheques", "journal", "missing"].includes(x.payeeSource) && (x.payeeSource === "missing" ? x.payee === null : x.payee)));
+    assert.ok(chq.every((x) => ["cheques", "journal", "priority", "missing"].includes(x.payeeSource) && (x.payeeSource === "missing" ? x.payee === null : x.payee)));
+    assert.equal(s.bankOpen.cheques.priority, r.bankOpen.filter((x) => x.payeeSource === "priority").length, "cheques named by the Priority file are counted apart");
     assert.ok(r.bankOpen.filter((x) => !/שיק/.test(x.details)).every((x) => !("payee" in x)));
     assert.equal(s.bankOpen.cheques.missing, r.bankOpen.filter((x) => x.payeeSource === "missing").length);
     assert.ok(s.bankOpen.cheques.found + s.bankOpen.cheques.missing === s.bankOpen.cheques.count);

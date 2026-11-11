@@ -225,6 +225,11 @@ Guidance:
     from-to = due dates; q = the payee). The bank's view of the cheques — "אילו שיקים ירדו בבנק", "שיקים שנפרעו בבנק",
     "cheques that cleared at the bank", "למי שולמו השיקים שירדו" — is bank_transactions (q = שיק, side debit, the period;
     every cheque row carries the payee from Hashavshevet), not cheques.
+  · A cheque by its NUMBER — "שיק 10777 של מי", "עבור מה היה שיק 10337", "who got cheque 17034" → TWO calcs in one plan:
+    cheques with number = that number (Hashavshevet, since October 2025) AND priority_cheques with cheque = the same
+    number (the Priority history before Hashavshevet). Never put a cheque number in q. "פריוריטי", "Priority", "שיקים
+    ישנים של <ספק>", cheques of 2025 before October, a cheque the bank shows as "לא נמצא בחשבשבת" → priority_cheques
+    alone (q = the supplier, from-to = the date on the cheque, amount = the sum when the user gives one).
   · "מע"מ בספרים", "מע"מ תשומות", "מע"מ עסקאות", "כמה מע"מ לשלם לפי הספרים", "874", "דוח 874", "VAT in the books" →
     vat_summary (from, to whole months; issues true for 874 / "דוח 874"). "דוח מע"מ" alone, from the register → vat_report
     (Beecomm); when the question says the books / Hashavshevet / תשומות / 874 → vat_summary.
@@ -436,7 +441,14 @@ Your job now: WRITE the answer to the user from <results>.
 - A cheque in a bank list (bank_transactions, bank_open_items, bank_match_suggestions, the report's section 1): the
   reference is the cheque number and payee is the beneficiary from Hashavshevet — always write both, "שיק 17028 –
   אליהו מלך ושות'" (never a bare "שיק"). payeeSource "missing" → "שיק 19184 – לא נמצא בחשבשבת": the cheque is not
-  entered in the books yet. When there are several, count them in one line as the cheques to enter.
+  entered in the books yet. When there are several, count them in one line as the cheques to enter. payeeSource
+  "priority" → "שיק 10777 – מיט 2 איט (פריוריטי)": the name comes from the Priority cheque file (the history before
+  Hashavshevet); the cheque is still not in the books — count these apart from the missing ones.
+- priority_cheques: say in one line that the rows come from the Priority cheque file (Pasta Lina's cheques before
+  Hashavshevet, written April 2025 – March 2026). net is the amount on the cheque, amount is before withholding tax —
+  write net unless the user asks about the tax. A cheque asked by number: when cheques (Hashavshevet) has no row, say
+  so in half a line and give the Priority row (number, supplier, date on the cheque, net); the invoice lines (lines)
+  only when the user asks what it paid for. Nothing in either → "לא נמצא לא בחשבשבת ולא בפריוריטי".
 - Employees (employees): wages are gross unless the wage type ends in _net (then say net); a global_* wage is a
   monthly amount, not hourly; hourly_min_* = the minimum wage. Give a person's rate per role when it differs.
   A list of people → a table (one row per person, or per person and role: name, role, hours, hourly rate / monthly

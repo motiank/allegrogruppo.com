@@ -528,9 +528,14 @@ export const CALCS = {
     run: finCalc(fin.accountStatement),
   },
   cheques: {
-    params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", limit? }',
-    about: 'issued cheques (שיקים) from the books: payee, amount, due date, state (future = due after today; cleared = matched to the bank; not_cleared = due and not matched), with totals per state; returned cheques are not available yet',
+    params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", number?: "a cheque number, or several comma-separated", limit? }',
+    about: 'issued cheques (שיקים) from the books (Hashavshevet, since October 2025): payee, amount, due date, state (future = due after today; cleared = matched to the bank; not_cleared = due and not matched), with totals per state; number = one cheque by its number; returned cheques are not available yet',
     run: finCalc(fin.cheques),
+  },
+  priority_cheques: {
+    params: '{ companyKeys?, cheque?: "a cheque number, or several comma-separated", q?: "part of the supplier name, the details or an invoice number", amount?: number, supplierAccount?, from?, to?, dateField?: "chequeDate" (default, the date on the cheque) | "payDate", limit? }',
+    about: 'the cheques Pasta Lina wrote in Priority BEFORE Hashavshevet (history, April 2025 – March 2026, cheque dates up to 2029; a constant file): cheque number, supplier, the date on the cheque, the payment date, amount before withholding tax, withholding, net = the amount on the cheque, and the invoices it paid. For a cheque the books do not know (a bank line "לא נמצא בחשבשבת" / payeeSource missing or priority), "what was cheque N for", old cheques of a supplier, or a question that says Priority / פריוריטי; cheques written in Hashavshevet are in cheques',
+    run: finCalc(fin.priorityCheques),
   },
   vat_summary: {
     params: `{ companyKeys?, ${FIN_PERIOD} (whole months), issues?: boolean (also the 874 report runs), includeUnposted? }`,
@@ -613,7 +618,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules

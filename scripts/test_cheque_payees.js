@@ -4,6 +4,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { isChequeLine, chequePayees, pickPayee, addChequePayees, financeCompanyId } from "../admin/server/modules/chequePayees.js";
 import { financeSql, closeFinancePool } from "../admin/server/sources/financePool.js";
+import { PRIORITY_CHEQUES } from "../admin/server/modules/priorityCheques.js";
 
 after(() => closeFinancePool());
 
@@ -57,11 +58,46 @@ test("addChequePayees marks only cheque rows, per company, and survives a bad co
     { company: "nope", action: "שיק", reference: String(mod.reference), debit: 10 },
   ];
   const stats = await addChequePayees(rows, { company: (r) => r.company, text: (r) => r.action, amount: (r) => r.debit });
-  assert.deepEqual(stats, { lines: 2, found: 1, missing: 1 });
+  assert.deepEqual(stats, { lines: 2, found: 1, priority: 0, missing: 1 });
   assert.equal(rows[0].payee, mod.payee_name);
   assert.equal(rows[0].payeeSource, "cheques");
   assert.deepEqual([rows[1].payee, rows[1].payeeSource], [null, "missing"]);
   assert.ok(!("payee" in rows[2]) && !("payee" in rows[3]));
+});
+
+test("a cheque Hashavshevet does not know is named by the Priority file (Pasta Lina only)", async () => {
+  // Priority numbers that are in no Hashavshevet cheque and no journal entry of the bank account
+  const [chq, jr] = await Promise.all([
+    financeSql(`SELECT DISTINCT reference FROM cheques WHERE company_id = 1 AND deleted_at IS NULL`),
+    financeSql(`SELECT DISTINCT e.reference FROM journal_entries e WHERE e.company_id = 1 AND e.deleted_at IS NULL AND (e.credit_account = '110011' OR e.debit_account = '110011')`),
+  ]);
+  const known = new Set([...chq, ...jr].map((r) => String(Number(r.reference))));
+  const onlyPriority = PRIORITY_CHEQUES.filter((c) => c.cheque != null && !known.has(String(c.cheque)));
+  assert.ok(onlyPriority.length > 500, `the local copy has ${onlyPriority.length} cheques known only from Priority`);
+  const twice = PRIORITY_CHEQUES.filter((c) => c.cheque === 10777);
+  assert.equal(twice.length, 2, "10777 was written twice in Priority");
+  const [a, b] = onlyPriority;
+  const rows = [
+    { company: "pastaLina", action: "שיק", reference: String(a.cheque), debit: a.net },
+    { company: "pastaLina", action: "שיק", reference: String(b.cheque), debit: b.net + 1 }, // another amount: the number still names the payee
+    { company: "pastaLina", action: "שיק", reference: "999999999", debit: 10 },
+  ];
+  const stats = await addChequePayees(rows, { company: (r) => r.company, text: (r) => r.action, amount: (r) => r.debit });
+  assert.deepEqual(stats, { lines: 3, found: 2, priority: 2, missing: 1 });
+  assert.deepEqual([rows[0].payee, rows[0].payeeSource], [a.supplier, "priority"]);
+  assert.deepEqual([rows[1].payee, rows[1].payeeSource], [b.supplier, "priority"]);
+  assert.deepEqual([rows[2].payee, rows[2].payeeSource], [null, "missing"]);
+  // a number used twice in Priority: the amount decides
+  if (!known.has("10777")) {
+    const names = await chequePayees(1, ["10777"]);
+    for (const c of twice) assert.equal(pickPayee(names.get("10777"), -c.net).payee, c.supplier);
+  }
+  // Hashavshevet first: a journal candidate with the same amount wins over Priority, a journal fee entry does not
+  assert.equal(pickPayee([{ payee: "ספק בחשבשבת", amount: 100, source: "journal" }, { payee: "ספק בפריוריטי", amount: 100, source: "priority" }], -100).payee, "ספק בחשבשבת");
+  assert.equal(pickPayee([{ payee: "עמלות", amount: 0.25, source: "journal" }, { payee: "ספק בפריוריטי", amount: 100, source: "priority" }], -90).payee, "ספק בפריוריטי");
+  // another company gets nothing from the file
+  const other = await chequePayees(999, [String(a.cheque)]).catch(() => new Map());
+  assert.ok(!other.has(String(a.cheque)));
 });
 
 test("on the real bank lines of this year most cheques get a name", async () => {

@@ -249,7 +249,7 @@ export async function buildBankReconReport(query = {}) {
   const bankOpen = bankOpenRows.map((r) => ({
     bankLineId: r.bank_line_id, year: r.fiscal_year, date: r.d, reference: r.reference, details: r.details, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to),
   }));
-  // the beneficiary of every cheque line, from Hashavshevet (payee / payeeSource: cheques, journal, missing)
+  // the beneficiary of every cheque line, from Hashavshevet or the Priority file (payee / payeeSource: cheques, journal, priority, missing)
   const payeeStats = await addChequePayees(bankOpen, { company: company.companyId, bankAccounts: [accountKey] });
 
   const bookFutureMatched = futureMatchedRows.map((r) => ({
@@ -269,7 +269,10 @@ export async function buildBankReconReport(query = {}) {
     bookBalance, bookLinesCount: num(book?.n), unpostedCount: num(book?.unposted),
     bankOpen: {
       count: bankOpen.length, total: sum(bankOpen, (x) => x.amount), beforeCount: older(bankOpen).length, beforeTotal: sum(older(bankOpen), (x) => x.amount),
-      cheques: { count: payeeStats.lines, found: payeeStats.found, missing: payeeStats.missing, missingTotal: sum(bankOpen.filter((x) => x.payeeSource === "missing"), (x) => x.amount) },
+      cheques: {
+        count: payeeStats.lines, found: payeeStats.found, missing: payeeStats.missing, missingTotal: sum(bankOpen.filter((x) => x.payeeSource === "missing"), (x) => x.amount),
+        priority: payeeStats.priority || 0, priorityTotal: sum(bankOpen.filter((x) => x.payeeSource === "priority"), (x) => x.amount),
+      },
     },
     bookOpen: { count: bookOpen.length, total: sum(bookOpen, (x) => x.amount), beforeCount: older(bookOpen).length, beforeTotal: sum(older(bookOpen), (x) => x.amount) },
     chequesOpen: {
@@ -293,6 +296,8 @@ export async function buildBankReconReport(query = {}) {
   if (summary.unpostedCount) notes.push(`${summary.unpostedCount} תנועות ספרים עד התאריך עדיין לא נקלטו (מנה פתוחה); הן נכללות ביתרת הספרים ומסומנות "לא נקלט".`);
   if (bookFutureMatched.length)
     notes.push(`${bookFutureMatched.length} תנועות ספרים בתאריך מאוחר מ-${fmtDate(to)} כבר הותאמו לתנועות בנק עד תאריך זה (למשל צ'ק שנרשם בתאריך ערך מאוחר); הן מוצגות בסוף סעיף 2 ומנוכות בסיכום.`);
+  if (payeeStats.priority)
+    notes.push(`${payeeStats.priority} צ'קים שנפרעו בבנק אינם בחשבשבת אך נמצאו בקובץ הצ'קים של פריוריטי (ההיסטוריה שלפני חשבשבת); שם המוטב מוצג עם הסימון "פריוריטי" בסעיף 1 – גם אותם יש לרשום בחשבשבת.`);
   if (payeeStats.missing)
     notes.push(`${payeeStats.missing} צ'קים שנפרעו בבנק לא נמצאו בחשבשבת (לא במודול הצ'קים ולא בפקודת יומן עם מספר הצ'ק); הם מסומנים "${payeeText({ payeeSource: "missing" })}" בסעיף 1 – אלה הצ'קים שיש לרשום.`);
   if (payeeStats.error) notes.push(`שמות המוטבים של הצ'קים לא נשלפו הפעם (${payeeStats.error}).`);
@@ -314,7 +319,7 @@ export async function buildBankReconReport(query = {}) {
 
 const MONEY_FMT = '#,##0.00;[Red]-#,##0.00';
 
-const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", missing: "חסר" };
+const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", priority: "פריוריטי", missing: "חסר" };
 
 function sheet(wb, title, columns, rows, totalLabel, total) {
   const ws = wb.addWorksheet(title.slice(0, 31), { views: [{ rightToLeft: true, state: "frozen", ySplit: 1 }] });

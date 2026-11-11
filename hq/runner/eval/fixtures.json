@@ -1309,6 +1309,69 @@
       }
     },
     {
+      "key": "pc-number",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "שיק 10777 של מי היה?",
+      "expect": {
+        "calcs": [
+          "cheques",
+          "priority_cheques"
+        ],
+        "params": {
+          "cheques": {
+            "number": "10777"
+          },
+          "priority_cheques": {
+            "cheque": "10777"
+          }
+        },
+        "noParams": {
+          "cheques": [
+            "q"
+          ],
+          "priority_cheques": [
+            "q"
+          ]
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "pc-supplier",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים נתנו לנסיפי כח אדם בפריוריטי?",
+      "expect": {
+        "calcs": [
+          "priority_cheques"
+        ],
+        "params": {
+          "priority_cheques": {
+            "q": "נסיפי"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "pc-missing-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "The bank report shows cheque 10334 as not found in Hashavshevet. What was it for?",
+      "expect": {
+        "calcs": [
+          "priority_cheques"
+        ],
+        "params": {
+          "priority_cheques": {
+            "cheque": "10334"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
       "key": "f-supplier-table",
       "kind": "ACCOUNTING",
       "lang": "he",

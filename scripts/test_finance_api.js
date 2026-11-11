@@ -272,7 +272,7 @@ describe("endpoints", () => {
   test("route list covers the readme", () => {
     const want = ["/companies", "/status", "/accounts", "/branches", "/pnl", "/cash", "/branch-costs", "/sales-vs-books", "/spending", "/aging", "/intercompany",
       "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/suggestions", "/invoices", "/statement",
-      "/cheques", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
+      "/cheques", "/cheques/priority", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
     assert.deepEqual(financeRoutes().sort(), want.sort());
   });
 
@@ -607,7 +607,7 @@ describe("endpoints", () => {
       assert.ok(bank.data.every((l, i, a) => ["in", "out"].includes(l.direction) && (i === 0 || a[i - 1].date <= l.date)), "oldest first");
       const chq = await ok(`/bank/open?company=${COMPANY}&side=bank&from=2026-01-01&limit=1000`);
       const chequeLines = chq.data.filter((l) => /^שיק/.test(l.details));
-      assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
+      assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "priority", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
       assert.equal(chq.meta.payees.lines, chq.data.filter((l) => /^שיק|החזרת שיק|בטול שיק/.test(l.details)).length);
       const old = await ok(`/bank/open?company=${COMPANY}&side=bank&minAge=90&limit=5`);
       assert.ok(old.meta.total < bank.meta.total && old.data.every((l) => l.ageDays >= 90));
@@ -705,6 +705,31 @@ describe("endpoints", () => {
       const ranged = await ok(`/cheques?company=${COMPANY}&from=2026-12-01&to=2026-12-31&account=500084`);
       assert.ok(ranged.data.every((c) => c.dueDate >= "2026-12-01" && c.dueDate <= "2026-12-31" && c.account === "500084"));
       assert.ok(ranged.data.every((c) => c.entry && c.entry.transId));
+    });
+    test("GET /cheques?number= and GET /cheques/priority: the Priority history", async () => {
+      const some = await ok(`/cheques?company=${COMPANY}&limit=3`);
+      const no = some.data[0].reference;
+      const byNo = await ok(`/cheques?company=${COMPANY}&number=${no},999999999`);
+      assert.ok(byNo.data.length >= 1 && byNo.data.every((c) => Number(c.reference) === Number(no)));
+      assert.deepEqual(byNo.meta.number, [Number(no), 999999999]);
+      await fail(`/cheques?company=${COMPANY}&number=abc`, 400, "bad_request");
+
+      const one = await ok(`/cheques/priority?company=${COMPANY}&cheque=10337`);
+      assert.equal(one.meta.total, 1);
+      assert.equal(one.data[0].supplier, 'שיווק א.א עפולה צ.א בע"מ');
+      assert.equal(one.data[0].lines.length, 4);
+      assert.equal(one.meta.source.company, "pastaLina");
+      const name = await ok(`/cheques/priority?company=${COMPANY}&q=נסיפי&from=2025-06-01&to=2025-06-30`);
+      assert.equal(name.meta.total, 4);
+      assert.ok(name.data.every((c) => c.supplier.includes("נסיפי") && c.chequeDate >= "2025-06-01" && c.chequeDate <= "2025-06-30"));
+      close(name.meta.totals.net, name.meta.totals.amount - name.meta.totals.withholding);
+      const amt = await ok(`/cheques/priority?company=${COMPANY}&amount=16878`);
+      assert.deepEqual(amt.data.map((c) => c.cheque), [10777]);
+      const paged = await ok(`/cheques/priority?company=${COMPANY}&from=2025-05-01&to=2029-12-31&limit=2&offset=1`);
+      assert.equal(paged.data.length, 2);
+      assert.equal(paged.meta.total, 2678, "a range of years is allowed: the file is small");
+      await fail(`/cheques/priority?company=${COMPANY}&cheque=x`, 400, "bad_request");
+      await fail(`/cheques/priority?company=${COMPANY}&amount=abc`, 400, "bad_request");
     });
     test("GET /vat and /vat/issues", async () => {
       const r = await ok(`/vat?company=${COMPANY}&from=2026-07-01&to=2026-08-31`);

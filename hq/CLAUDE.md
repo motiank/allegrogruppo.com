@@ -148,6 +148,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   → calc `statement_compare` (`/ledger` + `shared/statementCompare.js`) → only the differences (WRITE "Statement compare").
   `ChatArea`: a PDF anywhere / an Excel in the accounting chat = the next question's attachment (chip), other files = the import flow. Tests `scripts/test_statement_compare.js`; eval `st-*`.
   Deployed 2026-11-10 (`7e38e6e`: poppler-utils installed on the droplet, root `npm install`, hq built, joya-hq + joya-runner restarted; the chat-only version `1c1ef3f` deployed the same day).
+- **Priority cheques** (2026-11-11, owner: "a constant file, our history — use it when the books or the bank do not have the
+  cheque's details, e.g. bank reconciliations"): `shared/priority_cheques.json` (from `scripts/data/priority-cheque.xlsx` by
+  `scripts/priority_cheques_import.js`; 2,678 Pasta Lina cheques written in Priority, April 2025 – March 2026). The admin's
+  cheque lookup names bank cheque lines from it when Hashavshevet has nothing (`payeeSource: "priority"`, report note), and
+  calc `priority_cheques` (Finance API `/cheques/priority`; `cheques` got `number`) answers cheque questions; PLAN "A cheque
+  by its NUMBER" plans both. README → "Priority cheques". Tests `scripts/test_priority_cheques.js`; eval `pc-*`.
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

@@ -138,7 +138,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
-| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_recon_report`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `vat_summary`, `withholding`, `allocation_numbers`, `missing_invoices` (invoices not booked yet, channel by channel — first channel: the invoice agent's Drive index, flag written back into Drive), `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
+| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_recon_report`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `priority_cheques` (the Priority cheque file, before Hashavshevet), `vat_summary`, `withholding`, `allocation_numbers`, `missing_invoices` (invoices not booked yet, channel by channel — first channel: the invoice agent's Drive index, flag written back into Drive), `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
 
 **Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** (and ISRACARD, DISCOVER, MAESTRO — owner, 2026-11-03) of
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
@@ -472,6 +472,20 @@ then amount + date (45 days), then a one-off amount at any date — and returns 
 listed differences explain. The writer (WRITE "Statement compare") shows one line of counts, one of balances and up to
 three tables; several accounts fit the name → it lists them and asks. Follow-up questions stay in the same chat.
 Tests: `node --test scripts/test_statement_compare.js`; eval `st-*` (fixtures carry an `attachment`).
+
+**Priority cheques (owner 2026-11-11: "all the cheques created in Priority — use it when you need more info about cheques
+and you don't have it in our books or the bank details; a constant file, our history; e.g. bank reconciliations").**
+Pasta Lina wrote its cheques in Priority before Hashavshevet (April 2025 – March 2026). The owner's export became the
+constant file `shared/priority_cheques.json` (`scripts/priority_cheques_import.js` from `scripts/data/priority-cheque.xlsx`;
+2,678 cheques, one record per payment with the invoices it paid). Two uses: (1) every bank cheque line that Hashavshevet
+does not know — the reconciliation report's section 1, `bank_open_items`, `bank_match_suggestions`, `bank_transactions` —
+now gets its name from the file with `payeeSource: "priority"` ("שיק 10777 – מיט 2 איט (פריוריטי)"; the cheque still
+has to be entered in Hashavshevet, the report counts them in a note apart from the missing ones;
+`admin/server/modules/chequePayees.js`); (2) calc `priority_cheques` (Finance API `/cheques/priority`): "שיק 10777 של
+מי?" plans `cheques` with `number` (Hashavshevet) AND `priority_cheques` with `cheque` (the history); "שיקים ישנים של
+<ספק>", "בפריוריטי", a cheque the bank shows as "לא נמצא בחשבשבת" → `priority_cheques` alone (q, from–to on the date
+on the cheque, amount). `net` is the amount on the cheque, `amount` is before withholding tax. Tests
+`scripts/test_priority_cheques.js`, `scripts/test_cheque_payees.js`; eval `pc-*`.
 
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from

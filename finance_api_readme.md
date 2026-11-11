@@ -182,7 +182,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 15 | Suggested bank matches | `/bank/suggestions` | One-to-one only: 44 of 758 open lines within 30 days |
 | 16 | Customer invoices, credit notes, receipts | `/invoices`, `/statement` | |
 | 17 | Supplier card, open invoices, payments | `/statement` | Only 75 of 250 suppliers use matching |
-| 18 | Issued cheques | `/cheques` | "Returned" cannot be found yet |
+| 18 | Issued cheques | `/cheques`, `/cheques/priority` | "Returned" cannot be found yet. `/cheques/priority` = the Priority history before Hashavshevet (a file, not the DB) |
 | 19 | VAT check and the 874 report | `/vat`, `/vat/issues` | Book totals; 874 data is not understood yet |
 | 20 | Tax deducted at source, certificates | `/withholding` | |
 | 21 | Allocation numbers | `/allocation-numbers` | The legal limits per date are not confirmed |
@@ -550,10 +550,12 @@ Use case 14. The open lines, oldest first. Bank line `direction` is `in` or `out
 `counterAccount` and `chequeId`. `meta.total` and `meta.amount` cover the whole selection. A bank cheque line (`details`
 שיק / החזרת שיק / בטול שיק, `reference` = the cheque number) also has `payee` and `payeeSource`: the beneficiary from
 `cheques.payee_name` (`cheques`), else from the journal entry on the bank account with that reference and the same amount
-(`journal`), else
+(`journal`), else from the Priority cheque file (`priority` — the cheque was written in Priority before Hashavshevet, see
+`/cheques/priority`; the name is known, the cheque is still not in the books), else
 `missing` (`payee` null — the cheque is not in Hashavshevet yet); with a duplicate number the row with the same amount
-wins (`admin/server/modules/chequePayees.js`, also used by `/bank/suggestions`, the report and the Local Data API's
-`/bank/transactions/stored`). `meta.payees` = `{ lines, found, missing[, error] }`.
+wins, and with the same amount Hashavshevet's name wins over Priority (`admin/server/modules/chequePayees.js`, also used by
+`/bank/suggestions`, the report and the Local Data API's `/bank/transactions/stored`). `meta.payees` =
+`{ lines, found, priority, missing[, error] }` (`priority` = lines named by the file only, counted in `found` too).
 
 - `is_matched = 1` with `match_num` means a bank line is matched.
 - `bank_matches.linked_id` with `side = 'book'` is a `journal_lines.line_id`, not a `trans_id`.
@@ -639,9 +641,10 @@ and `buckets`. Plus = owed, as in `/aging`. `to` is also the `asOf` of the open 
 The accountant should confirm this rule. `meta.method` is as in `/aging`. An account that is neither a customer nor a
 supplier gets `side: "other"` and no open items.
 
-### `GET /finance/cheques?company=[&state=future|due|cleared|not_cleared|returned][&account=][&from=][&to=][&limit=][&offset=]`
+### `GET /finance/cheques?company=[&state=future|due|cleared|not_cleared|returned][&account=][&number=][&from=][&to=][&limit=][&offset=]`
 
-Use case 18. Source: `cheques`, linked to `journal_entries.cheque_id`. `from`/`to` filter the due date.
+Use case 18. Source: `cheques`, linked to `journal_entries.cheque_id`. `from`/`to` filter the due date. `number` = one
+cheque number or several, comma-separated (the cheque's `reference`); `meta.number` repeats it.
 
 `cheques.status` can't be used: all 1,665 rows have the value 3. So the state is worked out:
 
@@ -659,6 +662,32 @@ All 1,665 cheques link to an entry. `meta.totals` counts every state regardless 
 { "chequeId": 1445, "year": 2026, "account": "500201", "accountName": "אלון הרשקו עו\"ד", "payee": "אלון הרשקו עו\"ד", "amount": 4720, "paid": 4720, "deducted": 0,
   "dueDate": "2026-11-08", "issueDate": null, "originalDate": "2026-09-08", "reference": 17034, "bankAccount": "110011", "entry": { "year": 2026, "transId": 15516 }, "state": "future" }
 ```
+
+### `GET /finance/cheques/priority?company=[&cheque=][&q=][&supplierAccount=][&amount=][&from=][&to=][&dateField=chequeDate|payDate][&limit=][&offset=]`
+
+Use case 18, the history. Pasta Lina wrote its cheques in **Priority** before Hashavshevet (April 2025 – March 2026; the
+cheques module of Hashavshevet starts 2025-10-09). The owner's export of every Priority cheque is a constant file —
+`scripts/data/priority-cheque.xlsx` → `node scripts/priority_cheques_import.js` → `shared/priority_cheques.json` (2,678
+payments = cheques, 10 without a number; one record per payment with the invoice `lines` it paid; nothing updates it).
+Not the finance DB: `admin/server/modules/priorityCheques.js` reads the JSON. Only the company whose Allegro key is the
+file's `company` (`pastaLina`) has rows; another company gets `data: []` and a note.
+
+Filters combine: `cheque` = cheque number(s), comma-separated; `q` = part of the supplier name, the details or an invoice
+number; `supplierAccount` = the Priority supplier account; `amount` = the amount on the cheque (`net`) or before
+withholding (`amount`), ±0.01; `from`/`to` on `dateField` (`chequeDate` = the date written on the cheque, default;
+`payDate` = the day it was made in Priority) — no range limit, the file is small. `meta.totals` = `{ count, amount,
+withholding, net }` over every match; `meta.source` = the file's header (company, builtAt, payDates, chequeDates, count,
+net). On the local copy 1,002 of the 1,398 bank cheque lines that Hashavshevet does not know are in this file (2026-11-11).
+
+```json
+{ "payment": "CH25000351", "cheque": 10337, "payDate": "2025-06-03", "chequeDate": "2025-07-03", "bankAccount": "102-1", "currency": "ש\"ח",
+  "supplierAccount": "200076", "supplier": "שיווק א.א עפולה צ.א בע\"מ", "amount": 14389, "withholdingPct": 0, "withholding": 0, "net": 14389,
+  "details": "חש. ספק מרכזת", "lines": [ { "internal": "GI25000164", "invoice": "9473", "invoiceDate": "2025-04-29", "details": "חש. ספק מרכזת", "amount": 2546, "withholding": 0, "net": 2546 }, … ] }
+```
+
+`amount` is before withholding tax, `net` is what is written on the cheque (`amount − withholding`); a payment with
+several rows in Priority has its rows in `lines` (a minus line is a credit taken off). A cheque number can appear
+twice (10777 was written to two payees). Test: `node --test scripts/test_priority_cheques.js` (no database).
 
 ### `GET /finance/vat?company=&from=&to=[&includeUnposted=1]`
 

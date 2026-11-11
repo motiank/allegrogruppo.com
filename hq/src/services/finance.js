@@ -363,16 +363,35 @@ export async function accountStatement(companies, p = {}) {
   });
 }
 
+const numbersOf = (p, k) => {
+  if (p[k] == null || String(p[k]).trim() === '') return {};
+  const list = (Array.isArray(p[k]) ? p[k] : String(p[k]).split(',')).map((n) => String(n).trim()).filter(Boolean);
+  if (!list.length || list.some((n) => !/^\d+$/.test(n))) throw bad(`${k} must be a cheque number or a list of numbers`);
+  return { [k]: list.join(',') };
+};
+
 /** Issued cheques: future, cleared (matched to the bank), not cleared; returned is not available yet. */
 export async function cheques(companies, p = {}) {
   const limit = limitOf(p, LIMITS.cheques, 500);
   const q = textOf(p, 'q').q;
-  const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), limit: q ? 5000 : limit };
+  const params = { ...oneOf(p, 'state', ['future', 'due', 'cleared', 'not_cleared', 'returned']), ...dates(p, { required: false }), ...textOf(p, 'account'), ...numbersOf(p, 'number'), limit: q ? 5000 : limit };
   return result('cheques', { ...params, limit, ...(q ? { q } : {}) }, await perCompany(companies, '/cheques', params, (d, m) => {
     const rows = byName(d, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
     return { ...shown(rows, limit, q ? rows.length : m.total), totals: m.totals, notAvailable: m.notAvailable, note: m.note };
   }), {
-    note: 'from / to filter the due date; state future = due after today, cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet',
+    note: 'from / to filter the due date; number = the cheque number(s); state future = due after today, cleared = its bank line is matched, not_cleared = due and not matched; returned cheques cannot be found yet',
+  });
+}
+
+/** The cheques written in Priority before Hashavshevet (history, a constant file): by number, supplier, amount, dates. */
+export async function priorityCheques(companies, p = {}) {
+  const limit = limitOf(p, LIMITS.cheques, 500);
+  const amount = p.amount == null || p.amount === '' ? {} : Number.isFinite(Number(p.amount)) ? { amount: Number(p.amount) } : (() => { throw bad('amount must be a number'); })();
+  const params = { ...numbersOf(p, 'cheque'), ...textOf(p, 'q'), ...textOf(p, 'supplierAccount'), ...amount, ...oneOf(p, 'dateField', ['chequeDate', 'payDate']), ...dates(p, { required: false }), limit };
+  return result('priority_cheques', params, await perCompany(companies, '/cheques/priority', params, (d, m) => ({
+    ...shown(d, limit, m.total), totals: m.totals, source: m.source, note: m.note,
+  })), {
+    note: 'the Priority cheque file — Pasta Lina\'s cheques before Hashavshevet (written April 2025 – March 2026, cheque dates to 2029; nothing updates it): cheque = the number on the cheque, chequeDate = the date on it, payDate = when it was made, amount = before withholding tax, withholding, net = the amount on the cheque, lines = the invoices it paid (invoice, invoiceDate, amount); cheques written in Hashavshevet are in cheques',
   });
 }
 
