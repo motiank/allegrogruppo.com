@@ -118,7 +118,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   copy it names 1,002 of the 1,398 bank cheques Hashavshevet does not know) and the Finance API `GET /finance/cheques/priority`
   (+ `number=` on `/cheques`) behind Joya's calc `priority_cheques` ("שיק 10777 של מי?" asks Hashavshevet and Priority
   together). Tests `scripts/test_priority_cheques.js` (no DB), `scripts/test_cheque_payees.js`, `scripts/test_finance_api.js`;
-  eval `pc-*`. No DB table, nothing to deploy but the code (admin + Joya restart).
+  eval `pc-*`. No DB table. Deployed 2026-11-11 (`ff83715`: pull, `allegro-admin`, `joya-hq`, `joya-runner` restarted).
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
