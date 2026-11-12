@@ -10,5 +10,7 @@ set "NODE=node"
 if exist "%~dp0node-path.txt" set /p NODE=<"%~dp0node-path.txt"
 if not exist logs mkdir logs
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM"') do set "YM=%%i"
+echo Sync started. Nothing more appears here: everything is written to logs\sync-%YM%.log (open it in Notepad to follow).
+echo This window closes or returns when the sync is finished. The first run can take a long time.
 "%NODE%" src\sync.js --company %COMPANY% --name %COMPANY_NAME% --production %* >> "logs\sync-%YM%.log" 2>&1
 exit /b %ERRORLEVEL%
