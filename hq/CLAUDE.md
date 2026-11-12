@@ -163,7 +163,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   Same day: the file is a summary tab + a tab per month (day sums, month total — `chequeTabs`), and שקלפ without dates =
   today → the end of the third month ahead (`futureChequesRange`), read from `/cheques/all` so the post-dated Priority
   cheques count (README → "Future cheques by day"). Then: the file holds ONLY the future cheques of the asked window
-  (`chequesWindow`; owner: "according to the user request, 3 months by default, only" — no history); name "שיקים לפרעון · Joya".
+  (`chequesWindow`; owner: "according to the user request, 3 months by default, only" — no history); name "שיקים לפרעון · Joya". Deployed 2026-11-12 (`3ffc85f`, joya-hq + joya-runner restarted, no build).
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

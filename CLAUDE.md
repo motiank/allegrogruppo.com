@@ -129,7 +129,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   table by day with a sum per day; the Drive file = a summary tab + a tab per month, day sums and a month total
   (`hq/src/services/fixedSheets.js` `chequeTabs`, `finance.js` `futureChequesRange`; hq README → "Future cheques by day").
   Deployed 2026-11-11 (`3996b9a`, joya-hq + joya-runner restarted, no build). Then (owner): the file shows ONLY the future
-  cheques of the asked window (default 3 months), not the history — name "שיקים לפרעון · Joya", `chequesWindow`.
+  cheques of the asked window (default 3 months), not the history — name "שיקים לפרעון · Joya", `chequesWindow`. Deployed 2026-11-12 (`3ffc85f`, joya-hq + joya-runner restarted, no build).
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
