@@ -61,7 +61,9 @@ export async function workbookOf({ question, lang = 'he', today, calcs = [], col
   return { buffer, tabs: tabs.map((t) => ({ name: t.name, calc: t.calc, rows: Math.min(t.rows.length, MAX_ROWS), columns: t.columns.length })), rows };
 }
 
-/** One worksheet: a bold header row, dates as dates, numbers formatted, a filter on the header, fitted widths. */
+const TONE_COLOR = { actual: 'FF1E7B34', expected: 'FFC00000' };
+
+/** One worksheet: a bold header row, dates as dates, numbers formatted, a filter on the header, fitted widths; `_style` and `_tone` rows are styled. */
 function writeTab(wb, t, he) {
   const ws = wb.addWorksheet(t.name, { views: [{ rightToLeft: he, state: 'frozen', ySplit: 1 }] });
   const head = ws.addRow(t.columns);
@@ -78,6 +80,8 @@ function writeTab(wb, t, he) {
       if (r._style === 'grand') x.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } }; c.border = { top: { style: 'thin' } }; });
       else x.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; });
     }
+    // the row's tone (owner 2026-11-12, the cheques file): actual = a real bank balance → green; expected → red
+    if (TONE_COLOR[r._tone]) x.font = { ...(x.font || {}), color: { argb: TONE_COLOR[r._tone] } };
     t.columns.forEach((k, i) => {
       const cell = x.getCell(i + 1);
       if (cellDate(r[k])) cell.numFmt = 'dd.mm.yyyy';

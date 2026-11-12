@@ -1408,6 +1408,110 @@ route("/bank/open", async (req, ctx) => {
   return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}) }, codes: ["bank_gap"] };
 });
 
+// ── bank balance per day (readme → /bank/balances) ───────────────────────
+// The closing balance of each bank day, from two copies of the same bank statement: the bank file the admin uploads
+// ("the bank sheet", bank_transactions in the allegro DB — the day's closing = the first row of the day in the latest
+// upload, the file is newest first) and Hashavshevet's bank lines (bank_lines.running_balance of the last line of the
+// day). The two carry the bank's own running balance and agree on a finished day (checked 2026-11-12). A file day
+// uploaded on that same day is PROVISIONAL (the bank still adds and reverses lines that day — on 2026-10-26 a morning
+// file held 10 returned cheques that the final statement has not), so a day in both takes the file only when its upload
+// came on a later day; otherwise Hashavshevet. Owner 2026-11-12: the future cheques show the real balance up to the
+// last bank day and the expected one after it.
+
+/**
+ * Per-account closing rows [{ account, date, balance, lines, provisional? }] → one row per day with the sum of the
+ * accounts' last known balances; a day is provisional when any of its account rows is.
+ */
+export function balanceSeries(rows) {
+  const byDay = new Map();
+  for (const r of rows) {
+    if (r.balance == null) continue;
+    if (!byDay.has(r.date)) byDay.set(r.date, []);
+    byDay.get(r.date).push(r);
+  }
+  const known = new Map(); // account → last balance
+  const out = [];
+  for (const date of [...byDay.keys()].sort()) {
+    let lines = 0;
+    let provisional = false;
+    for (const r of byDay.get(date)) { known.set(r.account, round2(r.balance)); lines += num(r.lines); provisional = provisional || Boolean(r.provisional); }
+    out.push({ date, balance: round2([...known.values()].reduce((a, b) => a + b, 0)), lines, accounts: known.size, ...(provisional ? { provisional: true } : {}) });
+  }
+  return out;
+}
+
+/**
+ * The file's series and Hashavshevet's series → one series + meta. A day in both takes the file, unless the file's
+ * day is provisional (uploaded that same day); `agree` compares the two on their last common finished day.
+ */
+export function mergeBalanceSeries(file, hash) {
+  const days = new Map();
+  for (const r of hash) days.set(r.date, { date: r.date, balance: r.balance, lines: r.lines, source: "hashavshevet" });
+  for (const r of file) {
+    if (r.provisional && days.has(r.date)) continue;
+    days.set(r.date, { date: r.date, balance: r.balance, lines: r.lines, source: "bank_file", ...(r.provisional ? { provisional: true } : {}) });
+  }
+  const data = [...days.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const lastOf = (s) => (s.length ? { date: s[s.length - 1].date, balance: s[s.length - 1].balance } : null);
+  const common = file.filter((f) => !f.provisional && hash.some((h) => h.date === f.date)).pop();
+  const agree = common ? Math.abs(common.balance - hash.find((h) => h.date === common.date).balance) < 0.01 : null;
+  const l = data[data.length - 1];
+  const last = l ? { date: l.date, balance: l.balance, source: l.source, ...(l.provisional ? { provisional: true } : {}) } : null;
+  return { data, last, agree, file: lastOf(file), hash: lastOf(hash) };
+}
+
+const israelDay = (d) => (d ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)) : null);
+
+route("/bank/balances", async (req, ctx) => {
+  const wanted = optionalAccounts(req, ctx);
+  const keys = wanted.length ? wanted : ctx.bankAccounts;
+  const { from, to } = dateRange(req, { required: false, defaultFrom: addDays(today(), -45) });
+  const params = { companyId: ctx.companyId, from, toNext: addDays(to, 1) };
+  // Hashavshevet: the last line of each day (by bank_line_id, the order of the statement) per account
+  const hashRows = keys.length
+    ? await financeSql(
+        `SELECT b.account_key, DATE_FORMAT(b.line_date, '%Y-%m-%d') AS d, b.running_balance, g.n
+           FROM (SELECT account_key, DATE(line_date) AS day, MAX(bank_line_id) AS last_id, COUNT(*) AS n
+                   FROM bank_lines WHERE company_id = :companyId AND deleted_at IS NULL AND ${inList("account_key", keys, params, "k")}
+                    AND line_date >= :from AND line_date < :toNext GROUP BY account_key, DATE(line_date)) g
+           JOIN bank_lines b ON b.company_id = :companyId AND b.deleted_at IS NULL AND b.account_key = g.account_key AND b.bank_line_id = g.last_id
+          ORDER BY d, b.account_key`,
+        params,
+      )
+    : [];
+  const hash = balanceSeries(hashRows.map((r) => ({ account: r.account_key, date: r.d, balance: r.running_balance == null ? null : num(r.running_balance), lines: num(r.n) })));
+  // the bank file: the accounts of the company in restaurants.json (bank_accounts), the admin's bank_transactions
+  const fileAccounts = (ctx.restaurant?.bank_accounts || []).map((a) => a.account).filter(Boolean);
+  let fileRows = [];
+  if (fileAccounts.length && !wanted.length) {
+    const fp = { from, to };
+    const [rows] = await executeSql(
+      `SELECT t.account, DATE_FORMAT(t.tx_date, '%Y-%m-%d') AS d, COUNT(*) AS n, MAX(t.created_at) AS uploaded_at,
+              (SELECT b.balance FROM bank_transactions b WHERE b.account = t.account AND b.tx_date = t.tx_date ORDER BY b.upload_id DESC, b.id ASC LIMIT 1) AS closing
+         FROM bank_transactions t WHERE t.tx_date BETWEEN :from AND :to AND ${inList("t.account", fileAccounts, fp, "a")}
+        GROUP BY t.account, t.tx_date ORDER BY d, t.account`,
+      fp,
+    );
+    // a day whose newest upload came on that same day is provisional (the day was not over when the file was made)
+    fileRows = (rows || []).map((r) => ({ account: r.account, date: r.d, balance: r.closing == null ? null : num(r.closing), lines: num(r.n), provisional: israelDay(r.uploaded_at) <= r.d }));
+  }
+  const file = balanceSeries(fileRows);
+  const merged = mergeBalanceSeries(file, hash);
+  return {
+    data: merged.data,
+    meta: {
+      from, to, accounts: keys, fileAccounts: wanted.length ? [] : fileAccounts, last: merged.last, agree: merged.agree,
+      sources: {
+        bankFile: { accounts: wanted.length ? [] : fileAccounts, days: file.length, lastDate: merged.file?.date ?? null, lastBalance: merged.file?.balance ?? null },
+        hashavshevet: { accounts: keys, days: hash.length, lastDate: merged.hash?.date ?? null, lastBalance: merged.hash?.balance ?? null },
+      },
+      sign: "the bank's balance: minus = overdraft",
+      note: "one row per bank day: the closing balance of the day (the bank file the admin uploads, else Hashavshevet's bank lines — source per row; provisional = the file was uploaded on that same day, so the day may still change); last = the newest day of both; agree = the two copies give the same balance on their last common finished day; account= limits to Hashavshevet accounts only",
+    },
+    codes: ["bank_gap"],
+  };
+});
+
 route("/bank/suggestions", async (req, ctx) => {
   const wanted = optionalAccounts(req, ctx);
   const keys = wanted.length ? wanted : ctx.bankAccounts;

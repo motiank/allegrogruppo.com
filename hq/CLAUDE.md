@@ -164,6 +164,13 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   today → the end of the third month ahead (`futureChequesRange`), read from `/cheques/all` so the post-dated Priority
   cheques count (README → "Future cheques by day"). Then: the file holds ONLY the future cheques of the asked window
   (`chequesWindow`; owner: "according to the user request, 3 months by default, only" — no history); name "שיקים לפרעון · Joya". Deployed 2026-11-12 (`3ffc85f`, joya-hq + joya-runner restarted, no build).
+  2026-11-12 (owner): שקלפ always starts at the START of the current month, and every day carries the bank balance —
+  real up to the last bank day (Finance API `/bank/balances`: the uploaded bank file, else Hashavshevet's bank lines;
+  GREEN) and expected after it (the running balance minus the day's unpaid cheques and Joya's planned payments; RED):
+  `futureChequesData` / `chequesByDay(rows, { balances, payments })` / `balanceSummary` in `finance.js`, shared by the
+  `cheques` calc and the Drive file (`chequeTabs` with `byDay`, column יתרה, row `_tone`); the chat marks the cell with
+  🟢 / 🔴 (`cellTone`, coloured in `AskBox.js` and the Excel download). README → "Future cheques by day, with the bank
+  balance". Needs an hq client build and an admin restart on deploy.
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

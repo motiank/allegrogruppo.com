@@ -507,15 +507,54 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   assert.deepEqual(days.map((d) => [d.dueDate, d.count, d.amount]), [['2026-11-15', 2, 200.1], ['2026-12-01', 1, 100.5]]);
   assert.deepEqual(days[0].cheques.map((c) => c.payee), ['א', 'ב']);
   assert.deepEqual(chequesByDay([]), []);
-  // the default window of the future cheques: today → the end of the third month ahead (owner 2026-11-11)
-  const { futureChequesRange } = await import('../src/services/finance.js');
-  assert.deepEqual(futureChequesRange('2026-11-11'), { from: '2026-11-11', to: '2027-02-28' });
-  assert.deepEqual(futureChequesRange('2026-11-30'), { from: '2026-11-30', to: '2027-02-28' });
-  assert.deepEqual(futureChequesRange('2026-12-15'), { from: '2026-12-15', to: '2027-03-31' });
+  // the default window of the future cheques: the start of this month → the end of the third month ahead (owner 2026-11-11 / 11-12)
+  const { futureChequesRange, balanceSummary, chequeTotals } = await import('../src/services/finance.js');
+  assert.deepEqual(futureChequesRange('2026-11-11'), { from: '2026-11-01', to: '2027-02-28' });
+  assert.deepEqual(futureChequesRange('2026-11-30'), { from: '2026-11-01', to: '2027-02-28' });
+  assert.deepEqual(futureChequesRange('2026-12-15'), { from: '2026-12-01', to: '2027-03-31' });
   assert.deepEqual(futureChequesRange('2027-11-01'), { from: '2027-11-01', to: '2028-02-29' });
+  // the bank balance per day (owner 2026-11-12): real (actual) up to the last bank day — carried over a day without bank
+  // lines — then expected = running minus the day's unpaid cheques and planned payments; bank days without cheques are days too
+  const balances = {
+    available: true, last: { date: '2026-11-05', balance: -80000, source: 'hashavshevet' },
+    series: [{ date: '2026-11-02', balance: -50000, source: 'bank_file' }, { date: '2026-11-05', balance: -80000, source: 'hashavshevet' }],
+  };
+  const rowsB = [
+    { reference: 1, payee: 'א', amount: 1000, dueDate: '2026-11-03', bankDate: '2026-11-03', source: 'hashavshevet' }, // paid: in the real balance
+    { reference: 2, payee: 'ב', amount: 500, dueDate: '2026-11-04', bankDate: null, source: 'priority' }, // not paid, before the last bank day: not deducted
+    { reference: 3, payee: 'ג', amount: 2000, dueDate: '2026-11-10', bankDate: null, source: 'hashavshevet' },
+    { reference: 4, payee: 'ד', amount: 3000, dueDate: '2026-11-20', bankDate: null, source: 'hashavshevet' },
+  ];
+  const paymentsB = [{ id: 7, payee: 'שכירות', amount: 10000, date: '2026-11-10', dueTo: null, dueKind: 'DATE' }, { id: 8, payee: 'ארנונה', amount: 100, date: '2026-11-15', dueTo: '2026-11-21', dueKind: 'WEEK' }];
+  const byDayB = chequesByDay(rowsB, { balances, payments: paymentsB, today: '2026-11-12' });
+  assert.deepEqual(byDayB.map((d) => [d.dueDate, d.count, d.amount, d.paymentsAmount, d.balance?.kind, d.balance?.amount]), [
+    ['2026-11-02', 0, 0, 0, 'actual', -50000],
+    ['2026-11-03', 1, 1000, 0, 'actual', -50000],
+    ['2026-11-04', 1, 500, 0, 'actual', -50000],
+    ['2026-11-05', 0, 0, 0, 'actual', -80000],
+    ['2026-11-10', 1, 2000, 10000, 'expected', -92000],
+    ['2026-11-15', 0, 0, 100, 'expected', -92100],
+    ['2026-11-20', 1, 3000, 0, 'expected', -95100],
+  ]);
+  assert.deepEqual(byDayB[1].cheques[0], { reference: 1, payee: 'א', amount: 1000, paid: true });
+  assert.deepEqual(byDayB[2].cheques[0], { reference: 2, payee: 'ב', amount: 500, source: 'priority' });
+  assert.deepEqual(byDayB[1].balance, { amount: -50000, kind: 'actual', source: 'bank_file', asOf: '2026-11-02' });
+  assert.deepEqual(byDayB[5].payments, [{ id: 8, payee: 'ארנונה', amount: 100, window: '2026-11-15–2026-11-21' }]);
+  const sumB = balanceSummary(byDayB, balances, { to: '2027-02-28' });
+  assert.deepEqual(sumB.lastActual, { date: '2026-11-05', amount: -80000, source: 'hashavshevet', sourceHe: 'חשבשבת' });
+  assert.deepEqual([sumB.expectedEnd.date, sumB.expectedEnd.amount, sumB.lowest.date, sumB.lowest.amount], ['2026-11-20', -95100, '2026-11-20', -95100]);
+  assert.deepEqual(sumB.notPaidBefore, { count: 1, amount: 500 });
+  assert.equal(balanceSummary(chequesByDay(rowsB), { available: false, reason: 'no bank', series: [], last: null }).lastActual, null);
+  assert.deepEqual(chequeTotals(rowsB, '2026-11-12'), { window: { count: 4, amount: 6500 }, paid: { count: 1, amount: 1000 }, due: { count: 2, amount: 2500 }, future: { count: 1, amount: 3000 } });
+  // the chat's tone markers: 🟢 / 🔴 at the start of a cell → a colour; the number behind it still counts as a number
+  const { cellTone, cellNumber } = await import('../lib/answerTables.js');
+  assert.deepEqual(cellTone('🔴 **-95,100 ₪**'), { tone: 'bad', text: '**-95,100 ₪**' });
+  assert.deepEqual(cellTone('🟢-80,000 ₪'), { tone: 'ok', text: '-80,000 ₪' });
+  assert.equal(cellTone('-80,000 ₪'), null);
+  assert.deepEqual(cellNumber('🔴 -95,100 ₪'), { value: -95100, percent: false, money: true });
   // the file's tabs: a summary, then a tab per month with a sum row per day and a month total; far years one tab each
   const { chequeTabs, SUMMARY_COLUMNS, chequesWindow } = await import('../src/services/fixedSheets.js');
-  assert.deepEqual(chequesWindow({}, '2026-11-11'), { from: '2026-11-11', to: '2027-02-28', defaultRange: true });
+  assert.deepEqual(chequesWindow({}, '2026-11-11'), { from: '2026-11-01', to: '2027-02-28', defaultRange: true });
   assert.deepEqual(chequesWindow({ from: '2026-12-01', to: '2026-12-31' }, '2026-11-11'), { from: '2026-12-01', to: '2026-12-31', defaultRange: false });
   assert.deepEqual(chequesWindow({ to: '2026-12-31' }, '2026-11-11'), { from: '2026-11-11', to: '2026-12-31', defaultRange: false });
   const tabs = chequeTabs([
@@ -533,6 +572,22 @@ await ta('finance calcs refuse a non-admin before calling Allegro, and check the
   assert.deepEqual(nov.map((r) => r["מס' שיק"] ?? r['מוטב']), [1, 2, 'סה״כ 15.11.2026 – 2 שיקים', 3, 'סה״כ 20.11.2026 – 1 שיקים', 'סה״כ 11.2026 – 3 שיקים']);
   assert.deepEqual(nov.filter((r) => r._style).map((r) => [r._style, r['סכום']]), [['total', 300], ['total', 50], ['grand', 350]]);
   assert.equal(nov[0]['מקור'], 'פריוריטי');
+  // with byDay (balances + payments): the day's balance on its sum row with a tone, a bank day without cheques, a payment row
+  const tabsB = chequeTabs(rowsB.map((x) => ({ ...x, cheque: x.reference, state: x.bankDate ? 'cleared' : 'future' })), { today: '2026-11-12', byDay: byDayB });
+  assert.deepEqual(tabsB.map((t) => t.name), ['סיכום', '2026-11']);
+  const novB = tabsB[1].rows;
+  assert.deepEqual(novB.map((r) => [r["מס' שיק"] ?? r['מוטב'], r['סכום'], r['יתרה'], r._tone ?? null]), [
+    ['02.11.2026 – יום בנק ללא שיקים', null, -50000, 'actual'],
+    [1, 1000, null, null], ['סה״כ 03.11.2026 – 1 שיקים', 1000, -50000, 'actual'],
+    [2, 500, null, null], ['סה״כ 04.11.2026 – 1 שיקים', 500, -50000, 'actual'],
+    ['05.11.2026 – יום בנק ללא שיקים', null, -80000, 'actual'],
+    [3, 2000, null, null], ['העברה', 10000, null, null], ['סה״כ 10.11.2026 – 1 שיקים + 1 תשלומים', 12000, -92000, 'expected'],
+    ['העברה', 100, null, null], ['סה״כ 15.11.2026 – 1 תשלומים', 100, -92100, 'expected'],
+    [4, 3000, null, null], ['סה״כ 20.11.2026 – 1 שיקים', 3000, -95100, 'expected'],
+    ['סה״כ 11.2026 – 4 שיקים + תשלומים', 16600, -95100, 'expected'],
+  ]);
+  assert.deepEqual(novB.find((r) => r["מס' שיק"] === 'העברה' && r['סכום'] === 100)['פרטים'], 'שבוע 2026-11-15–2026-11-21');
+  assert.deepEqual(tabsB[0].rows.map((r) => [r['חודש'], r['שיקים'], r['סכום'], r['תשלומים מתוכננים'], r['יתרה בסוף החודש'], r._tone ?? null]), [['11.2026', 4, 6500, 10100, -95100, 'expected'], ['סה״כ', 4, 6500, 10100, null, null]]);
   // the fixed cheques sheet: Hebrew columns in the sheet's order, labels for source and state, empty withholding left blank
   const { chequeRowHe, CHEQUE_COLUMNS, FIXED_SHEETS } = await import('../src/services/fixedSheets.js');
   const he = chequeRowHe({ cheque: 10337, payee: 'שיווק', amount: 14389, dueDate: '2025-07-03', issueDate: '2025-06-03', state: 'cleared', bankDate: '2025-07-04', source: 'both', account: '500076', accountName: 'שיווק בע"מ', supplierAccount: '200076', priorityPayment: 'CH25000351', grossAmount: 14389, withholding: 0, invoices: '9473, 9100', details: null });

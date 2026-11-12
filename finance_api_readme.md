@@ -178,7 +178,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 11 | Trial balance on any date | `/trial-balance` | |
 | 12 | Account card | `/ledger` | |
 | 13 | Journal entries | `/journal` | |
-| 14 | Bank reconciliation | `/bank/reconciliation`, `/bank/open` | |
+| 14 | Bank reconciliation | `/bank/reconciliation`, `/bank/open`, `/bank/balances` | `/bank/balances` = the bank's closing balance per day (the uploaded bank file, else Hashavshevet's bank lines) |
 | 15 | Suggested bank matches | `/bank/suggestions` | One-to-one only: 44 of 758 open lines within 30 days |
 | 16 | Customer invoices, credit notes, receipts | `/invoices`, `/statement` | |
 | 17 | Supplier card, open invoices, payments | `/statement` | Only 75 of 250 suppliers use matching |
@@ -559,6 +559,26 @@ wins, and with the same amount Hashavshevet's name wins over Priority (`admin/se
 
 - `is_matched = 1` with `match_num` means a bank line is matched.
 - `bank_matches.linked_id` with `side = 'book'` is a `journal_lines.line_id`, not a `trans_id`.
+
+### `GET /finance/bank/balances?company=[&account=][&from=][&to=]`
+
+The bank account's closing balance at the end of each bank day (owner 2026-11-12, for the future cheques: the real
+balance up to the last bank day, the expected balance after it). Two copies of the same statement are read and merged,
+one row per day: the **bank file** the admin uploads (`bank_transactions` in the `allegro` DB, the accounts of the company
+in `shared/restaurants.json` → `bank_accounts`; the day's closing = the first row of the day in the latest upload, the
+file is newest first) and **Hashavshevet's bank lines** (`bank_lines.running_balance` of the last line of the day by
+`bank_line_id`, the company's bank accounts or `account=`). A day in both takes the file, unless the file's day is
+**provisional** — uploaded on that same day, when the bank still adds and reverses lines (on 2026-10-26 a morning file
+held 10 returned cheques that the final statement has not) — then Hashavshevet's day. `from` defaults to 45 days before
+today, `to` to today. Minus = overdraft.
+
+- `data[]`: `{ date, balance, lines, source: bank_file | hashavshevet, provisional? }`.
+- `meta`: `last` (the newest day of both: `{ date, balance, source, provisional? }`), `agree` (the two copies give the
+  same balance on their last common finished day; `null` when they share none), `sources.bankFile` /
+  `sources.hashavshevet` (`accounts`, `days`, `lastDate`, `lastBalance`), `accounts`, `fileAccounts`. `account=` reads
+  Hashavshevet only.
+- Pure helpers, tested: `balanceSeries` (per-account closings → one row per day with the sum of the accounts' last known
+  balances), `mergeBalanceSeries`.
 
 ### `GET /finance/bank/suggestions?company=[&account=][&days=30][&minAmount=][&limit=][&offset=]`
 

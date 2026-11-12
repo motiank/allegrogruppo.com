@@ -49,12 +49,22 @@ export function splitAnswer(text) {
 /** The tables of an answer only. */
 export const answerTables = (text) => splitAnswer(text).filter((b) => b.type === 'table');
 
+// A cell's tone (owner 2026-11-12, the future cheques: the real bank balance in green, the expected one in red). The
+// writer starts the cell with 🟢 or 🔴; the chat and the Excel show the text after it in that colour.
+const TONE_MARK = /^(🟢|🔴)\s*/u;
+const TONES = { '🟢': 'ok', '🔴': 'bad' };
+/** { tone: 'ok' | 'bad', text } when the cell starts with a tone marker, else null. */
+export function cellTone(s) {
+  const m = TONE_MARK.exec(String(s ?? ''));
+  return m ? { tone: TONES[m[1]], text: String(s).slice(m[0].length).trim() } : null;
+}
+
 /**
  * A cell as a number when it is one ("221,776", "₪ 1,234.5", "-3.6%", "(1,200)"), for Excel and for aligning numbers.
  * { value, percent, money } or null when the cell is text (a date, a name, "18.10–24.10").
  */
 export function cellNumber(s) {
-  const t = String(s ?? '').trim();
+  const t = String(s ?? '').trim().replace(TONE_MARK, '');
   if (!t) return null;
   const money = /₪|ש"ח|NIS/i.test(t);
   const percent = /%$/.test(t);

@@ -5,6 +5,7 @@
 // books have real gaps (no 2026 salaries, no income after August 2026, a bank gap…), and the writer must show a
 // `high` warning next to the number it affects.
 import { finance, financeCompanies } from './source.js';
+import { plannedByDay } from './payments.js';
 import { compareStatements } from '../../../shared/statementCompare.js';
 
 const SOURCE = 'the Hashavshevet books (allegro_finance), through the Allegro admin Finance API; posted entries only unless said otherwise; data as of the last nightly sync (dataUpTo)';
@@ -81,7 +82,7 @@ export async function linkCompanies(companies) {
  * One report of the Finance API per company: { report, source, params, companies: [{ company, companyKey, available,
  * dataUpTo, lastSync, warnings, ...shape(data, meta) }] }. shape() picks what the model needs from the admin's answer.
  */
-async function perCompany(companies, path, params, shape = (data, meta) => ({ data, totals: meta.totals ?? null })) {
+async function perCompany(companies, path, params, shape = (data, meta) => ({ data, totals: meta.totals ?? null }), { load = null } = {}) {
   const out = [];
   const notLoaded = [];
   for (const co of await linkCompanies(companies)) {
@@ -91,7 +92,8 @@ async function perCompany(companies, path, params, shape = (data, meta) => ({ da
       else notLoaded.push(co.label);
       continue;
     }
-    const r = await finance(path, { company: co.finance.code, ...params });
+    // load(co) = a report built from several admin calls (the future cheques); else one call of the Finance API
+    const r = load ? await load(co) : await finance(path, { company: co.finance.code, ...params });
     if (!r.available) {
       out.push({ company: co.label, companyKey: co.key, available: false, note: r.reason });
       continue;
@@ -106,7 +108,7 @@ async function perCompany(companies, path, params, shape = (data, meta) => ({ da
       syncStatus: m.sync?.status ?? null,
       warnings: warningsOf(m.warnings),
       ...(m.ambiguous ? { ambiguous: true, accounts: m.accounts, note: 'several accounts match the name: ask the user which one (accountKey), or list them' } : {}),
-      ...shape(r.data, m),
+      ...(await shape(r.data, m, co)),
     });
   }
   if (notLoaded.length) out.notLoaded = notLoaded;
@@ -370,14 +372,84 @@ const numbersOf = (p, k) => {
   return { [k]: list.join(',') };
 };
 
+export const monthStart = (d) => `${String(d).slice(0, 7)}-01`;
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 /**
  * The window of "the future cheques" when the user gives no dates (owner 2026-11-11: "from now 3 months, till the end
- * of the third month"): today → the last day of the month three months ahead (2026-11-11 → 2027-02-28).
+ * of the third month"; 2026-11-12: "always from the start of the current month, not from today"): the first day of
+ * this month → the last day of the month three months ahead (2026-11-12 → 2026-11-01 – 2027-02-28).
  */
 export function futureChequesRange(today) {
   const [y, m] = String(today).split('-').map(Number);
   const end = new Date(Date.UTC(y, m - 1 + 3 + 1, 0)); // day 0 of the month after (month + 3) = its last day
-  return { from: String(today), to: end.toISOString().slice(0, 10) };
+  return { from: monthStart(today), to: end.toISOString().slice(0, 10) };
+}
+
+/**
+ * The bank balance at the end of each bank day, from–to (Finance API /bank/balances: the uploaded bank file, else
+ * Hashavshevet's bank lines) → { available, series: [{ date, balance, source, provisional? }], last, sources, agree }.
+ */
+export async function bankBalances(financeCode, from, to) {
+  if (!from || !to || from > to) return { available: false, reason: 'no days to read', series: [], last: null };
+  const r = await finance('/bank/balances', { company: financeCode, from, to });
+  if (!r.available) return { available: false, reason: r.reason, series: [], last: null };
+  return { available: true, series: r.data || [], last: r.meta?.last ?? null, sources: r.meta?.sources ?? null, agree: r.meta?.agree ?? null, warnings: warningsOf(r.meta?.warnings) };
+}
+
+const SOURCE_HE = { bank_file: 'קובץ הבנק', hashavshevet: 'חשבשבת' };
+
+/** The words after the table: the last real balance, the expected end and the lowest expected day (owner 2026-11-12). */
+export function balanceSummary(byDay, balances, { to = null } = {}) {
+  const last = balances?.last || null;
+  if (!last) return { lastActual: null, expectedEnd: null, lowest: null, note: balances?.reason || 'no bank balance is loaded: the bank file was not uploaded and Hashavshevet has no bank lines' };
+  const expected = byDay.filter((d) => d.balance?.kind === 'expected');
+  const lowest = expected.reduce((m, d) => (m == null || d.balance.amount < m.balance.amount ? d : m), null);
+  const end = expected[expected.length - 1] || null;
+  const before = byDay.filter((d) => d.dueDate <= last.date).reduce((s, d) => s + d.cheques.filter((c) => !c.paid).length, 0);
+  const beforeAmount = r2(byDay.filter((d) => d.dueDate <= last.date).reduce((s, d) => s + d.cheques.filter((c) => !c.paid).reduce((a, c) => a + (Number(c.amount) || 0), 0), 0));
+  return {
+    lastActual: { date: last.date, amount: last.balance, source: last.source, sourceHe: SOURCE_HE[last.source] || last.source, ...(last.provisional ? { provisional: true } : {}) },
+    agree: balances.agree ?? null,
+    expectedEnd: end ? { date: end.dueDate, amount: end.balance.amount, windowTo: to } : null,
+    lowest: lowest ? { date: lowest.dueDate, amount: lowest.balance.amount } : null,
+    notPaidBefore: { count: before, amount: beforeAmount },
+    note: `actual = the bank's closing balance of that day (${SOURCE_HE[last.source] || last.source}; minus = overdraft) up to ${last.date}${last.provisional ? ' (a file uploaded that same day — the day may still change)' : ''}; expected = the last actual balance minus the cheques and planned payments of every later day (other movements — income, transfers, fees — are not in it); notPaidBefore = cheques dated up to the last bank day that the bank has not paid (not deducted)`,
+  };
+}
+
+/** The window's cheques by state: { window, paid, due (dated up to today, not paid), future (after today) }. */
+export function chequeTotals(rows, today) {
+  const t = { window: { count: 0, amount: 0 }, paid: { count: 0, amount: 0 }, due: { count: 0, amount: 0 }, future: { count: 0, amount: 0 } };
+  const add = (k, c) => { t[k].count += 1; t[k].amount = r2(t[k].amount + (Number(c.amount) || 0)); };
+  for (const c of rows) {
+    add('window', c);
+    add(c.bankDate ? 'paid' : c.dueDate && c.dueDate > today ? 'future' : 'due', c);
+  }
+  return t;
+}
+
+const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, bankDate: x.bankDate ?? null, source: x.source, account: x.account, accountName: x.accountName });
+
+/**
+ * The future-cheques report of one company (the chat calc and the fixed Drive file share it): the cheques of the window
+ * from Hashavshevet + Priority (/cheques/all, every state — the window starts in the past), the bank balance per day
+ * up to the last bank day and the expected balance after it (owner 2026-11-12). Cheques and planned payments between
+ * the last bank day and the window's start are read too, so the expected balance already counts them.
+ * → { available, meta, rows (the window), byDay, balances, payments, totals, balance }
+ */
+export async function futureChequesData({ financeCode, companyKey = null }, { from, to = null, today = todayISO() }) {
+  const balances = await bankBalances(financeCode, from < monthStart(today) ? from : monthStart(today), today);
+  const fetchFrom = balances.last && balances.last.date < from ? balances.last.date : from;
+  const r = await finance('/cheques/all', { company: financeCode, from: fetchFrom, ...(to ? { to } : {}), limit: EXPORT_MAX });
+  if (!r.available) return { available: false, reason: r.reason };
+  const all = (r.data || []).map(mapChequeRow);
+  const payments = await plannedByDay(companyKey, fetchFrom, to || '2099-12-31');
+  const inWindow = (d) => d >= from && (!to || d <= to);
+  const byDay = chequesByDay(all, { balances, payments, today }).filter((d) => inWindow(d.dueDate));
+  const rows = all.filter((x) => inWindow(x.dueDate));
+  return { available: true, meta: r.meta || {}, rows, byDay, balances, payments: payments.filter((p) => inWindow(p.date)), totals: chequeTotals(rows, today), balance: balanceSummary(byDay, balances, { to }) };
 }
 
 /**
@@ -392,18 +464,27 @@ export async function cheques(companies, p = {}) {
   const numbers = numbersOf(p, 'number').number?.split(',') || null;
   if (state === 'future') {
     const given = dates(p, { required: false });
-    const range = given.from || given.to ? given : { ...futureChequesRange(p.today || new Date().toISOString().slice(0, 10)), defaultRange: true };
+    const today = p.today || todayISO();
+    const range = given.from || given.to ? given : { ...futureChequesRange(today), defaultRange: true };
     const params = { state: 'future', from: range.from, ...(range.to ? { to: range.to } : {}), limit: EXPORT_MAX };
     const account = textOf(p, 'account').account;
+    const filtered = q || numbers || account; // a payee / number / account question: the plain list, no balance line
+    const load = async (co) => {
+      const d = await futureChequesData({ financeCode: co.finance.code, companyKey: co.key }, { from: range.from, to: range.to || null, today });
+      return d.available ? { available: true, data: d, meta: d.meta } : d;
+    };
     return result('cheques', { ...params, limit, ...(range.defaultRange ? { defaultRange: true } : {}), ...(q ? { q } : {}), ...(numbers ? { number: numbers.join(',') } : {}), ...(account ? { account } : {}) }, await perCompany(companies, '/cheques/all', params, (d, m) => {
-      let rows = d.map((x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, source: x.source, account: x.account, accountName: x.accountName }));
-      rows = byName(rows, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
+      let rows = byName(d.rows, q, (r) => `${r.payee || ''} ${r.accountName || ''}`);
       if (numbers) rows = rows.filter((r) => numbers.includes(String(r.reference)));
       if (account) rows = rows.filter((r) => r.account === account);
-      const sum = Math.round(rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) * 100) / 100;
-      return { ...shown(rows, limit, rows.length), byDay: chequesByDay(rows), totals: { future: { count: rows.length, amount: sum } }, allFuture: m.totals ? { amount: m.totals.future } : null, note: 'Hashavshevet + Priority (source per row); dueDate = the date on the cheque' };
-    }), {
-      note: `the future cheques (שיקים לפרעון, שקלפ): every cheque with a date after today in the window from–to, from Hashavshevet's cheques module AND the Priority history (source per row: hashavshevet / priority)${range.defaultRange ? '; no dates were given, so the window is the default — today to the end of the third month ahead (say it)' : ''}. byDay = the same cheques grouped by due date with the count and the sum of each day (over every cheque of the window, not only the shown rows); totals.future = the window; allFuture.amount = every future cheque, any date`,
+      const byDay = filtered ? chequesByDay(rows) : d.byDay;
+      return {
+        ...shown(rows, limit, rows.length), byDay, totals: filtered ? chequeTotals(rows, today) : d.totals,
+        ...(filtered ? {} : { balance: d.balance, payments: { count: d.payments.length, amount: r2(d.payments.reduce((s, x) => s + x.amount, 0)) } }),
+        allFuture: m.totals ? { amount: m.totals.future } : null, note: 'Hashavshevet + Priority (source per row); dueDate = the date on the cheque; paid = the bank paid it already (bankDate)',
+      };
+    }, { load }), {
+      note: `the future cheques (שיקים לפרעון, שקלפ): every cheque dated in the window from–to — the ones the bank paid already (paid), the ones due and not paid, and the future ones — from Hashavshevet's cheques module AND the Priority history (source per row: hashavshevet / priority)${range.defaultRange ? '; no dates were given, so the window is the default — the start of this month to the end of the third month ahead (say it)' : ''}. byDay = every day of the window with cheques, planned payments or a bank day, soonest first: the cheques (paid, source), the planned payments (Joya's Payments), the day's count and sum, and balance = the bank's closing balance of that day (kind actual, up to the last bank day) or the expected balance (kind expected: the last actual balance minus that day's unpaid cheques and payments, running); balance (the summary) = lastActual, expectedEnd, lowest, notPaidBefore; totals = window / paid / due / future; allFuture.amount = every future cheque, any date`,
     });
   }
   // every row is fetched (≤ 5000): the day groups and their sums must cover the whole selection, not the shown rows
@@ -416,18 +497,51 @@ export async function cheques(companies, p = {}) {
   });
 }
 
-/** The cheques grouped by due date, soonest first: { dueDate, count, amount, cheques: [{ reference, payee, amount }] }. */
-export function chequesByDay(rows) {
+/**
+ * The cheques grouped by due date, soonest first: { dueDate, count, amount, cheques: [{ reference, payee, amount, paid?,
+ * source? }] }. With `balances` (bankBalances) and `payments` (plannedByDay) every day also has: payments[], paymentsAmount,
+ * and balance = { amount, kind: 'actual' | 'expected', source? } — actual = the bank's closing balance of that day (or of
+ * the last bank day before it) up to the last bank day; after it expected = the running balance minus the day's unpaid
+ * cheques and planned payments (owner 2026-11-12: green = actual, red = expected). Bank days without cheques are days
+ * too (count 0), so the balance is seen at the end of each day.
+ */
+export function chequesByDay(rows, { balances = null, payments = [], today = null } = {}) {
   const days = new Map();
+  const day = (k) => {
+    if (!days.has(k)) days.set(k, { dueDate: k, count: 0, amount: 0, cheques: [], ...(balances || payments.length ? { payments: [], paymentsAmount: 0 } : {}) });
+    return days.get(k);
+  };
   for (const c of rows) {
-    const k = c.dueDate || 'no date';
-    if (!days.has(k)) days.set(k, { dueDate: k, count: 0, amount: 0, cheques: [] });
-    const d = days.get(k);
+    const d = day(c.dueDate || 'no date');
     d.count += 1;
-    d.amount = Math.round((d.amount + (Number(c.amount) || 0)) * 100) / 100;
-    d.cheques.push({ reference: c.reference ?? null, payee: c.payee || c.accountName || null, amount: c.amount });
+    d.amount = r2(d.amount + (Number(c.amount) || 0));
+    d.cheques.push({ reference: c.reference ?? null, payee: c.payee || c.accountName || null, amount: c.amount, ...(c.bankDate ? { paid: true } : {}), ...(c.source && c.source !== 'hashavshevet' ? { source: c.source } : {}) });
   }
-  return [...days.values()].sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
+  for (const p of payments) {
+    const d = day(p.date);
+    d.payments.push({ id: p.id, payee: p.payee, amount: p.amount, ...(p.dueKind === 'WEEK' ? { window: `${p.date}–${p.dueTo}` } : {}) });
+    d.paymentsAmount = r2(d.paymentsAmount + (Number(p.amount) || 0));
+  }
+  const last = balances?.last || null;
+  if (last) for (const b of balances.series || []) if (b.date <= last.date) day(b.date);
+  const out = [...days.values()].sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
+  if (!last) return out;
+  const series = (balances.series || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  let i = 0;
+  let actual = null;
+  let running = last.balance;
+  for (const d of out) {
+    if (d.dueDate === 'no date') continue;
+    if (d.dueDate <= last.date) {
+      while (i < series.length && series[i].date <= d.dueDate) actual = series[i++];
+      d.balance = actual ? { amount: actual.balance, kind: 'actual', source: actual.source, ...(actual.date !== d.dueDate ? { asOf: actual.date } : {}), ...(actual.provisional ? { provisional: true } : {}) } : null;
+    } else {
+      const outflow = d.cheques.filter((c) => !c.paid).reduce((s, c) => s + (Number(c.amount) || 0), 0) + (d.paymentsAmount || 0);
+      running = r2(running - outflow);
+      d.balance = { amount: running, kind: 'expected' };
+    }
+  }
+  return out;
 }
 
 /** The cheques written in Priority before Hashavshevet (history, a constant file): by number, supplier, amount, dates. */

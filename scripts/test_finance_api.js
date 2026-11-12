@@ -271,7 +271,7 @@ describe("endpoints", () => {
 
   test("route list covers the readme", () => {
     const want = ["/companies", "/status", "/accounts", "/branches", "/pnl", "/cash", "/branch-costs", "/sales-vs-books", "/spending", "/aging", "/intercompany",
-      "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/suggestions", "/invoices", "/statement",
+      "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/balances", "/bank/suggestions", "/invoices", "/statement",
       "/cheques", "/cheques/priority", "/cheques/all", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
     assert.deepEqual(financeRoutes().sort(), want.sort());
   });
@@ -751,6 +751,34 @@ describe("endpoints", () => {
       assert.ok(ranged.data.length > 0 && ranged.data.every((x) => x.dueDate >= "2025-06-01" && x.dueDate <= "2025-06-30"));
       assert.equal(ranged.meta.counts.total, c.total, "counts cover everything");
       await fail(`/cheques/all?company=${COMPANY}&source=excel`, 400, "bad_request");
+    });
+    test("GET /bank/balances: the closing balance of each bank day (the bank file, else Hashavshevet)", async () => {
+      const r = await ok(`/bank/balances?company=${COMPANY}&from=2026-10-19&to=2026-10-26`);
+      assert.ok(r.data.length >= 5, "a bank day per working day");
+      assert.ok(r.data.every((x, i, a) => i === 0 || a[i - 1].date < x.date), "one row per day, ascending");
+      assert.ok(r.data.every((x) => ["bank_file", "hashavshevet"].includes(x.source) && typeof x.balance === "number" && x.lines > 0));
+      // Hashavshevet's copy of the statement: 2026-10-20 closed at -256,610.28 (the file, when loaded, says the same → agree)
+      const d = r.data.find((x) => x.date === "2026-10-20");
+      close(d.balance, -256610.28, "closing of 2026-10-20");
+      assert.equal(r.meta.last.date, r.data[r.data.length - 1].date);
+      assert.equal(r.meta.sources.hashavshevet.accounts.length, 1);
+      if (r.meta.sources.bankFile.days) assert.equal(r.meta.agree, true, "the two copies agree on their last common finished day");
+      // 2026-10-26: the file was uploaded that morning (provisional, 10 returned cheques the final statement has not) → Hashavshevet's day wins
+      const last = r.data.find((x) => x.date === "2026-10-26");
+      if (r.meta.sources.bankFile.days) assert.equal(last.source, "hashavshevet");
+      close(last.balance, -80063.45, "closing of 2026-10-26 = Hashavshevet's last line");
+      // pure helpers: the sum of the accounts' last known balances, the file wins on a common day
+      const { balanceSeries, mergeBalanceSeries } = api;
+      const s = balanceSeries([{ account: "a", date: "2026-01-02", balance: 10, lines: 1 }, { account: "b", date: "2026-01-01", balance: 5, lines: 2 }, { account: "a", date: "2026-01-03", balance: null, lines: 1 }, { account: "b", date: "2026-01-03", balance: 7, lines: 1 }]);
+      assert.deepEqual(s, [{ date: "2026-01-01", balance: 5, lines: 2, accounts: 1 }, { date: "2026-01-02", balance: 15, lines: 1, accounts: 2 }, { date: "2026-01-03", balance: 17, lines: 1, accounts: 2 }]);
+      const m = mergeBalanceSeries([{ date: "2026-01-02", balance: 15, lines: 1 }, { date: "2026-01-03", balance: 99, lines: 1, provisional: true }, { date: "2026-01-04", balance: 20, lines: 1, provisional: true }], [{ date: "2026-01-01", balance: 5, lines: 2 }, { date: "2026-01-02", balance: 15.004, lines: 1 }, { date: "2026-01-03", balance: 17, lines: 1 }]);
+      assert.deepEqual(m.data.map((x) => [x.date, x.source, x.balance]), [["2026-01-01", "hashavshevet", 5], ["2026-01-02", "bank_file", 15], ["2026-01-03", "hashavshevet", 17], ["2026-01-04", "bank_file", 20]], "a provisional file day loses to Hashavshevet's day, but stands alone");
+      assert.deepEqual(m.last, { date: "2026-01-04", balance: 20, source: "bank_file", provisional: true });
+      assert.equal(m.agree, true, "compared on 01-02, the last common finished day");
+      assert.equal(balanceSeries([{ account: "a", date: "2026-01-02", balance: 1, lines: 1, provisional: true }])[0].provisional, true);
+      assert.equal(mergeBalanceSeries([], []).last, null);
+      await fail(`/bank/balances?company=${COMPANY}&from=2026-10-26&to=2026-10-19`, 400, "bad_request");
+      await fail(`/bank/balances?company=${COMPANY}&account=no-such-account`, 404, "not_found");
     });
     test("GET /vat and /vat/issues", async () => {
       const r = await ok(`/vat?company=${COMPANY}&from=2026-07-01&to=2026-08-31`);

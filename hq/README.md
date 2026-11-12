@@ -493,15 +493,21 @@ upon demand: if I ask to see future cheques, Joya updates the file and provides 
 a Google Sheet per key in the owner's Drive folder that keeps its id and link; Joya rewrites it in place ON DEMAND
 (`upsertFixedSheet` in `sheets.js`: the file is found by `appProperties.joyaFixed = key`, which scope drive.file can
 read because the app made it, then `files.update` with the new workbook; no timer, no service). The link and the last
-refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים לפרעון · Joya" — ONLY the future cheques of the
+refresh live in `joya_settings` → `fixedSheets`. Key `cheques` = "שיקים לפרעון · Joya" — ONLY the cheques of the
 window the user asked for (owner: "display according to the user request, 3 months by default, only" — not the
-history): `chequesWindow` = the request's from/to, else `futureChequesRange(today)`; Finance API `/cheques/all` with
-`state=future` and the window, per finance company, laid out by `chequeTabs` (owner: "a sheet per month, grouped by day,
-and a month total"): a first tab "סיכום" (one line per month: cheques, amount, of which Priority, and a total line), then
-one tab per month — the cheques of each due date, a bold sum row after each day, a shaded month-total row at the end
-(a window longer than two years gets one tab per year beyond that). Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`);
-the last tab "Joya" says the window, when it was refreshed and the counts. The default window on 2026-11-11: 133
-cheques, 5 tabs (סיכום, 2026-11 … 2027-02). Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
+history): `chequesWindow` = the request's from/to, else `futureChequesRange(today)` (since 2026-11-12 from the START of
+the current month); the data comes from `futureChequesData` in `finance.js` (the same report as the chat: Finance API
+`/cheques/all` for the window — every state, the month's paid cheques too — plus `/bank/balances` and Joya's planned
+payments), per finance company, laid out by `chequeTabs` (owner: "a sheet per month, grouped by day, and a month total";
+2026-11-12: "add the bank account balance… in 2 colours, green (old) and red (future)"): a first tab "סיכום" (one line per
+month: cheques, amount, of which Priority, planned payments, the balance at the month's end, and a total line), then one
+tab per month — the cheques of each due date (and a planned payment as a row "העברה"), a bold sum row after each day
+whose column **יתרה** holds the bank balance at the end of that day — the row's font is GREEN when it is the real closing
+balance (up to the last bank day) and RED when it is the expected one (`_tone` actual / expected, `sheets.js` `writeTab`)
+— a bank day without cheques as a sum row alone, and a shaded month-total row at the end (a window longer than two
+years gets one tab per year beyond that). Hebrew columns (`CHEQUE_COLUMNS`, `chequeRowHe`); the last tab "Joya" says the
+window, the last real balance, the expected end and lowest balance, the colours and the counts. The default window on
+2026-11-12: 321 cheques (Nov 1 – Feb 28), 5 tabs (סיכום, 2026-11 … 2027-02), 389 lines. Two ways to it: calc `cheques_file` (chain admin; "קובץ השיקים",
 "תעדכן את קובץ השיקים"; `from`/`to` optional) rebuilds the file and returns the record; and every `cheques` question
 with state `future` ("שיקים עתידיים", "שקלפ") rebuilds it too with the SAME window as the answer (`refreshForAnswer`) and
 adds `file` to its result. Either way the chat shows the
@@ -509,17 +515,34 @@ button "פתח את הקובץ הקבוע בדרייב" under the answer (`Sheet
 failed rebuild keeps the last good link and says so. Suggestion `joya.area.accounting.s19`. Made 2026-11-11 from the
 owner's machine (4,343 rows, same file on refresh); eval `x-cheques-file*`, `f-shaklap`.
 
-**Future cheques by day (owner 2026-11-11: "when I ask to see future cheques, put them in a table grouped by day and sum
-each day"; "שקלפ without dates = from now 3 months, till the end of the third month").** שקלפ = שיקים לפרעון = the
-future cheques (PLAN routing word → `cheques` state `future`, and NO from/to when the user says no period). With state
-`future` the calc reads the merged table (Finance API `/cheques/all`: Hashavshevet's cheques module AND the Priority
-history — the post-dated Priority cheques, rent for example, count too; `source` per row) in the window from–to, and
-without dates the window is `futureChequesRange(today)`: today → the last day of the month three months ahead
-(2026-11-11 → 2027-02-28; `params.defaultRange: true`, the writer says it). The result carries `byDay` (`chequesByDay`:
-every cheque of the window grouped by due date, soonest first, with the day's count and sum — computed by the system, so
-the verifier knows the numbers), `totals.future` (the window) and `allFuture.amount` (every future cheque, any date); the
-WRITE rule "FUTURE CHEQUES" shows the window, one table (תאריך | מוטב | מס' שיק | סכום, "(פריוריטי)" after a Priority
-payee) with a bold sum row after each day, the window's total and the all-dates total. Eval `f-shaklap`, `f-cheques`.
+**Future cheques by day, with the bank balance (owner 2026-11-11: "when I ask to see future cheques, put them in a
+table grouped by day and sum each day"; "שקלפ without dates = from now 3 months, till the end of the third month";
+2026-11-12: "always from the start of the current month, not from today; add the bank account balance — until today
+from the bank sheet or from Hashavshevet, the balance at the end of each day, and the future / expected balance while
+deducting the cheque or payment; in 2 colours, green (old) and red (future)").** שקלפ = שיקים לפרעון = the future
+cheques (PLAN routing word → `cheques` state `future`, and NO from/to when the user says no period). With state `future`
+the calc runs `futureChequesData` (`finance.js`, shared with the fixed Drive file): the merged table (Finance API
+`/cheques/all`: Hashavshevet's cheques module AND the Priority history — the post-dated Priority cheques, rent for
+example, count too; `source` per row) for the window from–to in EVERY state (the window starts in the past, so the
+month's paid cheques are in it, `paid` per cheque), and without dates the window is `futureChequesRange(today)`: the
+first day of this month → the last day of the month three months ahead (2026-11-12 → 2026-11-01 – 2027-02-28;
+`params.defaultRange: true`, the writer says it). The bank balance per day comes from Finance API `/bank/balances` (the
+uploaded bank file, else Hashavshevet's bank lines — `bankBalances`; read from the start of the month to today) and the
+planned transfers from Joya's Payments (`payments.plannedByDay`, PLANNED rows). `chequesByDay(rows, { balances, payments,
+today })` makes one entry per day — cheque days, payment days and bank days — soonest first, each with the cheques
+(`paid`, `source`), the planned payments, the day's count and sum, and `balance = { amount, kind }`: `actual` = the
+bank's closing balance of that day (carried over a day without bank lines) up to the last bank day, `expected` after it
+= the running balance minus the day's unpaid cheques and planned payments (income and other movements are not in it;
+cheques dated up to the last bank day that the bank has not paid are not deducted — `balance.notPaidBefore`). When the
+user asks for a period after the last bank day ("שקלפ בדצמבר"), the cheques between them are read too, so December
+starts from the right running balance. `balance` (the summary) = `lastActual` (date, amount, source, `provisional` when
+the bank file was uploaded that same day), `expectedEnd`, `lowest`; `totals` = window / paid / due / future;
+`allFuture.amount` = every future cheque, any date. The WRITE rule "FUTURE CHEQUES" shows the window and the last real
+balance, one table תאריך | מוטב | מס' שיק | סכום | יתרה ("(פריוריטי)" / "(נפרע)" after the payee, a planned payment as
+"העברה") with a bold sum row after each day whose יתרה cell starts with **🟢** (actual) or **🔴** (expected) — the chat
+colours such a cell green / red (`cellTone` in `lib/answerTables.js`, `AskBox.js`; the Excel download gets the font
+colour, `answerExcel.js`) — then the totals, the expected end and lowest balance, and the all-dates total. A question
+about one payee / number / account keeps the plain list (no balance). Eval `f-shaklap`, `f-cheques`.
 
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from

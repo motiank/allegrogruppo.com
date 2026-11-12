@@ -1,7 +1,7 @@
 // One table of an AI answer as an Excel file (the chat's "Download Excel" link under each table).
 // exceljs comes from the repo root's node_modules (the admin uses it), like shared/wage.js.
 import ExcelJS from 'exceljs';
-import { answerTables, cellNumber, floorMoney } from '../../lib/answerTables.js';
+import { answerTables, cellNumber, cellTone, floorMoney } from '../../lib/answerTables.js';
 import { err } from '../db.js';
 import { getRequest } from './ai.js';
 
@@ -26,12 +26,16 @@ export async function tableXlsx(r, t) {
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
     c.border = { bottom: { style: 'thin' } };
   });
+  const TONE_COLOR = { ok: 'FF1E7B34', bad: 'FFC00000' };
   for (const row of t.rows) {
-    const x = ws.addRow(row.map((c) => cellNumber(c)?.value ?? c));
+    const plain = row.map((c) => cellTone(c)?.text ?? c);
+    const x = ws.addRow(plain.map((c) => cellNumber(c)?.value ?? c));
     row.forEach((c, i) => {
-      const num = cellNumber(c);
-      if (!num) return;
+      const tone = cellTone(c);
       const cell = x.getCell(i + 1);
+      if (tone) cell.font = { bold: true, color: { argb: TONE_COLOR[tone.tone] } };
+      const num = cellNumber(plain[i]);
+      if (!num) return;
       const base = Number.isInteger(num.value) ? '#,##0' : '#,##0.00';
       cell.numFmt = num.percent ? `${Number.isInteger(num.value) ? '0' : '0.0'}"%"` : num.money ? `${base}" ₪"` : base;
     });

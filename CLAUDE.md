@@ -130,6 +130,15 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   (`hq/src/services/fixedSheets.js` `chequeTabs`, `finance.js` `futureChequesRange`; hq README → "Future cheques by day").
   Deployed 2026-11-11 (`3996b9a`, joya-hq + joya-runner restarted, no build). Then (owner): the file shows ONLY the future
   cheques of the asked window (default 3 months), not the history — name "שיקים לפרעון · Joya", `chequesWindow`. Deployed 2026-11-12 (`3ffc85f`, joya-hq + joya-runner restarted, no build).
+  **Bank balance per day in שקלפ** (2026-11-12, owner: "always from the start of the current month, not from today; add the bank
+  account balance — until today from the bank sheet or Hashavshevet, the balance at the end of each day, and the expected
+  balance deducting the cheques and payments; green = old, red = future"): Finance API `GET /finance/bank/balances` (the
+  uploaded bank file `bank_transactions`, else Hashavshevet `bank_lines.running_balance`, one closing per day; a file day
+  uploaded that same day is provisional and loses to Hashavshevet) + Joya `futureChequesData` / `chequesByDay` with balances
+  and the planned payments (`hq/src/services/finance.js`): the default window is the start of this month → the end of the
+  third month, every day of the chat table and the Drive file carries the balance (🟢 real / 🔴 expected in the chat,
+  green / red rows in the sheet). Tests `scripts/test_finance_api.js`, `hq/test/test_joya_lib.mjs`; hq README → "Future
+  cheques by day, with the bank balance".
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,

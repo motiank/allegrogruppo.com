@@ -368,6 +368,21 @@ export async function payees(companyKey = null, limit = 50) {
   return [...out.values()].slice(0, limit);
 }
 
+/**
+ * The PLANNED transfers of a company whose day (or week window) falls in from–to, oldest first: [{ id, payee, amount,
+ * date (the day, or the first day of the window), dueTo, dueKind }]. For the expected bank balance of the future
+ * cheques (finance.js): a planned payment leaves the account like a cheque.
+ */
+export async function plannedByDay(companyKey, from, to) {
+  if (!companyKey || !DATE.test(from) || !DATE.test(to) || from > to) return [];
+  await topUpSeries(companyKey).catch(() => {});
+  const rows = await q(
+    `SELECT id, payee, amount, due_kind, due_date, due_to FROM joya_payments WHERE company_key=:k AND status='PLANNED' AND due_date <= :to AND COALESCE(due_to, due_date) >= :from ORDER BY due_date, id`,
+    { k: companyKey, from, to },
+  );
+  return rows.map((r) => ({ id: r.id, payee: r.payee, amount: Number(r.amount), date: ymd(r.due_date), dueTo: r.due_to ? ymd(r.due_to) : null, dueKind: r.due_kind }));
+}
+
 /** Makes the missing months of every monthly series of a company, HORIZON_MONTHS ahead. Returns how many rows were added. */
 export async function topUpSeries(companyKey, today = todayLocal()) {
   const heads = await q(`SELECT * FROM joya_payments WHERE company_key=:k AND repeat_json IS NOT NULL AND series_id = id`, { k: companyKey });

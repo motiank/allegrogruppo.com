@@ -10,7 +10,7 @@ import { api, qs, ApiError } from './api.js';
 import { useT, Term } from './i18n/index.js';
 import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
-import { splitAnswer, cellNumber, floorMoney } from '../lib/answerTables.js';
+import { splitAnswer, cellNumber, cellTone, floorMoney } from '../lib/answerTables.js';
 
 const useStyles = createUseStyles((theme) => ({
   box: { border: `1px solid ${theme.border}`, borderRadius: 10, padding: '0.7rem 0.85rem', background: theme.surface, marginBottom: '0.7rem' },
@@ -27,6 +27,9 @@ const useStyles = createUseStyles((theme) => ({
     '& tr:last-child td': { borderBottom: 0 },
     // numbers align like the text: right in Hebrew, left only in English (owner 2026-11-04)
     '& td.num': { fontVariantNumeric: 'tabular-nums' },
+    // a cell the writer marked 🟢 / 🔴 (a real / expected bank balance, owner 2026-11-12)
+    '& td.ok': { color: '#1e7b34', fontWeight: 600 },
+    '& td.bad': { color: '#c0392b', fontWeight: 600 },
     '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
     '&[dir=ltr] th, &[dir=ltr] td': { textAlign: 'left' },
   },
@@ -180,11 +183,16 @@ function AnswerBody({ r, classes }) {
             <tbody>
               {b.rows.map((row, j) => (
                 <tr key={j}>
-                  {row.map((c, k) => (
-                    <td key={k} className={cellNumber(c) ? 'num' : undefined}>
-                      {cellNumber(c) ? <Term>{c}</Term> : c}
-                    </td>
-                  ))}
+                  {row.map((c, k) => {
+                    const tone = cellTone(c);
+                    const text = tone ? tone.text : c;
+                    const cls = [cellNumber(text) ? 'num' : '', tone?.tone || ''].filter(Boolean).join(' ') || undefined;
+                    return (
+                      <td key={k} className={cls}>
+                        {cellNumber(text) ? <Term>{text}</Term> : text}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
