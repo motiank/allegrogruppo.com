@@ -12,6 +12,7 @@
  */
 import http from 'http';
 import { BRANCHES, DEMO_COMPANY, dishesOf, ROLES, ROLE_NAMES, TEAM, WAGES, today as todayOf, addDays, weekday, hm, seeded } from './demo-defs.mjs';
+import { parseFilter, applyFilter } from '../../shared/bankReconFilter.js';
 
 const PORT = Number(process.argv[2] || process.env.FAKE_ALLEGRO_PORT || 4399);
 const rnd = seeded(20261021);
@@ -246,10 +247,19 @@ const FIN_ROUTES = {
       bankOpen: { count: 2, total: 1500, beforeCount: 0, beforeTotal: 0 }, bookOpen: { count: 1, total: -3000, beforeCount: 0, beforeTotal: 0 },
       chequesOpen: { count: 1, total: -2500, pastDueCount: 1, pastDueTotal: -2500, notDueCount: 0, notDueTotal: 0, clearedUnmatchedCount: 0, clearedUnmatchedTotal: 0 },
       bookFutureMatched: { count: 0, total: 0 }, chequesCleared: { count: 1, total: -4175, groupOnly: 0 }, cancelledCheques: 0, expectedBookBalance: -2000000, unexplained: 0 };
-    return { finance: true, data: { company: { code: 'demo', name: 'Demo company' }, account: { key: '110011', name: 'בנק הפועלים' }, from, to, dataUpTo: FIN_SYNC.dataUpTo, lastSync: FIN_SYNC.lastRunAt, generatedAt: T,
+    const report = { company: { code: 'demo', name: 'Demo company' }, account: { key: '110011', name: 'בנק הפועלים' }, from, to, dataUpTo: FIN_SYNC.dataUpTo, lastSync: FIN_SYNC.lastRunAt, generatedAt: T,
       summary, notes: ['demo'], bankOpen: [row(to, 1000, 'זיכוי'), { ...row(to, 500, 'שיק'), reference: 17028, payee: 'ספק לדוגמה בע"מ', payeeSource: 'cheques' }], bookOpen: [{ lineId: 1, date: to, reference: 120, type: null, description: 'העברה לספק', counterAccount: '500001', counterName: 'ספק', amount: -3000, ageDays: 1, posted: true }],
       bookFutureMatched: [], chequesCleared: [{ chequeNo: 15940, payee: 'ספק', issueDate: from, dueDate: from, amount: -4175, clearedDate: from, bankAmount: -4175, bankReference: 15940, daysAfterDue: 1, status: 'cleared' }],
-      chequesOpen: [{ chequeNo: 16000, payee: 'ספק', issueDate: from, dueDate: from, amount: -2500, daysAfterDue: 20, clearedDate: null, status: 'past_due' }] }, meta: { company: 'demo', account: '110011', from, to, sync: FIN_SYNC } };
+      chequesOpen: [{ chequeNo: 16000, payee: 'ספק', issueDate: from, dueDate: from, amount: -2500, daysAfterDue: 20, clearedDate: null, status: 'past_due' }] };
+    // the same filters as the admin (shared/bankReconFilter.js): kind, party, q, amount, sections, facets
+    let filter;
+    try { filter = parseFilter(Object.fromEntries(u.searchParams)); } catch (e) { return { error: { code: 'bad_request', message: e.message }, status: 400 }; }
+    applyFilter(report, filter);
+    return { finance: true, data: report, meta: { company: 'demo', account: '110011', from, to, filter: report.filter, sync: FIN_SYNC } };
+  },
+  '/finance/bank/report/facets': (u) => {
+    const r = FIN_ROUTES['/finance/bank/report'](new URL(`${u.origin}${u.pathname.replace(/\/facets$/, '')}?${new URLSearchParams({ ...Object.fromEntries(u.searchParams), facets: '1' })}`));
+    return r.finance ? { finance: true, data: { kinds: r.data.facets.kinds, parties: r.data.facets.parties }, meta: { count: r.data.facets.parties.length } } : r;
   },
   '/finance/status': (u) => finCompany(u) || fin({ lastRun: { at: FIN_SYNC.lastRunAt, status: 'done', changedRows: 3, error: null }, dataUpTo: FIN_SYNC.dataUpTo, dataStart: finMonths[0].month, years: [Number(T.slice(0, 4))], banks: [{ accountKey: '110011', name: 'בנק הפועלים', bankBalance: 121642.83, lastRunningBalance: 121642.83, bookBalance: -2000000, bankOpen: 17708.88, bookOpen: -2100000, openBankLines: 58, openBookLines: 93 }], suppliers: { debitCount: 2, debitTotal: 10000, creditCount: 40, creditTotal: 2500000 }, months: finMonths.map((m) => ({ ...m, warnings: m.salaries ? [] : ['no_salary_expense'], complete: !!m.salaries })) }),
   '/finance/pnl': (u) => {

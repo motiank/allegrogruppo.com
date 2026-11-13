@@ -257,20 +257,28 @@ export async function bankReconciliation(companies, p = {}) {
  * balance), the first rows of each section and the links to the full page / Excel. The chat shows the buttons.
  */
 export async function bankReconReport(companies, p = {}) {
-  const params = { ...textOf(p, 'account'), ...dates(p, { required: false }) };
+  // the filters (owner 2026-11-13) are the admin's: the API returns only the matching rows, so a big report costs
+  // the AI nothing — kind (cheque / transfer / card / direct_debit / deposit / fee / authorities / salary / other),
+  // party (a supplier / payee: account key or a part of the name), q (any text), amount, sections
+  const listOf = (k) => (p[k] == null ? {} : { [k]: (Array.isArray(p[k]) ? p[k] : String(p[k]).split(',')).map((x) => String(x).trim()).filter(Boolean).join(',') || undefined });
+  const params = { ...textOf(p, 'account'), ...dates(p, { required: false }), ...listOf('kind'), ...textOf(p, 'party'), ...textOf(p, 'q'), ...(p.amount != null && p.amount !== '' ? { amount: Math.abs(Number(String(p.amount).replace(/[,\s₪]/g, ''))) } : {}), ...listOf('sections') };
+  for (const k of Object.keys(params)) if (params[k] === undefined || Number.isNaN(params[k])) delete params[k];
   const n = LIMITS.recon;
   const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource } : {}) });
   const bookRow = (x) => ({ date: x.date, reference: x.reference, description: x.description, counter: x.counterName || x.counterAccount, amount: x.amount, ageDays: x.ageDays, ...(x.posted ? {} : { posted: false }) });
   const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status });
   const top = (rows, by) => [...rows].sort((a, b) => Math.abs(b[by]) - Math.abs(a[by]));
   return result('bank_recon_report', params, await perCompany(companies, '/bank/report', params, (d) => {
-    const q = { company: d.company?.code, account: d.account?.key, from: d.from, to: d.to };
+    const f = d.filter?.active ? d.filter : null;
+    const q = { company: d.company?.code, account: d.account?.key, from: d.from, to: d.to, ...(f ? { kind: f.kinds?.join(','), party: f.party, q: f.q, amount: f.amount, sections: f.sections?.join(',') } : {}) };
     const qs = Object.entries(q).filter(([, v]) => v != null && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     return {
       account: d.account,
       from: d.from,
       to: d.to,
       dataUpTo: d.dataUpTo,
+      ...(f ? { filter: { label: f.label, kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections }, filtered: d.filtered?.sections } : {}),
+      kinds: d.facets?.kinds,
       summary: d.summary,
       notes: d.notes,
       sections: {
@@ -283,7 +291,7 @@ export async function bankReconReport(companies, p = {}) {
       downloads: { page: `/accounting/bank-recon?${qs}`, xlsx: `/api/joya/finance/bank-recon?${qs}&format=xlsx`, html: `/api/joya/finance/bank-recon?${qs}&format=html` },
     };
   }), {
-    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1; a cheque line carries payee / payeeSource, see summary.bankOpen.cheques: count, found, missing = cheques in the bank that are not in Hashavshevet yet), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links',
+    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1; a cheque line carries payee / payeeSource, see summary.bankOpen.cheques: count, found, missing = cheques in the bank that are not in Hashavshevet yet), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links. With a filter: `filter.label` names it, the sections hold only the matching rows and `filtered[section]` = { count, total, of, ofTotal, omitted? } (kept of all); the summary is always for the whole account. `kinds` = the kinds in the whole report with count and total (every row has a kind: cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other)',
   });
 }
 

@@ -3,7 +3,7 @@ import { createRequire } from "module";
 import { financeSql } from "../sources/financePool.js";
 import { executeSql } from "../sources/dbpool.js";
 import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } from "./localApi.js";
-import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts } from "./bankRecon.js";
+import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts, bankReconFacets } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees, isChequeLine } from "./chequePayees.js";
 import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
@@ -2171,13 +2171,21 @@ const Router = () => {
   router.get("/bank/report/accounts", async (req, res) => {
     try { res.json({ data: await listBankReportAccounts(), meta: { today: today() } }); } catch (err) { sendError(res, err); }
   });
+  // the kinds (cheque / transfer / card …) and the parties (suppliers, payees, counter accounts) of the whole report,
+  // for the pickers of Joya's page (shared/bankReconFilter.js)
+  router.get("/bank/report/facets", async (req, res) => {
+    try {
+      const f = await bankReconFacets(req.query);
+      res.json({ data: { kinds: f.kinds, parties: f.parties }, meta: { company: f.company.code, account: f.account.key, from: f.from, to: f.to, dataUpTo: f.dataUpTo, count: f.parties.length } });
+    } catch (err) { sendError(res, err); }
+  });
   router.get("/bank/report", async (req, res) => {
     try {
       const format = String(req.query.format || "json").toLowerCase();
       if (!["json", "html", "xlsx"].includes(format)) throw badRequest("format must be json, html or xlsx");
       const report = await buildBankReconReport(req.query);
-      if (format === "json") return res.json({ data: report, meta: { company: report.company.code, account: report.account.key, from: report.from, to: report.to } });
-      const stem = `bank_recon_${report.account.key}_${report.from}_${report.to}`;
+      if (format === "json") return res.json({ data: report, meta: { company: report.company.code, account: report.account.key, from: report.from, to: report.to, filter: report.filter } });
+      const stem = `bank_recon_${report.account.key}_${report.from}_${report.to}${report.filter?.active ? "_filtered" : ""}`;
       if (format === "html") {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Content-Disposition", `inline; filename="${stem}.html"`);

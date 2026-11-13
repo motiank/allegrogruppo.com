@@ -489,6 +489,11 @@ export async function financeBankReport(params) {
   return finance('/bank/report', params);
 }
 
+/** The kinds and the parties (suppliers / payees / counter accounts) of a report, for the page's filter pickers. */
+export async function financeBankReportFacets(params) {
+  return finance('/bank/report/facets', params);
+}
+
 /** The same report as a file: format html (the Hebrew page) or xlsx → { buffer, fileName, headers }. Never cached. */
 export async function financeBankReportFile(params, format) {
   return getFile('/finance/bank/report', { ...params, format });

@@ -288,6 +288,7 @@ function BankReconFiles({ r, classes }) {
       <div key={`${x.companyKey}-${x.account?.key}-${x.from}`} className={classes.files}>
         <span dir="auto">
           {x.company} · {x.account?.name} · <Term>{x.from}</Term>–<Term>{x.to}</Term>
+          {x.filter?.label ? ` · ${x.filter.label}` : ''}
         </span>
         <a className={classes.fileBtn} href={x.downloads.page}>
           {t('joya.ask.file.bankReconPage')}

@@ -5,7 +5,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { buildBankReconReport, renderBankReconXlsx, resolveParams } from "../admin/server/modules/bankRecon.js";
+import { buildBankReconReport, renderBankReconXlsx, resolveParams, bankReconFacets } from "../admin/server/modules/bankRecon.js";
 import { renderBankReconHtml, renderBankReconBody, fmtMoney, fmtDate } from "../shared/bankReconHtml.js";
 import { financeSql, closeFinancePool } from "../admin/server/sources/financePool.js";
 
@@ -111,7 +111,7 @@ test("HTML and Excel", async () => {
   // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
   assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
   assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
-  assert.equal((html.match(/data-filter="1"/g) || []).length, 6 + (r.bookFutureMatched.length ? 2 : 0)); // פרטים, מוטב, חשבון נגדי per table
+  assert.equal((html.match(/data-filter="1"/g) || []).length, 8 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table
   const body = renderBankReconBody(r);
   assert.ok(body.startsWith('<div class="bank-recon">') && !body.includes("<html"));
   assert.ok(body.includes("<script") === false);
@@ -125,4 +125,50 @@ test("HTML and Excel", async () => {
   const s1 = wb.getWorksheet("1 בנק ללא ספרים");
   assert.equal(s1.rowCount, r.bankOpen.length + 2); // header + rows + total
   assert.ok(s1.getRow(1).values.includes("מוטב"), "the Excel has the beneficiary column");
+});
+
+test("filters: kind, party, q, sections and the facets (shared/bankReconFilter.js)", async () => {
+  const q = { from: "2026-01-01", to: "2026-11-05" };
+  const full = await buildBankReconReport({ ...q, facets: 1 });
+  assert.equal(full.filter.active, false);
+  assert.equal(full.filtered, null);
+  assert.ok(full.facets.kinds.length >= 5 && full.facets.kinds.every((k) => k.kind && k.label && k.count > 0), "kinds with counts");
+  assert.ok(full.facets.parties.length > 50 && full.facets.parties[0].count >= full.facets.parties[1].count, "parties, most rows first");
+  assert.ok(["bankOpen", "bookOpen", "chequesCleared", "chequesOpen"].every((s) => full[s].every((x) => x.kind)), "every row has a kind");
+  assert.ok(full.bankOpen.filter((x) => /^שיק/.test(x.details)).every((x) => x.kind === "cheque"));
+  const plain = await buildBankReconReport(q);
+  assert.equal(plain.facets.parties, undefined, "parties only on demand");
+  assert.deepEqual(plain.facets.kinds, full.facets.kinds);
+
+  const cheques = await buildBankReconReport({ ...q, kind: "cheque" });
+  assert.ok(cheques.bankOpen.length > 0 && cheques.bankOpen.every((x) => x.kind === "cheque"));
+  assert.equal(cheques.filtered.sections.bankOpen.of, full.bankOpen.length);
+  assert.equal(cheques.filtered.sections.chequesOpen.count, full.chequesOpen.length, "cheque sections are all cheques");
+  assert.deepEqual(cheques.summary, full.summary, "the summary is for the whole account");
+  assert.equal(cheques.filter.label, "סוג: שיקים");
+
+  // a supplier (group 500): one name per account; the employees account 450001 carries a different name on every line
+  const supplier = full.facets.parties.find((p) => /^500/.test(p.key || "") && p.sections.includes("bookOpen"));
+  const byKey = await buildBankReconReport({ ...q, party: supplier.key });
+  assert.ok(byKey.bookOpen.length > 0 && byKey.bookOpen.every((x) => String(x.counterAccount) === supplier.key));
+  const byName = await buildBankReconReport({ ...q, party: supplier.name.replace(/ בע"מ$/, "") });
+  assert.ok(byName.bookOpen.length >= byKey.bookOpen.length, "the name finds at least the keyed rows");
+
+  const text = await buildBankReconReport({ ...q, q: "זיכוי", sections: "bankOpen" });
+  assert.ok(text.bankOpen.length > 0 && text.bankOpen.every((x) => /זיכוי/.test(`${x.details} ${x.payee || ""}`)));
+  assert.equal(text.bookOpen.length, 0);
+  assert.equal(text.filtered.sections.bookOpen.omitted, true);
+  const html = renderBankReconHtml(text);
+  assert.ok(html.includes("סינון:") && html.includes("מתוך") && html.includes("לא נכלל בסינון הסעיפים"));
+  const buf = await renderBankReconXlsx(cheques);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  assert.equal(wb.getWorksheet("1 בנק ללא ספרים").rowCount, cheques.bankOpen.length + 2);
+  assert.ok(wb.getWorksheet("סיכום").getColumn(1).values.some((v) => typeof v === "string" && v.startsWith("סינון: סוג: שיקים")));
+
+  await assert.rejects(buildBankReconReport({ ...q, kind: "visa" }), /unknown kind visa/);
+  await assert.rejects(buildBankReconReport({ ...q, sections: "nope" }), /unknown section/);
+  const facets = await bankReconFacets(q);
+  assert.deepEqual(facets.kinds, full.facets.kinds);
+  assert.equal(facets.parties.length, full.facets.parties.length);
 });

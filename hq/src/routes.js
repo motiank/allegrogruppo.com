@@ -31,7 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
-import { financeBankAccounts, financeBankReport, financeBankReportFile } from './services/source.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -203,8 +203,18 @@ r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLin
 // ---------------------------------------------------------------- the books: the detailed bank reconciliation report
 // The admin's report (admin/server/modules/bankRecon.js) through the Finance API, for the chain admin: the bank
 // accounts to pick from, the JSON, the Hebrew HTML page (shown in an iframe) and the Excel file. Joya keeps nothing.
-const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to });
+// kind / party / q / amount / sections = the report's filters (shared/bankReconFilter.js), done by the admin server
+const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to, kind: req.query.kind, party: req.query.party, q: req.query.q, amount: req.query.amount, sections: req.query.sections });
 r.get('/joya/finance/bank-recon/accounts', requireAdmin, h(async () => financeBankAccounts()));
+r.get(
+  '/joya/finance/bank-recon/facets',
+  requireAdmin,
+  h(async (req) => {
+    const out = await financeBankReportFacets({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to });
+    if (!out.available) throw Object.assign(new Error(out.reason), { code: out.badRequest ? 'BAD_REQUEST' : 'NOT_LOADED' });
+    return { kinds: out.data?.kinds || [], parties: out.data?.parties || [] };
+  }),
+);
 r.get(
   '/joya/finance/bank-recon',
   requireAdmin,

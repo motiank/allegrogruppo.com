@@ -237,6 +237,15 @@ account and dates, shows the admin's HTML in a frame, offers the Excel and a pri
 ("תכין לי דוח התאמת בנק מפורט לאוקטובר"): the summary that ties the bank balance to the book balance, the biggest rows of
 each section, and the buttons "פתח את הדוח המלא" / Excel under the answer (`AskBox.js` `BankReconFiles`). Nothing is
 computed or stored in Joya.
+**Filters** (owner 2026-11-13): the report can be cut by the type of movement (`kind`: cheque, transfer, card,
+direct_debit, deposit, fee, authorities, salary, other), by one supplier / payee (`party`: the account key or a part
+of the name), by a text (`q`), an amount and the sections — in the chat ("בדוח התאמת הבנק תראה לי רק את השיקים",
+"מה לא מותאם מול חצרי א.ב ארזים", "רק השורות עם המילה זיכוי"; the planner puts them in the calc's params) and on the
+page (two pickers, "סוג תנועה" and "ספק / מוטב", filled from `/api/joya/finance/bank-recon/facets`; a text filter is
+for the chat only, by the owner's choice). The admin server does the filtering (`shared/bankReconFilter.js`, Finance
+API `/finance/bank/report?kind&party&q&amount&sections`), so a big report costs the AI nothing: the answer gets only
+the matching rows, `filter.label`, `filtered[section]` = kept of all, and the summary of the whole account. Eval
+fixtures `f-bank-recon-filter-*`.
 
 **Payments (תשלומים, owner 2026-11-07: "a new section on the main menu … pay to someone now / in the future, see the
 payments for today / week / upcoming to feed the bank, move a payment, later side by side with the cash flow").** The

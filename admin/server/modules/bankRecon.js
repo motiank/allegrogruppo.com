@@ -10,6 +10,9 @@
 // Mounted by auth/roles/admin.js at /admin/bank-recon (admin role only):
 //   GET /admin/bank-recon/accounts                      → companies and their bank accounts, default dates
 //   GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx
+//       [&kind=cheque,transfer,…][&party=<account key | name>][&q=<text>][&amount=<number>][&sections=…][&facets=1]
+//       — the filters of shared/bankReconFilter.js: the sections keep only the matching rows, the summary stays whole
+//   GET /admin/bank-recon/facets?company=&account=&from=&to= → the kinds and the parties of the report, for the pickers
 // HTML comes from shared/bankReconHtml.js (also used by the admin page); Excel from exceljs.
 
 import express from "express";
@@ -18,6 +21,7 @@ import { financeSql } from "../sources/financePool.js";
 import { ApiError, badRequest, isIsoDate } from "./localApi.js";
 import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
 import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
+import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
 import { addChequePayees } from "./chequePayees.js";
 
 const require = createRequire(import.meta.url);
@@ -70,13 +74,15 @@ export async function resolveParams(query = {}) {
   if (!isIsoDate(from) || !isIsoDate(to)) throw badRequest("from and to must be YYYY-MM-DD");
   if (from > to) throw badRequest("from must not be after to");
   if (daysBetween(from, to) > MAX_RANGE_DAYS) throw badRequest(`the range is longer than ${MAX_RANGE_DAYS} days`);
-  return { company, bank, accountKey, from, to };
+  let filter;
+  try { filter = parseFilter(query); } catch (err) { if (err.code === "bad_request") throw badRequest(err.message); throw err; }
+  return { company, bank, accountKey, from, to, filter };
 }
 
 // ── the report ───────────────────────────────────────────────────────────
 
 export async function buildBankReconReport(query = {}) {
-  const { company, bank, accountKey, from, to } = await resolveParams(query);
+  const { company, bank, accountKey, from, to, filter } = await resolveParams(query);
   const p = { companyId: company.companyId, acc: accountKey, from, to };
 
   const [sync] = await financeSql(`SELECT MAX(finished_at) AS t FROM sync_runs WHERE status = 'done' AND company_id = :companyId`, p);
@@ -308,11 +314,19 @@ export async function buildBankReconReport(query = {}) {
     notes.push(`מודול הצ'קים בחשבשבת מתחיל ב-${fmtDate(day(chqStart.d))} (דף הבנק מתחיל ב-${fmtDate(bank.from)}); צ'קים מלפני כן מופיעים בסעיפים 1 ו-2 כתנועות רגילות.`);
   notes.push(`"פתוח" הוא לפי ההתאמות שנעשו בחשבשבת עד ${fmtDate(to)} (התאמות מאוחרות יותר לא נספרות). הנתונים טרם נבדקו על ידי רואה החשבון.`);
 
-  return {
+  // every row gets its kind (cheque / transfer / card / …) and the filters of the query are applied (the summary stays
+  // for the whole account; `filtered` tells how many rows of each section were kept out of how many)
+  return applyFilter({
     company: { code: company.code, name: company.name }, account: { key: accountKey, name: bank.name }, from, to,
     dataUpTo: bank.dataUpTo, lastSync: sync?.t ? String(sync.t).slice(0, 19) : null, generatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
     summary, notes, bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen,
-  };
+  }, filter);
+}
+
+/** The kinds and the parties (suppliers / payees / counter accounts) of the whole report, for the pickers of the pages. */
+export async function bankReconFacets(query = {}) {
+  const r = await buildBankReconReport({ company: query.company, account: query.account, from: query.from, to: query.to, facets: 1 });
+  return { company: r.company, account: r.account, from: r.from, to: r.to, dataUpTo: r.dataUpTo, kinds: r.facets.kinds, parties: r.facets.parties || [] };
 }
 
 // ── Excel ────────────────────────────────────────────────────────────────
@@ -355,6 +369,14 @@ export async function renderBankReconXlsx(r) {
   add("תקופה", `${fmtDate(r.from)} – ${fmtDate(r.to)}`);
   add("נתונים עד", fmtDate(r.dataUpTo));
   add("הופק", r.generatedAt);
+  if (r.filter?.active) {
+    add(`סינון: ${r.filter.label}`, null, true);
+    add("הסיכום שלמטה הוא לכל החשבון; הגיליונות של הסעיפים מכילים רק את השורות שעברו את הסינון.", null);
+    for (const [key, name] of [["bankOpen", "סעיף 1"], ["bookOpen", "סעיף 2"], ["bookFutureMatched", "סעיף 2ב"], ["chequesCleared", "סעיף 3א"], ["chequesOpen", "סעיף 3ב"]]) {
+      const x = r.filtered?.sections?.[key];
+      if (x) add(`   ${name}: ${x.omitted ? "לא נכלל" : `${x.count} מתוך ${x.of} שורות`}`, x.omitted ? null : x.total);
+    }
+  }
   add("", null);
   add("יתרה בבנק לפי דף הבנק", s.bankBalance, true);
   add(`פחות: תנועות בנק ללא התאמה בספרים (סעיף 1) – ${s.bankOpen.count} תנועות`, -s.bankOpen.total);
@@ -376,37 +398,40 @@ export async function renderBankReconXlsx(r) {
   add("", null);
   add("סימנים: כניסה לבנק = פלוס, יציאה מהבנק = מינוס, בשני הצדדים.", null);
 
+  // with a filter the sheets hold the kept rows and the total row is theirs (the summary sheet shows "N מתוך M")
+  const tot = (key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : s[key].total);
+  const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
   sheet(wb, "1 בנק ללא ספרים", [
-    { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 },
+    { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol,
     { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
     { header: "מזהה שורה", key: "bankLineId", width: 10 },
-  ], r.bankOpen, 'סה"כ', s.bankOpen.total);
+  ], r.bankOpen, 'סה"כ', tot("bankOpen"));
   sheet(wb, "2 ספרים ללא בנק", [
-    { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "סוג", key: "type", width: 8 },
+    { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
     { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12 }, { header: "שם חשבון נגדי", key: "counterName", width: 26 },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "מנה", key: "batch", width: 8 },
     { header: "נקלט", key: "posted", width: 8, get: (x) => (x.posted ? "כן" : "לא") }, { header: "מס' תנועה", key: "transId", width: 10 },
-  ], r.bookOpen, 'סה"כ', s.bookOpen.total);
+  ], r.bookOpen, 'סה"כ', tot("bookOpen"));
   if (r.bookFutureMatched.length)
     sheet(wb, "2ב ספרים בתאריך מאוחר", [
-      { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "סוג", key: "type", width: 8 },
+      { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
       { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12 }, { header: "שם חשבון נגדי", key: "counterName", width: 26 },
       { header: "סכום", key: "amount", money: true, width: 16 }, { header: "מנה", key: "batch", width: 8 }, { header: "מס' תנועה", key: "transId", width: 10 },
-    ], r.bookFutureMatched, 'סה"כ', s.bookFutureMatched.total);
+    ], r.bookFutureMatched, 'סה"כ', tot("bookFutureMatched"));
   sheet(wb, "3א צ'קים שנפרעו", [
     { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום הצ'ק", key: "amount", money: true, width: 16 },
     { header: "נפרע בבנק", key: "clearedDate", date: true, width: 12 }, { header: "סכום בבנק", key: "bankAmount", money: true, width: 16 },
     { header: "אסמכתא בבנק", key: "bankReference", width: 12 }, { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10 },
     { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
-  ], r.chequesCleared, 'סה"כ', s.chequesCleared.total);
+  ], r.chequesCleared, 'סה"כ', tot("chequesCleared"));
   sheet(wb, "3ב צ'קים פתוחים", [
     { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום", key: "amount", money: true, width: 16 },
     { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) },
     { header: "נמצא בבנק בתאריך", key: "clearedDate", date: true, width: 14 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
-  ], r.chequesOpen, 'סה"כ', s.chequesOpen.total);
+  ], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -429,6 +454,10 @@ export function Router() {
       const to = today();
       res.json({ companies: list, defaults: { from: `${to.slice(0, 4)}-01-01`, to } });
     } catch (err) { fail(res, err); }
+  });
+
+  router.get("/facets", async (req, res) => {
+    try { res.json(await bankReconFacets(req.query)); } catch (err) { fail(res, err); }
   });
 
   router.get("/report", async (req, res) => {

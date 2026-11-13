@@ -2118,6 +2118,63 @@
       }
     },
     {
+      "key": "f-bank-recon-filter-kind",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "בדוח התאמת הבנק של השנה תראה לי רק את השיקים – בבנק בלי ספרים ואת הצ'קים שלא נפרעו",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "params": {
+          "bank_recon_report": {
+            "kind": "cheque"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-bank-recon-filter-party",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מה לא מותאם בבנק מול חצרי א.ב ארזים? תן לי את זה מתוך דוח התאמת הבנק המפורט של השנה",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "params": {
+          "bank_recon_report": {
+            "party": "חצרי א.ב ארזים"
+          }
+        },
+        "noParams": {
+          "bank_recon_report": [
+            "q"
+          ]
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "f-bank-recon-filter-text-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "In this year's detailed bank reconciliation report, show me only the open bank lines that contain the word זיכוי",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "params": {
+          "bank_recon_report": {
+            "q": "זיכוי",
+            "sections": "bankOpen"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
       "key": "f-vat-books",
       "kind": "ACCOUNTING",
       "lang": "he",

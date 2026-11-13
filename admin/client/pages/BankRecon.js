@@ -1,6 +1,9 @@
 // Bank reconciliation (דוח התאמת בנק מפורט) — admin only. Pick the company's bank account and a date range; the
 // server builds the report (GET /admin/bank-recon/report) and this page shows the Hebrew HTML from
 // shared/bankReconHtml.js, with buttons for Excel and for the report in its own tab (printing).
+// Filters (owner 2026-11-13): "סוג תנועה" (cheques / transfers / cards …) and "ספק / מוטב" — the server filters
+// (shared/bankReconFilter.js, `kind` and `party`); the lists come from the report's own facets, so they appear after
+// the first report. A free text (`q`) is for the chat only, by the owner's choice.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
@@ -15,6 +18,9 @@ const BankRecon = () => {
   const [account, setAccount] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [kind, setKind] = useState("");
+  const [party, setParty] = useState("");
+  const [facets, setFacets] = useState(null); // { kinds, parties } of the whole report (not of the filtered one)
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -42,15 +48,19 @@ const BankRecon = () => {
 
   const banks = useMemo(() => companies.find((c) => c.code === company)?.banks || [], [companies, company]);
   const bank = banks.find((b) => b.key === account) || null;
-  const params = { company, account, from, to };
+  const params = { company, account, from, to, ...(kind ? { kind } : {}), ...(party ? { party } : {}) };
   const query = new URLSearchParams(params).toString();
+  const base = `${company}|${account}|${from}|${to}`; // the facets belong to one account and period
 
-  const run = async () => {
+  const run = async (next = {}) => {
     setLoading(true);
     setError(null);
+    const p = { ...params, ...next, facets: 1 };
+    for (const k of ["kind", "party"]) if (!p[k]) delete p[k];
     try {
-      const res = await axios.get("/admin/bank-recon/report", { params, withCredentials: true });
+      const res = await axios.get("/admin/bank-recon/report", { params: p, withCredentials: true });
       setReport(res.data);
+      if (res.data?.facets) setFacets({ base, ...res.data.facets });
     } catch (err) {
       setReport(null);
       setError(errText(err, "the report failed"));
@@ -75,6 +85,13 @@ const BankRecon = () => {
   };
 
   const canRun = company && account && from && to && !loading;
+  const facetsHere = facets && facets.base === base ? facets : null; // another account or period: pick again after "הצג דוח"
+  const partyValue = (p) => p.key || p.name;
+  const changeFilter = (next) => {
+    if ("kind" in next) setKind(next.kind);
+    if ("party" in next) setParty(next.party);
+    if (report) run(next);
+  };
 
   return (
     <div style={styles.page}>
@@ -115,7 +132,29 @@ const BankRecon = () => {
           עד תאריך
           <input style={styles.input} type="date" value={to} max={bank?.dataUpTo || undefined} onChange={(e) => setTo(e.target.value)} />
         </label>
-        <button style={{ ...styles.button, opacity: canRun ? 1 : 0.6 }} disabled={!canRun} onClick={run}>
+        {facetsHere && (
+          <>
+            <label style={styles.field}>
+              סוג תנועה
+              <select style={styles.input} value={kind} onChange={(e) => changeFilter({ kind: e.target.value })}>
+                <option value="">הכל</option>
+                {facetsHere.kinds.map((k) => (
+                  <option key={k.kind} value={k.kind}>{k.label} ({k.count})</option>
+                ))}
+              </select>
+            </label>
+            <label style={styles.field}>
+              ספק / מוטב
+              <select style={{ ...styles.input, maxWidth: "260px" }} value={party} onChange={(e) => changeFilter({ party: e.target.value })}>
+                <option value="">הכל</option>
+                {(facetsHere.parties || []).map((p) => (
+                  <option key={partyValue(p)} value={partyValue(p)}>{p.name}{p.key ? ` (${p.key})` : ""} · {p.count}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+        <button style={{ ...styles.button, opacity: canRun ? 1 : 0.6 }} disabled={!canRun} onClick={() => run()}>
           {loading ? "מכין…" : "הצג דוח"}
         </button>
         <a style={styles.secondary} href={`/admin/bank-recon/report?${query}&format=xlsx`}>הורד Excel</a>

@@ -163,6 +163,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
   Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07. Also in Joya HQ (page
   `/accounting/bank-recon` + chat calc `bank_recon_report`) through the Finance API `GET /finance/bank/report[/accounts]`.
+  **Filters** (2026-11-13, owner: "supplier, cheque / type of movement, a specific name (prompt only) — best support in the API
+  to save AI tokens"): `shared/bankReconFilter.js` — `kind` (cheque, transfer, card, direct_debit, deposit, fee, authorities,
+  salary, other; every row gets one), `party` (account key or part of the name), `q`, `amount`, `sections`, `facets=1` on
+  `/admin/bank-recon/report` and `/finance/bank/report` (+ `/facets` for the pickers); the summary stays for the whole account,
+  `filtered[section]` = kept of all. Pickers "סוג תנועה" / "ספק / מוטב" on the admin page and Joya's page; the chat puts
+  the words in the calc params (planner rule "FILTERS of bank_recon_report"). Tests `scripts/test_bank_recon_filter.js` (no
+  DB), `scripts/test_bank_recon.js`; eval `f-bank-recon-filter-*`.
   **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,

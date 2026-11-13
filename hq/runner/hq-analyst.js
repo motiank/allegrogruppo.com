@@ -160,6 +160,15 @@ Guidance:
     "אילו תנועות בנק אין להן רישום בספרים ואילו תנועות ספרים לא הופיעו בבנק") → bank_recon_report alone — one calc with
     all the sections, never bank_open_items twice (account when named; from-to = the period, else this year to today). A question about the state or the numbers only
     ("מה מצב התאמת הבנקים", "כמה לא מותאם") → bank_reconciliation.
+    FILTERS of bank_recon_report — put them in the params, the API filters (never ask for the whole report to pick rows
+    yourself): a supplier / payee / company named ("של חצרי א.ב ארזים", "מול דורגז", "ההתאמה של ספק X") → party = the
+    name as written (or the account key when given); a type of movement → kind: "שיקים" / "צ'קים" → cheque, "העברות"
+    → transfer, "כרטיסי אשראי" / "סליקה" / "מקס" / "ישראכרט" → card, "הוראות קבע" / "חיובים ישירים" → direct_debit,
+    "הפקדות" → deposit, "עמלות" / "ריבית" → fee, "מע\\"מ" / "ביטוח לאומי" / "רשויות" → authorities, "משכורות" → salary
+    (several: "שיקים והעברות" → "cheque,transfer"); any other word that must appear in the rows ("עם המילה זיכוי",
+    "שכתוב בהן טכני") → q; "בסכום 12,345" → amount; only some sections ("רק הצ'קים שלא נפרעו" → sections
+    "chequesOpen", "רק תנועות הבנק ללא התאמה" → "bankOpen", "רק צד הספרים" → "bookOpen") → sections. A supplier's
+    name is party, not q.
   · "התאמת בנקים", "התאמות בנק", "bank reconciliation", "מה לא מותאם", "unmatched" → bank_reconciliation; the open lines
     themselves ("תנועות בנק לא מותאמות", "שיקים שלא נפרעו בספרים") → bank_open_items (side bank for statement lines, book
     for book lines); "הצעות התאמה", "suggest matches" → bank_match_suggestions. These are the BOOKS' reconciliation — not
@@ -511,6 +520,12 @@ Your job now: WRITE the answer to the user from <results>.
   by amount; say "the N biggest of M" when shown < count). Repeat the report's notes that matter (unexplained ≠ 0,
   cheques already in the bank but not matched, summary.bankOpen.cheques.missing = cheques in the bank that are not
   in Hashavshevet — name them as the ones to enter) in one or two lines, and say the full tables are in the page / Excel.
+  A FILTERED report (filter present): open with one line that names the filter (filter.label) and that the summary
+  table is for the whole account; then, per section that was asked, the kept rows as a table (date, details / payee,
+  amount, days) with "N מתוך M" from filtered[section] (count of of) and the kept total — the rows are the biggest
+  by amount, say so when shown < count; a section with omitted true is not mentioned; a section with 0 kept rows is
+  one line "אין … שעוברות את הסינון". The summary table is shown only when the user asked for the whole report or
+  the state; for a filter question it is one line (unexplained + the two balances) at most.
 - Payroll files (payroll_files): the chat shows the download buttons (payslip Excel + the Micpal / Shiklulit file)
   under the answer by itself — never write a link or a URL. Per restaurant one line: the month (month), the employees
   saved (employees, withPayslip = with a payslip) and when it was saved (savedAt, date only). Say that the files are

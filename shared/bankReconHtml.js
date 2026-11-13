@@ -3,6 +3,10 @@
 // server (GET /admin/bank-recon/report?format=html) and by the admin page (rendered inside the page).
 //
 // Signs everywhere: money into the bank is plus, money out is minus — on the bank side and on the books side.
+// A filtered report (report.filter.active, shared/bankReconFilter.js) shows the filter under the header, only the
+// kept rows in the sections, and "N מתוך M" in the section totals; the summary is always for the whole account.
+
+import { KIND_LABEL } from "./bankReconFilter.js";
 
 const nf = new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nf0 = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 0 });
@@ -81,6 +85,8 @@ export const CSS = `
 .bank-recon tr.older td{color:#777;background:#fafafa}
 .bank-recon tr.sub td{background:#f7f7f7;font-style:italic;color:#555}
 .bank-recon .empty{color:#666;font-style:italic;padding:6px 0}
+.bank-recon .filter{background:#e8f0fe;border:1px solid #a9c4f5;padding:8px 12px;margin:10px 0;border-radius:4px}
+.bank-recon .filter .of{color:#555;font-size:12px;margin-top:4px}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
 .bank-recon .summary{max-width:720px}
@@ -110,6 +116,28 @@ function notes(r) {
   if (!r.notes?.length) return "";
   return `<div class="notes"><b>הערות</b><ul>${r.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>`;
 }
+
+const SECTION_SHORT = { bankOpen: "סעיף 1", bookOpen: "סעיף 2", bookFutureMatched: "סעיף 2ב", chequesCleared: "סעיף 3א", chequesOpen: "סעיף 3ב" };
+
+// the active filter (kind / party / text / amount / sections) and what it kept of each section
+function filterBox(r) {
+  if (!r.filter?.active) return "";
+  const parts = Object.entries(r.filtered?.sections || {})
+    .filter(([, x]) => x && !x.omitted && x.of)
+    .map(([k, x]) => `${SECTION_SHORT[k] || k}: ${fmtInt(x.count)} מתוך ${fmtInt(x.of)}`);
+  const omitted = Object.entries(r.filtered?.sections || {}).filter(([, x]) => x?.omitted && x.of).map(([k]) => SECTION_SHORT[k] || k);
+  return `<div class="filter"><b>סינון:</b> ${esc(r.filter.label)}<div class="of">הסיכום הוא לכל החשבון; הסעיפים מציגים רק את השורות שעברו את הסינון${parts.length ? ` (${esc(parts.join(" · "))})` : ""}${omitted.length ? `. לא נכללו: ${esc(omitted.join(", "))}` : ""}.</div></div>`;
+}
+
+// the total row of a section: the kept rows and, with a filter, the whole section's count and total
+function totalText(r, key, unit) {
+  const x = r.filtered?.sections?.[key];
+  const n = (r[key] || []).length;
+  return x && x.of !== x.count ? `סה"כ ${fmtInt(n)} ${unit} (מתוך ${fmtInt(x.of)}, סכום מלא ${fmtMoney(x.ofTotal)})` : `סה"כ ${fmtInt(n)} ${unit}`;
+}
+const totalOf = (r, key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : r.summary[key].total);
+const omittedSection = (r, key) => (r.filtered?.sections?.[key]?.omitted ? `<h2>${SECTION_TITLES[key === "bookFutureMatched" ? "bookFuture" : key]}</h2><div class="empty">לא נכלל בסינון הסעיפים.</div>` : null);
+const kindCell = (x) => cell(KIND_LABEL[x.kind] || x.kind || "");
 
 function summary(r) {
   const s = r.summary;
@@ -152,63 +180,63 @@ export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x
 
 function bankOpenTable(r) {
   const rows = r.bankOpen || [];
-  if (!rows.length) return `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות.</div>`;
+  if (!rows.length) return omittedSection(r, "bankOpen") || `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.bankOpen}</h2>
 <table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("מוטב")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
+  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("סוג")}${fth("מוטב")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="4">סה"כ ${fmtInt(rows.length)} תנועות</td>${money(r.summary.bankOpen.total)}<td></td><td></td></tr>
+    <tr class="total"><td colspan="5">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
   </tbody>
 </table>`;
 }
 
 function bookOpenTable(r) {
   const rows = r.bookOpen || [];
-  if (!rows.length) return `<h2>${SECTION_TITLES.bookOpen}</h2><div class="empty">אין תנועות ספרים פתוחות (ללא צ'קים).</div>`;
+  if (!rows.length) return omittedSection(r, "bookOpen") || `<h2>${SECTION_TITLES.bookOpen}</h2><div class="empty">אין תנועות ספרים פתוחות (ללא צ'קים)${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.bookOpen}</h2>
 <table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th><th>סוג</th>${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th class="num">ימים</th><th>מנה</th><th>סטטוס</th></tr></thead>
+  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th class="num">ימים</th><th>מנה</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.type)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
+          `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">סה"כ ${fmtInt(rows.length)} תנועות</td>${money(r.summary.bookOpen.total)}<td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="5">${totalText(r, "bookOpen", "תנועות")}</td>${money(totalOf(r, "bookOpen"))}<td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
 
 function bookFutureTable(r) {
   const rows = r.bookFutureMatched || [];
-  if (!rows.length) return "";
+  if (!rows.length) return r.filtered?.sections?.bookFutureMatched?.of ? omittedSection(r, "bookFutureMatched") || "" : "";
   return `
 <h2>${SECTION_TITLES.bookFuture}</h2>
 <table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th><th>סוג</th>${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th>מנה</th></tr></thead>
+  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th>מנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.type)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.batch)}</tr>`,
+          `<tr>${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.batch)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">סה"כ ${fmtInt(rows.length)} תנועות</td>${money(r.summary.bookFutureMatched.total)}<td></td></tr>
+    <tr class="total"><td colspan="5">${totalText(r, "bookFutureMatched", "תנועות")}</td>${money(totalOf(r, "bookFutureMatched"))}<td></td></tr>
   </tbody>
 </table>`;
 }
 
 function chequesClearedTable(r) {
   const rows = r.chequesCleared || [];
-  if (!rows.length) return `<h2>${SECTION_TITLES.chequesCleared}</h2><div class="empty">לא נפרעו צ'קים בתקופה.</div>`;
+  if (!rows.length) return omittedSection(r, "chequesCleared") || `<h2>${SECTION_TITLES.chequesCleared}</h2><div class="empty">לא נפרעו צ'קים בתקופה${r.filter?.active ? " שעוברים את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.chequesCleared}</h2>
 <table>
@@ -220,14 +248,14 @@ function chequesClearedTable(r) {
           `<tr>${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(fmtDate(x.clearedDate))}${money(x.bankAmount)}${cell(x.bankReference)}${cell(x.daysAfterDue, "num")}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="4">סה"כ ${fmtInt(rows.length)} צ'קים</td>${money(r.summary.chequesCleared.total)}<td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="4">${totalText(r, "chequesCleared", "צ'קים")}</td>${money(totalOf(r, "chequesCleared"))}<td></td><td></td><td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
 
 function chequesOpenTable(r) {
   const rows = r.chequesOpen || [];
-  if (!rows.length) return `<h2>${SECTION_TITLES.chequesOpen}</h2><div class="empty">אין צ'קים פתוחים.</div>`;
+  if (!rows.length) return omittedSection(r, "chequesOpen") || `<h2>${SECTION_TITLES.chequesOpen}</h2><div class="empty">אין צ'קים פתוחים${r.filter?.active ? " שעוברים את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.chequesOpen}</h2>
 <table>
@@ -239,14 +267,14 @@ function chequesOpenTable(r) {
           `<tr>${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="4">סה"כ ${fmtInt(rows.length)} צ'קים</td>${money(r.summary.chequesOpen.total)}<td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="4">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
 
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
 export function renderBankReconBody(report) {
-  return `<div class="bank-recon">${header(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  return `<div class="bank-recon">${header(report)}${filterBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -397,7 +425,7 @@ export function bankReconBehavior(root) {
 }
 
 export function renderBankReconHtml(report) {
-  const title = `התאמת בנק ${report.account?.key || ""} ${fmtDate(report.from)}–${fmtDate(report.to)}`;
+  const title = `התאמת בנק ${report.account?.key || ""} ${fmtDate(report.from)}–${fmtDate(report.to)}${report.filter?.active ? " (מסונן)" : ""}`;
   return `<!doctype html>
 <html lang="he" dir="rtl">
 <head>

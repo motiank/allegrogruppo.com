@@ -617,6 +617,23 @@ no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on
 `{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:
 `node --test scripts/test_bank_recon.js`.
 
+**Filters (2026-11-13, owner: "filter by supplier, by the type of movement (cheque…) and by a name; the API should do
+it, to save AI tokens when the report is big").** `shared/bankReconFilter.js`, the same on `/admin/bank-recon/report`:
+`kind=` one or more of `cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other` (every row gets a
+`kind`: a bank line from its text — "שיק", "העברה", "עמ'", the card companies, "מע"מ"…, a debit with no known word =
+`direct_debit`; a book line from its cheque flag, its text and the counter account's group — a supplier paid without a
+cheque counts as `transfer`); `party=` the supplier / payee / counter account (the account key — it also matches that account's name on the bank side
+and in the cheques — or a part of the name; quotes, dots and בע"מ do not matter; a bank line without a payee is matched by its text); `q=` any text (details,
+description, payee, counter account, references, cheque number); `amount=` one exact amount (either sign); `sections=`
+only these sections. The sections keep only the matching rows; **the `summary` is always for the whole account**;
+`filter` = `{ kinds, party, q, amount, sections, active, label }` (`label` = one Hebrew line, also in `meta.filter`),
+`filtered.sections[name]` = `{ count, total, of, ofTotal, omitted? }`, `facets.kinds` = the kinds of the whole report with
+count and total (always), `facets.parties` (with `facets=1`: `[{ name, key, count, total, sections }]`, most rows first,
+400 at most). The HTML shows the filter under the header, a "סוג" column (filterable) in sections 1 and 2 and "N מתוך M"
+in the totals; the Excel's summary sheet lists the filter and the counts. `GET /finance/bank/report/facets?company&account&from&to`
+→ `{ data: { kinds, parties }, meta }` for the pickers of Joya's page (the admin page takes them from the report itself).
+Tests: `node --test scripts/test_bank_recon_filter.js` (no DB), the filter test in `scripts/test_bank_recon.js`.
+
 ### `GET /finance/invoices?company=&from=&to=[&side=customer|supplier][&account=][&q=][&type=invoice|credit][&includeUnposted=1][&limit=][&offset=]`
 
 Use case 16: "all income invoices from X in the last year". Entries of the customer invoice types (`side=customer`,
