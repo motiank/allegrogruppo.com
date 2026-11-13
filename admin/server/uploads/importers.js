@@ -2,7 +2,7 @@
 // Each one runs in a single transaction and returns counts for the result screen.
 import { getDbPool } from "../sources/dbpool.js";
 import { loadWorkbook } from "./workbook.js";
-import { parseTabitDetailed, parseBankHapoalim } from "./parsers.js";
+import { parseTabitDetailed, parseBankHapoalim, parseBankEvents } from "./parsers.js";
 
 const CHUNK = 500;
 
@@ -149,5 +149,36 @@ export const importBankHapoalim = async (buffer, { uploadId }) => {
       rows,
     );
     return { account: parsed.account, from: parsed.from, to: parsed.to, rows: rows.length, newRows: inserted, alreadyStored: rows.length - inserted };
+  });
+};
+
+// Bank Hapoalim transaction status ("סטטוס עסקאות") → bank_events. A row already stored (same row_key) is not
+// stored again; its status, execution date and cancelled flag are refreshed (an order's status changes while it waits).
+export const importBankEvents = async (buffer, { uploadId }) => {
+  const wb = await loadWorkbook(buffer);
+  const parsed = parseBankEvents(wb.worksheets.find((w) => w.rowCount > 0));
+  if (parsed.error) throw new Error(parsed.error);
+  if (!parsed.account) throw new Error("account number not found");
+  const rows = parsed.rows.map((r) => [
+    "hapoalim", r.account, r.event_type, r.payee_raw ? r.payee_raw.slice(0, 255) : null, r.payee_name ? r.payee_name.slice(0, 255) : null, r.payee_account, r.payee_code,
+    r.amount, r.currency, r.submitted_at, r.executed_at, r.submitted_by, r.status, r.cancelled, r.row_key, uploadId,
+  ]);
+  return inTransaction(async (conn) => {
+    const keys = parsed.rows.map((r) => r.row_key);
+    const existing = new Set();
+    for (let i = 0; i < keys.length; i += CHUNK) {
+      const [found] = await conn.query(`SELECT row_key FROM bank_events WHERE row_key IN (?)`, [keys.slice(i, i + CHUNK)]);
+      for (const f of found) existing.add(f.row_key);
+    }
+    const affected = await bulk(
+      conn,
+      `INSERT INTO bank_events (bank, account, event_type, payee_raw, payee_name, payee_account, payee_code, amount, currency, submitted_at, executed_at,
+         submitted_by, status, cancelled, row_key, upload_id) VALUES ?
+       ON DUPLICATE KEY UPDATE status = VALUES(status), cancelled = VALUES(cancelled), executed_at = VALUES(executed_at), upload_id = VALUES(upload_id)`,
+      rows,
+    );
+    const newRows = rows.length - existing.size;
+    const updated = Math.max(0, Math.round((affected - newRows) / 2)); // MySQL counts a changed duplicate as 2, an unchanged one as 0
+    return { account: parsed.account, from: parsed.from, to: parsed.to, produced: parsed.produced, rows: rows.length, newRows, updated, alreadyStored: existing.size - updated, counts: parsed.counts, cancelled: parsed.cancelled };
   });
 };

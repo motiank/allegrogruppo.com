@@ -82,6 +82,16 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
 - **Bank Hapoalim files** ("תנועות בחשבון", e.g. `excelNewTransactions.xlsx`) → Upload page → `bank_transactions`
   (admin only). A row is stored once: `row_key` = the row's fields without the running balance + its number among
   equal rows in the file; `UNIQUE` + `INSERT IGNORE`. Test: `node scripts/test_bank_hapoalim.js`.
+  **Bank transaction status file** ("סטטוס עסקאות", e.g. `eventsStatus.xlsx`; owner 2026-11-13: "support this file through the upload
+  page, a specific table, merge it with the bank sheet") → Upload page kind `BANK_EVENTS` → `bank_events` (created on prod
+  2026-11-13; `scripts/utils/create_file_upload_tables.sql`): the orders given on the bank site — transfers with the payee's name
+  and bank account, who submitted them, when, cancelled or not; standing-order authorizations; cheque cancellations. A stored
+  row only gets its status refreshed; the export holds 1,000 events at most (upload regularly). The merge
+  (`admin/server/modules/bankEvents.js`: same amount, executed on the line's day or up to 4 days before, the name must agree when
+  the line has one): Local Data API `/bank/events` + `event` on the transfer rows of `/bank/transactions/stored`; Finance API
+  `/bank/open` and the reconciliation report name the transfer lines (`payeeSource` `events`) and mark section-2 book lines paid by
+  transfer (`kind` transfer + `event`) — the start of "a supplier paid by transfer has no instrument word in the books". Tests
+  `node --test scripts/test_bank_events.js` (no DB).
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";

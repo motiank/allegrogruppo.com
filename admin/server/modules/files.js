@@ -12,7 +12,7 @@ import users from "../sources/users.js";
 import { nameKey } from "../uploads/workbook.js";
 import { recognizeFile, applyPermissions, KINDS } from "../uploads/recognize.js";
 import crypto from "crypto";
-import { importTabitDetailed, importBankHapoalim, saveTabitDetailed, saveTabitShiftReports, saveTabitRota } from "../uploads/importers.js";
+import { importTabitDetailed, importBankHapoalim, importBankEvents, saveTabitDetailed, saveTabitShiftReports, saveTabitRota } from "../uploads/importers.js";
 import { TabitShiftClient, tabitShiftConfig, reportToParsed, mergeParsed, nextMonth, rotaToRows, weekSunday } from "../uploads/tabitShift.js";
 import { Router as r404 } from "./r404.js";
 
@@ -322,6 +322,7 @@ export const importUploads = async (files, plan, perms, userEmail) => {
       let out;
       if (r.kind === "TABIT_DETAILED") out = await importTabitDetailed(f.buffer, { rest, uploadId });
       else if (r.kind === "BANK_HAPOALIM") out = await importBankHapoalim(f.buffer, { uploadId });
+      else if (r.kind === "BANK_EVENTS") out = await importBankEvents(f.buffer, { uploadId });
       else throw new Error(`no importer for ${r.kind}`);
       const status = (out.skippedBranches || []).length || (out.skippedSheets || []).length ? "PARTIAL" : "OK";
       await setUploadResult(uploadId, status, out);

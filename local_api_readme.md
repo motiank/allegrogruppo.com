@@ -140,6 +140,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /beecomm/items/stored?from=&to=[&branch=][&group=day\|dish]` | Dish sales per business day, or per dish over the range (stored) | `bcom_items_daily` ¹ |
 | `GET /beecomm/payments/stored?from=&to=[&branch=][&group=day\|type\|brand]` | Payments report (דוח תשלומים): charges, refunds, transactions and service per payment type and card brand, per business day or summed (stored) | `bcom_payments_daily` ¹ |
 | `GET /bank/transactions/stored?from=&to=[&company=][&account=][&q=][&side=credit\|debit][&group=none\|day\|action\|details]` | Bank account transactions (uploaded bank files), per row, per day with the closing balance, or summed per action | `bank_transactions` |
+| `GET /bank/events?from=&to=[&company=][&account=][&type=transfer\|authorization\|cheque_cancel\|government][&status=active\|cancelled\|all][&q=]` | The bank's transaction status file (orders given on the bank site: transfers with the payee's bank account and submitter, standing-order authorizations, cheque cancellations) | `bank_events` |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -858,12 +859,26 @@ The bank transactions uploaded on the admin **Upload files** page (`bank_transac
 | `reference`, `bundle` | אסמכתא, צרור. |
 | `credit`, `debit` | Money in / out, ₪ (one of them is null). |
 | `balance` | The balance after this row (יתרה). |
-| `payee`, `payeeSource` | Only on a cheque row (`action` שיק / החזרת שיק / בטול שיק, `reference` = the cheque number): the beneficiary from Hashavshevet (`allegro_finance`, looked up when the rows are read). `payeeSource` = `cheques` (the cheques module), `journal` (the journal entry on the bank account with that number and the same amount), `priority` (not in Hashavshevet, but in the Priority cheque file — Pasta Lina's cheques before Hashavshevet, `shared/priority_cheques.json`; the name is known, the cheque still has to be entered) or `missing` (`payee` null: the cheque is not in Hashavshevet yet — the one to enter). `meta.payees` = `{ lines, found, priority, missing }`, with `error` when `allegro_finance` could not be read (the rows then have no payee). Code: `admin/server/modules/chequePayees.js`. |
+| `payee`, `payeeSource`, `event` | A transfer row (קוד פעולה 485 / action העברה…, money out) gets `payee` from its own details ("לטובת: <name>", `payeeSource` `bank_file`) and, when the bank's transaction status file was uploaded (`bank_events`, see `/bank/events`), `event` = `{ id, payee, payeeAccount, submittedAt, executedAt, submittedBy, status }` — the one order with the same amount executed on that day or up to 4 days before (`meta.events` = `{ lines, found, ambiguous, none }`; `admin/server/modules/bankEvents.js`). On a cheque row (`action` שיק / החזרת שיק / בטול שיק, `reference` = the cheque number): the beneficiary from Hashavshevet (`allegro_finance`, looked up when the rows are read). `payeeSource` = `cheques` (the cheques module), `journal` (the journal entry on the bank account with that number and the same amount), `priority` (not in Hashavshevet, but in the Priority cheque file — Pasta Lina's cheques before Hashavshevet, `shared/priority_cheques.json`; the name is known, the cheque still has to be entered) or `missing` (`payee` null: the cheque is not in Hashavshevet yet — the one to enter). `meta.payees` = `{ lines, found, priority, missing }`, with `error` when `allegro_finance` could not be read (the rows then have no payee). Code: `admin/server/modules/chequePayees.js`. |
 
 - `group=none` (default): the rows, newest date first.
 - `group=day`: per account and date: `credit`, `debit`, the number of each (`credits`, `debits`), and `closingBalance`: the balance at the end of the day. The bank file lists the newest row first, so this is the balance of the day's first row in the latest upload that has the day. `closingBalance` is `null` when `q` or `side` is given. Days with no transactions have no row.
 - `group=action`: per account + action: `transactions`, `credit`, `debit`, `firstDate`, `lastDate`, biggest first. `group=details`: the same per action + details.
 - The data is as fresh as the last uploaded bank file (`/status` → `meta.bank.lastDate`).
+
+### `GET /bank/events?from=&to=[&company=a,b][&account=][&type=transfer|authorization|cheque_cancel|government][&status=active|cancelled|all][&q=]`
+
+The bank's **transaction status** file (Bank Hapoalim "סטטוס עסקאות", `.xlsx`, uploaded on the admin Upload files page → `bank_events`,
+2026-11-13): the orders given on the bank site, not the statement. `from` / `to` = the execution day (`executedAt`; the submission
+day when there is none). `type`: `transfer` (העברה: `payee` = the beneficiary's name, `payeeAccount` = its bank-branch-account),
+`authorization` (הקמת הרשאה: a standing-order authorization, `payeeCode` = the institution code, often no amount), `cheque_cancel`
+(ביטול שיק: no payee), `government` (תש. ממשלה). `status`: `active` (not cancelled), `cancelled` (סטאטוס בוטלה: the order never reached
+the statement), `all`. `q` = text in the payee or the submitter. Fields: `company`, `bank`, `account`, `type` (Hebrew), `typeCode`,
+`payee`, `payeeRaw`, `payeeAccount`, `payeeCode`, `amount`, `currency`, `submittedAt`, `executedAt`, `submittedBy` (מזרים העסקה — who gave
+the order), `status`, `cancelled`. Newest first. `meta`: `transfers`, `transfersAmount` (active transfers), `cancelled`. The export holds
+the last 1,000 events at most, so it is uploaded regularly (the Upload page warns). A stored event is not stored twice; a status that
+changed is refreshed. The same events name the transfer lines of the statement — here (`/bank/transactions/stored` → `event`) and in the
+books' bank reconciliation (Finance API `/bank/open`, the detailed report, `payeeSource` `events`).
 
 ---
 
@@ -882,6 +897,7 @@ The bank transactions uploaded on the admin **Upload files** page (`bank_transac
 | Beecomm payments report (stored) | DB `bcom_payments_daily`, same 06:00 job (`bcom_payments.js`), one Beecomm call per branch per day, at most the last 14 days per run | Previous day |
 | Uploads log | DB `file_uploads`, written by the Upload files page | Live |
 | Bank transactions | DB `bank_transactions`, written by the Upload files page from the bank file (account → company in `shared/restaurants.json` `bank_accounts`) | As of last upload |
+| Bank events (orders given on the bank site) | DB `bank_events`, written by the Upload files page from the bank's transaction status file (kind `BANK_EVENTS`) | As of last upload |
 | Beecomm Z / orders / exceptions / dish sales (live) | Beecomm backoffice API (`20cs5hma71…amazonaws.com/prod/api`) | Live |
 
 ### Tables and history
@@ -890,7 +906,7 @@ All tables exist on the production DB (created 21 Oct 2026). Beecomm history was
 
 | Table | Created by | Backfill / reload a range |
 |---|---|---|
-| `tabit_shifts`, `file_uploads`, `bank_transactions`, `bcom_z_reports` | `scripts/utils/create_file_upload_tables.sql` | Z: `node scripts/server/analoader/bcom_z_details.js --from DD/MM/YYYY [--to DD/MM/YYYY]`. Raw shifts: upload Tabit detailed reports on the Upload files page (nothing uploaded yet). |
+| `tabit_shifts`, `file_uploads`, `bank_transactions`, `bank_events`, `bcom_z_reports` | `scripts/utils/create_file_upload_tables.sql` | Z: `node scripts/server/analoader/bcom_z_details.js --from DD/MM/YYYY [--to DD/MM/YYYY]`. Raw shifts: upload Tabit detailed reports on the Upload files page (nothing uploaded yet). |
 | `bcom_orders` | `scripts/utils/create_bcom_orders_table.sql` | `node scripts/server/analoader/bcom_orders.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one week per call). Run it **after** the Z load for the same dates, so orders get their Z's business day. |
 | `bcom_items_daily` | `scripts/utils/create_bcom_items_table.sql` | `node scripts/server/analoader/bcom_items.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--pause ms]` (one call per day per Beecomm restaurant). Independent of the Z load. |
 | `bcom_payments_daily` | `scripts/utils/create_bcom_payments_table.sql` | `node scripts/server/analoader/bcom_payments.js --from DD/MM/YYYY [--to DD/MM/YYYY] [--branch id1,id2] [--pause ms]` (one call per branch per day). Independent of the Z load. |

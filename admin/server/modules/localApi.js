@@ -2,6 +2,7 @@ import express from "express";
 import { createRequire } from "module";
 import { executeSql } from "../sources/dbpool.js";
 import { addChequePayees } from "./chequePayees.js";
+import { addTransferEvents, listBankEvents, isTransferLine, payeeOfDetails } from "./bankEvents.js";
 import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
 import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
@@ -76,6 +77,7 @@ const TABLE_MIGRATIONS = {
   bcom_items_daily: "scripts/utils/create_bcom_items_table.sql",
   bcom_payments_daily: "scripts/utils/create_bcom_payments_table.sql",
   bank_transactions: "scripts/utils/create_file_upload_tables.sql",
+  bank_events: "scripts/utils/create_file_upload_tables.sql",
   tabit_rota: "scripts/utils/create_tabit_rota_table.sql",
 };
 
@@ -528,6 +530,7 @@ const ENDPOINTS = [
   "GET /beecomm/items/stored?from=&to=[&branch=a,b][&group=day|dish]",
   "GET /beecomm/payments/stored?from=&to=[&branch=a,b][&group=day|type|brand]",
   "GET /bank/transactions/stored?from=&to=[&company=a,b][&account=][&q=][&side=credit|debit][&group=none|day|action|details]",
+  "GET /bank/events?from=&to=[&company=a,b][&account=][&type=transfer|authorization|cheque_cancel|government][&status=active|cancelled|all][&q=]",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -1881,7 +1884,30 @@ const Router = () => {
     // a cheque row ("שיק" + the cheque number as reference) gets the beneficiary from Hashavshevet (allegro_finance):
     // payee + payeeSource (cheques / journal / priority = named by the Priority cheque file only / missing = not entered in Hashavshevet yet). A finance DB that is down leaves the rows as they are.
     const payees = await addChequePayees(data, { company: (r) => r.company, text: (r) => r.action, reference: (r) => r.reference, amount: (r) => r.debit ?? r.credit });
-    return { data, meta: { ...meta, payees } };
+    // a transfer row (קוד פעולה 485, "לטובת: <name>" in the details) gets `event` from the bank's transaction status file
+    // (bank_events: the payee's bank account, who submitted it and when); payee / payeeSource "events" when it had no name
+    for (const r of data) if (!r.payee && isTransferLine(r.action, r.actionCode) && r.debit != null) { const p = payeeOfDetails(r.details); if (p) { r.payee = p; r.payeeSource = "bank_file"; } }
+    const events = await addTransferEvents(data, { accounts: (r) => r.account, date: (r) => r.date, amount: (r) => r.debit, name: (r) => r.payee, account: (r) => r.account, text: (r) => r.action, actionCode: (r) => r.actionCode });
+    return { data, meta: { ...meta, payees, events } };
+  });
+
+  // The bank's transaction status file (bank_events, Bank Hapoalim "סטטוס עסקאות", uploaded on the Upload files page):
+  // the orders given on the bank site — transfers (payee name + bank account, submitter, time, cancelled or not),
+  // standing-order authorizations, cheque cancellations, government payments. from / to = the execution day.
+  get("/bank/events", async (req) => {
+    const accounts = optionalBankAccounts(req);
+    const { from, to } = requireDateRange(req, MAX_STORED_DAYS);
+    const type = String(req.query.type || "").trim() || null;
+    if (type && !["transfer", "authorization", "cheque_cancel", "government"].includes(type)) throw badRequest("type must be transfer, authorization, cheque_cancel or government");
+    const status = String(req.query.status || "all");
+    if (!["active", "cancelled", "all"].includes(status)) throw badRequest("status must be active, cancelled or all");
+    const q = String(req.query.q || "").trim() || null;
+    const meta = { from, to, companies: String(req.query.company || "") || "all", accounts: accounts == null ? [] : accounts.length ? accounts : "all", type: type || "all", status, source: "db" };
+    if (accounts == null) return { data: [], meta };
+    const rows = await listBankEvents({ accounts, from, to, type, status, q });
+    const data = rows.map((r) => ({ company: bankCompany(r.account), ...r }));
+    const sum = (f) => Math.round(data.filter(f).reduce((a, r) => a + (r.amount || 0), 0) * 100) / 100;
+    return { data, meta: { ...meta, transfers: data.filter((r) => r.typeCode === "transfer" && !r.cancelled).length, transfersAmount: sum((r) => r.typeCode === "transfer" && !r.cancelled), cancelled: data.filter((r) => r.cancelled).length } };
   });
 
   router.use((req, res) =>

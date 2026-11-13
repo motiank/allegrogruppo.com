@@ -4,7 +4,7 @@
 // import would do: which branch, which period, how many rows, or why it is not imported.
 import crypto from "crypto";
 import { containerOf, loadWorkbook, topRows, norm, nameKey, findHeaderRow, monthBounds } from "./workbook.js";
-import { parseTabitDetailed, parseBankHapoalim, peekTabitRoster } from "./parsers.js";
+import { parseTabitDetailed, parseBankHapoalim, parseBankEvents, peekTabitRoster } from "./parsers.js";
 
 // How each kind is imported:
 //   server        — POST /admin/files/import (this module)
@@ -24,6 +24,7 @@ export const KINDS = {
   BEECOMM_Z: { label: "Beecomm — cash report / Z (דוחות קופה)", handler: null },
   BEECOMM_EXCEPTIONS: { label: "Beecomm — exceptions / credits (דוח חריגות)", handler: null },
   BANK_HAPOALIM: { label: "Bank Hapoalim — account transactions (תנועות בחשבון)", handler: "server", adminOnly: true },
+  BANK_EVENTS: { label: "Bank Hapoalim — transaction status (סטטוס עסקאות: transfers, standing orders, cheque cancellations)", handler: "server", adminOnly: true },
   BANK_SALARY_BATCH: { label: "Bank — salary transfer batch (פרטי משכורת)", handler: null, adminOnly: true },
   BANK_LEUMI_HTML: { label: "Bank Leumi — transactions (HTML .xls)", handler: null, adminOnly: true },
   PAYSLIPS_PDF: { label: "Payslips (PDF)", handler: null },
@@ -185,6 +186,20 @@ export const recognizeFile = async (file, ctx, { allowed = null, isAdmin = false
   }
 
   // ── Bank
+  if (anyCell(top.slice(0, 5), (c) => c === "סטטוס עסקאות") && findHeaderRow(ws, ["סוג עסקה", "שם המוטב"], 12)) {
+    const parsed = parseBankEvents(ws);
+    const n = parsed.counts || {};
+    const parts = [n.transfer && `${n.transfer} transfers${parsed.cancelled ? ` (${parsed.cancelled} cancelled)` : ""}`, n.authorization && `${n.authorization} standing-order authorizations`, n.cheque_cancel && `${n.cheque_cancel} cheque cancellations`, n.government && `${n.government} government payments`, n.other && `${n.other} other`].filter(Boolean);
+    const out = result(base, "BANK_EVENTS", {
+      account: parsed.account || null,
+      period: parsed.from ? { from: parsed.from, to: parsed.to } : null,
+      summary: `Account ${parsed.account || "?"}: ${parsed.rows.length} events — ${parts.join(", ") || "none"}${parsed.from ? `, ${parsed.from} → ${parsed.to}` : ""}`,
+    });
+    if (!parsed.account) Object.assign(out, { importable: false, reason: "The account number was not found in the file." });
+    else if (!parsed.account.startsWith("12-")) out.warnings.push("The account does not start with 12 (Bank Hapoalim).");
+    if (parsed.rows.length >= 1000) out.warnings.push("The bank export holds 1,000 events at most: older events may be missing. Upload it regularly.");
+    return out;
+  }
   if (anyCell(top.slice(0, 5), (c) => c === "תנועות בחשבון") && findHeaderRow(ws, ["תאריך", "חובה", "זכות"], 12)) {
     const parsed = parseBankHapoalim(ws);
     const out = result(base, "BANK_HAPOALIM", {

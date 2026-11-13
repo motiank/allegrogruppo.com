@@ -178,3 +178,75 @@ export const peekTabitRoster = (ws) => {
   }
   return { count: names.length, names };
 };
+
+// ── Bank Hapoalim "סטטוס עסקאות" (transaction status: the orders given on the bank site) ──────────
+// r3 "סטטוס עסקאות", r4 "מספר חשבון 12-584-136663 תאריך הפקה dd.mm.yyyy",
+// r5 header "סוג עסקה | שם המוטב | סכום | מטבע | מועד הזרמה | תאריך ביצוע | מזרים העסקה | סטאטוס".
+// שם המוטב = "name bank-branch-account" for a transfer, "name - code" for a standing-order authorization, empty for
+// a cheque cancellation. Dates are date-time cells (local time). The export holds the last 1,000 events at most.
+export const EVENT_TYPES = { "העברה": "transfer", "הקמת הרשאה": "authorization", "ביטול שיק": "cheque_cancel", "תש. ממשלה": "government" };
+export const eventTypeCode = (t) => EVENT_TYPES[norm(t)] || "other";
+export const CANCELLED_RE = /בוטל|נדחת|לא בוצע|נכשל/;
+
+export const parsePayee = (raw) => {
+  const t = norm(cellText(raw)).replace(/\s+-\s+/g, " - ");
+  if (!t) return { raw: null, name: null, account: null, code: null };
+  let m = t.match(/^(.*?)\s+(\d{1,2}-\d{1,4}-\d{3,})\s*$/);
+  if (m) return { raw: t, name: norm(m[1]) || null, account: m[2], code: null };
+  m = t.match(/^(.*?)\s+-\s+(\d+)\s*$/);
+  if (m) return { raw: t, name: norm(m[1]) || null, account: null, code: m[2] };
+  return { raw: t, name: t, account: null, code: null };
+};
+
+export const parseBankEvents = (ws) => {
+  const hRow = findHeaderRow(ws, ["סוג עסקה", "שם המוטב", "סכום"], 12);
+  if (!hRow) return { rows: [], error: "no header row (סוג עסקה / שם המוטב / סכום)" };
+  let account = "";
+  let produced = null;
+  for (let r = 1; r < hRow; r++) {
+    const t = norm(ws.getRow(r).values.map((v) => cellText(v)).join(" "));
+    const a = t.match(/מספר חשבון\s+([\d-]+)/);
+    if (a) account = a[1];
+    const p = t.match(/תאריך הפקה\s+([\d./]+)/);
+    if (p) produced = dateOf(p[1]);
+  }
+  const cols = headerMap(ws, hRow);
+  const col = (prefix) => [...cols.entries()].find(([h]) => h.startsWith(prefix))?.[1] || 0;
+  const c = { type: col("סוג עסקה"), payee: col("שם המוטב"), amount: col("סכום"), currency: col("מטבע"), submitted: col("מועד הזרמה"), executed: col("תאריך ביצוע"), by: col("מזרים"), status: col("סט") };
+  const text = (row, k) => (c[k] ? norm(cellText(row.getCell(c[k]).value)) || null : null);
+  const rows = [];
+  const seen = new Map();
+  for (let r = hRow + 1; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const event_type = text(row, "type");
+    if (!event_type) continue;
+    const payee = parsePayee(row.getCell(c.payee).value);
+    const out = {
+      account,
+      event_type,
+      type_code: eventTypeCode(event_type),
+      payee_raw: payee.raw,
+      payee_name: payee.name,
+      payee_account: payee.account,
+      payee_code: payee.code,
+      amount: c.amount ? cellNum(row.getCell(c.amount).value) : null,
+      currency: text(row, "currency"),
+      submitted_at: c.submitted ? dateTimeOf(row.getCell(c.submitted).value) : null,
+      executed_at: c.executed ? dateTimeOf(row.getCell(c.executed).value) : null,
+      submitted_by: text(row, "by"),
+      status: text(row, "status"),
+    };
+    out.cancelled = CANCELLED_RE.test(out.status || "") ? 1 : 0;
+    // the key that stops a row from being stored twice: not the status or the execution date (they change while an
+    // order waits; a stored row is refreshed instead); equal rows (the same order given twice) get their number
+    const fields = JSON.stringify([out.account, out.event_type, out.payee_raw, out.amount, out.submitted_at, out.submitted_by]);
+    const n = (seen.get(fields) || 0) + 1;
+    seen.set(fields, n);
+    out.row_key = crypto.createHash("sha256").update(`${fields}#${n}`).digest("hex");
+    rows.push(out);
+  }
+  const days = rows.map((x) => (x.submitted_at || "").slice(0, 10)).filter(Boolean).sort();
+  const counts = {};
+  for (const x of rows) counts[x.type_code] = (counts[x.type_code] || 0) + 1;
+  return { account, produced, rows, from: days[0] || null, to: days[days.length - 1] || null, counts, cancelled: rows.filter((x) => x.cancelled).length };
+};

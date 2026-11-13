@@ -36,6 +36,8 @@ const resultText = (kind, r) => {
       }`;
     case "BANK_HAPOALIM":
       return `${r.newRows} new transactions, ${r.alreadyStored} were already stored (account ${r.account})`;
+    case "BANK_EVENTS":
+      return `${r.newRows} new events, ${r.updated} updated (status), ${r.alreadyStored} were already stored (account ${r.account}, ${r.from} → ${r.to})`;
     case "TABIT_ROSTER":
       return `${r.inserted} new, ${r.updated} updated${r.conflicts ? ` · ${r.conflicts} need a decision — open Shift-tabit → Employees → Shift loader` : ""}${
         r.phonesUpdated ? ` · ${r.phonesUpdated} phones updated` : ""
@@ -206,7 +208,7 @@ const Upload = () => {
     <div style={s.container}>
       <h2 style={s.title}>Upload files</h2>
       <p style={s.hint}>
-        Drop all your files here — Tabit reports and employee lists, Micpal / Shiklulit employee files, bank transactions. The system recognizes each
+        Drop all your files here — Tabit reports and employee lists, Micpal / Shiklulit employee files, bank transactions and the bank's transaction status (סטטוס עסקאות). The system recognizes each
         file and asks you to approve before anything is saved. Beecomm sales and cash details are loaded every day from the Beecomm API.
       </p>
 

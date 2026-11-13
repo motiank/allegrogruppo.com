@@ -23,6 +23,7 @@ import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
 import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
 import { addChequePayees } from "./chequePayees.js";
+import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
@@ -257,12 +258,20 @@ export async function buildBankReconReport(query = {}) {
   }));
   // the beneficiary of every cheque line, from Hashavshevet or the Priority file (payee / payeeSource: cheques, journal, priority, missing)
   const payeeStats = await addChequePayees(bankOpen, { company: company.companyId, bankAccounts: [accountKey] });
+  // the beneficiary of every transfer line, from the bank's transaction status file (bank_events; payeeSource events, + event:
+  // the payee's bank account, who gave the order and when); Hashavshevet's bank lines carry no name for a transfer
+  const fileAccounts = fileAccountsOf({ financeCode: company.code });
+  const eventStats = await addTransferEvents(bankOpen, { accounts: fileAccounts, date: (r) => r.date, amount: (r) => (r.amount < 0 ? -r.amount : null) });
 
   const bookFutureMatched = futureMatchedRows.map((r) => ({
     lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, date: r.d, reference: r.reference, type: r.trans_type, description: r.description || r.details,
     counterAccount: r.counter_account, counterName: r.counter_name, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to), batch: r.batch_no,
     posted: num(r.status) === 1, chequeId: r.cheque_id || null,
   }));
+  // a book line paid by transfer (no cheque, money out) gets the matching order too — the books carry no instrument
+  // word for a transfer; the event (same amount, given up to 4 days before the value date) says it was one
+  const bookEventStats = await addTransferEvents(bookOpen, { accounts: fileAccounts, date: (r) => r.date, amount: (r) => (r.amount < 0 && !r.chequeId ? -r.amount : null), name: (r) => r.counterName, transfer: () => true });
+  for (const r of bookOpen) if (r.event) { r.payeeSource = r.payeeSource || "events"; r.kind = "transfer"; }
   const older = (rows) => rows.filter((x) => x.date < from);
   const chequesOpen = cheques.open;
   const pastDue = chequesOpen.filter((x) => x.status === "past_due");
@@ -307,6 +316,9 @@ export async function buildBankReconReport(query = {}) {
   if (payeeStats.missing)
     notes.push(`${payeeStats.missing} צ'קים שנפרעו בבנק לא נמצאו בחשבשבת (לא במודול הצ'קים ולא בפקודת יומן עם מספר הצ'ק); הם מסומנים "${payeeText({ payeeSource: "missing" })}" בסעיף 1 – אלה הצ'קים שיש לרשום.`);
   if (payeeStats.error) notes.push(`שמות המוטבים של הצ'קים לא נשלפו הפעם (${payeeStats.error}).`);
+  if (eventStats.found || bookEventStats.found)
+    notes.push(`${eventStats.found + bookEventStats.found} העברות זוהו בקובץ סטטוס העסקאות של הבנק (שם המוטב, חשבון היעד, מי הזרים ומתי): ${eventStats.found} בסעיף 1 ו-${bookEventStats.found} בסעיף 2${eventStats.ambiguous + bookEventStats.ambiguous ? `; ${eventStats.ambiguous + bookEventStats.ambiguous} לא זוהו בוודאות (כמה הוראות באותו סכום ובאותם ימים)` : ""}.`);
+  if (eventStats.error) notes.push(`קובץ סטטוס העסקאות של הבנק לא נקרא הפעם (${eventStats.error}).`);
   if (cancelledCount) notes.push(`${cancelledCount} צ'קים מבוטלים (יש להם רישום הפוך) אינם מופיעים בסעיף 3.`);
   if (summary.chequesCleared.groupOnly) notes.push(`${summary.chequesCleared.groupOnly} צ'קים הותאמו בחשבשבת בתוך קבוצת התאמה גדולה ולא נמצאה שורת בנק עם אותו מספר צ'ק ואותו סכום; מוצג תאריך ההתאמה או שורת הבנק היחידה בקבוצה.`);
   if (clearedUnmatched.length) notes.push(`${clearedUnmatched.length} צ'קים כבר נפרעו בבנק (לפי מספר הצ'ק והסכום) אבל עדיין לא הותאמו בחשבשבת; הם נספרים כצ'קים פתוחים עד להתאמה.`);
@@ -333,7 +345,7 @@ export async function bankReconFacets(query = {}) {
 
 const MONEY_FMT = '#,##0.00;[Red]-#,##0.00';
 
-const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", priority: "פריוריטי", missing: "חסר" };
+const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", priority: "פריוריטי", missing: "חסר", events: "סטטוס עסקאות", bank_file: "קובץ הבנק" };
 
 function sheet(wb, title, columns, rows, totalLabel, total) {
   const ws = wb.addWorksheet(title.slice(0, 31), { views: [{ rightToLeft: true, state: "frozen", ySplit: 1 }] });

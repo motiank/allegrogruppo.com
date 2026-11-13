@@ -554,7 +554,7 @@ Use case 14. The open lines, oldest first. Bank line `direction` is `in` or `out
 `/cheques/priority`; the name is known, the cheque is still not in the books), else
 `missing` (`payee` null — the cheque is not in Hashavshevet yet); with a duplicate number the row with the same amount
 wins, and with the same amount Hashavshevet's name wins over Priority (`admin/server/modules/chequePayees.js`, also used by
-`/bank/suggestions`, the report and the Local Data API's `/bank/transactions/stored`). `meta.payees` =
+`/bank/suggestions`, the report and the Local Data API's `/bank/transactions/stored`). **Transfer lines** (העברה מהבנק / לאחר / זה"ב, money out; 2026-11-13) get `payee` / `payeeSource` `events` and `event` `{ payee, payeeAccount, submittedAt, executedAt, submittedBy, status }` from the bank's transaction status file (`bank_events`, uploaded on the admin Upload page; `admin/server/modules/bankEvents.js`: the one order with the same amount executed on that day or up to 4 days before; `meta.events` = `{ lines, found, ambiguous, none }`); in the report, a section-2 book line paid by transfer gets the same `event` and `kind` `transfer`. `meta.payees` =
 `{ lines, found, priority, missing[, error] }` (`priority` = lines named by the file only, counted in `found` too).
 
 - `is_matched = 1` with `match_num` means a bank line is matched.

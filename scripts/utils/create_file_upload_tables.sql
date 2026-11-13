@@ -102,3 +102,35 @@ CREATE TABLE IF NOT EXISTS `bank_transactions` (
   UNIQUE KEY `uniq_row_key` (`row_key`),
   KEY `idx_account_date` (`account`, `tx_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Bank Hapoalim "סטטוס עסקאות" (transaction status) export: the orders given on the bank site — transfers
+-- (with the payee's name and bank account, who submitted them, when, and whether they were cancelled),
+-- standing-order authorizations, cheque cancellations, government payments. Uploaded on the Upload files
+-- page (kind BANK_EVENTS, 2026-11-13). A row already stored (same row_key) only gets its status / execution
+-- date refreshed. The export holds the last 1,000 events at most, so it is uploaded regularly.
+-- The events name the transfers of the bank statement (admin/server/modules/bankEvents.js).
+CREATE TABLE IF NOT EXISTS `bank_events` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `bank` VARCHAR(16) NOT NULL COMMENT 'e.g. hapoalim',
+  `account` VARCHAR(40) NOT NULL COMMENT 'our account, bank-branch-account as in the file',
+  `event_type` VARCHAR(40) NOT NULL COMMENT 'סוג עסקה: העברה, הקמת הרשאה, ביטול שיק, תש. ממשלה',
+  `payee_raw` VARCHAR(255) DEFAULT NULL COMMENT 'שם המוטב as in the file: name + bank-branch-account, or name - institution code',
+  `payee_name` VARCHAR(255) DEFAULT NULL,
+  `payee_account` VARCHAR(40) DEFAULT NULL COMMENT 'the payee''s bank-branch-account (transfers)',
+  `payee_code` VARCHAR(40) DEFAULT NULL COMMENT 'the institution code (standing-order authorizations)',
+  `amount` DECIMAL(14,2) DEFAULT NULL,
+  `currency` VARCHAR(8) DEFAULT NULL,
+  `submitted_at` DATETIME DEFAULT NULL COMMENT 'מועד הזרמה (local time)',
+  `executed_at` DATETIME DEFAULT NULL COMMENT 'תאריך ביצוע (local time)',
+  `submitted_by` VARCHAR(128) DEFAULT NULL COMMENT 'מזרים העסקה',
+  `status` VARCHAR(64) DEFAULT NULL COMMENT 'סטאטוס: הועברה לביצוע, בוטלה, …',
+  `cancelled` TINYINT(1) NOT NULL DEFAULT 0,
+  `row_key` CHAR(64) NOT NULL COMMENT 'sha256 of account, type, payee, amount, submitted_at, submitted_by + the number among equal rows',
+  `upload_id` INT UNSIGNED DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_row_key` (`row_key`),
+  KEY `idx_account_executed` (`account`, `executed_at`),
+  KEY `idx_account_amount` (`account`, `amount`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

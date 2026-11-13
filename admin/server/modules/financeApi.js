@@ -6,6 +6,7 @@ import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } f
 import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts, bankReconFacets } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees, isChequeLine } from "./chequePayees.js";
+import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
 import { mergeCheques } from "./chequesAll.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
@@ -1403,9 +1404,11 @@ route("/bank/open", async (req, ctx) => {
       : { lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, account: r.account_key, date: r.d, reference: r.reference, description: r.description, type: r.trans_type, posted: r.status === 1,
           counterAccount: r.debit_account === r.account_key ? r.credit_account : r.debit_account, side: r.side, amount: round2(r.amount), signedAmount: round2(r.signed_amount), chequeId: r.cheque_id || null, ageDays: num(r.age) },
   );
-  // cheque lines of the bank get the beneficiary from Hashavshevet (payee / payeeSource: cheques, journal, missing)
+  // cheque lines of the bank get the beneficiary from Hashavshevet (payee / payeeSource: cheques, journal, missing);
+  // transfer lines get it from the bank's transaction status file (bank_events; payeeSource events, + event)
   const payees = side === "bank" ? await addChequePayees(data, { company: ctx.companyId, bankAccounts: ctx.bankAccounts }) : undefined;
-  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}) }, codes: ["bank_gap"] };
+  const events = side === "bank" ? await addTransferEvents(data, { accounts: fileAccountsOf({ financeCode: ctx.code }), date: (r) => r.date, amount: (r) => (r.signedAmount < 0 ? -r.signedAmount : null) }) : undefined;
+  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}), ...(events ? { events } : {}) }, codes: ["bank_gap"] };
 });
 
 // ── bank balance per day (readme → /bank/balances) ───────────────────────
