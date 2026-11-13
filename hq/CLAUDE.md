@@ -170,7 +170,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   `futureChequesData` / `chequesByDay(rows, { balances, payments })` / `balanceSummary` in `finance.js`, shared by the
   `cheques` calc and the Drive file (`chequeTabs` with `byDay`, column יתרה, row `_tone`); the chat marks the cell with
   🟢 / 🔴 (`cellTone`, coloured in `AskBox.js` and the Excel download). README → "Future cheques by day, with the bank
-  balance". Needs an hq client build and an admin restart on deploy.
+  balance". Deployed 2026-11-13 (`0a229f0`: `allegro-admin` restarted, hq built, `joya-hq` + `joya-runner` restarted).
 - **Files to Drive** (2026-11-09, owner): a plan `file` ({ kind: 'sheet', title, show, columns? }) when the user asks for a
   file, for a list too big for the chat (> ~150 rows) or for something to share → `compute` runs the calcs in export mode
   (`params.export`, `finance.js` `limitOf` / `EXPORT_MAX`), `src/services/sheets.js` builds a workbook from every list in

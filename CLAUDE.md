@@ -138,7 +138,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   and the planned payments (`hq/src/services/finance.js`): the default window is the start of this month → the end of the
   third month, every day of the chat table and the Drive file carries the balance (🟢 real / 🔴 expected in the chat,
   green / red rows in the sheet). Tests `scripts/test_finance_api.js`, `hq/test/test_joya_lib.mjs`; hq README → "Future
-  cheques by day, with the bank balance".
+  cheques by day, with the bank balance". Deployed 2026-11-13 (`0a229f0`: pull, `allegro-admin` restarted, hq built, `joya-hq` + `joya-runner` restarted).
   Tests `scripts/test_statement_compare.js`; eval `st-*`. Needs an hq client build on deploy; `apt-get install poppler-utils`
   on the droplet is optional but gives better Hebrew PDF text.
 - **Downloads page** (2026-11-07): admin menu "Downloads" (`/downloads`, admin role only; `admin/server/modules/downloads.js`,
