@@ -38,7 +38,8 @@ first time it appears.
 Droplet `ssh root@157.245.241.116`, repo `/root/dvlp/allegrogruppo.com`, branch `main` (pull with
 `git pull --ff-only origin main`). Node 18.19. nginx + certbot. DNS is at Namecheap (the owner adds records).
 The same droplet also runs the owner's tradewit services — leave those alone. Back up `dist/` before a root build
-(`/root/allegro-dist-backup-*`).
+(`/root/allegro-dist-backup-*`). A root build needs the devDependencies (vite): on 2026-11-13 `npm run build` printed
+`sh: 1: vite: not found` and left the old `dist/` — check the build's output, and run `npm install` first when that happens.
 
 ## Status (2026-10-24)
 
