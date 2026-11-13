@@ -201,6 +201,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   `/api/joya/finance/bank-recon/facets`; the chat's link carries the filters to the page. The rules live in the admin
   (`shared/bankReconFilter.js`, `finance_api_readme.md` → `/bank/report` "Filters"). Eval `f-bank-recon-filter-*`. Deployed
   2026-11-13 (`c77cd4e`: root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner` restarted).
+  The supplier picker (searchable, red count = the supplier's bank moves missing from the books) deployed 2026-11-13 (`43c3a18`).
   Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
   from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
