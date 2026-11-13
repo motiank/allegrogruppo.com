@@ -11,6 +11,57 @@ import { renderBankReconBody, bankReconBehavior, CSS } from "../../../shared/ban
 
 const errText = (err, fallback) => err.response?.data?.error?.message || err.response?.data?.error || err.message || fallback;
 
+const partyValue = (p) => p.key || p.name;
+const partyText = (p) => `${p.name}${p.key ? ` (${p.key})` : ""}`;
+
+// The supplier / payee picker: a searchable list (a native dropdown cannot show a coloured number). Each party shows
+// its rows in the whole report and, in red brackets, its bank moves with no match in the books (section 1).
+const PartyPicker = ({ parties, value, onChange, theme, inputStyle }) => {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef(null);
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+  const current = parties.find((p) => partyValue(p) === value) || null;
+  const needle = q.trim();
+  const list = parties.filter((p) => !needle || `${p.name} ${p.key || ""}`.includes(needle)).slice(0, 200);
+  const red = { color: "#b00020", fontWeight: 700 };
+  const counts = (p) => (
+    <span style={{ color: theme.textSecondary, marginRight: 6, whiteSpace: "nowrap" }} title={`${p.count} שורות בדוח${p.bankOpen ? ` · ${p.bankOpen} תנועות בנק ללא רישום בספרים` : ""}`}>
+      {p.count}
+      {p.bankOpen ? <span style={red}> ({p.bankOpen})</span> : null}
+    </span>
+  );
+  const item = { padding: "5px 8px", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 8, borderBottom: `1px solid ${theme.border}` };
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button type="button" style={{ ...inputStyle, minWidth: 280, maxWidth: 360, textAlign: "right", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 8 }} onClick={() => setOpen((o) => !o)}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{current ? partyText(current) : "הכל"}</span>
+        <span>{current ? counts(current) : null} ▾</span>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 30, width: 380, background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 6, boxShadow: "0 4px 16px rgba(0,0,0,.18)", padding: 6 }}>
+          <input autoFocus style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 4 }} placeholder="חיפוש ספק / מוטב…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            <div style={{ ...item, fontWeight: 700 }} onClick={() => { onChange(""); setOpen(false); setQ(""); }}>הכל</div>
+            {list.map((p) => (
+              <div key={partyValue(p)} style={{ ...item, background: partyValue(p) === value ? theme.background : undefined }} onClick={() => { onChange(partyValue(p)); setOpen(false); setQ(""); }}>
+                <span>{partyText(p)}</span>
+                {counts(p)}
+              </div>
+            ))}
+            {!list.length && <div style={{ ...item, color: theme.textSecondary, cursor: "default" }}>אין ספק כזה בדוח</div>}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: theme.textSecondary, padding: "6px 4px 2px" }}>המספר = שורות של הספק בדוח; <span style={red}>(באדום)</span> = תנועות בנק שאין להן רישום בספרים (סעיף 1).</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const BankRecon = () => {
   const { theme } = useTheme();
   const [companies, setCompanies] = useState([]);
@@ -86,7 +137,6 @@ const BankRecon = () => {
 
   const canRun = company && account && from && to && !loading;
   const facetsHere = facets && facets.base === base ? facets : null; // another account or period: pick again after "הצג דוח"
-  const partyValue = (p) => p.key || p.name;
   const changeFilter = (next) => {
     if ("kind" in next) setKind(next.kind);
     if ("party" in next) setParty(next.party);
@@ -143,15 +193,10 @@ const BankRecon = () => {
                 ))}
               </select>
             </label>
-            <label style={styles.field}>
+            <div style={styles.field}>
               ספק / מוטב
-              <select style={{ ...styles.input, maxWidth: "260px" }} value={party} onChange={(e) => changeFilter({ party: e.target.value })}>
-                <option value="">הכל</option>
-                {(facetsHere.parties || []).map((p) => (
-                  <option key={partyValue(p)} value={partyValue(p)}>{p.name}{p.key ? ` (${p.key})` : ""} · {p.count}</option>
-                ))}
-              </select>
-            </label>
+              <PartyPicker parties={facetsHere.parties || []} value={party} onChange={(v) => changeFilter({ party: v })} theme={theme} inputStyle={styles.input} />
+            </div>
           </>
         )}
         <button style={{ ...styles.button, opacity: canRun ? 1 : 0.6 }} disabled={!canRun} onClick={() => run()}>

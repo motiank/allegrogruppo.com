@@ -4,7 +4,7 @@
 // Filters (owner 2026-11-13): "סוג תנועה" and "ספק / מוטב" pickers (the lists come from /finance/bank-recon/facets of
 // the shown account and period); the admin server filters (shared/bankReconFilter.js). A text / amount / sections
 // filter comes only from the chat's link (q, amount, sections in the URL) and can be cleared here.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { useSearchParams } from 'react-router-dom';
 import { api, qs } from '../api.js';
@@ -17,9 +17,69 @@ const useStyles = createUseStyles((theme) => ({
   wide: { width: 260 },
   hint: { fontSize: '0.76rem', color: theme.textSecondary, margin: '0.2rem 0 0.6rem' },
   chip: { display: 'inline-flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.8rem', padding: '0.15rem 0.5rem', borderRadius: 999, background: theme.surface2 || theme.surface, border: `1px solid ${theme.border}` },
+  // the supplier / payee picker: a searchable list with the red count of bank moves missing from the books
+  pickerWrap: { position: 'relative' },
+  pickerBtn: { width: 300, display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center', padding: '0.4rem 0.6rem', border: `1px solid ${theme.border}`, borderRadius: 8, background: theme.surface, color: theme.text, cursor: 'pointer', font: 'inherit', textAlign: 'start' },
+  pickerName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  pickerPanel: { position: 'absolute', top: '100%', insetInlineStart: 0, zIndex: 30, width: 380, maxWidth: '90vw', background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.18)', padding: '0.4rem' },
+  pickerSearch: { width: '100%', boxSizing: 'border-box', marginBottom: '0.3rem', padding: '0.35rem 0.5rem', border: `1px solid ${theme.border}`, borderRadius: 6, background: theme.background, color: theme.text, font: 'inherit' },
+  pickerList: { maxHeight: 320, overflowY: 'auto' },
+  pickerItem: { padding: '0.3rem 0.5rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '0.5rem', borderBottom: `1px solid ${theme.border}`, '&:hover': { background: theme.background } },
+  pickerOn: { background: theme.background },
+  pickerCount: { color: theme.textSecondary, whiteSpace: 'nowrap' },
+  red: { color: '#c0392b', fontWeight: 700 },
+  pickerLegend: { fontSize: '0.74rem', color: theme.textSecondary, padding: '0.4rem 0.2rem 0.1rem' },
   frame: { width: '100%', height: 'calc(100vh - 230px)', minHeight: 480, border: `1px solid ${theme.border}`, borderRadius: 8, background: '#fff' },
   links: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' },
 }));
+
+const partyValue = (p) => p.key || p.name;
+const partyText = (p) => `${p.name}${p.key ? ` (${p.key})` : ''}`;
+
+function PartyPicker({ parties, value, onChange, disabled, c, t }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef(null);
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+  const current = parties.find((p) => partyValue(p) === value) || null;
+  const needle = q.trim();
+  const list = parties.filter((p) => !needle || `${p.name} ${p.key || ''}`.includes(needle)).slice(0, 200);
+  const counts = (p) => (
+    <span className={c.pickerCount} title={t('joya.bankRecon.partyTitle', { n: p.count, open: p.bankOpen || 0 })}>
+      {p.count}
+      {p.bankOpen ? <span className={c.red}> ({p.bankOpen})</span> : null}
+    </span>
+  );
+  const pick = (v) => { onChange(v); setOpen(false); setQ(''); };
+  return (
+    <div ref={ref} className={c.pickerWrap}>
+      <button type="button" className={c.pickerBtn} disabled={disabled} onClick={() => setOpen((o) => !o)}>
+        <span className={c.pickerName} dir="auto">{current ? partyText(current) : t('joya.bankRecon.all')}</span>
+        <span>{current ? counts(current) : null} ▾</span>
+      </button>
+      {open && (
+        <div className={c.pickerPanel}>
+          <input autoFocus className={c.pickerSearch} placeholder={t('joya.bankRecon.partySearch')} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className={c.pickerList}>
+            <div className={c.pickerItem} style={{ fontWeight: 700 }} onClick={() => pick('')}>{t('joya.bankRecon.all')}</div>
+            {list.map((p) => (
+              <div key={partyValue(p)} className={`${c.pickerItem} ${partyValue(p) === value ? c.pickerOn : ''}`} onClick={() => pick(partyValue(p))}>
+                <span dir="auto">{partyText(p)}</span>
+                {counts(p)}
+              </div>
+            ))}
+            {!list.length && <div className={c.pickerItem} style={{ cursor: 'default' }}>{t('joya.bankRecon.partyNone')}</div>}
+          </div>
+          <div className={c.pickerLegend}>{t('joya.bankRecon.partyLegend')}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BankRecon() {
   const theme = useTheme();
@@ -63,7 +123,6 @@ export default function BankRecon() {
 
   // the kinds and the parties of the shown report (the whole report, not the filtered one)
   const facets = useLoad(() => (shown ? api(`/finance/bank-recon/facets${qs(shown)}`) : Promise.resolve(null)), [shown]);
-  const partyValue = (p) => p.key || p.name;
 
   return (
     <Page title={t('joya.bankRecon.title')} back="/accounting">
@@ -126,12 +185,7 @@ export default function BankRecon() {
                 </Select>
               </Field>
               <Field label={t('joya.bankRecon.party')}>
-                <Select className={c.wide} value={party} onChange={(e) => setParty(e.target.value)} disabled={facets.loading}>
-                  <option value="">{t('joya.bankRecon.all')}</option>
-                  {(facets.data?.parties || []).map((p) => (
-                    <option key={partyValue(p)} value={partyValue(p)}>{p.name}{p.key ? ` (${p.key})` : ''} · {p.count}</option>
-                  ))}
-                </Select>
+                <PartyPicker parties={facets.data?.parties || []} value={party} onChange={setParty} disabled={facets.loading} c={c} t={t} />
               </Field>
               {extraOn && (
                 <span className={c.chip} dir="auto">

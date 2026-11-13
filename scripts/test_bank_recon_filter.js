@@ -100,6 +100,9 @@ test("facetsOf: kinds always, parties on demand (by key or by normalised name, a
   assert.equal(named.length, 1);
   assert.equal(named[0].count, 3);
   assert.deepEqual(named[0].sections.sort(), ["bankOpen", "bookOpen", "chequesOpen"]);
+  assert.equal(named[0].bankOpen, 1, "bank moves missing from the books");
+  assert.equal(named[0].bankOpenTotal, -1000);
+  assert.equal(f.parties.find((p) => p.name === "עובד").bankOpen, 0);
   assert.ok(f.parties.find((p) => p.name === "עמ העברה/הפקדה"), "a bank line without a payee is listed by its text");
   assert.ok(!f.parties.find((p) => p.name === "שיק"), "a cheque line without a payee is not a party");
 });
@@ -118,6 +121,7 @@ test("matchRow and applyFilter: kind, party (key / name), text, amount, sections
   assert.deepEqual(r.bookOpen.map((x) => x.lineId), [11]);
   assert.deepEqual(r.bankOpen.map((x) => x.bankLineId), [1], "the key also matches that account's name on the bank side");
   assert.deepEqual(r.chequesOpen.map((x) => x.chequeNo), [16000]);
+  assert.equal(r.filter.label, 'ספק / מוטב: חצרי א.ב ארזים בע"מ (500084)', "a key is shown with its name");
   r = applyFilter(sample(), parseFilter({ party: "999999" }));
   assert.equal(r.bankOpen.length + r.bookOpen.length + r.chequesOpen.length, 0, "an unknown key matches nothing");
 

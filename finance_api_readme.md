@@ -628,7 +628,8 @@ description, payee, counter account, references, cheque number); `amount=` one e
 only these sections. The sections keep only the matching rows; **the `summary` is always for the whole account**;
 `filter` = `{ kinds, party, q, amount, sections, active, label }` (`label` = one Hebrew line, also in `meta.filter`),
 `filtered.sections[name]` = `{ count, total, of, ofTotal, omitted? }`, `facets.kinds` = the kinds of the whole report with
-count and total (always), `facets.parties` (with `facets=1`: `[{ name, key, count, total, sections }]`, most rows first,
+count and total (always), `facets.parties` (with `facets=1`: `[{ name, key, count, total, sections, bankOpen, bankOpenTotal }]` — `count` = the party's rows in the
+whole report, `bankOpen` = its bank moves with no match in the books (section 1; the red number in the pickers); most rows first,
 400 at most). The HTML shows the filter under the header, a "סוג" column (filterable) in sections 1 and 2 and "N מתוך M"
 in the totals; the Excel's summary sheet lists the filter and the counts. `GET /finance/bank/report/facets?company&account&from&to`
 → `{ data: { kinds, parties }, meta }` for the pickers of Joya's page (the admin page takes them from the report itself).

@@ -144,7 +144,7 @@ export function filterLabel(f) {
   if (!f || !f.active) return "";
   const parts = [];
   if (f.kinds) parts.push(`סוג: ${f.kinds.map((k) => KIND_LABEL[k] || k).join(" / ")}`);
-  if (f.party) parts.push(`ספק / מוטב: ${f.party}`);
+  if (f.party) parts.push(`ספק / מוטב: ${f.partyLabel || f.party}`);
   if (f.q) parts.push(`טקסט: ${f.q}`);
   if (f.amount != null) parts.push(`סכום: ${f.amount.toLocaleString("he-IL", { minimumFractionDigits: 2 })}`);
   if (f.sections) parts.push(`סעיפים: ${f.sections.map((s) => SECTION_LABEL[s] || s).join(", ")}`);
@@ -182,7 +182,8 @@ const sumOf = (rows) => round2(rows.reduce((a, r) => a + (Number(r.amount) || 0)
 
 /**
  * The facets of the (unfiltered) report: the kinds with count and total, and — with `withParties` — the parties
- * (supplier / payee / counter account) with count, total and the sections they appear in, most rows first.
+ * (supplier / payee / counter account) with count (rows in the whole report), total, the sections they appear in,
+ * and bankOpen / bankOpenTotal (their bank moves missing from the books, section 1), most rows first.
  */
 export function facetsOf(report, { withParties = false, maxParties = 400 } = {}) {
   const kinds = new Map();
@@ -199,9 +200,14 @@ export function facetsOf(report, { withParties = false, maxParties = 400 } = {})
       const name = p.name || (s === "bankOpen" && k !== "cheque" ? p.text : null);
       if (!name) continue;
       const id = p.key || normName(name);
-      const pc = parties.get(id) || { name, key: p.key, count: 0, total: 0, sections: [] };
+      const pc = parties.get(id) || { name, key: p.key, count: 0, total: 0, sections: [], bankOpen: 0, bankOpenTotal: 0 };
       pc.count++;
       pc.total += Number(x.amount) || 0;
+      if (s === "bankOpen") {
+        // bank moves missing from the books (section 1) — the owner wants this number in red next to the party
+        pc.bankOpen++;
+        pc.bankOpenTotal += Number(x.amount) || 0;
+      }
       if (!pc.sections.includes(s)) pc.sections.push(s);
       if (!pc.key && p.key) pc.key = p.key;
       parties.set(id, pc);
@@ -219,13 +225,15 @@ export function facetsOf(report, { withParties = false, maxParties = 400 } = {})
       const k = parties.get(keyedId);
       k.count += p.count;
       k.total += p.total;
+      k.bankOpen += p.bankOpen;
+      k.bankOpenTotal += p.bankOpenTotal;
       for (const s of p.sections) if (!k.sections.includes(s)) k.sections.push(s);
       parties.delete(id);
     }
     out.parties = [...parties.values()]
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "he"))
       .slice(0, maxParties)
-      .map((p) => ({ ...p, total: round2(p.total) }));
+      .map((p) => ({ ...p, total: round2(p.total), bankOpenTotal: round2(p.bankOpenTotal) }));
   }
   return out;
 }
@@ -243,6 +251,7 @@ export function applyFilter(report, f) {
   if (f.party && /^\d+$/.test(f.party)) {
     const keyed = (f.facets ? report.facets.parties : facetsOf(report, { withParties: true }).parties).find((p) => p.key === f.party);
     f.partyNames = keyed ? [normName(keyed.name)] : [];
+    f.partyLabel = keyed ? `${keyed.name} (${keyed.key})` : null;
   }
   report.filter = { kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections, active: f.active, label: filterLabel(f) };
   if (!f.active) {
