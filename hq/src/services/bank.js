@@ -130,7 +130,7 @@ export async function bankTransactions(companies, from, to, { q = null, side = n
     period: { from, to },
     filter: { q: q || null, side: side || 'all', order: order === 'date' ? 'date' : 'amount' },
     source: SOURCE,
-    note: 'a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet); a transfer line carries payee from its details (payeeSource bank_file; payeeRole "to" = paid to it, "from" = money that came IN from that party — say "מאת"; payeePurpose = the bank's "עבור" text) and event = the order in the bank\'s transaction status file (payeeAccount, submittedBy, submittedAt, status) when that file was uploaded',
+    note: 'a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet); a transfer line carries payee from its details (payeeSource bank_file; payeeRole "to" = paid to it, "from" = money that came IN from that party — say "מאת"; payeePurpose = the bank\'s "עבור" text) and event = the order in the bank\'s transaction status file (payeeAccount, submittedBy, submittedAt, status) when that file was uploaded',
     ...(reason ? { missing: reason } : {}),
     companies: out,
   };
