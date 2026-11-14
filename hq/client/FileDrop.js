@@ -2,6 +2,9 @@
 // (POST /api/joya/files/recognize → Allegro /files/recognize), the card shows what it is, and "Import" writes it to the
 // Allegro tables (POST /api/joya/files/import). Joya keeps nothing. Files that the admin imports with its own loaders
 // (employee list, Micpal / Shiklulit index) are shown with a link to the admin's Upload files page.
+// Owner 2026-11-14: the paperclip and the drop use the same code as the admin's Upload page for EVERY file — the recognizer
+// decides first; only a file it does not know (a statement PDF / Excel) can become the attachment of a question (`add`'s
+// `forQuestion`).
 import React, { useEffect, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { ApiError } from './api.js';
@@ -107,19 +110,28 @@ export function DropOverlay() {
   );
 }
 
-/** The uploads of a chat: add(files) starts one card per drop. */
+/** The uploads of a chat: add(files, { forQuestion }) starts one card per drop. Every file goes through the admin's
+ *  recognizer; the FIRST file the recognizer does not know and that passes forQuestion(file) leaves the card (a card
+ *  with nothing left is removed) and is returned, so the chat can attach it to the next question. */
 export function useUploads() {
   const [uploads, setUploads] = useState([]);
   const set = (key, patch) => setUploads((xs) => xs.map((u) => (u.key === key ? { ...u, ...patch } : u)));
-  const add = async (files) => {
+  const remove = (key) => setUploads((xs) => xs.filter((u) => u.key !== key));
+  const add = async (files, { forQuestion = null } = {}) => {
     const key = `${Date.now()}-${Math.random()}`;
     setUploads((xs) => [...xs, { key, files, status: 'checking', recognized: null, results: null, error: null }]);
     const form = new FormData();
     for (const f of files) form.append('files', f, f.name);
     try {
-      set(key, { status: 'checked', recognized: await post('recognize', form) });
+      const recognized = await post('recognize', form);
+      const out = forQuestion ? files.findIndex((f, i) => recognized[i] && recognized[i].recognized === false && forQuestion(f)) : -1;
+      const kept = files.filter((_, i) => i !== out);
+      if (!kept.length) remove(key);
+      else set(key, { status: 'checked', files: kept, recognized: recognized.filter((_, i) => i !== out) });
+      return out >= 0 ? files[out] : null;
     } catch (e) {
       set(key, { status: 'failed', error: e });
+      return null;
     }
   };
   // rests: hash → the branch chosen for a Tabit report
@@ -135,7 +147,6 @@ export function useUploads() {
       set(u.key, { status: 'checked', error: e });
     }
   };
-  const remove = (key) => setUploads((xs) => xs.filter((u) => u.key !== key));
   return { uploads, add, run, remove };
 }
 

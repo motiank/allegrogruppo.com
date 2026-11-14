@@ -364,16 +364,16 @@ export default function ChatArea({ contextId, locationId = null, title, intro, s
   const top = useRef(null);
   const contextKind = 'AREA';
   const { uploads, add: addFiles, run: importFiles, remove: removeUpload } = useUploads();
-  // a file for the QUESTION (a supplier's / customer's statement to compare with the books, owner 2026-11-10): a PDF
-  // anywhere, or an Excel / CSV in the accounting chat, is attached to the next question (POST /ai/ask-file); every
-  // other file goes to the admin's import flow (useUploads: bank files, Tabit reports…)
+  // Every file (dropped or picked with 📎) goes first through the admin's Upload files code (owner 2026-11-14: "the
+  // upload button = the same code as the admin's upload page"): a file the recognizer knows (bank statement, bank
+  // transaction status, Tabit report…) gets an import card. Only a file it does NOT know can be a file for the QUESTION
+  // (a supplier's / customer's statement to compare with the books, owner 2026-11-10): a PDF anywhere, or an Excel / CSV
+  // in the accounting chat, is attached to the next question (POST /ai/ask-file).
   const [attached, setAttached] = useState(null);
   const forQuestion = (f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf' || (contextId === ACCOUNTING_AREA && /\.(xlsx|csv)$/i.test(f.name));
-  const takeFiles = (files) => {
-    const q = files.find(forQuestion);
+  const takeFiles = async (files) => {
+    const q = await addFiles(files, { forQuestion });
     if (q) setAttached(q);
-    const rest = files.filter((f) => f !== q);
-    if (rest.length) addFiles(rest);
   };
   const dragging = useWindowDrop((files) => {
     scrollDown.current = true;

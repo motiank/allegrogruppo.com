@@ -105,7 +105,9 @@ closed branches): sums, averages and the labor cost stand as they are; the AI ma
 missing data, and the data page shows them as a LOW note.
 **Files in the chat** (owner 2026-10-31): a file dropped on a chat area (or picked with 📎) is read by the Allegro
 admin's Upload files code (Allegro `POST /files/recognize`), the card shows what it is, and "Import" writes it to the
-Allegro tables (`POST /files/import`, `client/FileDrop.js`, routes `/joya/files/*`). Joya keeps nothing. Rights: the
+Allegro tables (`POST /files/import`, `client/FileDrop.js`, routes `/joya/files/*`). Joya keeps nothing. Every file goes
+through the recognizer first (owner 2026-11-14: "the upload button = the same code as the admin's upload page"); only a
+file the recognizer does not know can become a question's attachment (statement compare, below). Rights: the
 chain admin = every file; a manager = the Tabit reports of their branches, no bank files; the accountant = only the
 bank files of their companies' accounts. Employee lists and Micpal / Shiklulit files link to the admin page.
 
@@ -464,9 +466,11 @@ area. Eval `x-file-*`.
 **Statement compare — השוואת כרטסת לקוח / ספק (owner 2026-11-10: "not a menu item, not a dialog — part of the chat").**
 In the accounting chat (chain admin; the last suggestion of the area): the user attaches the statement a supplier or
 a customer sent with the chat's paperclip or by dropping it (PDF with text, Excel .xlsx or CSV, up to 15 MB), may add
-words ("מספק" / "מלקוח", the name in our books) and sends. In `ChatArea` a PDF anywhere, or an Excel / CSV in the
-accounting chat, becomes the attachment of the NEXT question (a chip above the field; with no text the default
-question is sent); every other file still goes to the admin's import flow (`FileDrop.js`). `POST /api/joya/ai/ask-file`
+words ("מספק" / "מלקוח", the name in our books) and sends. In `ChatArea` every file is first read by the admin's
+recognizer (`FileDrop.js` `useUploads().add`, the same code as the admin's Upload page); a file it knows (a bank
+statement, the bank transaction status file, a Tabit report…) gets the import card, and a file it does NOT know that is a
+PDF anywhere, or an Excel / CSV in the accounting chat, becomes the attachment of the NEXT question (a chip above the
+field; with no text the default question is sent). `POST /api/joya/ai/ask-file`
 (multipart, multer from the repo root) turns the file into TEXT (`src/services/attachments.js`: Excel → tab-separated
 lines per sheet with exceljs; PDF → `pdftotext -layout` when installed, else `pdf-parse`; a scanned PDF is refused)
 and creates a normal chat request with `meta_json.attachment` { name, kind, chars, cut, text } — the file itself is not
