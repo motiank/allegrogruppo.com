@@ -105,7 +105,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   **RTGS (זה"ב) orders** (2026-11-15, owner: unnamed lines with reference 12268 = Hashavshevet's bundle number of "העברת זה"ב נט"): the status
   file holds them as a type of their own, `העברת זה"ב` → `typeCode` `rtgs` (`EVENT_TYPES` in `parsers.js`; `type=transfer` on `/bank/events`
   includes them); the lookup takes both types and the instrument must agree (`isRtgsLine`: a זה"ב statement line takes only an RTGS
-  order, a plain line only a plain order, a book line either). All 18 זה"ב lines of section 1 named on production (141 from the status file in all). Deployed 2026-11-15 (`34415c4`, `allegro-admin` restarted).
+  order, a plain line only a plain order, a book line either). All 18 זה"ב lines of section 1 named on production (141 from the status file in all). Deployed 2026-11-15 (`34415c4` + `60adfc7`, `allegro-admin` restarted; `34415c4` alone named NO transfer on
+  production — a Hebrew value with a double quote written inline in the SQL broke the server's mysql2 named-placeholder parser
+  (ER_PARSE_ERROR) while the local one coped: always pass such values as parameters, and read the report's notes after a deploy).
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";
