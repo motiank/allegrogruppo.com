@@ -99,9 +99,12 @@ export async function listBankEvents({ accounts = [], from, to, type = null, sta
 async function transferEvents(accounts, from, to) {
   const params = { from: addDays(from, -MATCH_WINDOW_DAYS), to };
   accounts.forEach((a, i) => (params[`a${i}`] = a));
+  // the type names go in as parameters: 'העברת זה"ב' written inline broke the named-placeholder parser of the server's
+  // mysql2 (ER_PARSE_ERROR on production, 2026-11-15) while a newer one coped
+  TRANSFER_EVENT_TYPES.forEach((h, i) => (params[`e${i}`] = h));
   const [rows] = await executeSql(
     `SELECT id, account, event_type, payee_name, payee_raw, payee_account, amount, submitted_at, executed_at, submitted_by, status
-       FROM bank_events WHERE event_type IN (${TRANSFER_EVENT_TYPES.map((h) => `'${h}'`).join(",")}) AND cancelled = 0 AND amount IS NOT NULL
+       FROM bank_events WHERE event_type IN (${TRANSFER_EVENT_TYPES.map((_, i) => `:e${i}`).join(",")}) AND cancelled = 0 AND amount IS NOT NULL
         AND DATE(COALESCE(executed_at, submitted_at)) BETWEEN :from AND :to
         ${accounts.length ? `AND account IN (${accounts.map((_, i) => `:a${i}`).join(",")})` : ""}`,
     params,
