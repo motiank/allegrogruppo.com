@@ -93,7 +93,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `/bank/open` and the reconciliation report name the transfer lines (`payeeSource` `events`) and mark section-2 book lines paid by
   transfer (`kind` transfer + `event`) — the start of "a supplier paid by transfer has no instrument word in the books". Tests
   `node --test scripts/test_bank_events.js` (no DB). Deployed 2026-11-13 (`c77cd4e`: pull, root build, `allegro-admin`, hq build,
-  `joya-hq` + `joya-runner` restarted); the owner uploads the file on the Upload page.
+  `joya-hq` + `joya-runner` restarted); the owner uploads the file on the Upload page. Fix 2026-11-14 (`a278109`, `allegro-admin` restarted): the
+  events read from the DB are Date objects — one formatter `stamp` for Date and string, else no transfer was ever named.
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";
