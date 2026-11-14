@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import ExcelJS from "exceljs";
 import { parseBankEvents, parsePayee, eventTypeCode } from "../admin/server/uploads/parsers.js";
 import { recognizeFile } from "../admin/server/uploads/recognize.js";
-import { matchTransfers, isTransferLine, payeeOfDetails, fileAccountsOf, MATCH_WINDOW_DAYS } from "../admin/server/modules/bankEvents.js";
+import { matchTransfers, isTransferLine, payeeOfDetails, fileAccountsOf, MATCH_WINDOW_DAYS, stamp } from "../admin/server/modules/bankEvents.js";
 
 const d = (s) => new Date(`${s}Z`);
 const sheet = (rows) => {
@@ -146,4 +146,15 @@ test("matchTransfers: amount + day window, same order twice, name tie-break, amb
   matchTransfers(named, [ev(1, 'אחת שתיים שלוש בע"מ', 6707, "2026-06-02")], { date: (r) => r.d, amount: (r) => r.out });
   assert.equal(named[0].payeeSource, "bank_file");
   assert.equal(named[0].event.payeeAccount, "10-800-1");
+});
+
+// The admin's DB pool returns DATETIME as Date objects; the parsers give strings. Both must give the same stamp and day
+// (bug of 2026-11-14: the Date form had no day, so the report named no transfer).
+test("stamp: a Date object and a string give the same 'YYYY-MM-DD HH:MM:SS'", () => {
+  assert.equal(stamp(new Date(2026, 10, 12, 21, 5, 7)), "2026-11-12 21:05:07");
+  assert.equal(stamp("2026-11-12T21:05:07.000Z"), "2026-11-12 21:05:07");
+  assert.equal(stamp("2026-11-12 21:05:07"), "2026-11-12 21:05:07");
+  assert.equal(stamp(null), null);
+  assert.equal(stamp(""), null);
+  assert.equal(stamp(new Date("nonsense")), null);
 });

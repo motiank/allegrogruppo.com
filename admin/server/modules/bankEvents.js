@@ -30,7 +30,17 @@ export const payeeOfDetails = (details) => {
 // two spellings of one payee: one starts with the other (the bank file cuts long names), or the first 10 letters agree
 const sameName = (a, b) => Boolean(a && b) && (a.startsWith(b) || b.startsWith(a) || a.slice(0, 10) === b.slice(0, 10));
 const addDays = (d, n) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
-const day = (v) => (v == null ? null : String(v).slice(0, 10));
+// The admin's pool returns DATETIME columns as JS Date objects (no dateStrings), the parsers give strings: one
+// formatter for both, in local time (mysql2 parses the stored wall-clock time with the server's own zone, so the local
+// getters give the stored value back). Bug found 2026-11-14: String(Date).slice(0, 19) gave " hu Nov 12 2026 21:" and
+// no event had a day, so the report named no transfer at all.
+const pad = (n) => String(n).padStart(2, "0");
+export const stamp = (v) => {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())} ${pad(v.getHours())}:${pad(v.getMinutes())}:${pad(v.getSeconds())}`;
+  return String(v).slice(0, 19).replace("T", " ");
+};
+const day = (v) => (v == null ? null : stamp(v)?.slice(0, 10) ?? null);
 const num = (v) => (v == null || v === "" ? null : Number(v));
 export const MATCH_WINDOW_DAYS = 4;
 
@@ -44,8 +54,8 @@ export function fileAccountsOf({ allegroKey = null, financeCode = null } = {}) {
 const eventOut = (r) => ({
   id: r.id, bank: r.bank, account: r.account, type: r.event_type, typeCode: eventTypeCode(r.event_type),
   payee: r.payee_name, payeeRaw: r.payee_raw, payeeAccount: r.payee_account, payeeCode: r.payee_code,
-  amount: num(r.amount), currency: r.currency, submittedAt: r.submitted_at ? String(r.submitted_at).slice(0, 19).replace("T", " ") : null,
-  executedAt: r.executed_at ? String(r.executed_at).slice(0, 19).replace("T", " ") : null, submittedBy: r.submitted_by,
+  amount: num(r.amount), currency: r.currency, submittedAt: stamp(r.submitted_at),
+  executedAt: stamp(r.executed_at), submittedBy: r.submitted_by,
   status: r.status, cancelled: Boolean(Number(r.cancelled)), loadedAt: r.created_at,
 });
 
@@ -91,7 +101,7 @@ async function transferEvents(accounts, from, to) {
         ${accounts.length ? `AND account IN (${accounts.map((_, i) => `:a${i}`).join(",")})` : ""}`,
     params,
   );
-  return rows.map((r) => ({ id: r.id, account: r.account, payee: r.payee_name, payeeRaw: r.payee_raw, payeeAccount: r.payee_account, amount: Number(r.amount), day: day(r.executed_at || r.submitted_at), submittedAt: String(r.submitted_at || "").slice(0, 19).replace("T", " "), executedAt: String(r.executed_at || "").slice(0, 19).replace("T", " "), submittedBy: r.submitted_by, status: r.status }));
+  return rows.map((r) => ({ id: r.id, account: r.account, payee: r.payee_name, payeeRaw: r.payee_raw, payeeAccount: r.payee_account, amount: Number(r.amount), day: day(r.executed_at || r.submitted_at), submittedAt: stamp(r.submitted_at), executedAt: stamp(r.executed_at), submittedBy: r.submitted_by, status: r.status }));
 }
 
 /**
