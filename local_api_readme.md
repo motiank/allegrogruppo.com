@@ -870,7 +870,7 @@ The bank transactions uploaded on the admin **Upload files** page (`bank_transac
 
 The bank's **transaction status** file (Bank Hapoalim "סטטוס עסקאות", `.xlsx`, uploaded on the admin Upload files page → `bank_events`,
 2026-11-13): the orders given on the bank site, not the statement. `from` / `to` = the execution day (`executedAt`; the submission
-day when there is none). `type`: `transfer` (העברה: `payee` = the beneficiary's name, `payeeAccount` = its bank-branch-account),
+day when there is none). `type`: `transfer` (העברה and העברת זה"ב: `payee` = the beneficiary's name, `payeeAccount` = its bank-branch-account), `rtgs` (העברת זה"ב only — RTGS, the statement's "העברת זה"ב נט"; a transfer line takes only an order of its own instrument), `standing_order` (פתיחת הו"ק),
 `authorization` (הקמת הרשאה: a standing-order authorization, `payeeCode` = the institution code, often no amount), `cheque_cancel`
 (ביטול שיק: no payee), `government` (תש. ממשלה). `status`: `active` (not cancelled), `cancelled` (סטאטוס בוטלה: the order never reached
 the statement), `all`. `q` = text in the payee or the submitter. Fields: `company`, `bank`, `account`, `type` (Hebrew), `typeCode`,

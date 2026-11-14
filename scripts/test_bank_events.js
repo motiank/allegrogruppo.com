@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import ExcelJS from "exceljs";
 import { parseBankEvents, parsePayee, eventTypeCode } from "../admin/server/uploads/parsers.js";
 import { recognizeFile } from "../admin/server/uploads/recognize.js";
-import { matchTransfers, isTransferLine, payeeOfDetails, fileAccountsOf, MATCH_WINDOW_DAYS, stamp } from "../admin/server/modules/bankEvents.js";
+import { matchTransfers, isTransferLine, isRtgsLine, payeeOfDetails, fileAccountsOf, MATCH_WINDOW_DAYS, stamp } from "../admin/server/modules/bankEvents.js";
 import { partyOfDetails, matchBankFileNames } from "../admin/server/modules/bankFileNames.js";
 
 const d = (s) => new Date(`${s}Z`);
@@ -197,4 +197,22 @@ test("matchBankFileNames: account day + reference + signed amount; money in = fr
   assert.deepEqual([rows[3].payee, rows[3].payeeRole, rows[3].payeePurpose], ["פרימיום איטליה ב", "from", "מבנק 020,סניף 410 ,חשבון 000073349"]);
   assert.equal(rows[4].payee, undefined);
   assert.equal(rows[5].payee, undefined);
+});
+
+// RTGS (זה"ב) orders are a type of their own in the status file ("העברת זה"ב"); the statement line "העברת זה"ב נט" takes only
+// such an order, a plain transfer line only a plain order, a book line (no instrument word) either (2026-11-15).
+test("matchTransfers: the instrument (RTGS / plain) of the line and the order must agree", () => {
+  const events = [
+    ev(1, "נופר ברסקי", 5000, "2026-08-09"), // a plain transfer, 3 days before
+    ev(2, "JOYA ORYAM", 5000, "2026-08-12", { rtgs: true, type: 'העברת זה"ב' }), // the RTGS order of that day
+  ];
+  const line = (details, d = "2026-08-12") => ({ date: d, amount: -5000, details });
+  const a = [line('העברת זה"ב נט'), line("העברה לאחר")];
+  const st = matchTransfers(a, events, { date: (r) => r.date, amount: (r) => -r.amount, rtgs: (r) => isRtgsLine(r.details) });
+  assert.deepEqual(st, { lines: 2, found: 2, ambiguous: 0, none: 0 });
+  assert.deepEqual([a[0].payee, a[0].event.type, a[1].payee], ["JOYA ORYAM", 'העברת זה"ב', "נופר ברסקי"]);
+  // a book line does not know its instrument: both orders are candidates → ambiguous
+  const b = [{ date: "2026-08-12", amount: -5000 }];
+  assert.deepEqual(matchTransfers(b, events, { date: (r) => r.date, amount: (r) => -r.amount }), { lines: 1, found: 0, ambiguous: 1, none: 0 });
+  assert.deepEqual([isRtgsLine('העברת זה"ב נט'), isRtgsLine("העברה מהבנק"), isRtgsLine(null)], [true, false, null]);
 });

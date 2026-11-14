@@ -189,7 +189,7 @@ export const recognizeFile = async (file, ctx, { allowed = null, isAdmin = false
   if (anyCell(top.slice(0, 5), (c) => c === "סטטוס עסקאות") && findHeaderRow(ws, ["סוג עסקה", "שם המוטב"], 12)) {
     const parsed = parseBankEvents(ws);
     const n = parsed.counts || {};
-    const parts = [n.transfer && `${n.transfer} transfers${parsed.cancelled ? ` (${parsed.cancelled} cancelled)` : ""}`, n.authorization && `${n.authorization} standing-order authorizations`, n.cheque_cancel && `${n.cheque_cancel} cheque cancellations`, n.government && `${n.government} government payments`, n.other && `${n.other} other`].filter(Boolean);
+    const parts = [n.transfer && `${n.transfer} transfers${parsed.cancelled ? ` (${parsed.cancelled} cancelled)` : ""}`, n.rtgs && `${n.rtgs} RTGS (זה"ב) transfers`, n.authorization && `${n.authorization} standing-order authorizations`, n.standing_order && `${n.standing_order} standing orders`, n.cheque_cancel && `${n.cheque_cancel} cheque cancellations`, n.government && `${n.government} government payments`, n.other && `${n.other} other`].filter(Boolean);
     const out = result(base, "BANK_EVENTS", {
       account: parsed.account || null,
       period: parsed.from ? { from: parsed.from, to: parsed.to } : null,

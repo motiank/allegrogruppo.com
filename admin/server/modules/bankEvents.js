@@ -11,7 +11,7 @@
 import { createRequire } from "module";
 import { executeSql } from "../sources/dbpool.js";
 import { normName } from "../../../shared/bankReconFilter.js";
-import { eventTypeCode } from "../uploads/parsers.js";
+import { eventTypeCode, EVENT_TYPES, TRANSFER_EVENT_TYPES } from "../uploads/parsers.js";
 
 const require = createRequire(import.meta.url);
 const RESTAURANTS = require("../../../shared/restaurants.json");
@@ -20,6 +20,9 @@ const FINANCE_MAP = require("../../../shared/finance_map.json");
 export const PAYEE_SOURCE_EVENTS = "events";
 // the bank's own text of a transfer we made (Hapoalim's `action`, Hashavshevet's `details`)
 const TRANSFER_RE = /העבר|^העב'|זה"ב/;
+const RTGS_RE = /זה"ב/; // the statement's "העברת זה"ב נט" — an RTGS transfer, a type of its own in the status file (העברת זה"ב)
+/** true = the line is an RTGS (זה"ב) transfer, false = a plain transfer, null = unknown (a book line) */
+export const isRtgsLine = (text) => (text == null ? null : RTGS_RE.test(String(text)));
 export const isTransferLine = (text, actionCode) => String(actionCode ?? "") === "485" || TRANSFER_RE.test(String(text || "").trim());
 /** The payee's name in a bank file line: the text after "לטובת:" (up to "עבור:"). */
 export const payeeOfDetails = (details) => {
@@ -72,9 +75,11 @@ export async function listBankEvents({ accounts = [], from, to, type = null, sta
     where += ` AND account IN (${accounts.map((_, i) => `:a${i}`).join(",")})`;
   }
   if (type) {
-    const heb = Object.entries({ "העברה": "transfer", "הקמת הרשאה": "authorization", "ביטול שיק": "cheque_cancel", "תש. ממשלה": "government" }).find(([h, c]) => c === type || h === type)?.[0];
-    params.type = heb || type;
-    where += ` AND event_type = :type`;
+    // a type code (transfer = העברה and העברת זה"ב, rtgs, authorization, standing_order, cheque_cancel, government) or the Hebrew type
+    const hebs = Object.entries(EVENT_TYPES).filter(([h, c]) => c === type || h === type || (type === "transfer" && c === "rtgs")).map(([h]) => h);
+    if (!hebs.length) hebs.push(type);
+    hebs.forEach((h, i) => (params[`t${i}`] = h));
+    where += ` AND event_type IN (${hebs.map((_, i) => `:t${i}`).join(",")})`;
   }
   if (status === "active") where += ` AND cancelled = 0`;
   else if (status === "cancelled") where += ` AND cancelled = 1`;
@@ -95,13 +100,13 @@ async function transferEvents(accounts, from, to) {
   const params = { from: addDays(from, -MATCH_WINDOW_DAYS), to };
   accounts.forEach((a, i) => (params[`a${i}`] = a));
   const [rows] = await executeSql(
-    `SELECT id, account, payee_name, payee_raw, payee_account, amount, submitted_at, executed_at, submitted_by, status
-       FROM bank_events WHERE event_type = 'העברה' AND cancelled = 0 AND amount IS NOT NULL
+    `SELECT id, account, event_type, payee_name, payee_raw, payee_account, amount, submitted_at, executed_at, submitted_by, status
+       FROM bank_events WHERE event_type IN (${TRANSFER_EVENT_TYPES.map((h) => `'${h}'`).join(",")}) AND cancelled = 0 AND amount IS NOT NULL
         AND DATE(COALESCE(executed_at, submitted_at)) BETWEEN :from AND :to
         ${accounts.length ? `AND account IN (${accounts.map((_, i) => `:a${i}`).join(",")})` : ""}`,
     params,
   );
-  return rows.map((r) => ({ id: r.id, account: r.account, payee: r.payee_name, payeeRaw: r.payee_raw, payeeAccount: r.payee_account, amount: Number(r.amount), day: day(r.executed_at || r.submitted_at), submittedAt: stamp(r.submitted_at), executedAt: stamp(r.executed_at), submittedBy: r.submitted_by, status: r.status }));
+  return rows.map((r) => ({ id: r.id, account: r.account, type: r.event_type, rtgs: eventTypeCode(r.event_type) === "rtgs", payee: r.payee_name, payeeRaw: r.payee_raw, payeeAccount: r.payee_account, amount: Number(r.amount), day: day(r.executed_at || r.submitted_at), submittedAt: stamp(r.submitted_at), executedAt: stamp(r.executed_at), submittedBy: r.submitted_by, status: r.status }));
 }
 
 /**
@@ -112,7 +117,7 @@ async function transferEvents(accounts, from, to) {
  * sets r.event = { id, payee, payeeAccount, submittedAt, executedAt, submittedBy, status } (and r.payee /
  * r.payeeSource "events" when the row had no payee).
  */
-export function matchTransfers(rows, events, { date, amount, name = () => null, account = () => null } = {}) {
+export function matchTransfers(rows, events, { date, amount, name = () => null, account = () => null, rtgs = () => null } = {}) {
   const stats = { lines: 0, found: 0, ambiguous: 0, none: 0 };
   const used = new Set();
   const byAmount = new Map();
@@ -127,7 +132,10 @@ export function matchTransfers(rows, events, { date, amount, name = () => null, 
     if (!(amt > 0) || !d) continue;
     stats.lines++;
     const acc = account(r);
-    let cands = (byAmount.get(Math.round(amt * 100)) || []).filter((e) => !used.has(e.id) && e.day && e.day <= d && e.day >= addDays(d, -MATCH_WINDOW_DAYS) && (!acc || !e.account || e.account === acc));
+    // the instrument must agree: a statement line "העברת זה"ב נט" takes only an RTGS order (type העברת זה"ב), a plain transfer line
+    // only a plain order (2026-11-15: a זה"ב line of 5,000 took a plain 5,000 order of 3 days before); a book line (null) takes either
+    const want = rtgs(r);
+    let cands = (byAmount.get(Math.round(amt * 100)) || []).filter((e) => !used.has(e.id) && e.day && e.day <= d && e.day >= addDays(d, -MATCH_WINDOW_DAYS) && (!acc || !e.account || e.account === acc) && (want == null || Boolean(e.rtgs) === want));
     // a line that carries a name (the bank file's "לטובת: …") takes only an order with that name: two payees paid the
     // same amount on the same day are told apart, and never swapped
     const n = normName(name(r));
@@ -137,7 +145,7 @@ export function matchTransfers(rows, events, { date, amount, name = () => null, 
     if (cands.length === 1) {
       const e = cands[0];
       used.add(e.id);
-      r.event = { id: e.id, payee: e.payee, payeeAccount: e.payeeAccount, submittedAt: e.submittedAt, executedAt: e.executedAt, submittedBy: e.submittedBy, status: e.status };
+      r.event = { id: e.id, type: e.type, payee: e.payee, payeeAccount: e.payeeAccount, submittedAt: e.submittedAt, executedAt: e.executedAt, submittedBy: e.submittedBy, status: e.status };
       if (!r.payee) {
         r.payee = e.payee;
         r.payeeSource = PAYEE_SOURCE_EVENTS;
@@ -163,7 +171,7 @@ export async function addTransferEvents(rows, { accounts = [], date, amount, nam
   const days = list.map(date).sort();
   try {
     const events = await transferEvents(accs, days[0], days[days.length - 1]);
-    return matchTransfers(list, events, { date, amount, name, account });
+    return matchTransfers(list, events, { date, amount, name, account, rtgs: transfer ? () => null : (r) => isRtgsLine(text(r)) });
   } catch (err) {
     return { lines: list.length, found: 0, ambiguous: 0, none: 0, error: `events not looked up: ${err.code || err.message}` };
   }

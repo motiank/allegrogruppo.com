@@ -184,7 +184,10 @@ export const peekTabitRoster = (ws) => {
 // r5 header "סוג עסקה | שם המוטב | סכום | מטבע | מועד הזרמה | תאריך ביצוע | מזרים העסקה | סטאטוס".
 // שם המוטב = "name bank-branch-account" for a transfer, "name - code" for a standing-order authorization, empty for
 // a cheque cancellation. Dates are date-time cells (local time). The export holds the last 1,000 events at most.
-export const EVENT_TYPES = { "העברה": "transfer", "הקמת הרשאה": "authorization", "ביטול שיק": "cheque_cancel", "תש. ממשלה": "government" };
+// rtgs = העברת זה"ב (RTGS: a same-day transfer through the Bank of Israel; the statement says "העברת זה"ב נט") — a transfer too
+// (2026-11-15: 71 of them in the owner's files were ignored); standing_order = פתיחת הו"ק
+export const EVENT_TYPES = { "העברה": "transfer", "העברת זה\"ב": "rtgs", "הקמת הרשאה": "authorization", "פתיחת הו\"ק": "standing_order", "ביטול שיק": "cheque_cancel", "תש. ממשלה": "government" };
+export const TRANSFER_EVENT_TYPES = Object.entries(EVENT_TYPES).filter(([, c]) => c === "transfer" || c === "rtgs").map(([h]) => h);
 export const eventTypeCode = (t) => EVENT_TYPES[norm(t)] || "other";
 export const CANCELLED_RE = /בוטל|נדחת|לא בוצע|נכשל/;
 

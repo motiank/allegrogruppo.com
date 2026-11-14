@@ -102,6 +102,10 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   and the Local Data API stored rows. Named 112 more section-1 lines on production, 103 of them money in. Tests in `test_bank_events.js`. Deployed 2026-11-15 (`7b7fdd0` + `935ddf3`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`;
   `joya-hq` was down ~1 minute on `7b7fdd0` — an unescaped apostrophe in a single-quoted note string: run `node --check` on changed
   hq server files before a commit, the hq build checks only the client).
+  **RTGS (זה"ב) orders** (2026-11-15, owner: unnamed lines with reference 12268 = Hashavshevet's bundle number of "העברת זה"ב נט"): the status
+  file holds them as a type of their own, `העברת זה"ב` → `typeCode` `rtgs` (`EVENT_TYPES` in `parsers.js`; `type=transfer` on `/bank/events`
+  includes them); the lookup takes both types and the instrument must agree (`isRtgsLine`: a זה"ב statement line takes only an RTGS
+  order, a plain line only a plain order, a book line either). All 18 זה"ב lines of section 1 named on production (141 from the status file in all).
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";
