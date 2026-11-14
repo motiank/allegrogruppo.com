@@ -95,6 +95,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   `node --test scripts/test_bank_events.js` (no DB). Deployed 2026-11-13 (`c77cd4e`: pull, root build, `allegro-admin`, hq build,
   `joya-hq` + `joya-runner` restarted); the owner uploads the file on the Upload page. Fix 2026-11-14 (`a278109`, `allegro-admin` restarted): the
   events read from the DB are Date objects — one formatter `stamp` for Date and string, else no transfer was ever named.
+  **Money in named by the uploaded bank file** (2026-11-15, owner: the 50,000 FROM אן-קור of 10/4/26, reference 452606556, looked
+  like the 50,000 TO אן-קור of the same day): `admin/server/modules/bankFileNames.js` — a bank line still without a name gets the
+  other side from `bank_transactions` (same account, day, reference, signed amount): "המבצע: <name>" = `payeeRole` `from` (shown
+  "מאת: …"), "לטובת: <name>" = `to`, `payeeSource` `bank_file`, `payeePurpose`; in the report, `/finance/bank/open` (`meta.bankFile`)
+  and the Local Data API stored rows. Named 112 more section-1 lines on production, 103 of them money in. Tests in `test_bank_events.js`.
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";

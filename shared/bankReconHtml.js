@@ -176,7 +176,8 @@ const olderClass = (row, from) => (row.date && from && String(row.date) < String
 // the beneficiary of a cheque line (payee from Hashavshevet; "priority" = named by the Priority cheque file, the
 // history before Hashavshevet; "missing" = the cheque is not in Hashavshevet yet)
 export const PAYEE_MISSING = "לא נמצא בחשבשבת";
-export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payeeSource === "priority" && x.payee ? `${x.payee} (פריוריטי)` : x.payee || "");
+// payeeRole "from" (the bank file's "המבצע: …", money that came in) is shown as "מאת: <name>", so a receipt is never read as a payment
+export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payeeSource === "priority" && x.payee ? `${x.payee} (פריוריטי)` : x.payeeRole === "from" && x.payee ? `מאת: ${x.payee}` : x.payee || "");
 
 function bankOpenTable(r) {
   const rows = r.bankOpen || [];

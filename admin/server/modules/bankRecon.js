@@ -24,6 +24,7 @@ import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, paye
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
 import { addChequePayees } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
+import { addBankFileNames } from "./bankFileNames.js";
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
@@ -262,6 +263,9 @@ export async function buildBankReconReport(query = {}) {
   // the payee's bank account, who gave the order and when); Hashavshevet's bank lines carry no name for a transfer
   const fileAccounts = fileAccountsOf({ financeCode: company.code });
   const eventStats = await addTransferEvents(bankOpen, { accounts: fileAccounts, date: (r) => r.date, amount: (r) => (r.amount < 0 ? -r.amount : null) });
+  // the lines still without a name — money that came IN above all — get the other side from the bank file uploaded in the
+  // admin (bank_transactions: "המבצע: <name>" = from, "לטובת: <name>" = to; payeeSource bank_file, payeeRole from | to)
+  const fileNameStats = await addBankFileNames(bankOpen, { accounts: fileAccounts, date: (r) => r.date, reference: (r) => r.reference, amount: (r) => r.amount });
 
   const bookFutureMatched = futureMatchedRows.map((r) => ({
     lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, date: r.d, reference: r.reference, type: r.trans_type, description: r.description || r.details,
@@ -319,6 +323,9 @@ export async function buildBankReconReport(query = {}) {
   if (eventStats.found || bookEventStats.found)
     notes.push(`${eventStats.found + bookEventStats.found} העברות זוהו בקובץ סטטוס העסקאות של הבנק (שם המוטב, חשבון היעד, מי הזרים ומתי): ${eventStats.found} בסעיף 1 ו-${bookEventStats.found} בסעיף 2${eventStats.ambiguous + bookEventStats.ambiguous ? `; ${eventStats.ambiguous + bookEventStats.ambiguous} לא זוהו בוודאות (כמה הוראות באותו סכום ובאותם ימים)` : ""}.`);
   if (eventStats.error) notes.push(`קובץ סטטוס העסקאות של הבנק לא נקרא הפעם (${eventStats.error}).`);
+  if (fileNameStats.found)
+    notes.push(`${fileNameStats.found} תנועות בסעיף 1 קיבלו שם מקובץ הבנק שהועלה באדמין${fileNameStats.from ? ` – ${fileNameStats.from} מהן כספים שנכנסו לחשבון ("מאת: …" = מי שהעביר אלינו)` : ""}.`);
+  if (fileNameStats.error) notes.push(`קובץ הבנק שהועלה באדמין לא נקרא הפעם (${fileNameStats.error}).`);
   if (cancelledCount) notes.push(`${cancelledCount} צ'קים מבוטלים (יש להם רישום הפוך) אינם מופיעים בסעיף 3.`);
   if (summary.chequesCleared.groupOnly) notes.push(`${summary.chequesCleared.groupOnly} צ'קים הותאמו בחשבשבת בתוך קבוצת התאמה גדולה ולא נמצאה שורת בנק עם אותו מספר צ'ק ואותו סכום; מוצג תאריך ההתאמה או שורת הבנק היחידה בקבוצה.`);
   if (clearedUnmatched.length) notes.push(`${clearedUnmatched.length} צ'קים כבר נפרעו בבנק (לפי מספר הצ'ק והסכום) אבל עדיין לא הותאמו בחשבשבת; הם נספרים כצ'קים פתוחים עד להתאמה.`);

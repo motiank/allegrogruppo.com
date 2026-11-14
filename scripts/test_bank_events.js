@@ -7,6 +7,7 @@ import ExcelJS from "exceljs";
 import { parseBankEvents, parsePayee, eventTypeCode } from "../admin/server/uploads/parsers.js";
 import { recognizeFile } from "../admin/server/uploads/recognize.js";
 import { matchTransfers, isTransferLine, payeeOfDetails, fileAccountsOf, MATCH_WINDOW_DAYS, stamp } from "../admin/server/modules/bankEvents.js";
+import { partyOfDetails, matchBankFileNames } from "../admin/server/modules/bankFileNames.js";
 
 const d = (s) => new Date(`${s}Z`);
 const sheet = (rows) => {
@@ -157,4 +158,43 @@ test("stamp: a Date object and a string give the same 'YYYY-MM-DD HH:MM:SS'", ()
   assert.equal(stamp(null), null);
   assert.equal(stamp(""), null);
   assert.equal(stamp(new Date("nonsense")), null);
+});
+
+// The uploaded bank file names both sides of a transfer (admin/server/modules/bankFileNames.js): "לטובת:" = paid to,
+// "המבצע:" = received from (owner 2026-11-14: the 50,000 FROM אן-קור looked like the 50,000 TO אן-קור of the same day).
+test("partyOfDetails: payee, payer with bank account, purpose, nobody", () => {
+  assert.deepEqual(partyOfDetails('לטובת: אן-קור שירותי תוכנה בע"'), { name: 'אן-קור שירותי תוכנה בע"', role: "to", purpose: null });
+  assert.deepEqual(partyOfDetails('המבצע: אן-קור שירותי תוכנה בע" 12-584-55663'), { name: 'אן-קור שירותי תוכנה בע"', role: "from", purpose: null });
+  assert.deepEqual(partyOfDetails('המבצע: אן-קור שירותי תוכנה בע" עבור: הלוואה 12-584-55663'), { name: 'אן-קור שירותי תוכנה בע"', role: "from", purpose: "הלוואה 12-584-55663" });
+  assert.deepEqual(partyOfDetails("המבצע: פרימיום איטליה ב עבור: מבנק 020,סניף 410 ,חשבון 000073349"), { name: "פרימיום איטליה ב", role: "from", purpose: "מבנק 020,סניף 410 ,חשבון 000073349" });
+  assert.deepEqual(partyOfDetails("לטובת: מיט2איט עבור: חשבונית 77"), { name: "מיט2איט", role: "to", purpose: "חשבונית 77" });
+  assert.equal(partyOfDetails("סיבת החזרה: נ.ה.ב"), null);
+  assert.equal(partyOfDetails(null), null);
+  assert.equal(partyOfDetails("המבצע:"), null);
+});
+
+test("matchBankFileNames: account day + reference + signed amount; money in = from; a row with a name is kept; duplicates", () => {
+  const file = [
+    { id: 1, date: "2026-04-10", reference: "452609196", signedAmount: -50000, details: 'לטובת: אן-קור שירותי תוכנה בע"' },
+    { id: 2, date: "2026-04-10", reference: "452606556", signedAmount: 50000, details: 'המבצע: אן-קור שירותי תוכנה בע" 12-584-55663' },
+    { id: 3, date: "2026-04-10", reference: "452606556", signedAmount: 50000, details: 'המבצע: אן-קור שירותי תוכנה בע" 12-584-55663' }, // the same row from a second upload
+    { id: 4, date: "2026-04-10", reference: "452609196", signedAmount: -2.55, details: null }, // the fee: names nobody
+    { id: 5, date: "2026-05-07", reference: "99020330", signedAmount: 20000, details: "המבצע: פרימיום איטליה ב עבור: מבנק 020,סניף 410 ,חשבון 000073349" },
+  ];
+  const rows = [
+    { date: "2026-04-10", reference: 452606556, amount: 50000, details: "העברה" }, // Hashavshevet: a number, money in
+    { date: "2026-04-10", reference: 452609196, amount: -50000, details: "העברה לאחר", payee: "כבר יש שם", payeeSource: "events" },
+    { date: "2026-04-10", reference: 452609196, amount: -2.55, details: "עמ העברה/הפקדה" },
+    { date: "2026-05-07", reference: 99020330, amount: 20000, details: "העברה/הפקדה" },
+    { date: "2026-05-07", reference: 99020330, amount: 20001, details: "העברה/הפקדה" }, // another amount: no
+    { date: "2026-05-08", reference: 99020330, amount: 20000, details: "העברה/הפקדה" }, // another day: no
+  ];
+  const st = matchBankFileNames(rows, file, { date: (r) => r.date, reference: (r) => r.reference, amount: (r) => r.amount });
+  assert.deepEqual(st, { lines: 5, found: 2, from: 2 });
+  assert.deepEqual([rows[0].payee, rows[0].payeeSource, rows[0].payeeRole, rows[0].payeePurpose], ['אן-קור שירותי תוכנה בע"', "bank_file", "from", undefined]);
+  assert.deepEqual([rows[1].payee, rows[1].payeeSource], ["כבר יש שם", "events"]);
+  assert.equal(rows[2].payee, undefined);
+  assert.deepEqual([rows[3].payee, rows[3].payeeRole, rows[3].payeePurpose], ["פרימיום איטליה ב", "from", "מבנק 020,סניף 410 ,חשבון 000073349"]);
+  assert.equal(rows[4].payee, undefined);
+  assert.equal(rows[5].payee, undefined);
 });

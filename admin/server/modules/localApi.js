@@ -2,7 +2,8 @@ import express from "express";
 import { createRequire } from "module";
 import { executeSql } from "../sources/dbpool.js";
 import { addChequePayees } from "./chequePayees.js";
-import { addTransferEvents, listBankEvents, isTransferLine, payeeOfDetails } from "./bankEvents.js";
+import { addTransferEvents, listBankEvents, isTransferLine } from "./bankEvents.js";
+import { partyOfDetails, PAYEE_SOURCE_BANK_FILE } from "./bankFileNames.js";
 import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
 import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
@@ -1886,7 +1887,9 @@ const Router = () => {
     const payees = await addChequePayees(data, { company: (r) => r.company, text: (r) => r.action, reference: (r) => r.reference, amount: (r) => r.debit ?? r.credit });
     // a transfer row (קוד פעולה 485, "לטובת: <name>" in the details) gets `event` from the bank's transaction status file
     // (bank_events: the payee's bank account, who submitted it and when); payee / payeeSource "events" when it had no name
-    for (const r of data) if (!r.payee && isTransferLine(r.action, r.actionCode) && r.debit != null) { const p = payeeOfDetails(r.details); if (p) { r.payee = p; r.payeeSource = "bank_file"; } }
+    // a row whose details name the other side gets payee from them: "לטובת: <name>" (money out, payeeRole "to") or
+    // "המבצע: <name>" (money in, payeeRole "from"), + payeePurpose from "עבור: …" (payeeSource bank_file)
+    for (const r of data) if (!r.payee) { const p = partyOfDetails(r.details); if (p) { r.payee = p.name; r.payeeSource = PAYEE_SOURCE_BANK_FILE; r.payeeRole = p.role; if (p.purpose) r.payeePurpose = p.purpose; } }
     const events = await addTransferEvents(data, { accounts: (r) => r.account, date: (r) => r.date, amount: (r) => r.debit, name: (r) => r.payee, account: (r) => r.account, text: (r) => r.action, actionCode: (r) => r.actionCode });
     return { data, meta: { ...meta, payees, events } };
   });

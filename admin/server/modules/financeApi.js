@@ -7,6 +7,7 @@ import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts, bank
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees, isChequeLine } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
+import { addBankFileNames } from "./bankFileNames.js";
 import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
 import { mergeCheques } from "./chequesAll.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
@@ -1408,7 +1409,10 @@ route("/bank/open", async (req, ctx) => {
   // transfer lines get it from the bank's transaction status file (bank_events; payeeSource events, + event)
   const payees = side === "bank" ? await addChequePayees(data, { company: ctx.companyId, bankAccounts: ctx.bankAccounts }) : undefined;
   const events = side === "bank" ? await addTransferEvents(data, { accounts: fileAccountsOf({ financeCode: ctx.code }), date: (r) => r.date, amount: (r) => (r.signedAmount < 0 ? -r.signedAmount : null) }) : undefined;
-  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}), ...(events ? { events } : {}) }, codes: ["bank_gap"] };
+  // the lines still without a name (money in above all) get the other side from the bank file uploaded in the admin
+  // (bank_transactions; payeeSource bank_file, payeeRole from | to, payeePurpose)
+  const bankFile = side === "bank" ? await addBankFileNames(data, { accounts: fileAccountsOf({ financeCode: ctx.code }), date: (r) => r.date, reference: (r) => r.reference, amount: (r) => r.signedAmount }) : undefined;
+  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}), ...(events ? { events } : {}), ...(bankFile ? { bankFile } : {}) }, codes: ["bank_gap"] };
 });
 
 // ── bank balance per day (readme → /bank/balances) ───────────────────────
