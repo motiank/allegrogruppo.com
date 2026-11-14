@@ -144,7 +144,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   other companies' books (hash-sync), the accountant's check of the numbers (`not_validated`).
 - **Statement compare** (2026-11-10, owner: "part of the chat", no menu item, no dialog): in the accounting chat (suggestion
   s18) the party's כרטסת (PDF / xlsx / csv) is attached with the paperclip (since 2026-11-14 only after the admin's recognizer
-  said it is not one of the upload files — `FileDrop.js` `add({ forQuestion })`) → `POST /joya/ai/ask-file` → text in `meta_json.attachment` (`src/services/attachments.js`; PDF via `pdftotext` when
+  said it is not one of the upload files — `FileDrop.js` `add({ forQuestion })`; deployed 2026-11-14, `b5ec42c`, hq build + `joya-hq` + `joya-runner`) → `POST /joya/ai/ask-file` → text in `meta_json.attachment` (`src/services/attachments.js`; PDF via `pdftotext` when
   installed, else `pdf-parse` — root dependency, Node 18 build) → the planner extracts the rows (PLAN "STATEMENT COMPARE")
   → calc `statement_compare` (`/ledger` + `shared/statementCompare.js`) → only the differences (WRITE "Statement compare").
   `ChatArea`: a PDF anywhere / an Excel in the accounting chat = the next question's attachment (chip), other files = the import flow. Tests `scripts/test_statement_compare.js`; eval `st-*`.
