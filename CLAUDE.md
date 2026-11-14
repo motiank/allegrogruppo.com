@@ -99,7 +99,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   like the 50,000 TO אן-קור of the same day): `admin/server/modules/bankFileNames.js` — a bank line still without a name gets the
   other side from `bank_transactions` (same account, day, reference, signed amount): "המבצע: <name>" = `payeeRole` `from` (shown
   "מאת: …"), "לטובת: <name>" = `to`, `payeeSource` `bank_file`, `payeePurpose`; in the report, `/finance/bank/open` (`meta.bankFile`)
-  and the Local Data API stored rows. Named 112 more section-1 lines on production, 103 of them money in. Tests in `test_bank_events.js`.
+  and the Local Data API stored rows. Named 112 more section-1 lines on production, 103 of them money in. Tests in `test_bank_events.js`. Deployed 2026-11-15 (`7b7fdd0` + `935ddf3`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`;
+  `joya-hq` was down ~1 minute on `7b7fdd0` — an unescaped apostrophe in a single-quoted note string: run `node --check` on changed
+  hq server files before a commit, the hq build checks only the client).
 - **Order system shut down permanently** (owner's order, 2026-11-02; reopen only when the owner says so):
   `PERMANENT_SHUTDOWN = true` in `order_sys/server/orderState.js` fixes the state to shutdown (a restart, the
   11:00–15:00 schedule and the admin cannot reopen it); the site stays online with "closed until further notice";
