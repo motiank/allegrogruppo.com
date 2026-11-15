@@ -15,7 +15,9 @@
     "password": "ran24",
     "authKey": "7908651cbdab90cdbb74ef7cbdfccad2",
     "role": "restMngr",
-    "restaurants": ["5ff419934676f0fddabaef3a"],
+    "restaurants": [
+      "5ff419934676f0fddabaef3a"
+    ],
     "status": "active"
   },
   {
@@ -25,7 +27,9 @@
     "password": "moremix",
     "authKey": "f7e48cc46d691c91da5076b43386c14e",
     "role": "restMngr",
-    "restaurants": ["*"],
+    "restaurants": [
+      "*"
+    ],
     "status": "active"
   },
   {
@@ -35,7 +39,27 @@
     "password": "mtnrch",
     "authKey": "f0208f21d7045708a46626940ff4ee7d",
     "role": "restMngr",
-    "restaurants": ["6012624f0d491ef6429e127c"],
+    "restaurants": [
+      "6012624f0d491ef6429e127c"
+    ],
+    "status": "active"
+  },
+  {
+    "user_id": 5,
+    "id": 5,
+    "email": "inbal",
+    "password": "in2279",
+    "authKey": "5b9dff9679eac28fae41491d6e7be9d9",
+    "role": "admin",
+    "status": "active"
+  },
+  {
+    "user_id": 6,
+    "id": 6,
+    "email": "itzik",
+    "password": "it9242",
+    "authKey": "325f77287e5941394c217913d966acc6",
+    "role": "admin",
     "status": "active"
   }
 ]
