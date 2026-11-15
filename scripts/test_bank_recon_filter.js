@@ -167,3 +167,69 @@ test("the HTML of a filtered report shows the filter, the kinds and 'מתוך'",
   assert.ok(!/סינון:/.test(plain));
   assert.match(plain, /סה"כ 3 תנועות<\/td>/);
 });
+
+// Noise (shared/bankReconNoise.js, owner 2026-11-15): de facto cancelled cheques and entry + cancellation pairs are
+// tagged on the whole report; noise=hide drops them; the page shows a toggle.
+test("tagNoise: stale cheques, reversal pairs on the bank and the books sides, the window, the counts", async () => {
+  const { tagNoise, STALE_DAYS, PAIR_DAYS, NOISE_LABEL } = await import("../shared/bankReconNoise.js");
+  const report = {
+    summary: {},
+    bankOpen: [
+      { date: "2026-04-15", reference: 14127, details: "שיק", amount: -50000 }, // a cheque …
+      { date: "2026-04-16", reference: 14127, details: "החזרת שיק-טכני", amount: 50000 }, // … returned the next day (same reference)
+      { date: "2026-06-12", reference: 10335, details: "שיק", amount: -27431.25, payee: 'נסיפי כח אדם בע"מ' },
+      { date: "2026-06-16", reference: 99, details: "החזרת שיק", amount: 27431.25, payee: "נסיפי כח אדם בעמ" }, // the same payee, spelled differently
+      { date: "2026-04-10", reference: 452606556, details: "העברה", amount: 50000, payee: "אן-קור" }, // money in, no opposite twin → stays
+      { date: "2026-01-02", reference: 777, details: "שיק", amount: -1000 },
+      { date: "2026-09-01", reference: 777, details: "החזרת שיק", amount: 1000 }, // 8 months later: outside the window
+    ],
+    bookOpen: [
+      { date: "2026-07-31", reference: 840, description: "שיק", counterAccount: "500084", counterName: "חצרי", amount: -47200 },
+      { date: "2026-07-31", reference: 840, description: "ביטול שיק", counterAccount: "500084", counterName: "חצרי", amount: 47200 },
+      { date: "2026-07-31", reference: 841, description: "שיק", counterAccount: "500084", counterName: "חצרי", amount: -47200 }, // a third one: no twin left
+      { date: "2026-05-05", reference: 12, description: "העברה", counterAccount: "500001", amount: -300 },
+    ],
+    bookFutureMatched: [],
+    chequesCleared: [],
+    chequesOpen: [
+      { chequeNo: 1, status: "past_due", daysAfterDue: 61, amount: -100, dueDate: "2026-09-01" },
+      { chequeNo: 2, status: "past_due", daysAfterDue: 60, amount: -200, dueDate: "2026-09-02" }, // exactly 60: not yet
+      { chequeNo: 3, status: "not_due", daysAfterDue: -5, amount: -300, dueDate: "2026-11-20" },
+      { chequeNo: 4, status: "cleared_unmatched", daysAfterDue: 90, amount: -400, dueDate: "2026-08-01" }, // in the bank: real
+    ],
+  };
+  tagNoise(report);
+  assert.equal(STALE_DAYS, 60);
+  assert.equal(PAIR_DAYS, 90);
+  assert.deepEqual(report.bankOpen.map((x) => x.noise?.rule || null), ["reversal", "reversal", "reversal", "reversal", null, null, null]);
+  assert.equal(report.bankOpen[0].noise.with, "2026-04-16");
+  assert.deepEqual(report.bookOpen.map((x) => x.noise?.rule || null), ["reversal", "reversal", null, null]);
+  assert.deepEqual(report.chequesOpen.map((x) => x.noise?.rule || null), ["stale_cheque", null, null, null]);
+  assert.deepEqual(report.noise.sections, { bankOpen: { count: 4, total: 0 }, bookOpen: { count: 2, total: 0 }, chequesOpen: { count: 1, total: -100 } });
+  assert.equal(report.noise.count, 7);
+  assert.equal(report.noise.total, -100);
+  assert.ok(NOISE_LABEL.stale_cheque.includes("60"));
+  // idempotent
+  tagNoise(report);
+  assert.equal(report.noise.count, 7);
+  // the filter noise=hide drops them; the summary stays
+  const f = parseFilter({ noise: "hide" });
+  assert.equal(f.noise, "hide");
+  assert.equal(f.active, true);
+  assert.equal(filterLabel(f), "ללא רעשים");
+  const r2 = applyFilter(JSON.parse(JSON.stringify({ ...report, summary: { bankOpen: { total: 0 }, bookOpen: { total: 0 }, chequesOpen: { total: 0 } } })), f);
+  assert.equal(r2.bankOpen.length, 3);
+  assert.equal(r2.bookOpen.length, 2);
+  assert.equal(r2.chequesOpen.length, 3);
+  assert.deepEqual(r2.filtered.sections.bankOpen, { count: 3, total: 50000 - 1000 + 1000, of: 7, ofTotal: 50000 });
+  assert.equal(r2.filter.noise, "hide");
+  assert.equal(parseFilter({}).noise, null);
+  // the page: the rows are marked, the box with the toggle is there; with noise=hide there is no toggle
+  const html = renderBankReconBody({ ...report, company: {}, account: {}, from: "2026-01-01", to: "2026-11-15", notes: [], summary: { bankBalance: 0, bankOpen: { total: 0, count: 7 }, bookOpen: { total: 0, count: 4 }, chequesOpen: { total: 0, count: 4, pastDueTotal: 0, pastDueCount: 2, notDueTotal: 0, notDueCount: 1 }, chequesCleared: { total: 0, count: 0 }, expectedBookBalance: 0, bookBalance: 0, unexplained: 0, bankLinesSum: 0 }, filter: { active: false } });
+  assert.ok(html.includes('class="bank-recon noise-off"'), "noise hidden by default");
+  assert.ok(html.includes("noise-tog"), "the toggle button");
+  assert.equal((html.match(/<tr class="[^"]*\bnoise\b/g) || []).length, 7);
+  const html2 = renderBankReconBody({ ...r2, company: {}, account: {}, from: "2026-01-01", to: "2026-11-15", notes: [], summary: { bankBalance: 0, bankOpen: { total: 0, count: 7 }, bookOpen: { total: 0, count: 4 }, chequesOpen: { total: 0, count: 4, pastDueTotal: 0, pastDueCount: 2, notDueTotal: 0, notDueCount: 1 }, chequesCleared: { total: 0, count: 0 }, expectedBookBalance: 0, bookBalance: 0, unexplained: 0, bankLinesSum: 0 } });
+  assert.ok(!html2.includes("noise-tog"));
+  assert.ok(html2.includes("ללא רעשים"));
+});

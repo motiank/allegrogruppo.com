@@ -12,6 +12,7 @@
 //   q=<text>                   a text in any column (details, payee, description, counter account, references)
 //   amount=<number>            the exact amount (either sign, ±0.01)
 //   sections=bankOpen,…        only these sections (bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen)
+//   noise=hide                 without the noise rows (shared/bankReconNoise.js: de facto cancelled cheques, reversal pairs)
 //   facets=1                   also the list of parties of the whole report (the kinds are always given)
 
 export const KINDS = [
@@ -26,6 +27,8 @@ export const KINDS = [
   { kind: "other", label: "אחר" },
 ];
 export const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.kind, k.label]));
+import { tagNoise } from "./bankReconNoise.js";
+
 export const SECTIONS = ["bankOpen", "bookOpen", "bookFutureMatched", "chequesCleared", "chequesOpen"];
 const SECTION_LABEL = { bankOpen: "1 בנק ללא ספרים", bookOpen: "2 ספרים ללא בנק", bookFutureMatched: "2ב", chequesCleared: "3א צ'קים שנפרעו", chequesOpen: "3ב צ'קים פתוחים" };
 
@@ -134,8 +137,9 @@ export function parseFilter(query = {}) {
   }
   const party = text(query.party) || null;
   const q = text(query.q) || null;
-  const f = { kinds: kinds.length ? kinds : null, party, q, amount, sections: sections.length ? sections : null, facets: /^(1|true|yes)$/i.test(text(query.facets)) };
-  f.active = Boolean(f.kinds || f.party || f.q || f.amount != null || f.sections);
+  const noise = /^(hide|1|true|yes|off)$/i.test(text(query.noise)) ? "hide" : null;
+  const f = { kinds: kinds.length ? kinds : null, party, q, amount, sections: sections.length ? sections : null, noise, facets: /^(1|true|yes)$/i.test(text(query.facets)) };
+  f.active = Boolean(f.kinds || f.party || f.q || f.amount != null || f.sections || f.noise);
   return f;
 }
 
@@ -148,6 +152,7 @@ export function filterLabel(f) {
   if (f.q) parts.push(`טקסט: ${f.q}`);
   if (f.amount != null) parts.push(`סכום: ${f.amount.toLocaleString("he-IL", { minimumFractionDigits: 2 })}`);
   if (f.sections) parts.push(`סעיפים: ${f.sections.map((s) => SECTION_LABEL[s] || s).join(", ")}`);
+  if (f.noise === "hide") parts.push("ללא רעשים");
   return parts.join(" · ");
 }
 
@@ -158,6 +163,7 @@ const rowTexts = (x, section) => {
 
 /** True when the row of `section` passes the filter `f` (kind, party, q, amount). */
 export function matchRow(x, section, f) {
+  if (f.noise === "hide" && x.noise) return false;
   if (f.kinds && !f.kinds.includes(x.kind || KIND_OF[section](x))) return false;
   if (f.amount != null) {
     const ok = [x.amount, x.bankAmount].some((v) => v != null && Math.abs(Math.abs(Number(v)) - f.amount) < 0.011);
@@ -246,6 +252,7 @@ export function facetsOf(report, { withParties = false, maxParties = 400 } = {})
  */
 export function applyFilter(report, f) {
   decorateReport(report);
+  tagNoise(report); // the noise rows are marked on the whole report; noise=hide drops them, the page hides them with a toggle
   report.facets = facetsOf(report, { withParties: f.facets });
   // a party given as an account key also matches that account's name on the bank side and in the cheques
   if (f.party && /^\d+$/.test(f.party)) {
@@ -253,7 +260,7 @@ export function applyFilter(report, f) {
     f.partyNames = keyed ? [normName(keyed.name)] : [];
     f.partyLabel = keyed ? `${keyed.name} (${keyed.key})` : null;
   }
-  report.filter = { kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections, active: f.active, label: filterLabel(f) };
+  report.filter = { kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections, noise: f.noise, active: f.active, label: filterLabel(f) };
   if (!f.active) {
     report.filtered = null;
     return report;

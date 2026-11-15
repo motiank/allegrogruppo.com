@@ -239,6 +239,11 @@ account and dates, shows the admin's HTML in a frame, offers the Excel and a pri
 ("תכין לי דוח התאמת בנק מפורט לאוקטובר"): the summary that ties the bank balance to the book balance, the biggest rows of
 each section, and the buttons "פתח את הדוח המלא" / Excel under the answer (`AskBox.js` `BankReconFiles`). Nothing is
 computed or stored in Joya.
+**Noise** (owner 2026-11-15): rows that are open only on paper — a cheque not cleared more than 60 days after its date
+(de facto cancelled) and two opposite moves with the same name and amount within 90 days (an entry and its cancellation)
+— are tagged by the admin (`shared/bankReconNoise.js`, `noise.rule` stale_cheque / reversal, `noise` counts in the calc's
+result). The report page starts with them hidden and a button "הצג גם את הרעשים" shows them; in the chat "בלי רעשים" /
+"רק מה שבאמת פתוח" → calc param `noise: "hide"` (the API leaves them out). The summary always includes them.
 **Filters** (owner 2026-11-13): the report can be cut by the type of movement (`kind`: cheque, transfer, card,
 direct_debit, deposit, fee, authorities, salary, other), by one supplier / payee (`party`: the account key or a part
 of the name), by a text (`q`), an amount and the sections — in the chat ("בדוח התאמת הבנק תראה לי רק את השיקים",

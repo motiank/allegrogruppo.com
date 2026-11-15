@@ -6,6 +6,7 @@
 // A filtered report (report.filter.active, shared/bankReconFilter.js) shows the filter under the header, only the
 // kept rows in the sections, and "N מתוך M" in the section totals; the summary is always for the whole account.
 
+import { NOISE_LABEL } from "./bankReconNoise.js";
 import { KIND_LABEL } from "./bankReconFilter.js";
 
 const nf = new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -86,6 +87,12 @@ export const CSS = `
 .bank-recon tr.sub td{background:#f7f7f7;font-style:italic;color:#555}
 .bank-recon .empty{color:#666;font-style:italic;padding:6px 0}
 .bank-recon .filter{background:#e8f0fe;border:1px solid #a9c4f5;padding:8px 12px;margin:10px 0;border-radius:4px}
+.bank-recon .noisebox{background:#fff4e5;border:1px solid #f0c27a;padding:8px 12px;margin:10px 0;border-radius:4px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+.bank-recon .noisebox button{padding:4px 12px;border:1px solid #b36b00;background:#fff;color:#7a4a00;border-radius:4px;cursor:pointer;font-weight:700;font:inherit}
+.bank-recon .noisebox .rules{font-size:.85em;color:#555;flex-basis:100%}
+.bank-recon tr.noise td{color:#8a6d3b;background:#fffaf0}
+.bank-recon .nz{display:inline-block;font-size:.75em;background:#f0c27a;color:#4a3000;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
+.bank-recon.noise-off tr.noise{display:none}
 .bank-recon .filter .of{color:#555;font-size:12px;margin-top:4px}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
@@ -137,7 +144,20 @@ function totalText(r, key, unit) {
 }
 const totalOf = (r, key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : r.summary[key].total);
 const omittedSection = (r, key) => (r.filtered?.sections?.[key]?.omitted ? `<h2>${SECTION_TITLES[key === "bookFutureMatched" ? "bookFuture" : key]}</h2><div class="empty">לא נכלל בסינון הסעיפים.</div>` : null);
-const kindCell = (x) => cell(KIND_LABEL[x.kind] || x.kind || "");
+const noiseBadge = (x) => (x.noise ? `<span class="nz" title="${esc(NOISE_LABEL[x.noise.rule] || x.noise.rule)}${x.noise.with ? ` (מול ${esc(fmtDate(x.noise.with))})` : ""}">רעש</span>` : "");
+const noiseClass = (x) => (x.noise ? " noise" : "");
+const kindCell = (x) => `<td>${esc(KIND_LABEL[x.kind] || x.kind || "")}${noiseBadge(x)}</td>`;
+
+// the noise rows (shared/bankReconNoise.js) and the button that hides / shows them; with the server filter noise=hide
+// they are not in the report at all (the filter box says so)
+function noiseBox(r) {
+  const n = r.noise;
+  if (!n?.count || r.filter?.noise === "hide") return "";
+  const parts = Object.entries(n.sections || {}).filter(([, x]) => x.count).map(([k, x]) => `${SECTION_SHORT[k] || k}: ${fmtInt(x.count)}`);
+  return `<div class="noisebox"><b>רעשים:</b> ${fmtInt(n.count)} שורות (${esc(parts.join(" · "))}), סכום ${fmtMoney(n.total)}
+  <button type="button" class="noise-tog" data-count="${n.count}">הצג גם את הרעשים (${fmtInt(n.count)})</button>
+  <span class="rules">רעש = ${esc(NOISE_LABEL.stale_cheque)}; ${esc(NOISE_LABEL.reversal)} (עד ${n.pairDays} ימים זו מזו). השורות מסומנות "רעש"; הסיכום למעלה כולל אותן.</span></div>`;
+}
 
 function summary(r) {
   const s = r.summary;
@@ -189,7 +209,7 @@ function bankOpenTable(r) {
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
@@ -208,7 +228,7 @@ function bookOpenTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr class="${olderClass(x, r.from)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
+          `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "bookOpen", "תנועות")}</td>${money(totalOf(r, "bookOpen"))}<td></td><td></td><td></td></tr>
@@ -265,7 +285,7 @@ function chequesOpenTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
+          `<tr class="${noiseClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${noiseBadge(x)}</td></tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="4">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
@@ -275,7 +295,8 @@ function chequesOpenTable(r) {
 
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
 export function renderBankReconBody(report) {
-  return `<div class="bank-recon">${header(report)}${filterBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -321,11 +342,13 @@ export function bankReconBehavior(root) {
     var rows = Array.prototype.filter.call(tbody.rows, function (r) { return !r.classList.contains("total"); });
     var active = {}; // column index → the values kept (a column that is absent shows everything)
     var valueOf = function (r, i) { var c = r.cells[i]; var t = c ? c.textContent.trim() : ""; return t || EMPTY; };
+    var noiseRows = rows.filter(function (r) { return r.classList.contains("noise"); }).length;
     var apply = function () {
       var cols = Object.keys(active);
+      var hideNoise = root.classList.contains("noise-off") && noiseRows > 0;
       var shown = 0, sum = 0, hasSum = false;
       rows.forEach(function (r) {
-        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); });
+        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); }) && !(hideNoise && r.classList.contains("noise"));
         r.classList.toggle("hid", !ok);
         if (ok) {
           shown++;
@@ -334,7 +357,7 @@ export function bankReconBehavior(root) {
         }
       });
       var line = tbody.querySelector("tr.filtered");
-      if (!cols.length) { if (line) line.parentNode.removeChild(line); }
+      if (!cols.length && !hideNoise) { if (line) line.parentNode.removeChild(line); }
       else {
         if (!line) {
           line = document.createElement("tr");
@@ -344,7 +367,7 @@ export function bankReconBehavior(root) {
           line.appendChild(td);
           tbody.insertBefore(line, tbody.querySelector("tr.total"));
         }
-        line.firstChild.textContent = "מסונן: " + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "");
+        line.firstChild.textContent = (cols.length ? "מסונן: " : "ללא רעשים: ") + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "") + (hideNoise ? " (רעשים מוסתרים: " + fmt(noiseRows, 0) + ")" : "");
       }
       Array.prototype.forEach.call(ths, function (th, i) { var b = th.querySelector(".flt"); if (b) b.classList.toggle("on", Boolean(active[i])); });
     };
@@ -420,7 +443,21 @@ export function bankReconBehavior(root) {
       th.appendChild(btn);
       btn.addEventListener("click", function (e) { e.stopPropagation(); if (th.querySelector(".br-panel")) closePanels(); else openPanel(th, i); });
     });
+    table.__brApply = apply;
+    if (noiseRows) apply(); // the noise rows start hidden: show the "ללא רעשים" line at once
   });
+  // 3. the noise toggle (the rows with the class "noise": de facto cancelled cheques, entry + cancellation pairs)
+  var tog = root.querySelector(".noise-tog");
+  if (tog) {
+    var count = tog.getAttribute("data-count");
+    var relabel = function () { tog.textContent = root.classList.contains("noise-off") ? "הצג גם את הרעשים (" + count + ")" : "הסתר רעשים (" + count + ")"; };
+    tog.addEventListener("click", function () {
+      root.classList.toggle("noise-off");
+      relabel();
+      Array.prototype.forEach.call(root.querySelectorAll("table"), function (t) { if (t.__brApply) t.__brApply(); });
+    });
+    relabel();
+  }
   document.addEventListener("click", closePanels);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePanels(); });
 }

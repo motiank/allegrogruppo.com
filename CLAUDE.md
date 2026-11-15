@@ -198,6 +198,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   DB), `scripts/test_bank_recon.js`; eval `f-bank-recon-filter-*`. Deployed 2026-11-13 (`c77cd4e`). The supplier picker is a
   searchable list: each name shows its rows in the report and, in red brackets, its bank moves with no record in the books
   (section 1; `facetsOf` → `bankOpen`). Deployed 2026-11-13 (`43c3a18`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
+  **Noise toggle** (2026-11-15, owner: "a noise cancellation toggle button: de facto cancelled cheques (older than 60 days), two
+  opposite moves with the same details (name and sum) on the books or the bank"): `shared/bankReconNoise.js` tags `noise.rule`
+  `stale_cheque` (section 3ב, past due > 60 days) and `reversal` (sections 1 and 2: two opposite rows, same payee / reference on the
+  bank side, same counter account on the books side, same amount, within 90 days); `report.noise` = counts per section. Filter
+  `noise=hide` (API, Joya calc param, planner rule "בלי רעשים"); the HTML starts with the noise rows hidden and a button shows
+  them (the summary always includes them); Excel column "רעש". On production 2026: 239 noise rows (24 bank, 134 books, 81 cheques).
+  Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`.
   **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,

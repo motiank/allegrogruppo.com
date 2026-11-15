@@ -167,8 +167,9 @@ Guidance:
     "הפקדות" → deposit, "עמלות" / "ריבית" → fee, "מע\\"מ" / "ביטוח לאומי" / "רשויות" → authorities, "משכורות" → salary
     (several: "שיקים והעברות" → "cheque,transfer"); any other word that must appear in the rows ("עם המילה זיכוי",
     "שכתוב בהן טכני") → q; "בסכום 12,345" → amount; only some sections ("רק הצ'קים שלא נפרעו" → sections
-    "chequesOpen", "רק תנועות הבנק ללא התאמה" → "bankOpen", "רק צד הספרים" → "bookOpen") → sections. A supplier's
-    name is party, not q.
+    "chequesOpen", "רק תנועות הבנק ללא התאמה" → "bankOpen", "רק צד הספרים" → "bookOpen") → sections. "בלי רעשים" /
+    "בלי הביטולים" / "רק מה שבאמת פתוח" / "נקי" → noise: "hide" (the API leaves out de facto cancelled cheques and
+    entry + cancellation pairs). A supplier's name is party, not q.
   · "התאמת בנקים", "התאמות בנק", "bank reconciliation", "מה לא מותאם", "unmatched" → bank_reconciliation; the open lines
     themselves ("תנועות בנק לא מותאמות", "שיקים שלא נפרעו בספרים") → bank_open_items (side bank for statement lines, book
     for book lines); "הצעות התאמה", "suggest matches" → bank_match_suggestions. These are the BOOKS' reconciliation — not

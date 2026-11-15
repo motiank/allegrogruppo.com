@@ -617,6 +617,14 @@ no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on
 `{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:
 `node --test scripts/test_bank_recon.js`.
 
+**Noise (2026-11-15, owner: "a noise cancellation toggle button: de facto cancelled cheques (older than 60 days), two
+opposite moves with the same details (name and sum) on the books or the bank").** `shared/bankReconNoise.js` tags, on the
+whole report, `noise: { rule, with }` on a section-3ב cheque past its date by more than 60 days (`stale_cheque`) and on
+each of two opposite rows with the same name (bank: the payee, else the reference, e.g. a cheque and its return; books: the
+counter account, else the description) and the same amount within 90 days (`reversal`); `noise` = `{ count, total,
+sections, staleDays, pairDays, rules }`. `noise=hide` is a filter like the others (the rows are left out, `filtered` says
+kept of all, label "ללא רעשים"); the HTML page starts with the noise rows hidden and a button shows them (the summary always
+includes them); the Excel has a "רעש" column.
 **Filters (2026-11-13, owner: "filter by supplier, by the type of movement (cheque…) and by a name; the API should do
 it, to save AI tokens when the report is big").** `shared/bankReconFilter.js`, the same on `/admin/bank-recon/report`:
 `kind=` one or more of `cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other` (every row gets a

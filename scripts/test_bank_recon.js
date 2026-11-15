@@ -113,7 +113,7 @@ test("HTML and Excel", async () => {
   assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
   assert.equal((html.match(/data-filter="1"/g) || []).length, 8 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table
   const body = renderBankReconBody(r);
-  assert.ok(body.startsWith('<div class="bank-recon">') && !body.includes("<html"));
+  assert.ok(body.startsWith('<div class="bank-recon') && !body.includes("<html"));
   assert.ok(body.includes("<script") === false);
   const buf = await renderBankReconXlsx(r);
   const wb = new ExcelJS.Workbook();

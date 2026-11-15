@@ -22,6 +22,7 @@ import { ApiError, badRequest, isIsoDate } from "./localApi.js";
 import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
 import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
+import { NOISE_LABEL } from "../../../shared/bankReconNoise.js";
 import { addChequePayees } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
@@ -411,6 +412,7 @@ export async function renderBankReconXlsx(r) {
   add("", null);
   add(`צ'קים שנפרעו בתקופה (סעיף 3א) – ${s.chequesCleared.count}`, s.chequesCleared.total);
   add("סכום כל תנועות הבנק עד התאריך", s.bankLinesSum);
+  if (r.noise?.count) add(`רעשים (צ'קים שבוטלו דה-פקטו, רישום וביטולו): ${r.noise.count} שורות — מסומנות בעמודה "רעש"; בלי רעשים: noise=hide`, r.noise.total);
   add("", null);
   add("הערות", null, true);
   for (const n of r.notes) add(n, null);
@@ -420,18 +422,19 @@ export async function renderBankReconXlsx(r) {
   // with a filter the sheets hold the kept rows and the total row is theirs (the summary sheet shows "N מתוך M")
   const tot = (key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : s[key].total);
   const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
+  const noiseCol = { header: "רעש", key: "noise", width: 34, get: (x) => (x.noise ? NOISE_LABEL[x.noise.rule] || x.noise.rule : null) };
   sheet(wb, "1 בנק ללא ספרים", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol,
     { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
     { header: "מזהה שורה", key: "bankLineId", width: 10 },
-  ], r.bankOpen, 'סה"כ', tot("bankOpen"));
+  noiseCol], r.bankOpen, 'סה"כ', tot("bankOpen"));
   sheet(wb, "2 ספרים ללא בנק", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
     { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12 }, { header: "שם חשבון נגדי", key: "counterName", width: 26 },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "מנה", key: "batch", width: 8 },
     { header: "נקלט", key: "posted", width: 8, get: (x) => (x.posted ? "כן" : "לא") }, { header: "מס' תנועה", key: "transId", width: 10 },
-  ], r.bookOpen, 'סה"כ', tot("bookOpen"));
+  noiseCol], r.bookOpen, 'סה"כ', tot("bookOpen"));
   if (r.bookFutureMatched.length)
     sheet(wb, "2ב ספרים בתאריך מאוחר", [
       { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
@@ -450,7 +453,7 @@ export async function renderBankReconXlsx(r) {
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום", key: "amount", money: true, width: 16 },
     { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) },
     { header: "נמצא בבנק בתאריך", key: "clearedDate", date: true, width: 14 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
-  ], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
+  noiseCol], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

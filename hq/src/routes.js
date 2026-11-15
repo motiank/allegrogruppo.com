@@ -204,7 +204,7 @@ r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLin
 // The admin's report (admin/server/modules/bankRecon.js) through the Finance API, for the chain admin: the bank
 // accounts to pick from, the JSON, the Hebrew HTML page (shown in an iframe) and the Excel file. Joya keeps nothing.
 // kind / party / q / amount / sections = the report's filters (shared/bankReconFilter.js), done by the admin server
-const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to, kind: req.query.kind, party: req.query.party, q: req.query.q, amount: req.query.amount, sections: req.query.sections });
+const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to, kind: req.query.kind, party: req.query.party, q: req.query.q, amount: req.query.amount, sections: req.query.sections, noise: req.query.noise });
 r.get('/joya/finance/bank-recon/accounts', requireAdmin, h(async () => financeBankAccounts()));
 r.get(
   '/joya/finance/bank-recon/facets',
