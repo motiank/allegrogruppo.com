@@ -204,7 +204,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   bank side, same counter account on the books side, same amount, within 90 days); `report.noise` = counts per section. Filter
   `noise=hide` (API, Joya calc param, planner rule "בלי רעשים"); the HTML starts with the noise rows hidden and a button shows
   them (the summary always includes them); Excel column "רעש". On production 2026: 239 noise rows (24 bank, 134 books, 81 cheques).
-  Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`.
+  Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`. Deployed 2026-11-15 (`62428e9`: pull, root build,
+  `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
   **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
