@@ -200,8 +200,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   (section 1; `facetsOf` → `bankOpen`). Deployed 2026-11-13 (`43c3a18`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
   **Noise toggle** (2026-11-15, owner: "a noise cancellation toggle button: de facto cancelled cheques (older than 60 days), two
   opposite moves with the same details (name and sum) on the books or the bank"): `shared/bankReconNoise.js` tags `noise.rule`
-  `stale_cheque` (section 3ב, past due > 60 days) and `reversal` (sections 1 and 2: two opposite rows, same payee / reference on the
-  bank side, same counter account on the books side, same amount, within 90 days); `report.noise` = counts per section. Filter
+  `reversal` (sections 1 and 2: two opposite rows, same payee / reference on the bank side, same counter account on the books
+  side, same amount, within 90 days); `report.noise` = counts per section. A cheque past due > 60 days and not cleared is NOT noise
+  (owner, same day: "those lines should be handled"): `todo.rule` `stale_cheque`, `report.todo`, a red "לטיפול" box, never hidden. Filter
   `noise=hide` (API, Joya calc param, planner rule "בלי רעשים"); the HTML starts with the noise rows hidden and a button shows
   them (the summary always includes them); Excel column "רעש". On production 2026: 239 noise rows (24 bank, 134 books, 81 cheques).
   Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`. Deployed 2026-11-15 (`62428e9`: pull, root build,

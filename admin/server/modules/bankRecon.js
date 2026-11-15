@@ -22,7 +22,7 @@ import { ApiError, badRequest, isIsoDate } from "./localApi.js";
 import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
 import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
-import { NOISE_LABEL } from "../../../shared/bankReconNoise.js";
+import { NOISE_LABEL, TODO_LABEL } from "../../../shared/bankReconNoise.js";
 import { addChequePayees } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
@@ -412,7 +412,8 @@ export async function renderBankReconXlsx(r) {
   add("", null);
   add(`צ'קים שנפרעו בתקופה (סעיף 3א) – ${s.chequesCleared.count}`, s.chequesCleared.total);
   add("סכום כל תנועות הבנק עד התאריך", s.bankLinesSum);
-  if (r.noise?.count) add(`רעשים (צ'קים שבוטלו דה-פקטו, רישום וביטולו): ${r.noise.count} שורות — מסומנות בעמודה "רעש"; בלי רעשים: noise=hide`, r.noise.total);
+  if (r.noise?.count) add(`רעשים (רישום וביטולו, סעיפים 1 ו-2): ${r.noise.count} שורות — מסומנות בעמודה "רעש / לטיפול"; בלי רעשים: noise=hide`, r.noise.total);
+  if (r.todo?.count) add(`לטיפול: ${r.todo.count} צ'קים שמועדם עבר לפני יותר מ-${r.todo.staleDays} יום ולא נפרעו (סעיף 3ב) – לבטל בספרים או לברר`, r.todo.total);
   add("", null);
   add("הערות", null, true);
   for (const n of r.notes) add(n, null);
@@ -422,7 +423,7 @@ export async function renderBankReconXlsx(r) {
   // with a filter the sheets hold the kept rows and the total row is theirs (the summary sheet shows "N מתוך M")
   const tot = (key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : s[key].total);
   const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
-  const noiseCol = { header: "רעש", key: "noise", width: 34, get: (x) => (x.noise ? NOISE_LABEL[x.noise.rule] || x.noise.rule : null) };
+  const noiseCol = { header: "רעש / לטיפול", key: "noise", width: 40, get: (x) => (x.noise ? `רעש: ${NOISE_LABEL[x.noise.rule] || x.noise.rule}` : x.todo ? `לטיפול: ${TODO_LABEL[x.todo.rule] || x.todo.rule}` : null) };
   sheet(wb, "1 בנק ללא ספרים", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol,
     { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },

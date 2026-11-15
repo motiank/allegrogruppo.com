@@ -6,7 +6,7 @@
 // A filtered report (report.filter.active, shared/bankReconFilter.js) shows the filter under the header, only the
 // kept rows in the sections, and "N מתוך M" in the section totals; the summary is always for the whole account.
 
-import { NOISE_LABEL } from "./bankReconNoise.js";
+import { NOISE_LABEL, TODO_LABEL } from "./bankReconNoise.js";
 import { KIND_LABEL } from "./bankReconFilter.js";
 
 const nf = new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -93,6 +93,10 @@ export const CSS = `
 .bank-recon tr.noise td{color:#8a6d3b;background:#fffaf0}
 .bank-recon .nz{display:inline-block;font-size:.75em;background:#f0c27a;color:#4a3000;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
 .bank-recon.noise-off tr.noise{display:none}
+.bank-recon .todobox{background:#fdecea;border:1px solid #f1998e;padding:8px 12px;margin:10px 0;border-radius:4px}
+.bank-recon .todobox .rules{font-size:.85em;color:#555;display:block;margin-top:2px}
+.bank-recon tr.todo td{background:#fff1f0}
+.bank-recon .td{display:inline-block;font-size:.75em;background:#e05050;color:#fff;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
 .bank-recon .filter .of{color:#555;font-size:12px;margin-top:4px}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
@@ -146,6 +150,15 @@ const totalOf = (r, key) => (r.filtered?.sections?.[key] ? r.filtered.sections[k
 const omittedSection = (r, key) => (r.filtered?.sections?.[key]?.omitted ? `<h2>${SECTION_TITLES[key === "bookFutureMatched" ? "bookFuture" : key]}</h2><div class="empty">לא נכלל בסינון הסעיפים.</div>` : null);
 const noiseBadge = (x) => (x.noise ? `<span class="nz" title="${esc(NOISE_LABEL[x.noise.rule] || x.noise.rule)}${x.noise.with ? ` (מול ${esc(fmtDate(x.noise.with))})` : ""}">רעש</span>` : "");
 const noiseClass = (x) => (x.noise ? " noise" : "");
+const todoBadge = (x) => (x.todo ? `<span class="td" title="${esc(TODO_LABEL[x.todo.rule] || x.todo.rule)}">לטיפול</span>` : "");
+const todoClass = (x) => (x.todo ? " todo" : "");
+
+// the cheques to handle (section 3ב: past their date by more than 60 days and not cleared) — never hidden
+function todoBox(r) {
+  const n = r.todo;
+  if (!n?.count) return "";
+  return `<div class="todobox"><b>לטיפול:</b> ${fmtInt(n.count)} צ'קים שמועדם עבר לפני יותר מ-${n.staleDays} יום ולא נפרעו, סכום ${fmtMoney(n.total)} (סעיף 3ב, מסומנים "לטיפול")<span class="rules">${esc(TODO_LABEL.stale_cheque)}. הם אינם רעש ואינם מוסתרים.</span></div>`;
+}
 const kindCell = (x) => `<td>${esc(KIND_LABEL[x.kind] || x.kind || "")}${noiseBadge(x)}</td>`;
 
 // the noise rows (shared/bankReconNoise.js) and the button that hides / shows them; with the server filter noise=hide
@@ -156,7 +169,7 @@ function noiseBox(r) {
   const parts = Object.entries(n.sections || {}).filter(([, x]) => x.count).map(([k, x]) => `${SECTION_SHORT[k] || k}: ${fmtInt(x.count)}`);
   return `<div class="noisebox"><b>רעשים:</b> ${fmtInt(n.count)} שורות (${esc(parts.join(" · "))}), סכום ${fmtMoney(n.total)}
   <button type="button" class="noise-tog" data-count="${n.count}">הצג גם את הרעשים (${fmtInt(n.count)})</button>
-  <span class="rules">רעש = ${esc(NOISE_LABEL.stale_cheque)}; ${esc(NOISE_LABEL.reversal)} (עד ${n.pairDays} ימים זו מזו). השורות מסומנות "רעש"; הסיכום למעלה כולל אותן.</span></div>`;
+  <span class="rules">רעש = ${esc(NOISE_LABEL.reversal)}, עד ${n.pairDays} ימים זו מזו (בבנק: אותו מוטב או אותה אסמכתא, למשל שיק והחזרתו; בספרים: אותו חשבון נגדי). השורות מסומנות "רעש"; הסיכום למעלה כולל אותן.</span></div>`;
 }
 
 function summary(r) {
@@ -285,7 +298,7 @@ function chequesOpenTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr class="${noiseClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${noiseBadge(x)}</td></tr>`,
+          `<tr class="${todoClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="4">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
@@ -296,7 +309,7 @@ function chequesOpenTable(r) {
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
 export function renderBankReconBody(report) {
   const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
-  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.

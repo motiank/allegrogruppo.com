@@ -168,10 +168,10 @@ test("the HTML of a filtered report shows the filter, the kinds and 'מתוך'",
   assert.match(plain, /סה"כ 3 תנועות<\/td>/);
 });
 
-// Noise (shared/bankReconNoise.js, owner 2026-11-15): de facto cancelled cheques and entry + cancellation pairs are
-// tagged on the whole report; noise=hide drops them; the page shows a toggle.
-test("tagNoise: stale cheques, reversal pairs on the bank and the books sides, the window, the counts", async () => {
-  const { tagNoise, STALE_DAYS, PAIR_DAYS, NOISE_LABEL } = await import("../shared/bankReconNoise.js");
+// Noise and to-handle (shared/bankReconNoise.js, owner 2026-11-15): entry + cancellation pairs are noise (hidden by a
+// toggle, dropped by noise=hide); old unpaid cheques are "לטיפול" — tagged, counted, never hidden.
+test("tagNoise: reversal pairs on the bank and the books sides (noise), stale cheques (to handle), the window, the counts", async () => {
+  const { tagNoise, STALE_DAYS, PAIR_DAYS, NOISE_LABEL, TODO_LABEL } = await import("../shared/bankReconNoise.js");
   const report = {
     summary: {},
     bankOpen: [
@@ -204,14 +204,17 @@ test("tagNoise: stale cheques, reversal pairs on the bank and the books sides, t
   assert.deepEqual(report.bankOpen.map((x) => x.noise?.rule || null), ["reversal", "reversal", "reversal", "reversal", null, null, null]);
   assert.equal(report.bankOpen[0].noise.with, "2026-04-16");
   assert.deepEqual(report.bookOpen.map((x) => x.noise?.rule || null), ["reversal", "reversal", null, null]);
-  assert.deepEqual(report.chequesOpen.map((x) => x.noise?.rule || null), ["stale_cheque", null, null, null]);
-  assert.deepEqual(report.noise.sections, { bankOpen: { count: 4, total: 0 }, bookOpen: { count: 2, total: 0 }, chequesOpen: { count: 1, total: -100 } });
-  assert.equal(report.noise.count, 7);
-  assert.equal(report.noise.total, -100);
-  assert.ok(NOISE_LABEL.stale_cheque.includes("60"));
+  assert.deepEqual(report.chequesOpen.map((x) => x.noise?.rule || null), [null, null, null, null], "cheques are never noise");
+  assert.deepEqual(report.chequesOpen.map((x) => x.todo?.rule || null), ["stale_cheque", null, null, null]);
+  assert.deepEqual(report.noise.sections, { bankOpen: { count: 4, total: 0 }, bookOpen: { count: 2, total: 0 } });
+  assert.equal(report.noise.count, 6);
+  assert.equal(report.noise.total, 0);
+  assert.deepEqual(report.todo, { staleDays: 60, count: 1, total: -100, sections: { chequesOpen: { count: 1, total: -100 } }, rules: TODO_LABEL });
+  assert.ok(TODO_LABEL.stale_cheque.includes("60") && !NOISE_LABEL.stale_cheque);
   // idempotent
   tagNoise(report);
-  assert.equal(report.noise.count, 7);
+  assert.equal(report.noise.count, 6);
+  assert.equal(report.todo.count, 1);
   // the filter noise=hide drops them; the summary stays
   const f = parseFilter({ noise: "hide" });
   assert.equal(f.noise, "hide");
@@ -220,7 +223,7 @@ test("tagNoise: stale cheques, reversal pairs on the bank and the books sides, t
   const r2 = applyFilter(JSON.parse(JSON.stringify({ ...report, summary: { bankOpen: { total: 0 }, bookOpen: { total: 0 }, chequesOpen: { total: 0 } } })), f);
   assert.equal(r2.bankOpen.length, 3);
   assert.equal(r2.bookOpen.length, 2);
-  assert.equal(r2.chequesOpen.length, 3);
+  assert.equal(r2.chequesOpen.length, 4, "noise=hide keeps the cheques to handle");
   assert.deepEqual(r2.filtered.sections.bankOpen, { count: 3, total: 50000 - 1000 + 1000, of: 7, ofTotal: 50000 });
   assert.equal(r2.filter.noise, "hide");
   assert.equal(parseFilter({}).noise, null);
@@ -228,8 +231,12 @@ test("tagNoise: stale cheques, reversal pairs on the bank and the books sides, t
   const html = renderBankReconBody({ ...report, company: {}, account: {}, from: "2026-01-01", to: "2026-11-15", notes: [], summary: { bankBalance: 0, bankOpen: { total: 0, count: 7 }, bookOpen: { total: 0, count: 4 }, chequesOpen: { total: 0, count: 4, pastDueTotal: 0, pastDueCount: 2, notDueTotal: 0, notDueCount: 1 }, chequesCleared: { total: 0, count: 0 }, expectedBookBalance: 0, bookBalance: 0, unexplained: 0, bankLinesSum: 0 }, filter: { active: false } });
   assert.ok(html.includes('class="bank-recon noise-off"'), "noise hidden by default");
   assert.ok(html.includes("noise-tog"), "the toggle button");
-  assert.equal((html.match(/<tr class="[^"]*\bnoise\b/g) || []).length, 7);
+  assert.equal((html.match(/<tr class="[^"]*\bnoise\b/g) || []).length, 6);
+  assert.equal((html.match(/<tr class="todo"/g) || []).length, 1, "the stale cheque row is marked to handle");
+  assert.ok(html.includes("todobox") && html.includes("לטיפול:"), "the to-handle box");
+  assert.ok(html.indexOf("noisebox") < html.indexOf("todobox"));
   const html2 = renderBankReconBody({ ...r2, company: {}, account: {}, from: "2026-01-01", to: "2026-11-15", notes: [], summary: { bankBalance: 0, bankOpen: { total: 0, count: 7 }, bookOpen: { total: 0, count: 4 }, chequesOpen: { total: 0, count: 4, pastDueTotal: 0, pastDueCount: 2, notDueTotal: 0, notDueCount: 1 }, chequesCleared: { total: 0, count: 0 }, expectedBookBalance: 0, bookBalance: 0, unexplained: 0, bankLinesSum: 0 } });
   assert.ok(!html2.includes("noise-tog"));
   assert.ok(html2.includes("ללא רעשים"));
+  assert.ok(html2.includes("todobox"), "the to-handle box stays with noise=hide");
 });
