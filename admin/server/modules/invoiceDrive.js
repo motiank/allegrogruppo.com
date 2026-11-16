@@ -55,6 +55,9 @@ function auth() {
   return client;
 }
 const files = () => google.drive({ version: "v3", auth: auth() }).files;
+/** The Drive `files` resource with the agent's login — for the other readers of the agent's Drive (chequeArchive.js). */
+export const driveFiles = files;
+export const driveQuote = quote;
 
 async function findOne(q) {
   const r = await files().list({ q: `${q} and trashed=false`, fields: "files(id,name,modifiedTime)", pageSize: 1 });
@@ -73,6 +76,7 @@ async function root() {
 async function readJson(fileId) {
   return (await files().get({ fileId, alt: "media" }, { responseType: "json" })).data;
 }
+export const readDriveJson = readJson;
 
 let cache = { at: 0, value: null };
 /**

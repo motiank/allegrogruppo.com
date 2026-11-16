@@ -182,7 +182,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 15 | Suggested bank matches | `/bank/suggestions` | One-to-one only: 44 of 758 open lines within 30 days |
 | 16 | Customer invoices, credit notes, receipts | `/invoices`, `/statement` | |
 | 17 | Supplier card, open invoices, payments | `/statement` | Only 75 of 250 suppliers use matching |
-| 18 | Issued cheques | `/cheques`, `/cheques/priority`, `/cheques/all` | "Returned" cannot be found yet. `/cheques/priority` = the Priority history before Hashavshevet (a file, not the DB); `/cheques/all` = both in one table |
+| 18 | Issued cheques | `/cheques`, `/cheques/priority`, `/cheques/all`, `/cheques/archive`, `/cheques/image/:id` | "Returned" cannot be found yet. `/cheques/priority` = the Priority history before Hashavshevet (a file, not the DB); `/cheques/all` = both in one table, plus the scanned cheques of the Drive archive; `/cheques/archive` = the scanned cheques (names read from the picture, the bookkeeper's work list) and `/cheques/image/:id` the picture |
 | 19 | VAT check and the 874 report | `/vat`, `/vat/issues` | Book totals; 874 data is not understood yet |
 | 20 | Tax deducted at source, certificates | `/withholding` | |
 | 21 | Allocation numbers | `/allocation-numbers` | The legal limits per date are not confirmed |
@@ -551,11 +551,16 @@ Use case 14. The open lines, oldest first. Bank line `direction` is `in` or `out
 שיק / החזרת שיק / בטול שיק, `reference` = the cheque number) also has `payee` and `payeeSource`: the beneficiary from
 `cheques.payee_name` (`cheques`), else from the journal entry on the bank account with that reference and the same amount
 (`journal`), else from the Priority cheque file (`priority` — the cheque was written in Priority before Hashavshevet, see
-`/cheques/priority`; the name is known, the cheque is still not in the books), else
+`/cheques/priority`; the name is known, the cheque is still not in the books), else from the **cheque archive in
+Drive** (`image` — the name was READ FROM THE SCANNED CHEQUE with that number and amount, see `/cheques/archive`; 2026-11-16;
+`image_guess` = an unsure reading, `payee` = the guess), else
 `missing` (`payee` null — the cheque is not in Hashavshevet yet); with a duplicate number the row with the same amount
-wins, and with the same amount Hashavshevet's name wins over Priority (`admin/server/modules/chequePayees.js`, also used by
-`/bank/suggestions`, the report and the Local Data API's `/bank/transactions/stored`). **Transfer lines** (העברה מהבנק / לאחר / זה"ב, money out; 2026-11-13) get `payee` / `payeeSource` `events` and `event` `{ payee, payeeAccount, submittedAt, executedAt, submittedBy, status }` from the bank's transaction status file (`bank_events`, uploaded on the admin Upload page; `admin/server/modules/bankEvents.js`: the one order with the same amount executed on that day or up to 4 days before; `meta.events` = `{ lines, found, ambiguous, none }`); in the report, a section-2 book line paid by transfer gets the same `event` and `kind` `transfer`. **The uploaded bank file** (2026-11-15; `bank_transactions`, the admin's Upload page; `admin/server/modules/bankFileNames.js`) then names every bank line still without a name — above all **money that came in**, which no other source names: the file row with the same account, day, reference and signed amount gives `payee` / `payeeSource` `bank_file`, `payeeRole` `from` ("המבצע: <name>", money in from that party — shown "מאת: <name>" in the report) or `to` ("לטובת: <name>", money out), and `payeePurpose` when the bank's text has "עבור: …"; `meta.bankFile` = `{ lines, found, from }`. Owner's case: the 50,000 of 10/4/2026 with reference 452606556 is money IN from אן-קור, not the transfer TO אן-קור of the same day (reference 452609196, matched in the books). `meta.payees` =
-`{ lines, found, priority, missing[, error] }` (`priority` = lines named by the file only, counted in `found` too).
+wins, and with the same amount Hashavshevet's name wins over Priority and over the picture (`admin/server/modules/chequePayees.js`, also used by
+`/bank/suggestions`, the report and the Local Data API's `/bank/transactions/stored`). Every cheque line whose picture is in the
+archive (same number and amount, else the only picture of that number) also carries `imageId` (the Drive file) and `image`
+(its Drive link); the report shows it as 📷 and streams it through `/cheques/image/:id`. **Transfer lines** (העברה מהבנק / לאחר / זה"ב, money out; 2026-11-13) get `payee` / `payeeSource` `events` and `event` `{ payee, payeeAccount, submittedAt, executedAt, submittedBy, status }` from the bank's transaction status file (`bank_events`, uploaded on the admin Upload page; `admin/server/modules/bankEvents.js`: the one order with the same amount executed on that day or up to 4 days before; `meta.events` = `{ lines, found, ambiguous, none }`); in the report, a section-2 book line paid by transfer gets the same `event` and `kind` `transfer`. **The uploaded bank file** (2026-11-15; `bank_transactions`, the admin's Upload page; `admin/server/modules/bankFileNames.js`) then names every bank line still without a name — above all **money that came in**, which no other source names: the file row with the same account, day, reference and signed amount gives `payee` / `payeeSource` `bank_file`, `payeeRole` `from` ("המבצע: <name>", money in from that party — shown "מאת: <name>" in the report) or `to` ("לטובת: <name>", money out), and `payeePurpose` when the bank's text has "עבור: …"; `meta.bankFile` = `{ lines, found, from }`. Owner's case: the 50,000 of 10/4/2026 with reference 452606556 is money IN from אן-קור, not the transfer TO אן-קור of the same day (reference 452609196, matched in the books). `meta.payees` =
+`{ lines, found, priority, image, imageGuess, withImage, missing[, error][, archiveError] }` (`priority` and `image` = lines named by that
+source only, counted in `found` too; `imageGuess` is in neither `found` nor `missing`; `archiveError` = Drive could not be read, the archive added nothing).
 
 - `is_matched = 1` with `match_num` means a bank line is matched.
 - `bank_matches.linked_id` with `side = 'book'` is a `journal_lines.line_id`, not a `trans_id`.
@@ -610,7 +615,7 @@ have a Google-Sheets-like filter — icon in the header, a panel with a search b
 `from` to 1 January of `to`'s year, `account` to the company's first bank account. The report, as of `to`: `summary`
 (bankBalance = Hashavshevet's running balance after the last line ≤ `to`; bookBalance; bankOpen, bookOpen,
 chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
-(Hebrew), and the rows `bankOpen` (cheque lines with `payee` / `payeeSource`, see `/bank/open`; `summary.bankOpen.cheques` =
+(Hebrew), and the rows `bankOpen` (cheque lines with `payee` / `payeeSource` and `imageId` / `image` of the scanned cheque, see `/bank/open`; `summary.bankOpen.cheques` =
 `{ count, found, missing, missingTotal }`), `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
 date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). "Open" =
 no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on both sides. `/bank/report/accounts` →
@@ -737,7 +742,7 @@ net). On the local copy 1,002 of the 1,398 bank cheque lines that Hashavshevet d
 several rows in Priority has its rows in `lines` (a minus line is a credit taken off). A cheque number can appear
 twice (10777 was written to two payees). Test: `node --test scripts/test_priority_cheques.js` (no database).
 
-### `GET /finance/cheques/all?company=[&source=hashavshevet|priority|both][&state=future|cleared|not_cleared][&from=][&to=][&limit=][&offset=]`
+### `GET /finance/cheques/all?company=[&source=hashavshevet|priority|both|archive][&state=future|cleared|not_cleared][&from=][&to=][&limit=][&offset=]`
 
 Owner 2026-11-11: "merge the Priority and Hashavshevet cheques into one table". Every cheque of the company, one row
 each, by due date (`admin/server/modules/chequesAll.js`, `mergeCheques`): the rows of `/cheques` (`source`
@@ -746,8 +751,13 @@ each, by due date (`admin/server/modules/chequesAll.js`, `mergeCheques`): the ro
 `invoices`); the same number with another amount stays two rows. On the local copy the two never meet (Hashavshevet's
 numbers start at 15917): 1,665 + 2,678 = 4,343 rows. `bankDate` = the day the bank paid it (the first statement cheque
 line with that number and amount); a Priority-only cheque is `cleared` when the bank paid it, else `future` /
-`not_cleared` by its date. `from`/`to` filter `dueDate` (no range limit). `meta.counts` = `{ total, hashavshevet,
-priority, both, bankPaid }` and `meta.totals` = `{ amount, future, cleared, not_cleared }` over every cheque. Joya HQ
+`not_cleared` by its date. `from`/`to` filter `dueDate` (no range limit). **The cheque archive** (2026-11-16, `/cheques/archive`)
+joins by the same key: a scanned cheque of a known row adds `imageId` / `image` to it; a scanned cheque in NEITHER source is a
+row of its own (`source` `archive`: the bank paid it — `state` `cleared`, `dueDate` = `bankDate` = the bank day, the only date
+the archive has; `payee` = the archive's confirmed name with `payeeSource` = where the archive got it, or `payeeGuess`). On the
+local copy 2026-11-16: 1,665 + 2,678 + 462 archive-only = 4,805 rows, 1,343 with a picture. `meta.counts` = `{ total, hashavshevet,
+priority, both, archive, bankPaid, withImage }`, `meta.totals` = `{ amount, future, cleared, not_cleared }` over every cheque,
+`meta.archive` = `{ folder, count, modifiedTime[, error] }` (null when the company has no archive). Joya HQ
 keeps this table as a **fixed Google Sheet** in the owner's Drive folder, rebuilt on demand (hq README → "Fixed files in Drive").
 
 ```json
@@ -755,6 +765,45 @@ keeps this table as a **fixed Google Sheet** in the owner's Drive folder, rebuil
   "bankDate": "2025-07-03", "account": null, "accountName": null, "chequeId": null, "supplierAccount": "200076", "priorityPayment": "CH25000351",
   "grossAmount": 14389, "withholding": 0, "invoices": "9473, 9100, 8528, 8156", "details": "חש. ספק מרכזת" }
 ```
+
+### `GET /finance/cheques/archive?company=[&number=][&q=][&amount=][&books=in|missing][&named=1|0][&from=][&to=][&limit=][&offset=]`
+
+Owner 2026-11-16: "load the index.json from the cheques folder in the Drive and use it to extract names wherever needed to
+reduce the 'לא נמצא בחשבשבת' cases". **The cheque archive** = the Drive folder the owner's machine fills from the Bank Hapoalim
+site (memory `bank-cheque-images`): the scanned front of every cheque the bank paid since May 2025, filed per payee, with an
+`index.json` per company (`<root>/<company folder>/index.json`, rows: `rowId`, `date` = the bank day, `reference` = the cheque
+number, `amount` (minus = money out), `payee`, `payeeSource`, `payeeGuess`, `party_folder`, `files.front`). Where the books and
+Priority had no name, the payee was READ FROM THE PICTURE (`payeeSource` `image` / `image_handwriting`: 336 of 1,358 on
+2026-11-16; 17 unsure readings in `payeeGuess`, 7 with nothing). `admin/server/modules/chequeArchive.js` reads the index with
+the invoice agent's Google login (the same files as `/invoices/drive-check`; `CHEQUE_ARCHIVE_FOLDER` = the root folder id,
+default the owner's folder), 5 minutes in memory, nothing stored, nothing written. The company is found by its folder name
+(`shared/finance_map.json` → `chequeArchive.folder`); a company without one gets `data: []` and `meta.archive` null. Drive down
+→ `data: []` with `meta.archive.error` (the report and the lookups then work without the archive).
+
+Filters combine: `number` = cheque number(s); `q` = part of the payee, the guess or the folder; `amount` = one or several amounts
+(±0.01); `from`/`to` on the bank day (no range limit); `named=1` / `named=0` = with / without a confirmed name; `books` =
+`in` (Hashavshevet knows the cheque today — its cheques module or a journal entry with that number and amount) or `missing`
+(**the bookkeeper's work list**: the cheques still to enter, each with name, amount, bank day and the picture). Row: `cheque`,
+`date`, `amount`, `payee`, `payeeSource` (`image` | `image_handwriting` | `priority` | `journal` | `cheques` = where the archive got the
+name when it was filed; `none`), `fromImage`, `payeeGuess`, `partyFolder`, `imageId`, `image` (the Drive link), `reviewed`, `rowId`,
+`inBooks`, `booksPayee` / `booksSource` (what Hashavshevet says now), `account` = the company account with exactly that name, if
+one. `meta.totals` = `{ count, amount, inBooks, named, guess, unnamed }` over the selection, `meta.counts` = the whole archive
+(`total, named, fromImage, guess, unnamed, withImage, bySource`), `meta.archive` = `{ folder, count, modifiedTime[, error] }`. On the
+local copy 2026-11-16: 1,358 rows, 117 in the books, 1,241 to enter.
+
+```json
+{ "cheque": 11106, "date": "2025-07-27", "amount": 3639, "payee": "ציונוב מעיין", "payeeSource": "image_handwriting", "fromImage": true, "payeeGuess": null,
+  "partyFolder": "ציונוב מעיין", "imageId": "1c1bBi…", "image": "https://drive.google.com/file/d/1c1bBi…/view", "reviewed": "image", "rowId": 1173,
+  "inBooks": false, "booksPayee": null, "booksSource": null, "account": null }
+```
+
+### `GET /finance/cheques/image/:id`
+
+The picture of a scanned cheque (`imageId` of the archive rows and of the bank lines), streamed from Drive with the agent's
+login — so a Joya user needs no Drive sharing (Joya proxies it at `/api/joya/finance/cheque-image/:id`; the admin report page
+has its own `/admin/bank-recon/cheque-image/:id`). Not a JSON envelope: `image/jpeg` (or the file's type), `Cache-Control`
+private one day; an id that is not in the archive's index → 404 (no other Drive file can be fetched through it). The report HTML
+links the 📷 to the relative `cheque-image/<id>`, which lands on the right route on both pages.
 
 ### `GET /finance/vat?company=&from=&to=[&includeUnposted=1]`
 

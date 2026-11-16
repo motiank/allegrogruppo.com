@@ -140,7 +140,7 @@ Every number the AI gives comes from one AI calculation (`src/services/ai.js` CA
 | Clock times (who worked when) | `tabit_shifts` | Tabit Shift API, daily 06:30 / Upload page | `/shifts/raw`, `/shifts/by-shift` | `staffing_actual`, `staffing_forecast_week`, `labor_summary` (hours) |
 | Payroll, labor cost | `payroll` (+ `tabit_shifts`, `bcom_cash`) | admin Shifts page (saved payroll) | `/payroll`, `/shifts/summary`, `/labor/daily` | `labor_summary`, `payroll_issues` |
 | Branches, companies | `branches` + `shared/restaurants.json` | admin | `/branches` | the picker, `context.locations` |
-| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_recon_report`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `priority_cheques` (the Priority cheque file, before Hashavshevet), `vat_summary`, `withholding`, `allocation_numbers`, `missing_invoices` (invoices not booked yet, channel by channel — first channel: the invoice agent's Drive index, flag written back into Drive), `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
+| **The books** (Hashavshevet copy, `allegro_finance` DB): P&L, cash, suppliers, debts, trial balance, account cards, journal, bank reconciliation, invoices, cheques, VAT in the books, withholding, allocation numbers, exceptions, change history | `allegro_finance.*` (hash-sync, nightly) | hash-sync | `/finance/*` (`../finance_api_readme.md`) | `finance_status`, `pnl`, `cash_position`, `branch_costs`, `sales_vs_books`, `spending`, `aging`, `intercompany`, `trial_balance`, `account_card`, `journal_search`, `bank_reconciliation`, `bank_recon_report`, `bank_open_items`, `bank_match_suggestions`, `customer_invoices`, `account_statement`, `cheques`, `priority_cheques` (the Priority cheque file, before Hashavshevet), `cheque_archive` (the scanned cheques in Drive: names read from the picture, the bookkeeper's work list), `vat_summary`, `withholding`, `allocation_numbers`, `missing_invoices` (invoices not booked yet, channel by channel — first channel: the invoice agent's Drive index, flag written back into Drive), `payroll_check`, `exceptions`, `change_history` (`src/services/finance.js`) — chain admin only |
 
 **Credit card vs members club (Beecomm, owner 2026-10-26).** "Credit card" = only **VISA, MASTERCARD, AMEX and DINERS** (and ISRACARD, DISCOVER, MAESTRO — owner, 2026-11-03) of
 the credit type (אשראי). Every other brand of that type (PRIVATE LABEL BRAND - חבר…) is the
@@ -505,6 +505,22 @@ has to be entered in Hashavshevet, the report counts them in a note apart from t
 <ספק>", "בפריוריטי", a cheque the bank shows as "לא נמצא בחשבשבת" → `priority_cheques` alone (q, from–to on the date
 on the cheque, amount). `net` is the amount on the cheque, `amount` is before withholding tax. Tests
 `scripts/test_priority_cheques.js`, `scripts/test_cheque_payees.js`; eval `pc-*`.
+
+**Cheque archive (owner 2026-11-16: "load the index.json from the cheques folder in the drive and use it to extract names
+wherever needed to reduce the 'לא נמצא בחשבשבת' cases" — all use cases).** The owner's machine files the scanned front of every
+cheque the bank paid in a Drive folder, per payee, with an `index.json`; where the books and Priority had no name, the payee was
+read from the picture (336 of 1,358 on 2026-11-16, 17 unsure guesses). The admin reads that index with the invoice agent's login
+(`admin/server/modules/chequeArchive.js`; Finance API `/cheques/archive`, `/cheques/image/:id`; `../finance_api_readme.md`). In
+Joya: (1) every bank cheque row (`bank_transactions`, `bank_open_items`, `bank_match_suggestions`, the report's section 1) may
+carry `payeeSource` `image` — written "שיק 11106 – ציונוב מעיין (מהצ'ק)", the cheque is still not in the books — or `image_guess`
+("? (מהצ'ק, לא ודאי)", confirm against the picture), and `image` / `hasImage` when the scan exists; the report page shows 📷 next to
+the name and serves the picture through `/api/joya/finance/cheque-image/:id` (no Drive sharing needed). (2) Calc
+`cheque_archive`: "אילו שיקים עוד לא נרשמו בחשבשבת", "רשימת העבודה של מנהלת החשבונות" → `books: "missing"` (name, amount, bank
+day, picture, the account with that name); "שיקים בלי שם ודאי" → `named: false`; "יש תמונה של שיק N" → `number`; a cheque by its
+number now plans `cheques` + `priority_cheques` + `cheque_archive`. (3) The cheques file and `cheques` (`/cheques/all`) include the
+scanned cheques that are in neither Hashavshevet nor Priority (`source` `archive`, the bank day as the date). (4) `statement_compare`:
+a payment in THEIR statement that our books lack gets `archiveCheque` when a scanned cheque has that amount near that date — the
+writer says the payment happened and the cheque is not entered yet. Eval `ca-*`; tests in the repo root (`scripts/test_cheque_archive.js`).
 
 **Fixed files in Drive (owner 2026-11-11: "merge into one table the Priority and Hashavshevet cheques, create an Excel on
 the Drive and provide the link — a fixed file that is updated all the time"; then: "no schedule and no service for that,

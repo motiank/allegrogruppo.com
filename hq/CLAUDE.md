@@ -205,6 +205,15 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   The supplier picker (searchable, red count = the supplier's bank moves missing from the books) deployed 2026-11-13 (`43c3a18`).
   Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
   from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
+- **Cheque archive** (2026-11-16, owner: use the Drive cheques folder's `index.json` to cut the "לא נמצא בחשבשבת" cases — all use
+  cases): the admin reads the scanned-cheque archive (`admin/server/modules/chequeArchive.js`, root `CLAUDE.md` → "Cheque archive in
+  Drive"). In Joya: `payeeSource` `image` ("(מהצ'ק)" — the name read from the picture) / `image_guess` ("? (מהצ'ק, לא ודאי)") on every bank
+  cheque row and `image` / `hasImage` where a scan exists (WRITE rule in the bank-cheque paragraph; the report page shows 📷, the picture is
+  proxied at `/api/joya/finance/cheque-image/:id` → Finance API `/cheques/image/:id`); calc `cheque_archive` (`fin.chequeArchive`, Finance
+  API `/cheques/archive`: number, q, amount, books `missing` = the bookkeeper's work list, named false = the unsure / unnamed ones; PLAN
+  rules "A cheque by its NUMBER" → three calcs, and "The scanned cheques … WORK LIST"); `statement_compare` adds `archiveCheque` to an
+  onlyTheirs payment that a scanned cheque explains (same amount, within `days`); `/cheques/all` rows (the cheques file) may be
+  `source` `archive` with `payeeGuess` / `image` (`fixedSheets.js` SOURCE_HE). Eval `ca-*`, `pc-number` (3 calcs). Deployed 2026-11-16 (no hq client build needed).
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

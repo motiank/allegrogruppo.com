@@ -7,6 +7,11 @@
 // fields, Priority's supplier account, payment number, withholding and invoices added). The same number with another
 // amount stays two rows (a number can be reused). The bank day comes from the bank statement's cheque lines with that
 // number and amount; a Priority-only cheque is "cleared" when the bank paid it, else "future" or "not_cleared" by its date.
+// The cheque archive in Drive (chequeArchive.js, owner 2026-11-16) joins by the same key: a scanned cheque of a known row
+// adds `imageId` / `image` to it; a scanned cheque in NEITHER source becomes a row of its own (source "archive": the bank
+// paid it, payee = the archive's confirmed name with payeeSource = where the archive got it (image / image_handwriting =
+// read from the picture, priority / journal = copied by number when filed), or payeeGuess; dueDate = the bank day — the
+// only date the archive has).
 
 const amountKey = (n) => (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toFixed(2);
 const key = (no, amount) => `${String(Number(no))}|${amountKey(amount)}`;
@@ -17,10 +22,12 @@ const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
  * @param {Array} p.hash      rows of the Finance API's /cheques (chequeRows): reference, payee, amount, dueDate, issueDate, originalDate, state, account, accountName, chequeId
  * @param {Array} p.priority  records of shared/priority_cheques.json
  * @param {Array} p.bank      the bank statement's cheque lines: { reference, amount (absolute), date }
+ * @param {Array} [p.archive] records of the cheque archive (chequeArchive.js normalizeEntry): reference, amount, date, payee, fromImage, guess, imageId
  * @param {string} p.today    YYYY-MM-DD
  * @returns {{ rows: Array, counts: object, totals: object }}
  */
-export function mergeCheques({ hash = [], priority = [], bank = [], today }) {
+export function mergeCheques({ hash = [], priority = [], bank = [], archive = [], today }) {
+  const imageUrl = (id) => (id ? `https://drive.google.com/file/d/${id}/view` : null);
   const bankBy = new Map(); // number|amount → earliest bank day
   for (const b of bank) {
     if (b.reference == null || !/^\d+$/.test(String(b.reference).trim())) continue;
@@ -59,12 +66,36 @@ export function mergeCheques({ hash = [], priority = [], bank = [], today }) {
       account: null, accountName: null, chequeId: null, ...p,
     });
   }
-  const all = [...rows, ...extra].sort((a, b) => String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999")) || (a.cheque ?? 0) - (b.cheque ?? 0));
-  const counts = { total: all.length, hashavshevet: 0, priority: 0, both: 0, bankPaid: 0 };
+  // the archive: the picture joins the row with the same number and amount; a cheque in neither source is a row of its own
+  const byKey = new Map(hashByKey);
+  for (const x of extra) {
+    const k = x.cheque == null ? null : key(x.cheque, x.amount);
+    if (k && !byKey.has(k)) byKey.set(k, x);
+  }
+  const scanned = [];
+  for (const c of archive) {
+    if (c.reference == null || !c.imageId) continue;
+    const k = key(c.reference, c.amount);
+    const twin = byKey.get(k);
+    if (twin) {
+      if (!twin.imageId) Object.assign(twin, { imageId: c.imageId, image: imageUrl(c.imageId) });
+      continue;
+    }
+    const row = {
+      source: "archive", cheque: Number(c.reference), payee: c.payee || null, payeeSource: c.payee ? c.source : null, payeeGuess: !c.payee && c.guess ? c.guess : null, amount: r2(c.amount), dueDate: c.date || null,
+      issueDate: null, state: "cleared", bankDate: c.date || null, account: null, accountName: null, chequeId: null,
+      supplierAccount: null, priorityPayment: null, grossAmount: null, withholding: null, invoices: null, details: null, imageId: c.imageId, image: imageUrl(c.imageId),
+    };
+    scanned.push(row);
+    byKey.set(k, row);
+  }
+  const all = [...rows, ...extra, ...scanned].sort((a, b) => String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999")) || (a.cheque ?? 0) - (b.cheque ?? 0));
+  const counts = { total: all.length, hashavshevet: 0, priority: 0, both: 0, archive: 0, bankPaid: 0, withImage: 0 };
   const totals = { amount: 0, future: 0, cleared: 0, not_cleared: 0 };
   for (const x of all) {
     counts[x.source] += 1;
     if (x.bankDate) counts.bankPaid += 1;
+    if (x.imageId) counts.withImage += 1;
     totals.amount += x.amount;
     totals[x.state] = (totals[x.state] || 0) + x.amount;
   }

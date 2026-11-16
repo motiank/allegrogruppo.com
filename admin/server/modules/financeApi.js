@@ -10,6 +10,8 @@ import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
 import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
 import { mergeCheques } from "./chequesAll.js";
+import { companyArchive, searchArchive, archiveCounts, driveImageUrl, readChequeImage } from "./chequeArchive.js";
+import { chequePayees, pickPayee } from "./chequePayees.js";
 import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
 import { matchInvoices, booksFlag, flagChanged, normDigits, STATUSES } from "../../../shared/invoiceMatch.js";
 
@@ -1405,7 +1407,8 @@ route("/bank/open", async (req, ctx) => {
       : { lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, account: r.account_key, date: r.d, reference: r.reference, description: r.description, type: r.trans_type, posted: r.status === 1,
           counterAccount: r.debit_account === r.account_key ? r.credit_account : r.debit_account, side: r.side, amount: round2(r.amount), signedAmount: round2(r.signed_amount), chequeId: r.cheque_id || null, ageDays: num(r.age) },
   );
-  // cheque lines of the bank get the beneficiary from Hashavshevet (payee / payeeSource: cheques, journal, missing);
+  // cheque lines of the bank get the beneficiary from Hashavshevet, the Priority file or the cheque archive in Drive (payee /
+  // payeeSource: cheques, journal, priority, image, image_guess, missing; + imageId / image = the scanned cheque);
   // transfer lines get it from the bank's transaction status file (bank_events; payeeSource events, + event)
   const payees = side === "bank" ? await addChequePayees(data, { company: ctx.companyId, bankAccounts: ctx.bankAccounts }) : undefined;
   const events = side === "bank" ? await addTransferEvents(data, { accounts: fileAccountsOf({ financeCode: ctx.code }), date: (r) => r.date, amount: (r) => (r.signedAmount < 0 ? -r.signedAmount : null) }) : undefined;
@@ -1676,7 +1679,7 @@ route("/cheques", async (req, ctx) => {
 route("/cheques/all", async (req, ctx) => {
   const { from, to } = dateRange(req, { required: false, maxDays: 0 });
   const hasRange = Boolean(from || req.query.to);
-  const source = oneOf(req, "source", ["hashavshevet", "priority", "both"], null);
+  const source = oneOf(req, "source", ["hashavshevet", "priority", "both", "archive"], null);
   const state = oneOf(req, "state", ["future", "cleared", "not_cleared"], null);
   const { limit, offset } = paging(req);
   const hash = await chequeRows(ctx);
@@ -1690,14 +1693,16 @@ route("/cheques/all", async (req, ctx) => {
       )
     : [];
   const bank = bankRows.filter((b) => isChequeLine(b.details)).map((b) => ({ reference: b.reference, amount: b.amount, date: b.d }));
-  const merged = mergeCheques({ hash, priority, bank, today: today() });
+  const archive = await companyArchive(ctx.code); // the scanned cheques (Drive); [] with `error` when Drive is down
+  const merged = mergeCheques({ hash, priority, bank, archive: archive.cheques, today: today() });
   const filtered = merged.rows.filter((x) => (!hasRange || ((!from || (x.dueDate && x.dueDate >= from)) && (!to || (x.dueDate && x.dueDate <= to)))) && (!source || x.source === source) && (!state || x.state === state));
   return {
     data: filtered.slice(offset, offset + limit),
     meta: {
       from: from || null, to: hasRange ? to : null, source, state, limit, offset, total: filtered.length, counts: merged.counts, totals: merged.totals,
       priority: priority.length ? { builtAt: PRIORITY_CHEQUES_META.builtAt, count: PRIORITY_CHEQUES_META.count } : null,
-      note: "one row per cheque: Hashavshevet's cheques module and the Priority file merged by number + amount (source both); dueDate = the date on the cheque, bankDate = the day the bank paid it (a statement cheque line with that number and amount); amount = the amount on the cheque; counts and totals cover every cheque, not the filter",
+      archive: archive.configured ? { folder: archive.folder, count: archive.cheques.length, modifiedTime: archive.modifiedTime, ...(archive.error ? { error: archive.error } : {}) } : null,
+      note: "one row per cheque: Hashavshevet's cheques module and the Priority file merged by number + amount (source both), plus the scanned cheques of the Drive archive that are in neither (source archive: the bank paid it, payee read from the picture or payeeGuess, dueDate = the bank day); imageId / image = the scanned cheque where the archive has it; dueDate = the date on the cheque, bankDate = the day the bank paid it (a statement cheque line with that number and amount); amount = the amount on the cheque; counts and totals cover every cheque, not the filter",
     },
     codes: ["bank_gap"],
   };
@@ -1725,6 +1730,54 @@ route("/cheques/priority", async (req, ctx) => {
       cheque: cheque.length ? cheque.map(Number) : null, q, supplierAccount, amount: amountRaw ? Number(amountRaw) : null, dateField, from: from || null, to: hasRange ? to : null,
       limit, offset, total: r.total, totals: r.totals, source,
       note: "cheques written in Priority before Hashavshevet (history, a constant file): amount = before withholding tax, net = the amount on the cheque, lines = the invoices it paid; cheques written in Hashavshevet are in /cheques",
+    },
+  };
+});
+
+// ── the cheque archive in Drive (readme → /cheques/archive) ──────────────
+// The scanned cheques the bank paid, with the index the owner's machine keeps in Drive (chequeArchive.js): the name
+// read from the picture when the books and Priority had none. `books` = in (Hashavshevet knows the cheque) | missing
+// (not in Hashavshevet — the bookkeeper's work list: name, amount, date and the picture of every cheque still to enter).
+const normName = (s) => String(s ?? "").replace(/["'`״׳.\-]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+route("/cheques/archive", async (req, ctx) => {
+  const archive = await companyArchive(ctx.code);
+  const about = archive.configured ? { folder: archive.folder, count: archive.cheques.length, modifiedTime: archive.modifiedTime, ...(archive.error ? { error: archive.error } : {}) } : null;
+  if (!archive.configured) return { data: [], meta: { total: 0, archive: null, note: `${ctx.code} has no cheque archive folder in Drive (finance_map.json → chequeArchive.folder)` } };
+  const number = csv(req.query.number);
+  if (number.some((n) => !/^\d+$/.test(n))) throw badRequest("number must be a comma-separated list of cheque numbers");
+  const q = String(req.query.q ?? "").trim() || null;
+  const amounts = csv(req.query.amount);
+  if (amounts.some((a) => !Number.isFinite(Number(a)))) throw badRequest("amount must be a number or a comma-separated list of numbers");
+  const named = req.query.named == null || req.query.named === "" ? null : flag(req, "named");
+  const books = oneOf(req, "books", ["in", "missing"], null);
+  const { from, to } = dateRange(req, { required: false, maxDays: 0 });
+  const hasRange = Boolean(from || req.query.to);
+  const { limit, offset } = paging(req);
+  const found = searchArchive(archive.cheques, { number: number.length ? number : null, q, amount: amounts.length ? amounts : null, from, to: hasRange ? to : null, named, limit: 100000, offset: 0 });
+  // what Hashavshevet knows of these cheques (the live books, not the archive's own note): inBooks + the name the books give
+  const names = found.rows.length ? await chequePayees(ctx.companyId, found.rows.map((c) => c.reference), { bankAccounts: ctx.bankAccounts }) : new Map();
+  const accountsByName = new Map();
+  for (const a of ctx.accounts.values()) if (a.name) accountsByName.set(normName(a.name), a);
+  let rows = found.rows.map((c) => {
+    const hit = pickPayee((names.get(c.reference) || []).filter((x) => x.source === "cheques" || x.source === "journal"), c.amount);
+    const name = c.payee || c.guess;
+    const account = name ? accountsByName.get(normName(name)) || null : null;
+    return {
+      cheque: Number(c.reference), date: c.date, amount: c.amount, payee: c.payee, payeeSource: c.source, fromImage: c.fromImage, payeeGuess: c.guess, partyFolder: c.partyFolder,
+      imageId: c.imageId, image: driveImageUrl(c.imageId), reviewed: c.reviewed, rowId: c.rowId,
+      inBooks: Boolean(hit), booksPayee: hit?.payee || null, booksSource: hit?.source || null,
+      account: account ? { key: account.accountKey, name: account.name } : null,
+    };
+  });
+  if (books === "in") rows = rows.filter((r) => r.inBooks);
+  if (books === "missing") rows = rows.filter((r) => !r.inBooks);
+  const totals = { count: rows.length, amount: round2(rows.reduce((s, r) => s + r.amount, 0)), inBooks: rows.filter((r) => r.inBooks).length, named: rows.filter((r) => r.payee).length, guess: rows.filter((r) => !r.payee && r.payeeGuess).length, unnamed: rows.filter((r) => !r.payee && !r.payeeGuess).length };
+  return {
+    data: rows.slice(offset, offset + limit),
+    meta: {
+      number: number.length ? number.map(Number) : null, q, amount: amounts.length ? amounts.map(Number) : null, named, books, from: from || null, to: hasRange ? to : null, limit, offset,
+      total: rows.length, totals, archive: about, counts: archiveCounts(archive.cheques),
+      note: "the scanned cheques the bank paid (the Drive archive): date = the bank day, payee = the confirmed name (payeeSource image / image_handwriting = read from the picture, priority / journal / cheques = copied from those sources when the cheque was filed), payeeGuess = an unsure reading, image = the picture; inBooks = Hashavshevet knows the cheque today (booksPayee / booksSource); account = the company's account with exactly that name, if any; books=missing = the cheques still to enter",
     },
   };
 });
@@ -2184,6 +2237,18 @@ const Router = () => {
     try {
       const f = await bankReconFacets(req.query);
       res.json({ data: { kinds: f.kinds, parties: f.parties }, meta: { company: f.company.code, account: f.account.key, from: f.from, to: f.to, dataUpTo: f.dataUpTo, count: f.parties.length } });
+    } catch (err) { sendError(res, err); }
+  });
+  // the scanned cheque of the Drive archive (chequeArchive.js), for the 📷 links of the report shown in Joya (relative
+  // "cheque-image/<id>" → Joya's /api/joya/finance/cheque-image/<id> → here); only ids in the archive's index are served
+  router.get("/cheques/image/:id", async (req, res) => {
+    try {
+      const img = await readChequeImage(req.params.id);
+      if (!img) return res.status(404).json({ error: { code: "not_found", message: "no such cheque image in the archive" } });
+      res.setHeader("Content-Type", img.mimeType);
+      res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(img.name)}`);
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      return res.send(img.buffer);
     } catch (err) { sendError(res, err); }
   });
   router.get("/bank/report", async (req, res) => {

@@ -272,7 +272,7 @@ describe("endpoints", () => {
   test("route list covers the readme", () => {
     const want = ["/companies", "/status", "/accounts", "/branches", "/pnl", "/cash", "/branch-costs", "/sales-vs-books", "/spending", "/aging", "/intercompany",
       "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/balances", "/bank/suggestions", "/invoices", "/statement",
-      "/cheques", "/cheques/priority", "/cheques/all", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
+      "/cheques", "/cheques/priority", "/cheques/all", "/cheques/archive", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
     assert.deepEqual(financeRoutes().sort(), want.sort());
   });
 
@@ -607,7 +607,7 @@ describe("endpoints", () => {
       assert.ok(bank.data.every((l, i, a) => ["in", "out"].includes(l.direction) && (i === 0 || a[i - 1].date <= l.date)), "oldest first");
       const chq = await ok(`/bank/open?company=${COMPANY}&side=bank&from=2026-01-01&limit=1000`);
       const chequeLines = chq.data.filter((l) => /^שיק/.test(l.details));
-      assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "priority", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
+      assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "priority", "image", "image_guess", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
       assert.equal(chq.meta.payees.lines, chq.data.filter((l) => /^שיק|החזרת שיק|בטול שיק/.test(l.details)).length);
       const old = await ok(`/bank/open?company=${COMPANY}&side=bank&minAge=90&limit=5`);
       assert.ok(old.meta.total < bank.meta.total && old.data.every((l) => l.ageDays >= 90));
@@ -731,11 +731,53 @@ describe("endpoints", () => {
       await fail(`/cheques/priority?company=${COMPANY}&cheque=x`, 400, "bad_request");
       await fail(`/cheques/priority?company=${COMPANY}&amount=abc`, 400, "bad_request");
     });
+    test("GET /cheques/archive: the scanned cheques of the Drive archive (when Drive can be read from here)", async () => {
+      const r = await ok(`/cheques/archive?company=${COMPANY}&limit=3`);
+      assert.ok(r.meta.archive, "pastalina has an archive folder in finance_map.json");
+      await fail(`/cheques/archive?company=${COMPANY}&number=x`, 400, "bad_request");
+      await fail(`/cheques/archive?company=${COMPANY}&amount=abc`, 400, "bad_request");
+      await fail(`/cheques/archive?company=${COMPANY}&books=maybe`, 400, "bad_request");
+      if (r.meta.archive.error) {
+        console.log(`  (archive not read: ${r.meta.archive.error})`);
+        assert.equal(r.data.length, 0);
+        return;
+      }
+      assert.ok(r.meta.total > 1000 && r.data.length === 3);
+      assert.ok(r.data.every((x) => Number.isInteger(x.cheque) && x.amount > 0 && x.image && x.imageId && typeof x.inBooks === "boolean"));
+      assert.equal(r.meta.totals.named + r.meta.totals.guess + r.meta.totals.unnamed, r.meta.total);
+      assert.equal(r.meta.counts.fromImage, r.meta.counts.bySource.image + r.meta.counts.bySource.image_handwriting);
+      const missing = await ok(`/cheques/archive?company=${COMPANY}&books=missing&limit=1`);
+      assert.ok(missing.meta.total < r.meta.total && missing.data.every((x) => !x.inBooks));
+      const inBooks = await ok(`/cheques/archive?company=${COMPANY}&books=in&limit=1`);
+      assert.equal(missing.meta.total + inBooks.meta.total, r.meta.total);
+      assert.ok(inBooks.data.every((x) => x.inBooks && x.booksPayee && ["cheques", "journal"].includes(x.booksSource)));
+      const unnamed = await ok(`/cheques/archive?company=${COMPANY}&named=0&limit=100`);
+      assert.ok(unnamed.data.every((x) => !x.payee));
+      const one = await ok(`/cheques/archive?company=${COMPANY}&number=${r.data[0].cheque}`);
+      assert.ok(one.data.length >= 1 && one.data.every((x) => x.cheque === r.data[0].cheque));
+      const byAmount = await ok(`/cheques/archive?company=${COMPANY}&amount=${r.data[0].amount},${r.data[1].amount}`);
+      assert.ok(byAmount.data.length >= 2 && byAmount.data.every((x) => [r.data[0].amount, r.data[1].amount].includes(x.amount)));
+      const ranged = await ok(`/cheques/archive?company=${COMPANY}&from=2025-06-01&to=2025-06-30&limit=5000`);
+      assert.ok(ranged.data.length > 0 && ranged.data.every((x) => x.date >= "2025-06-01" && x.date <= "2025-06-30"));
+      // the picture itself, streamed through the admin
+      const imgRes = await fetch(`${base}/cheques/image/${r.data[0].imageId}`);
+      assert.equal(imgRes.status, 200);
+      assert.match(imgRes.headers.get("content-type"), /^image\//);
+      assert.ok((await imgRes.arrayBuffer()).byteLength > 1000);
+      assert.equal((await fetch(`${base}/cheques/image/not-in-the-archive-0000`)).status, 404);
+    });
     test("GET /cheques/all: Hashavshevet + Priority in one table", async () => {
       const all = await ok(`/cheques/all?company=${COMPANY}&limit=5000`);
       const c = all.meta.counts;
       assert.equal(c.total, all.data.length);
-      assert.equal(c.hashavshevet + c.priority + c.both, c.total);
+      assert.equal(c.hashavshevet + c.priority + c.both + c.archive, c.total);
+      if (all.meta.archive && !all.meta.archive.error) {
+        assert.ok(c.archive > 0 && c.withImage > c.archive, "the scanned cheques join the known rows and add the unknown ones");
+        const a = all.data.find((x) => x.source === "archive");
+        assert.ok(a.imageId && a.image.includes(a.imageId) && a.state === "cleared" && a.bankDate === a.dueDate);
+        const onlyArchive = await ok(`/cheques/all?company=${COMPANY}&source=archive&limit=5000`);
+        assert.equal(onlyArchive.meta.total, c.archive);
+      }
       assert.equal(c.hashavshevet + c.both, 1665, "every Hashavshevet cheque is in the table once");
       assert.equal(c.priority + c.both, 2678, "every Priority cheque is in the table once");
       assert.equal(c.both, 0, "the two sources do not overlap on the local copy: Hashavshevet's numbers start at 15917");

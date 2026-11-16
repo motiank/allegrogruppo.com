@@ -9,6 +9,9 @@ import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
 import { renderBankReconBody, bankReconBehavior, CSS } from "../../../shared/bankReconHtml.js";
 
+// the 📷 link of a section-1 cheque line: the scanned cheque, streamed by the server from the Drive archive
+const chequeImageHref = (x) => `/admin/bank-recon/cheque-image/${encodeURIComponent(x.imageId)}`;
+
 const errText = (err, fallback) => err.response?.data?.error?.message || err.response?.data?.error || err.message || fallback;
 
 const partyValue = (p) => p.key || p.name;
@@ -207,7 +210,7 @@ const BankRecon = () => {
         {bank && <span style={styles.hint}>נתוני הבנק בחשבשבת: {bank.from} עד {bank.dataUpTo} ({bank.lines} תנועות)</span>}
       </div>
       {error && <div style={styles.error}>{String(error)}</div>}
-      {report && <div ref={reportRef} style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report) }} />}
+      {report && <div ref={reportRef} style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report, { imageHref: chequeImageHref }) }} />}
       {!report && !error && !loading && <p style={styles.hint}>בחר חשבון ותקופה ולחץ "הצג דוח". הדוח נבנה מספרי חשבשבת (allegro_finance) לקריאה בלבד.</p>}
     </div>
   );

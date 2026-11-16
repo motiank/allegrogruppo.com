@@ -98,6 +98,8 @@ export const CSS = `
 .bank-recon tr.todo td{background:#fff1f0}
 .bank-recon .td{display:inline-block;font-size:.75em;background:#e05050;color:#fff;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
 .bank-recon .filter .of{color:#555;font-size:12px;margin-top:4px}
+.bank-recon td.guess{color:#8a5a00}
+.bank-recon a.chq-img{text-decoration:none;font-size:12px;margin-right:4px}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
 .bank-recon .summary{max-width:720px}
@@ -207,12 +209,26 @@ function summary(r) {
 const olderClass = (row, from) => (row.date && from && String(row.date) < String(from) ? "older" : "");
 
 // the beneficiary of a cheque line (payee from Hashavshevet; "priority" = named by the Priority cheque file, the
-// history before Hashavshevet; "missing" = the cheque is not in Hashavshevet yet)
+// history before Hashavshevet; "image" = the name was read from the scanned cheque in the Drive archive, "image_guess" =
+// an unsure reading of it; "missing" = the cheque is not in Hashavshevet yet)
 export const PAYEE_MISSING = "לא נמצא בחשבשבת";
+export const PAYEE_SOURCE_SUFFIX = { priority: " (פריוריטי)", image: " (מהצ'ק)", image_guess: "? (מהצ'ק, לא ודאי)" };
 // payeeRole "from" (the bank file's "המבצע: …", money that came in) is shown as "מאת: <name>", so a receipt is never read as a payment
-export const payeeText = (x) => (x.payeeSource === "missing" ? PAYEE_MISSING : x.payeeSource === "priority" && x.payee ? `${x.payee} (פריוריטי)` : x.payeeRole === "from" && x.payee ? `מאת: ${x.payee}` : x.payee || "");
+export const payeeText = (x) =>
+  x.payeeSource === "missing" ? PAYEE_MISSING : PAYEE_SOURCE_SUFFIX[x.payeeSource] && x.payee ? `${x.payee}${PAYEE_SOURCE_SUFFIX[x.payeeSource]}` : x.payeeRole === "from" && x.payee ? `מאת: ${x.payee}` : x.payee || "";
 
-function bankOpenTable(r) {
+// the link to the scanned cheque: by default a relative "cheque-image/<id>" (the admin's /admin/bank-recon/report page
+// and Joya's /api/joya/finance/bank-recon page both serve the picture next to the report); a page that renders the
+// body itself passes its own `imageHref(row)`. The payee cell keeps its plain text in data-f for the column filter.
+const defaultImageHref = (x) => `cheque-image/${encodeURIComponent(x.imageId)}`;
+const payeeCell = (x, opts) => {
+  const text = payeeText(x);
+  const cls = x.payeeSource === "missing" ? "missing" : x.payeeSource === "image_guess" ? "guess" : "";
+  const link = x.imageId ? ` <a class="chq-img" href="${esc((opts?.imageHref || defaultImageHref)(x))}" target="_blank" rel="noreferrer" title="תמונת הצ'ק הסרוק">📷</a>` : "";
+  return `<td${cls ? ` class="${cls}"` : ""} data-f="${esc(text)}">${esc(text)}${link}</td>`;
+};
+
+function bankOpenTable(r, opts) {
   const rows = r.bankOpen || [];
   if (!rows.length) return omittedSection(r, "bankOpen") || `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
@@ -222,7 +238,7 @@ function bankOpenTable(r) {
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${cell(payeeText(x), x.payeeSource === "missing" ? "missing" : "")}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${payeeCell(x, opts)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
@@ -307,9 +323,10 @@ function chequesOpenTable(r) {
 }
 
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
-export function renderBankReconBody(report) {
+// opts.imageHref(row) = the link of a cheque's scanned picture (default: "cheque-image/<imageId>" next to the report).
+export function renderBankReconBody(report, opts = {}) {
   const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
-  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -354,7 +371,7 @@ export function bankReconBehavior(root) {
     if (!tbody || !ths.length) return;
     var rows = Array.prototype.filter.call(tbody.rows, function (r) { return !r.classList.contains("total"); });
     var active = {}; // column index → the values kept (a column that is absent shows everything)
-    var valueOf = function (r, i) { var c = r.cells[i]; var t = c ? c.textContent.trim() : ""; return t || EMPTY; };
+    var valueOf = function (r, i) { var c = r.cells[i]; var t = c ? (c.getAttribute("data-f") != null ? c.getAttribute("data-f") : c.textContent).trim() : ""; return t || EMPTY; };
     var noiseRows = rows.filter(function (r) { return r.classList.contains("noise"); }).length;
     var apply = function () {
       var cols = Object.keys(active);
@@ -475,7 +492,7 @@ export function bankReconBehavior(root) {
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePanels(); });
 }
 
-export function renderBankReconHtml(report) {
+export function renderBankReconHtml(report, opts = {}) {
   const title = `התאמת בנק ${report.account?.key || ""} ${fmtDate(report.from)}–${fmtDate(report.to)}${report.filter?.active ? " (מסונן)" : ""}`;
   return `<!doctype html>
 <html lang="he" dir="rtl">
@@ -485,7 +502,7 @@ export function renderBankReconHtml(report) {
 <title>${esc(title)}</title>
 <style>body{margin:16px;background:#fff}${CSS}</style>
 </head>
-<body>${renderBankReconBody(report)}
+<body>${renderBankReconBody(report, opts)}
 <script>(${bankReconBehavior.toString()})(document.querySelector(".bank-recon"));</script>
 </body>
 </html>`;

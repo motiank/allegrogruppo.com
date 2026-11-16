@@ -498,3 +498,8 @@ export async function financeBankReportFacets(params) {
 export async function financeBankReportFile(params, format) {
   return getFile('/finance/bank/report', { ...params, format });
 }
+
+/** The scanned cheque of the Drive archive (the report's 📷 links; admin chequeArchive.js) → { buffer, headers }. */
+export async function financeChequeImage(id) {
+  return getFile(`/finance/cheques/image/${encodeURIComponent(String(id || ''))}`);
+}

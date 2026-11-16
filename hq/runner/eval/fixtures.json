@@ -1340,7 +1340,8 @@
       "expect": {
         "calcs": [
           "cheques",
-          "priority_cheques"
+          "priority_cheques",
+          "cheque_archive"
         ],
         "params": {
           "cheques": {
@@ -1348,6 +1349,9 @@
           },
           "priority_cheques": {
             "cheque": "10777"
+          },
+          "cheque_archive": {
+            "number": "10777"
           }
         },
         "noParams": {
@@ -1356,9 +1360,12 @@
           ],
           "priority_cheques": [
             "q"
+          ],
+          "cheque_archive": [
+            "q"
           ]
         },
-        "maxCalcs": 2
+        "maxCalcs": 3
       }
     },
     {
@@ -1385,14 +1392,18 @@
       "question": "The bank report shows cheque 10334 as not found in Hashavshevet. What was it for?",
       "expect": {
         "calcs": [
-          "priority_cheques"
+          "priority_cheques",
+          "cheque_archive"
         ],
         "params": {
           "priority_cheques": {
             "cheque": "10334"
+          },
+          "cheque_archive": {
+            "number": "10334"
           }
         },
-        "maxCalcs": 2
+        "maxCalcs": 3
       }
     },
     {
@@ -2689,6 +2700,96 @@
           "payments_summary"
         ],
         "payments": "none"
+      }
+    },
+    {
+      "key": "ca-worklist",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים שירדו בבנק עוד לא נרשמו בחשבשבת? תן לי את רשימת העבודה של מנהלת החשבונות",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "books": "missing"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "ca-worklist-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Which cheques still have to be entered in Hashavshevet? Use the scanned cheques.",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "books": "missing"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "ca-unsure",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים בארכיון הצ'קים עדיין בלי שם ודאי?",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "named": false
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "ca-picture",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "יש תמונה של שיק 11106? למי הוא היה?",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "number": "11106"
+          }
+        },
+        "noParams": {
+          "cheque_archive": [
+            "q"
+          ]
+        },
+        "maxCalcs": 3
+      }
+    },
+    {
+      "key": "ca-payee",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו שיקים סרוקים יש בארכיון לציונוב מעיין?",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "q": "ציונוב|ציונוב מעיין"
+          }
+        },
+        "maxCalcs": 2
       }
     }
   ]

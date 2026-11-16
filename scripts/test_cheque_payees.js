@@ -58,7 +58,7 @@ test("addChequePayees marks only cheque rows, per company, and survives a bad co
     { company: "nope", action: "שיק", reference: String(mod.reference), debit: 10 },
   ];
   const stats = await addChequePayees(rows, { company: (r) => r.company, text: (r) => r.action, amount: (r) => r.debit });
-  assert.deepEqual(stats, { lines: 2, found: 1, priority: 0, missing: 1 });
+  assert.deepEqual({ ...stats, archiveError: undefined, withImage: undefined }, { lines: 2, found: 1, priority: 0, image: 0, imageGuess: 0, missing: 1, archiveError: undefined, withImage: undefined });
   assert.equal(rows[0].payee, mod.payee_name);
   assert.equal(rows[0].payeeSource, "cheques");
   assert.deepEqual([rows[1].payee, rows[1].payeeSource], [null, "missing"]);
@@ -83,7 +83,7 @@ test("a cheque Hashavshevet does not know is named by the Priority file (Pasta L
     { company: "pastaLina", action: "שיק", reference: "999999999", debit: 10 },
   ];
   const stats = await addChequePayees(rows, { company: (r) => r.company, text: (r) => r.action, amount: (r) => r.debit });
-  assert.deepEqual(stats, { lines: 3, found: 2, priority: 2, missing: 1 });
+  assert.deepEqual({ lines: stats.lines, found: stats.found, priority: stats.priority, missing: stats.missing, imageGuess: stats.imageGuess }, { lines: 3, found: 2, priority: 2, missing: 1, imageGuess: 0 });
   assert.deepEqual([rows[0].payee, rows[0].payeeSource], [a.supplier, "priority"]);
   assert.deepEqual([rows[1].payee, rows[1].payeeSource], [b.supplier, "priority"]);
   assert.deepEqual([rows[2].payee, rows[2].payeeSource], [null, "missing"]);
@@ -109,4 +109,17 @@ test("on the real bank lines of this year most cheques get a name", async () => 
   assert.equal(stats.lines, rows.length);
   assert.ok(stats.found / stats.lines > 0.9, `found ${stats.found} of ${stats.lines}`);
   assert.ok(rows.every((r) => r.payeeSource === "missing" ? r.payee === null : typeof r.payee === "string" && r.payee.length > 0));
+  assert.ok(rows.every((r) => ["cheques", "journal", "priority", "image", "image_guess", "missing"].includes(r.payeeSource)));
+  // the cheque archive in Drive (owner 2026-11-16): names read from the scanned cheques and the picture on the lines —
+  // only when Drive can be read from here (the agent's Google files); otherwise the stats say why
+  if (stats.archiveError) {
+    console.log(`  (archive not read: ${stats.archiveError})`);
+    assert.ok(!rows.some((r) => r.imageId));
+  } else {
+    assert.ok(stats.withImage > 0, "the archive has pictures of this year's cheques");
+    assert.equal(stats.found + stats.imageGuess + stats.missing, stats.lines);
+    assert.ok(rows.filter((r) => r.imageId).every((r) => r.image === `https://drive.google.com/file/d/${r.imageId}/view`));
+    assert.ok(rows.filter((r) => r.payeeSource === "image" || r.payeeSource === "image_guess").every((r) => r.imageId && r.payee));
+    console.log(`  payees: ${JSON.stringify(stats)}`);
+  }
 });

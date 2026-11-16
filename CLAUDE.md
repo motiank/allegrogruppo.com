@@ -211,7 +211,23 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
   the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
   read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
-  else the Priority cheque file = `priority` (2026-11-11), else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
+  else the Priority cheque file = `priority` (2026-11-11), else the cheque archive in Drive = `image` / `image_guess` (2026-11-16), else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
+  **Cheque archive in Drive** (2026-11-16, owner: "load the index.json from the cheques folder in the drive and use it to extract names wherever
+  needed to reduce the 'לא נמצא בחשבשבת' cases" → "all" seven use cases): the owner's machine files the scanned front of every cheque the bank
+  paid in the Drive folder `CHEQUE_ARCHIVE_FOLDER` (default the owner's folder; `<company folder>/index.json` + `cheques/<payee>/<no>.jpg`; the
+  payee of a cheque the books and Priority do not know is READ FROM THE PICTURE — 336 of 1,358 on 2026-11-16, 17 unsure guesses). The admin reads
+  the index with the invoice agent's Google login (`admin/server/modules/chequeArchive.js`, 5-min cache, nothing stored; company by
+  `shared/finance_map.json` → `chequeArchive.folder`). Uses: (1) the cheque lookup's fourth source — `payeeSource` `image` (name read from the
+  picture, same number AND amount; shown "(מהצ'ק)") / `image_guess` ("? (מהצ'ק, לא ודאי)"), and `imageId` / `image` on EVERY cheque line that has a
+  scan — so the report (section 1, Excel column "תמונת הצ'ק", notes and `summary.bankOpen.cheques.image / imageGuess / withImage`), `/finance/bank/open`,
+  `/bank/suggestions`, the Local Data API stored rows and Joya's bank chat all get them; the 📷 link streams the picture through
+  `/admin/bank-recon/cheque-image/:id` (admin page) or `/finance/cheques/image/:id` → Joya `/api/joya/finance/cheque-image/:id` (only ids in the
+  index); (2) Finance API `GET /finance/cheques/archive` (`books=missing` = the bookkeeper's work list: name, amount, bank day, picture, and the
+  account with that name) + Joya calc `cheque_archive`; (3) `/cheques/all` joins the scans and adds archive-only rows (`source` `archive`) — so Joya's
+  cheques file too; (4) Joya `statement_compare`: an onlyTheirs payment gets `archiveCheque` when a scanned cheque has that amount near that date;
+  (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12
+  guesses, 7 left. Tests `scripts/test_cheque_archive.js` (no DB), `test_cheque_payees.js`, `test_bank_recon.js`, `test_finance_api.js`
+  (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet).
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

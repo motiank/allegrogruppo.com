@@ -13,6 +13,7 @@
 //       [&kind=cheque,transfer,…][&party=<account key | name>][&q=<text>][&amount=<number>][&sections=…][&facets=1]
 //       — the filters of shared/bankReconFilter.js: the sections keep only the matching rows, the summary stays whole
 //   GET /admin/bank-recon/facets?company=&account=&from=&to= → the kinds and the parties of the report, for the pickers
+//   GET /admin/bank-recon/cheque-image/:id                   → the scanned cheque (Drive archive, chequeArchive.js), for the 📷 links
 // HTML comes from shared/bankReconHtml.js (also used by the admin page); Excel from exceljs.
 
 import express from "express";
@@ -24,6 +25,7 @@ import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, paye
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
 import { NOISE_LABEL, TODO_LABEL } from "../../../shared/bankReconNoise.js";
 import { addChequePayees } from "./chequePayees.js";
+import { readChequeImage } from "./chequeArchive.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
 
@@ -258,7 +260,8 @@ export async function buildBankReconReport(query = {}) {
   const bankOpen = bankOpenRows.map((r) => ({
     bankLineId: r.bank_line_id, year: r.fiscal_year, date: r.d, reference: r.reference, details: r.details, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to),
   }));
-  // the beneficiary of every cheque line, from Hashavshevet or the Priority file (payee / payeeSource: cheques, journal, priority, missing)
+  // the beneficiary of every cheque line, from Hashavshevet, the Priority file or the cheque archive in Drive (payee / payeeSource:
+  // cheques, journal, priority, image = read from the scanned cheque, image_guess, missing) + imageId / image = the scanned cheque
   const payeeStats = await addChequePayees(bankOpen, { company: company.companyId, bankAccounts: [accountKey] });
   // the beneficiary of every transfer line, from the bank's transaction status file (bank_events; payeeSource events, + event:
   // the payee's bank account, who gave the order and when); Hashavshevet's bank lines carry no name for a transfer
@@ -292,6 +295,9 @@ export async function buildBankReconReport(query = {}) {
       cheques: {
         count: payeeStats.lines, found: payeeStats.found, missing: payeeStats.missing, missingTotal: sum(bankOpen.filter((x) => x.payeeSource === "missing"), (x) => x.amount),
         priority: payeeStats.priority || 0, priorityTotal: sum(bankOpen.filter((x) => x.payeeSource === "priority"), (x) => x.amount),
+        image: payeeStats.image || 0, imageTotal: sum(bankOpen.filter((x) => x.payeeSource === "image"), (x) => x.amount),
+        imageGuess: payeeStats.imageGuess || 0, imageGuessTotal: sum(bankOpen.filter((x) => x.payeeSource === "image_guess"), (x) => x.amount),
+        withImage: payeeStats.withImage || 0, missingWithImage: bankOpen.filter((x) => x.payeeSource === "missing" && x.imageId).length,
       },
     },
     bookOpen: { count: bookOpen.length, total: sum(bookOpen, (x) => x.amount), beforeCount: older(bookOpen).length, beforeTotal: sum(older(bookOpen), (x) => x.amount) },
@@ -318,9 +324,15 @@ export async function buildBankReconReport(query = {}) {
     notes.push(`${bookFutureMatched.length} תנועות ספרים בתאריך מאוחר מ-${fmtDate(to)} כבר הותאמו לתנועות בנק עד תאריך זה (למשל צ'ק שנרשם בתאריך ערך מאוחר); הן מוצגות בסוף סעיף 2 ומנוכות בסיכום.`);
   if (payeeStats.priority)
     notes.push(`${payeeStats.priority} צ'קים שנפרעו בבנק אינם בחשבשבת אך נמצאו בקובץ הצ'קים של פריוריטי (ההיסטוריה שלפני חשבשבת); שם המוטב מוצג עם הסימון "פריוריטי" בסעיף 1 – גם אותם יש לרשום בחשבשבת.`);
+  if (payeeStats.image)
+    notes.push(`${payeeStats.image} צ'קים שנפרעו בבנק אינם בחשבשבת ולא בפריוריטי, ושם המוטב נקרא מתמונת הצ'ק הסרוק בארכיון הצ'קים בדרייב; הם מסומנים "(מהצ'ק)" בסעיף 1 – גם אותם יש לרשום בחשבשבת.`);
+  if (payeeStats.imageGuess)
+    notes.push(`${payeeStats.imageGuess} צ'קים קיבלו שם לא ודאי מתמונת הצ'ק (מסומנים "? (מהצ'ק, לא ודאי)"); יש לאשר את השם מול התמונה.`);
   if (payeeStats.missing)
-    notes.push(`${payeeStats.missing} צ'קים שנפרעו בבנק לא נמצאו בחשבשבת (לא במודול הצ'קים ולא בפקודת יומן עם מספר הצ'ק); הם מסומנים "${payeeText({ payeeSource: "missing" })}" בסעיף 1 – אלה הצ'קים שיש לרשום.`);
+    notes.push(`${payeeStats.missing} צ'קים שנפרעו בבנק לא נמצאו בחשבשבת (לא במודול הצ'קים ולא בפקודת יומן עם מספר הצ'ק); הם מסומנים "${payeeText({ payeeSource: "missing" })}" בסעיף 1 – אלה הצ'קים שיש לרשום${summary.bankOpen.cheques.missingWithImage ? ` (ל-${summary.bankOpen.cheques.missingWithImage} מהם יש תמונה סרוקה – 📷)` : ""}.`);
+  if (payeeStats.withImage) notes.push(`ל-${payeeStats.withImage} צ'קים בסעיף 1 יש תמונה סרוקה בארכיון הצ'קים בדרייב – הסימן 📷 ליד שם המוטב פותח אותה.`);
   if (payeeStats.error) notes.push(`שמות המוטבים של הצ'קים לא נשלפו הפעם (${payeeStats.error}).`);
+  if (payeeStats.archiveError) notes.push(`ארכיון הצ'קים בדרייב לא נקרא הפעם (${payeeStats.archiveError}); השמות מתמונות הצ'קים והקישורים לתמונות חסרים.`);
   if (eventStats.found || bookEventStats.found)
     notes.push(`${eventStats.found + bookEventStats.found} העברות זוהו בקובץ סטטוס העסקאות של הבנק (שם המוטב, חשבון היעד, מי הזרים ומתי): ${eventStats.found} בסעיף 1 ו-${bookEventStats.found} בסעיף 2${eventStats.ambiguous + bookEventStats.ambiguous ? `; ${eventStats.ambiguous + bookEventStats.ambiguous} לא זוהו בוודאות (כמה הוראות באותו סכום ובאותם ימים)` : ""}.`);
   if (eventStats.error) notes.push(`קובץ סטטוס העסקאות של הבנק לא נקרא הפעם (${eventStats.error}).`);
@@ -353,7 +365,7 @@ export async function bankReconFacets(query = {}) {
 
 const MONEY_FMT = '#,##0.00;[Red]-#,##0.00';
 
-const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", priority: "פריוריטי", missing: "חסר", events: "סטטוס עסקאות", bank_file: "קובץ הבנק" };
+const PAYEE_SOURCE_LABEL = { cheques: "מודול צ'קים", journal: "פקודת יומן", priority: "פריוריטי", image: "תמונת הצ'ק", image_guess: "תמונת הצ'ק – לא ודאי", missing: "חסר", events: "סטטוס עסקאות", bank_file: "קובץ הבנק" };
 
 function sheet(wb, title, columns, rows, totalLabel, total) {
   const ws = wb.addWorksheet(title.slice(0, 31), { views: [{ rightToLeft: true, state: "frozen", ySplit: 1 }] });
@@ -365,9 +377,11 @@ function sheet(wb, title, columns, rows, totalLabel, total) {
     for (const c of columns) {
       let v = c.get ? c.get(r) : r[c.key];
       if (c.date && v) v = new Date(`${String(v).slice(0, 10)}T00:00:00Z`);
+      if (c.link && v) v = { text: c.link, hyperlink: String(v) };
       out[c.key] = v ?? null;
     }
-    ws.addRow(out);
+    const row = ws.addRow(out);
+    for (const c of columns) if (c.link && out[c.key]) row.getCell(c.key).font = { color: { argb: "FF1155CC" }, underline: true };
   }
   if (totalLabel) {
     const row = ws.addRow({ [columns[0].key]: `${totalLabel} (${rows.length})`, [columns.find((c) => c.money)?.key]: total });
@@ -428,7 +442,7 @@ export async function renderBankReconXlsx(r) {
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol,
     { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
-    { header: "מזהה שורה", key: "bankLineId", width: 10 },
+    { header: "מזהה שורה", key: "bankLineId", width: 10 }, { header: "תמונת הצ'ק", key: "image", width: 14, link: "פתח תמונה", get: (x) => x.image || null },
   noiseCol], r.bankOpen, 'סה"כ', tot("bankOpen"));
   sheet(wb, "2 ספרים ללא בנק", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
@@ -481,6 +495,19 @@ export function Router() {
 
   router.get("/facets", async (req, res) => {
     try { res.json(await bankReconFacets(req.query)); } catch (err) { fail(res, err); }
+  });
+
+  // the scanned cheque of a section-1 line (📷): the Drive file is read with the invoice agent's login and sent as the
+  // picture, so the admin needs no Drive sharing; only ids that are in the archive's index are served
+  router.get("/cheque-image/:id", async (req, res) => {
+    try {
+      const img = await readChequeImage(req.params.id);
+      if (!img) return res.status(404).json({ error: { code: "not_found", message: "no such cheque image in the archive" } });
+      res.setHeader("Content-Type", img.mimeType);
+      res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(img.name)}`);
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      return res.send(img.buffer);
+    } catch (err) { fail(res, err); }
   });
 
   router.get("/report", async (req, res) => {

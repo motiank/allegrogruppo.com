@@ -1883,7 +1883,8 @@ const Router = () => {
     );
     const data = rows.map((r) => ({ id: r.id, company: bankCompany(r.account), bank: r.bank, account: r.account, date: r.tx_date, actionCode: r.action_code, action: r.action, details: r.details, reference: r.reference, bundle: r.bundle, debit: num(r.debit), credit: num(r.credit), balance: num(r.balance), note: r.note, loadedAt: r.created_at }));
     // a cheque row ("שיק" + the cheque number as reference) gets the beneficiary from Hashavshevet (allegro_finance):
-    // payee + payeeSource (cheques / journal / priority = named by the Priority cheque file only / missing = not entered in Hashavshevet yet). A finance DB that is down leaves the rows as they are.
+    // payee + payeeSource (cheques / journal / priority = named by the Priority cheque file only / image = read from the scanned cheque in the
+    // Drive archive / image_guess / missing = not entered in Hashavshevet yet) + imageId / image when the archive has the scan. A finance DB that is down leaves the rows as they are.
     const payees = await addChequePayees(data, { company: (r) => r.company, text: (r) => r.action, reference: (r) => r.reference, amount: (r) => r.debit ?? r.credit });
     // a transfer row (קוד פעולה 485, "לטובת: <name>" in the details) gets `event` from the bank's transaction status file
     // (bank_events: the payee's bank account, who submitted it and when); payee / payeeSource "events" when it had no name

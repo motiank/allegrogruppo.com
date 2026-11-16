@@ -15,7 +15,7 @@ import { sheetsUnavailable, workbookFromTabs, upsertFixedSheet } from './sheets.
 import { getConfig, updateConfig, err } from '../db.js';
 
 const SETTING = 'fixedSheets';
-const SOURCE_HE = { hashavshevet: 'חשבשבת', priority: 'פריוריטי', both: 'חשבשבת + פריוריטי' };
+const SOURCE_HE = { hashavshevet: 'חשבשבת', priority: 'פריוריטי', both: 'חשבשבת + פריוריטי', archive: "ארכיון הצ'קים (תמונה)" };
 const STATE_HE = { future: 'עתידי', cleared: 'נפרע', not_cleared: 'לא נפרע' };
 const BALANCE_SOURCE_HE = { bank_file: 'קובץ הבנק', hashavshevet: 'חשבשבת' };
 
@@ -25,7 +25,7 @@ export const CHEQUE_COLUMNS = ["מס' שיק", 'מוטב', 'סכום', 'יתרה
 /** One row of /cheques/all → the Hebrew row of the sheet. */
 export function chequeRowHe(x) {
   return {
-    "מס' שיק": x.cheque ?? null, 'מוטב': x.payee ?? null, 'סכום': x.amount ?? null, 'יתרה': null, 'תאריך פרעון': x.dueDate ?? null, 'תאריך הוצאה': x.issueDate ?? null,
+    "מס' שיק": x.cheque ?? null, 'מוטב': x.payee ?? (x.payeeGuess ? `${x.payeeGuess}? (לא ודאי)` : null), 'סכום': x.amount ?? null, 'יתרה': null, 'תאריך פרעון': x.dueDate ?? null, 'תאריך הוצאה': x.issueDate ?? null,
     'מצב': STATE_HE[x.state] || x.state || null, 'נפרע בבנק': x.bankDate ?? null, 'מקור': SOURCE_HE[x.source] || x.source || null,
     'חשבון בחשבשבת': x.account ?? null, 'שם החשבון': x.accountName ?? null, 'חשבון ספק (פריוריטי)': x.supplierAccount ?? null, "מס' תשלום (פריוריטי)": x.priorityPayment ?? null,
     'לפני ניכוי': x.grossAmount ?? null, 'ניכוי מס': x.withholding || null, 'חשבוניות': x.invoices ?? null, 'פרטים': x.details ?? null,

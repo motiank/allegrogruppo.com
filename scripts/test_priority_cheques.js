@@ -80,7 +80,7 @@ test("mergeCheques: one row per cheque, both sides joined by number + amount, th
     { reference: "x", amount: 1, date: "2025-01-01" },
   ];
   const m = mergeCheques({ hash, priority, bank, today: "2025-08-01" });
-  assert.deepEqual(m.counts, { total: 4, hashavshevet: 1, priority: 1, both: 2, bankPaid: 2 });
+  assert.deepEqual(m.counts, { total: 4, hashavshevet: 1, priority: 1, both: 2, archive: 0, bankPaid: 2, withImage: 0 });
   const by = Object.fromEntries(m.rows.map((r) => [`${r.cheque}|${r.amount}`, r]));
   assert.equal(by["10337|14389"].source, "both");
   assert.equal(by["10337|14389"].priorityPayment, "CH25000351");

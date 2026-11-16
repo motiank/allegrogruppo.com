@@ -264,7 +264,7 @@ export async function bankReconReport(companies, p = {}) {
   const params = { ...textOf(p, 'account'), ...dates(p, { required: false }), ...listOf('kind'), ...textOf(p, 'party'), ...textOf(p, 'q'), ...(p.amount != null && p.amount !== '' ? { amount: Math.abs(Number(String(p.amount).replace(/[,\s₪]/g, ''))) } : {}), ...listOf('sections'), ...(p.noise === 'hide' || p.noise === true ? { noise: 'hide' } : {}) };
   for (const k of Object.keys(params)) if (params[k] === undefined || Number.isNaN(params[k])) delete params[k];
   const n = LIMITS.recon;
-  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource, ...(x.payeeRole ? { payeeRole: x.payeeRole } : {}), ...(x.payeePurpose ? { payeePurpose: x.payeePurpose } : {}) } : {}) });
+  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource, ...(x.payeeRole ? { payeeRole: x.payeeRole } : {}), ...(x.payeePurpose ? { payeePurpose: x.payeePurpose } : {}) } : {}), ...(x.imageId ? { hasImage: true } : {}) });
   const bookRow = (x) => ({ date: x.date, reference: x.reference, description: x.description, counter: x.counterName || x.counterAccount, amount: x.amount, ageDays: x.ageDays, ...(x.posted ? {} : { posted: false }) });
   const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status });
   const top = (rows, by) => [...rows].sort((a, b) => Math.abs(b[by]) - Math.abs(a[by]));
@@ -293,7 +293,7 @@ export async function bankReconReport(companies, p = {}) {
       downloads: { page: `/accounting/bank-recon?${qs}`, xlsx: `/api/joya/finance/bank-recon?${qs}&format=xlsx`, html: `/api/joya/finance/bank-recon?${qs}&format=html` },
     };
   }), {
-    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1; a cheque line carries payee / payeeSource, see summary.bankOpen.cheques: count, found, missing = cheques in the bank that are not in Hashavshevet yet; a transfer line carries payee from the bank\'s status file (payeeSource events) or from the uploaded bank file (payeeSource bank_file) — payeeRole "from" = money that came IN from that party (say "מאת"), "to" = money paid to it; payeePurpose = the bank\'s "עבור" text), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links. With a filter: `filter.label` names it, the sections hold only the matching rows and `filtered[section]` = { count, total, of, ofTotal, omitted? } (kept of all); the summary is always for the whole account. `kinds` = the kinds in the whole report with count and total (every row has a kind: cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other). `noise` = rows that are open only on paper (two opposite moves with the same name and amount within pairDays = an entry and its cancellation, sections 1 and 2): count, total, per section; such a row carries `noise.rule` reversal; with the param noise "hide" they are left out and `filtered` says kept of all — offer it when the user wants the real open items only. `todo` = cheques not cleared more than staleDays (60) after their date (section 3ב, rows with `todo.rule` stale_cheque): work to do — cancel in the books or check with the payee — ALWAYS mention them when present, they are never noise',
+    note: 'signs: money into the bank is plus on both sides. summary: bankBalance (the statement, running balance at `to`), bankOpen = bank lines with no book match (section 1; a cheque line carries payee / payeeSource — cheques / journal = Hashavshevet, priority = the Priority file, image = the name was READ FROM THE SCANNED CHEQUE in the Drive archive (not in the books), image_guess = an unsure reading of it, missing = no name anywhere; hasImage = the scanned cheque is in the archive (the page shows it behind 📷) — see summary.bankOpen.cheques: count, found, priority, image, imageGuess, withImage, missing = cheques in the bank that are not in Hashavshevet yet; a transfer line carries payee from the bank\'s status file (payeeSource events) or from the uploaded bank file (payeeSource bank_file) — payeeRole "from" = money that came IN from that party (say "מאת"), "to" = money paid to it; payeePurpose = the bank\'s "עבור" text), bookOpen = book lines with no bank match without cheques (section 2), chequesOpen = cheques issued and not cleared (section 3b: pastDue / notDue / clearedUnmatched), bookFutureMatched = book lines dated after `to` already matched, expectedBookBalance = bankBalance − bankOpen + bookOpen + chequesOpen − bookFutureMatched, unexplained = bookBalance − expected; chequesCleared = cleared in the period (section 3a). Each section gives its biggest rows by amount (shown of count; the full lists are in the page / Excel); cheque status: cleared, cleared_group (matched in a group), cleared_unmatched (in the bank, not matched yet), past_due, not_due; the chat shows the buttons for the full page and the Excel — do not write the links. With a filter: `filter.label` names it, the sections hold only the matching rows and `filtered[section]` = { count, total, of, ofTotal, omitted? } (kept of all); the summary is always for the whole account. `kinds` = the kinds in the whole report with count and total (every row has a kind: cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other). `noise` = rows that are open only on paper (two opposite moves with the same name and amount within pairDays = an entry and its cancellation, sections 1 and 2): count, total, per section; such a row carries `noise.rule` reversal; with the param noise "hide" they are left out and `filtered` says kept of all — offer it when the user wants the real open items only. `todo` = cheques not cleared more than staleDays (60) after their date (section 3ב, rows with `todo.rule` stale_cheque): work to do — cancel in the books or check with the payee — ALWAYS mention them when present, they are never noise',
   });
 }
 
@@ -304,7 +304,7 @@ export async function bankOpenItems(companies, p = {}) {
   const limit = limitOf(p, LIMITS.open, 500);
   const params = { side, ...dates(p, { required: false }), ...textOf(p, 'account'), ...(p.minAge != null ? { minAge: Number(p.minAge) || 0 } : {}), ...flagOf(p, 'includeUnposted'), limit };
   return result('bank_open_items', params, await perCompany(companies, '/bank/open', params, (d, m) => ({ shown: d.length, count: m.total, amount: m.amount, rows: d })), {
-    note: 'bank side: direction in / out, money in is plus, a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary from Hashavshevet and payeeSource (cheques = the cheques module, journal = the journal entry with that number, missing = the cheque is not in Hashavshevet yet); a transfer line carries payee from the bank\'s status file (payeeSource events, + event) or from the uploaded bank file (payeeSource bank_file; payeeRole "from" = money that came IN from that party, "to" = paid to it; payeePurpose); book side: side debit / credit on the bank account; ageDays = days since the line',
+    note: 'bank side: direction in / out, money in is plus, a cheque line (שיק + the cheque number as reference) carries payee = its beneficiary and payeeSource (cheques = the cheques module, journal = the journal entry with that number, priority = the Priority cheque file, image = read from the scanned cheque in the Drive archive, image_guess = an unsure reading of it, missing = no name anywhere — not in Hashavshevet) and image = the link of the scanned cheque when the archive has it; a transfer line carries payee from the bank\'s status file (payeeSource events, + event) or from the uploaded bank file (payeeSource bank_file; payeeRole "from" = money that came IN from that party, "to" = paid to it; payeePurpose); book side: side debit / credit on the bank account; ageDays = days since the line',
   });
 }
 
@@ -352,12 +352,34 @@ export async function statementCompare(companies, p = {}) {
   if (!params.account && !params.q) throw bad('account (the account key) or q (part of the party name) is needed');
   const days = clamp(p.days, 45, 365), tolerance = p.tolerance == null ? 0.05 : Math.max(0, Number(p.tolerance) || 0);
   const perspective = theirs.perspective === 'customer' ? 'customer' : 'supplier';
-  return result('statement_compare', { ...params, perspective, days, tolerance, theirsRows: theirs.rows.length }, await perCompany(companies, '/ledger', params, (d, m) => {
+  const load = async (co) => {
+    const r = await finance('/ledger', { company: co.finance.code, ...params });
+    if (!r.available || r.meta?.ambiguous) return r;
+    const cmp = compareStatements({ ...theirs, perspective }, { lines: r.data || [], openingBalance: r.meta.openingBalance, closingBalance: r.meta.closingBalance }, { days, tolerance });
+    // a payment THEY show and our books lack may be a cheque the bank paid that is not entered yet: the Drive archive
+    // (the scanned cheques) is asked by amount, one call; the nearest bank day within `days` names the cheque
+    const payments = cmp.onlyTheirs.filter((x) => x.kind === 'payment' && x.amount > 0);
+    if (payments.length) {
+      const a = await finance('/cheques/archive', { company: co.finance.code, amount: [...new Set(payments.map((x) => x.amount))].join(','), limit: 5000 });
+      if (a.available) {
+        const used = new Set();
+        for (const x of payments) {
+          const cands = (a.data || []).filter((c) => !used.has(c.cheque + '|' + c.date) && Math.abs(c.amount - x.amount) <= tolerance + 1e-9 && (!x.date || !c.date || Math.abs(Date.parse(c.date) - Date.parse(x.date)) <= days * 86400000)).sort((p, q) => Math.abs(Date.parse(p.date) - Date.parse(x.date || p.date)) - Math.abs(Date.parse(q.date) - Date.parse(x.date || q.date)));
+          if (!cands.length) continue;
+          const c = cands[0];
+          used.add(c.cheque + '|' + c.date);
+          x.archiveCheque = { cheque: c.cheque, bankDate: c.date, payee: c.payee || c.payeeGuess || null, ...(c.payee ? {} : c.payeeGuess ? { unsure: true } : {}), inBooks: c.inBooks, image: c.image };
+        }
+        cmp.archiveHints = payments.filter((x) => x.archiveCheque).length;
+      }
+    }
+    return { available: true, data: cmp, meta: r.meta };
+  };
+  return result('statement_compare', { ...params, perspective, days, tolerance, theirsRows: theirs.rows.length }, await perCompany(companies, '/ledger', params, (cmp, m) => {
     if (m.ambiguous) return { ambiguous: true, accounts: m.accounts };
-    const cmp = compareStatements({ ...theirs, perspective }, { lines: d || [], openingBalance: m.openingBalance, closingBalance: m.closingBalance }, { days, tolerance });
     return { account: m.account, period: { from: m.from, to: m.to }, ours: { lines: m.total, openingBalance: m.openingBalance, closingBalance: m.closingBalance }, theirs: { party: theirs.party ?? null, rows: theirs.rows.length, openingBalance: theirs.openingBalance ?? null, closingBalance: theirs.closingBalance ?? null }, ...cmp };
-  }), {
-    note: 'only the differences are listed: onlyTheirs = in their statement and not in our books, onlyOurs = in our books and not in their statement, amountDiffers = the same document with another amount; kind charge = an invoice (raises the debt), payment = money or a credit note; balance = the debt in one direction (debt says which), theirs as they give it, ours from our books, difference = theirs − ours, explainedByDifferences = what the listed differences add up to, unexplained = the rest (opening balance, lines outside the period)',
+  }, { load }), {
+    note: 'only the differences are listed: onlyTheirs = in their statement and not in our books, onlyOurs = in our books and not in their statement, amountDiffers = the same document with another amount; kind charge = an invoice (raises the debt), payment = money or a credit note; balance = the debt in one direction (debt says which), theirs as they give it, ours from our books, difference = theirs − ours, explainedByDifferences = what the listed differences add up to, unexplained = the rest (opening balance, lines outside the period). An onlyTheirs payment with archiveCheque = a cheque the bank paid with that amount near that date, from the scanned-cheque archive (cheque number, bank day, payee — unsure when it says so, inBooks = Hashavshevet knows it; the picture is behind image): the payment probably happened and the cheque is not entered in our books yet — say so',
   });
 }
 
@@ -440,7 +462,7 @@ export function chequeTotals(rows, today) {
   return t;
 }
 
-const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, bankDate: x.bankDate ?? null, source: x.source, account: x.account, accountName: x.accountName });
+const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, bankDate: x.bankDate ?? null, source: x.source, account: x.account, accountName: x.accountName, ...(x.payeeGuess ? { payeeGuess: x.payeeGuess } : {}), ...(x.image ? { image: x.image } : {}) });
 
 /**
  * The future-cheques report of one company (the chat calc and the fixed Drive file share it): the cheques of the window
@@ -563,6 +585,22 @@ export async function priorityCheques(companies, p = {}) {
     ...shown(d, limit, m.total), totals: m.totals, source: m.source, note: m.note,
   })), {
     note: 'the Priority cheque file — Pasta Lina\'s cheques before Hashavshevet (written April 2025 – March 2026, cheque dates to 2029; nothing updates it): cheque = the number on the cheque, chequeDate = the date on it, payDate = when it was made, amount = before withholding tax, withholding, net = the amount on the cheque, lines = the invoices it paid (invoice, invoiceDate, amount); cheques written in Hashavshevet are in cheques',
+  });
+}
+
+/**
+ * The scanned cheques the bank paid (the Drive archive; owner 2026-11-16): by number, payee, amount or bank day, and the
+ * bookkeeper's work list (books = missing: the cheques Hashavshevet does not know, with name, amount, date and the picture).
+ */
+export async function chequeArchive(companies, p = {}) {
+  const limit = limitOf(p, LIMITS.cheques, 500);
+  const amounts = p.amount == null || p.amount === '' ? {} : { amount: (Array.isArray(p.amount) ? p.amount : String(p.amount).split(',')).map((a) => { const n = Number(String(a).replace(/[,\s₪]/g, '')); if (!Number.isFinite(n)) throw bad('amount must be a number or a list of numbers'); return Math.abs(n); }).join(',') };
+  const named = p.named == null || p.named === '' ? {} : { named: p.named === true || p.named === 'true' || p.named === 1 || p.named === '1' ? '1' : '0' };
+  const params = { ...numbersOf(p, 'number'), ...textOf(p, 'q'), ...amounts, ...named, ...oneOf(p, 'books', ['in', 'missing']), ...dates(p, { required: false }), limit, ...(p.offset ? { offset: Number(p.offset) || 0 } : {}) };
+  return result('cheque_archive', params, await perCompany(companies, '/cheques/archive', params, (d, m) => ({
+    ...shown(d, limit, m.total), totals: m.totals, archive: m.archive, counts: m.counts, note: m.note,
+  })), {
+    note: 'the cheque archive in Drive: the scanned front of every cheque the bank paid (Pasta Lina, from May 2025), one row per bank cheque line: cheque = the number, date = the BANK day (not the date written on the cheque), amount, payee = the confirmed name with payeeSource (image / image_handwriting = read from the picture; priority / journal / cheques = copied from those sources when it was filed), payeeGuess = an unsure reading (confirm it against the picture), inBooks = Hashavshevet knows the cheque today, account = the company account with exactly that name when there is one, image = the picture (the chat does not show pictures — say it exists). books "missing" = the cheques still to enter in Hashavshevet — the bookkeeper\'s work list; totals = count, amount, inBooks, named, guess, unnamed over the selection',
   });
 }
 

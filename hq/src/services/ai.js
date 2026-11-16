@@ -556,6 +556,11 @@ export const CALCS = {
     about: 'the cheques Pasta Lina wrote in Priority BEFORE Hashavshevet (history, April 2025 – March 2026, cheque dates up to 2029; a constant file): cheque number, supplier, the date on the cheque, the payment date, amount before withholding tax, withholding, net = the amount on the cheque, and the invoices it paid. For a cheque the books do not know (a bank line "לא נמצא בחשבשבת" / payeeSource missing or priority), "what was cheque N for", old cheques of a supplier, or a question that says Priority / פריוריטי; cheques written in Hashavshevet are in cheques',
     run: finCalc(fin.priorityCheques),
   },
+  cheque_archive: {
+    params: '{ companyKeys?, number?: "a cheque number, or several comma-separated", q?: "part of the payee name", amount?: number or "a,b,c", books?: "missing" (not in Hashavshevet — the cheques still to enter) | "in", named?: boolean (false = the cheques with no confirmed name), from?, to? (bank days), limit? }',
+    about: 'the SCANNED CHEQUES in the Drive archive (ארכיון הצ\'קים, תמונות הצ\'קים): every cheque the bank paid since May 2025 with the name READ FROM THE PICTURE when the books and Priority had none — cheque number, bank day, amount, payee (payeeSource image = from the picture), payeeGuess (unsure), inBooks (Hashavshevet knows it today), the picture. For "the cheques not entered yet / to enter in Hashavshevet / רשימת העבודה של מנהלת החשבונות / צ\'קים שלא נרשמו" → books "missing"; for "who got cheque N" ask it together with cheques and priority_cheques; for "the unknown cheques / בלי שם / לא ודאי" → named false; for "is there a picture of cheque N / תמונת הצ\'ק" → number',
+    run: finCalc(fin.chequeArchive),
+  },
   vat_summary: {
     params: `{ companyKeys?, ${FIN_PERIOD} (whole months), issues?: boolean (also the 874 report runs), includeUnposted? }`,
     about: 'VAT from the BOOKS per month: sales VAT, input VAT, VAT on fixed assets, to pay (sales − input − assets), the VAT accounts and their balances; issues = also the 874 report runs with their totals by record type (not checked yet). For the Beecomm-based VAT report use vat_report instead',
@@ -637,7 +642,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheque_archive', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules

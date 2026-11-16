@@ -31,7 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
-import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets } from './services/source.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeChequeImage } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -229,6 +229,19 @@ r.get(
     const file = await financeBankReportFile(reportParams(req), format);
     res.setHeader('Content-Type', file.headers['content-type'] || (format === 'html' ? 'text/html; charset=utf-8' : 'application/octet-stream'));
     if (format === 'xlsx') res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    res.send(file.buffer);
+  }),
+);
+
+// the scanned cheque behind a 📷 link of the report (the HTML's relative "cheque-image/<id>" lands here): streamed from the
+// admin's Finance API, which reads the Drive archive with the invoice agent's login — the Joya user needs no Drive access
+r.get(
+  '/joya/finance/cheque-image/:id',
+  requireAdmin,
+  h(async (req, res) => {
+    const file = await financeChequeImage(req.params.id);
+    res.setHeader('Content-Type', file.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     res.send(file.buffer);
   }),
 );
