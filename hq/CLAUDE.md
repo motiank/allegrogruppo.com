@@ -213,7 +213,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   API `/cheques/archive`: number, q, amount, books `missing` = the bookkeeper's work list, named false = the unsure / unnamed ones; PLAN
   rules "A cheque by its NUMBER" → three calcs, and "The scanned cheques … WORK LIST"); `statement_compare` adds `archiveCheque` to an
   onlyTheirs payment that a scanned cheque explains (same amount, within `days`); `/cheques/all` rows (the cheques file) may be
-  `source` `archive` with `payeeGuess` / `image` (`fixedSheets.js` SOURCE_HE). Eval `ca-*`, `pc-number` (3 calcs). Deployed 2026-11-16 (no hq client build needed).
+  `source` `archive` with `payeeGuess` / `image` (`fixedSheets.js` SOURCE_HE). Eval `ca-*`, `pc-number` (3 calcs). Deployed 2026-11-16 (`a046632`, no hq client build needed).
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

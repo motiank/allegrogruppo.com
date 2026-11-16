@@ -227,7 +227,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   cheques file too; (4) Joya `statement_compare`: an onlyTheirs payment gets `archiveCheque` when a scanned cheque has that amount near that date;
   (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12
   guesses, 7 left. Tests `scripts/test_cheque_archive.js` (no DB), `test_cheque_payees.js`, `test_bank_recon.js`, `test_finance_api.js`
-  (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet).
+  (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (`a046632`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet). On production that day, section 1 of 2026: 283 cheques named from the picture, 17 guesses, 19 missing (7 with a scan), 379 with a 📷.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own
