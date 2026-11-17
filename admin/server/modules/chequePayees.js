@@ -54,7 +54,9 @@ const ARCHIVE_ONLY = "archive";
  * @param {Array<{reference:any}|number|string>} refs  cheque numbers (strings or ints)
  * @param {{bankAccounts?: string[], archive?: object}} [opt]  the company's bank account keys (looked up when missing); `archive`
  *        collects the archive's error, when given ({ error } is set on it)
- * @returns {Promise<Map<string, Array<{payee:string|null, amount:number|null, source:'cheques'|'journal'|'priority'|'image'|'image_guess'|'archive', chequeId?:number, dueDate?:string, transId?:number, payment?:string, chequeDate?:string, imageId?:string, date?:string}>>>}
+ * @returns {Promise<Map<string, Array<{payee:string|null, amount:number|null, source:'cheques'|'journal'|'priority'|'image'|'image_guess'|'archive', account?:string|null, supplierAccount?:string|null, chequeId?:number, dueDate?:string, transId?:number, payment?:string, chequeDate?:string, imageId?:string, date?:string}>>>}
+ *          `account` = the Hashavshevet account the cheque was booked on (cheques module / the journal's other side);
+ *          `supplierAccount` = Priority's own supplier number of the payee (108 = the employees' one supplier)
  *          keyed by the cheque number as a plain string; numbers not found are absent. Resolve one line with `pickPayee`
  *          and its picture with `pickImage`. An archive record without a confirmed name is a candidate with payee null
  *          (source "archive") — it only carries the image.
@@ -73,11 +75,11 @@ export async function chequePayees(companyId, refs, { bankAccounts, archive } = 
   const p1 = { companyId };
   const nlist1 = numbers.map((n, i) => ((p1[`n${i}`] = n), `:n${i}`)).join(",");
   const cheques = await financeSql(
-    `SELECT reference, payee_name, amount_to_pay, cheque_id, DATE_FORMAT(due_date, '%Y-%m-%d') AS due
+    `SELECT reference, payee_name, amount_to_pay, cheque_id, account_key, DATE_FORMAT(due_date, '%Y-%m-%d') AS due
        FROM cheques WHERE company_id = :companyId AND deleted_at IS NULL AND reference IN (${nlist1}) ORDER BY cheque_id`,
     p1,
   );
-  for (const c of cheques) if (c.payee_name) push(c.reference, { payee: c.payee_name, amount: amt(c.amount_to_pay), source: PAYEE_SOURCE.cheques, chequeId: c.cheque_id, dueDate: c.due });
+  for (const c of cheques) if (c.payee_name) push(c.reference, { payee: c.payee_name, amount: amt(c.amount_to_pay), source: PAYEE_SOURCE.cheques, chequeId: c.cheque_id, dueDate: c.due, account: c.account_key || null });
 
   // 2. the journal entry with that reference on the bank account (only for numbers the module does not know)
   const rest = numbers.filter((n) => !out.has(String(n)));
@@ -86,7 +88,7 @@ export async function chequePayees(companyId, refs, { bankAccounts, archive } = 
     // 3. the Priority file — pushed after the journal candidates, so with the same amount Hashavshevet's name wins
     const priority = companyId === (await financeCompanyId(PRIORITY_CHEQUES_META.company)) ? priorityChequesByNumber(rest) : new Map();
     const pushPriority = () => {
-      for (const [no, list] of priority) for (const c of list) push(no, { payee: c.supplier, amount: c.net, source: PAYEE_SOURCE.priority, payment: c.payment, chequeDate: c.chequeDate });
+      for (const [no, list] of priority) for (const c of list) push(no, { payee: c.supplier, amount: c.net, source: PAYEE_SOURCE.priority, payment: c.payment, chequeDate: c.chequeDate, supplierAccount: c.supplierAccount == null ? null : String(c.supplierAccount) });
     };
     let banks = bankAccounts;
     if (!banks) {
@@ -106,8 +108,9 @@ export async function chequePayees(companyId, refs, { bankAccounts, archive } = 
         p2,
       );
       for (const e of entries) {
-        const name = banks.includes(e.credit_account) ? e.debit_name : e.credit_name;
-        if (name) push(e.reference, { payee: name, amount: amt(e.amount), source: PAYEE_SOURCE.journal, transId: e.trans_id });
+        const bankIsCredit = banks.includes(e.credit_account);
+        const name = bankIsCredit ? e.debit_name : e.credit_name;
+        if (name) push(e.reference, { payee: name, amount: amt(e.amount), source: PAYEE_SOURCE.journal, transId: e.trans_id, account: (bankIsCredit ? e.debit_account : e.credit_account) || null });
       }
     }
     pushPriority();
@@ -185,7 +188,9 @@ export async function financeCompanyCode(companyId) {
 /**
  * Adds `payee` and `payeeSource` ("cheques" | "journal" | "priority" | "image" | "image_guess" | "missing") to the cheque
  * lines of `rows` (other rows are left alone), and `imageId` + `image` (the Drive link of the scanned cheque) where the
- * archive has the picture. Rows of several companies are grouped by `company(row)`; a finance DB error leaves the rows
+ * archive has the picture; `booksAccount` (the Hashavshevet account the cheque is booked on) when the name came from the
+ * books and `payeeSupplier` (Priority's supplier number) when it came from the Priority file — bankLineAccounts.js turns
+ * them into the line's card (כרטסת). Rows of several companies are grouped by `company(row)`; a finance DB error leaves the rows
  * unchanged. `found` counts every surely named line (`priority` and `image` = of them, named by that source only — not
  * in Hashavshevet), `imageGuess` the lines with an unsure name from the picture (not in `found`, not in `missing`),
  * `withImage` the lines that have a picture, `missing` the lines with no name at all.
@@ -214,6 +219,8 @@ export async function addChequePayees(rows, { company, text = (r) => r.details, 
         if (hit) {
           r.payee = hit.payee;
           r.payeeSource = hit.source;
+          if (hit.account) r.booksAccount = hit.account;
+          if (hit.supplierAccount) r.payeeSupplier = hit.supplierAccount;
           if (hit.source === PAYEE_SOURCE.imageGuess) stats.imageGuess++;
           else {
             stats.found++;

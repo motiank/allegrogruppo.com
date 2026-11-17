@@ -561,6 +561,21 @@ archive (same number and amount, else the only picture of that number) also carr
 (its Drive link); the report shows it as 📷 and streams it through `/cheques/image/:id`. **Transfer lines** (העברה מהבנק / לאחר / זה"ב, money out; 2026-11-13) get `payee` / `payeeSource` `events` and `event` `{ payee, payeeAccount, submittedAt, executedAt, submittedBy, status }` from the bank's transaction status file (`bank_events`, uploaded on the admin Upload page; `admin/server/modules/bankEvents.js`: the one order with the same amount executed on that day or up to 4 days before; `meta.events` = `{ lines, found, ambiguous, none }`); in the report, a section-2 book line paid by transfer gets the same `event` and `kind` `transfer`. **The uploaded bank file** (2026-11-15; `bank_transactions`, the admin's Upload page; `admin/server/modules/bankFileNames.js`) then names every bank line still without a name — above all **money that came in**, which no other source names: the file row with the same account, day, reference and signed amount gives `payee` / `payeeSource` `bank_file`, `payeeRole` `from` ("המבצע: <name>", money in from that party — shown "מאת: <name>" in the report) or `to` ("לטובת: <name>", money out), and `payeePurpose` when the bank's text has "עבור: …"; `meta.bankFile` = `{ lines, found, from }`. Owner's case: the 50,000 of 10/4/2026 with reference 452606556 is money IN from אן-קור, not the transfer TO אן-קור of the same day (reference 452609196, matched in the books). `meta.payees` =
 `{ lines, found, priority, image, imageGuess, withImage, missing[, error][, archiveError] }` (`priority` and `image` = lines named by that
 source only, counted in `found` too; `imageGuess` is in neither `found` nor `missing`; `archiveError` = Drive could not be read, the archive added nothing).
+**The card (כרטסת) of every bank line** (2026-11-18, owner: "the card index number next to each line, to complete every row; one card for
+all employees — make sure it is an employee by the admin's employees table or another way; no supplier, no other role → the employees card,
+in color"): `admin/server/modules/bankLineAccounts.js` adds `counterAccount` (the Hashavshevet account key), `counterName`, `counterSource`,
+`counterBasis` (one Hebrew sentence: why) and `counterEmployee` (true = the one employees card, `shared/finance_map.json` → `employees.account`,
+450001 "עובד" for Pasta Lina) to each bank line. `counterSource`, in order: `books` (the cheque is in Hashavshevet: the account it was booked on —
+`booksAccount` on the row), `name` (an account with the payee's name: exact, without spaces, cut short by the bank file, or a fixed alias of
+`finance_map` → `cardAliases`, e.g. "מע\"מ" → 400004, Wolt's bank names → the customer when money comes in / the supplier when it goes out),
+`employee` (Priority wrote the cheque on the employees' supplier — `payeeSupplier` on the row, 108 "עובדים" — or the name is in the admin's
+employee tables: `employees`, `shift_employees`, the Tabit shifts and rota), `history` (past journal entries carry this name on one account — the
+journal keeps the person's name on the shared employees card too), `employee_guess` (a person's name, two to four words, no company word, with no
+card anywhere → the employees card, to check), `text` (a line without a name: the account the bookkeeper matched the same bank text to before, at
+least 2 lines and 60 % on one account; only texts that name the other side — card companies, fees, deposits, direct debits, the authorities).
+An employee is paid, never pays: money in never gets the employees card. `meta.cards` = `{ rows, found, books, name, employee, history,
+employeeGuess, text, missing, employeesAccount[, error][, adminError] }` (`adminError` = the admin DB's employee tables could not be read; the
+Priority names and the history still work). Nothing is stored; the context (accounts, histories, names) is cached 5 minutes.
 
 - `is_matched = 1` with `match_num` means a bank line is matched.
 - `bank_matches.linked_id` with `side = 'book'` is a `journal_lines.line_id`, not a `trans_id`.
@@ -617,7 +632,14 @@ have a Google-Sheets-like filter — icon in the header, a panel with a search b
 chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
 (Hebrew), and the rows `bankOpen` (cheque lines with `payee` / `payeeSource` and `imageId` / `image` of the scanned cheque, see `/bank/open`; `summary.bankOpen.cheques` =
 `{ count, found, missing, missingTotal }`), `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
-date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). "Open" =
+date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). **Every row carries its card
+(כרטסת, 2026-11-18)**: `counterAccount` / `counterName` — the books' own on sections 2 and 3 (section 3 from the cheques module, `counterSource`
+`books`), `bankLineAccounts.js`'s on section 1 (`counterSource`, `counterBasis`, see `/bank/open`); `counterEmployee` = the one employees card
+in every section; `report.employees` = `{ account, name }`; `summary.bankOpen.accounts` = `meta.cards` of `/bank/open` + `missingTotal`,
+`employeeTotal`; a note counts them. The HTML has a "כרטסת" column (filterable) in sections 1, 3א and 3ב, the employees card in blue (a guess
+lighter, with "?"), a tooltip with the basis; the Excel has "כרטסת", "שם הכרטסת", "מקור הכרטסת" (section 1) and the blue fill. The filter
+`party=<key>` matches section-1 and section-3 rows by their card too, and the facets name a keyed party by its card ("עובד (450001)")
+while each employee's own name stays a party. "Open" =
 no `bank_matches` row with `matched_on` ≤ `to`. Money into the bank is plus on both sides. `/bank/report/accounts` →
 `{ data: [{ code, name, banks: [{ key, name, from, dataUpTo, lines }] }], meta: { today } }`. Test:
 `node --test scripts/test_bank_recon.js`.

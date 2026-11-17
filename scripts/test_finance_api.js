@@ -609,6 +609,14 @@ describe("endpoints", () => {
       const chequeLines = chq.data.filter((l) => /^שיק/.test(l.details));
       assert.ok(chequeLines.length > 0 && chequeLines.every((l) => ["cheques", "journal", "priority", "image", "image_guess", "missing"].includes(l.payeeSource)), "cheque lines carry the beneficiary");
       assert.equal(chq.meta.payees.lines, chq.data.filter((l) => /^שיק|החזרת שיק|בטול שיק/.test(l.details)).length);
+      // the card (כרטסת) of every bank line (bankLineAccounts.js): counted in meta.cards, the employees card flagged
+      const cards = chq.meta.cards;
+      assert.equal(cards.rows, chq.data.length);
+      assert.equal(cards.found, chq.data.filter((l) => l.counterAccount).length);
+      assert.equal(cards.found, cards.books + cards.name + cards.employee + cards.history + cards.employeeGuess + cards.text);
+      assert.ok(cards.found > cards.rows * 0.6 && cards.employeesAccount === "450001");
+      assert.ok(chq.data.filter((l) => l.counterAccount).every((l) => l.counterName && l.counterSource && l.counterBasis && Boolean(l.counterEmployee) === (l.counterAccount === "450001")));
+      assert.ok(chq.data.filter((l) => ["employee", "employee_guess"].includes(l.counterSource)).every((l) => l.signedAmount < 0), "an employee is paid, never pays (a returned cheque on the card comes from the books)");
       const old = await ok(`/bank/open?company=${COMPANY}&side=bank&minAge=90&limit=5`);
       assert.ok(old.meta.total < bank.meta.total && old.data.every((l) => l.ageDays >= 90));
       const ranged = await ok(`/bank/open?company=${COMPANY}&side=bank&from=2026-10-01&to=2026-10-31&limit=1000`);

@@ -15,7 +15,11 @@ const ExcelJS = require("exceljs");
 process.env.FINANCE_TODAY ||= "2026-11-07";
 const sum = (rows, f) => Math.round(rows.reduce((a, r) => a + Number(f(r) || 0), 0) * 100) / 100;
 
-after(() => closeFinancePool());
+after(async () => {
+  await closeFinancePool();
+  // the card resolver reads the admin DB's employee tables (bankLineAccounts.js): close that pool too, or the run never ends
+  try { const { getDbPool } = await import("../admin/server/sources/dbpool.js"); await getDbPool().end(); } catch {}
+});
 
 test("formatting helpers", () => {
   assert.equal(fmtDate("2026-11-05"), "05/11/2026");
@@ -64,9 +68,32 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     assert.equal(s.bankOpen.cheques.imageGuess, r.bankOpen.filter((x) => x.payeeSource === "image_guess").length);
     assert.equal(s.bankOpen.cheques.withImage, r.bankOpen.filter((x) => x.imageId).length);
     assert.equal(s.bankOpen.cheques.found + s.bankOpen.cheques.imageGuess + s.bankOpen.cheques.missing, s.bankOpen.cheques.count);
-    assert.ok(r.bankOpen.filter((x) => !/שיק/.test(x.details)).every((x) => !("payee" in x)));
+    // a non-cheque line is named only by the bank's status file or the uploaded bank file (the admin DB; absent when it cannot be read)
+    assert.ok(r.bankOpen.filter((x) => !/שיק/.test(x.details)).every((x) => !("payee" in x) || ["events", "bank_file"].includes(x.payeeSource)));
     assert.equal(s.bankOpen.cheques.missing, r.bankOpen.filter((x) => x.payeeSource === "missing").length);
     assert.ok(s.bankOpen.cheques.found + s.bankOpen.cheques.imageGuess + s.bankOpen.cheques.missing === s.bankOpen.cheques.count);
+    // The card (כרטסת) of every row (bankLineAccounts.js): section 3 from the cheques module, section 1 found or not; the
+    // employees card is flagged wherever it is; the summary counts agree with the rows.
+    assert.deepEqual(r.employees, { account: "450001", name: "עובד" });
+    assert.ok([...r.chequesCleared, ...r.chequesOpen].every((x) => x.counterAccount && x.counterSource === "books" && (x.counterAccount !== "450001") === !x.counterEmployee));
+    assert.ok(r.bookOpen.every((x) => (x.counterAccount === "450001") === Boolean(x.counterEmployee)));
+    const a = s.bankOpen.accounts;
+    assert.equal(a.rows, r.bankOpen.length);
+    assert.equal(a.found, r.bankOpen.filter((x) => x.counterAccount).length);
+    assert.equal(a.missing, r.bankOpen.filter((x) => !x.counterAccount).length);
+    assert.equal(a.found, a.books + a.name + a.employee + a.history + a.employeeGuess + a.text);
+    assert.equal(a.employeesAccount, "450001");
+    assert.ok(a.found > a.rows * 0.6, `a card for most of section 1 (${a.found} of ${a.rows})`);
+    for (const x of r.bankOpen) {
+      if (!x.counterAccount) { assert.ok(!x.counterSource && !x.counterEmployee); continue; }
+      assert.ok(x.counterName && x.counterSource && x.counterBasis, JSON.stringify(x));
+      assert.equal(Boolean(x.counterEmployee), x.counterAccount === "450001");
+      if (x.counterSource === "books") assert.ok(["cheques", "journal"].includes(x.payeeSource));
+      if (["employee", "employee_guess"].includes(x.counterSource)) assert.ok(x.counterEmployee && x.amount < 0, "an employee is paid, never pays");
+      if (x.counterSource === "text") assert.ok(!/^שיק|^העב/.test(x.details), x.details); // a fee "עמ העברה" is fine, a transfer text is not
+    }
+    assert.ok(r.bankOpen.filter((x) => x.counterSource === "books").every((x) => x.booksAccount === x.counterAccount));
+    assert.ok(r.notes.some((n) => n.startsWith("כרטסת:")), "a note counts the cards");
     // Every row is dated up to `to`; cleared cheques inside the period.
     assert.ok(r.bankOpen.every((x) => x.date <= to));
     assert.ok(r.bookOpen.every((x) => x.date <= to && !r.chequesOpen.some((c) => c.lineId === x.lineId)));
@@ -110,12 +137,12 @@ test("HTML and Excel", async () => {
   const html = renderBankReconHtml(r);
   assert.ok(html.startsWith("<!doctype html>"));
   assert.ok(html.includes('dir="rtl"'));
-  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
+  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "data-filter=\"1\">כרטסת</th>", "כרטיס העובדים עובד (450001)", 'class="acc acc-emp', "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
     assert.ok(html.includes(t), t);
   // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
   assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
   assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
-  assert.equal((html.match(/data-filter="1"/g) || []).length, 8 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table
+  assert.equal((html.match(/data-filter="1"/g) || []).length, 11 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table + כרטסת in 1, 3א, 3ב
   const body = renderBankReconBody(r);
   assert.ok(body.startsWith('<div class="bank-recon') && !body.includes("<html"));
   assert.ok(body.includes("<script") === false);
@@ -129,6 +156,11 @@ test("HTML and Excel", async () => {
   const s1 = wb.getWorksheet("1 בנק ללא ספרים");
   assert.equal(s1.rowCount, r.bankOpen.length + 2); // header + rows + total
   assert.ok(s1.getRow(1).values.includes("מוטב"), "the Excel has the beneficiary column");
+  for (const h of ["כרטסת", "שם הכרטסת", "מקור הכרטסת"]) assert.ok(s1.getRow(1).values.includes(h), h);
+  const empRow = r.bankOpen.findIndex((x) => x.counterEmployee);
+  const cardCol = s1.getRow(1).values.indexOf("כרטסת"); // a loaded workbook keeps no column keys: find it by its header
+  if (empRow >= 0) assert.equal(s1.getRow(empRow + 2).getCell(cardCol).fill?.fgColor?.argb, r.bankOpen[empRow].counterSource === "employee_guess" ? "FFEAF3FF" : "FFD6E9FF", "the employees card is blue in the Excel too");
+  for (const name of ["3א צ'קים שנפרעו", "3ב צ'קים פתוחים"]) assert.ok(wb.getWorksheet(name).getRow(1).values.includes("כרטסת"), name);
 });
 
 test("filters: kind, party, q, sections and the facets (shared/bankReconFilter.js)", async () => {

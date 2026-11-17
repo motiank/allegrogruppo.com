@@ -9,6 +9,16 @@
 import { NOISE_LABEL, TODO_LABEL } from "./bankReconNoise.js";
 import { KIND_LABEL } from "./bankReconFilter.js";
 
+// the card (כרטסת) of a line — admin/server/modules/bankLineAccounts.js; the pages color the one employees card
+export const ACCOUNT_SOURCE_LABEL = {
+  books: "מהספרים",
+  name: "שם זהה לשם הכרטסת",
+  employee: "עובד – כרטיס העובדים",
+  history: "לפי פקודות יומן קודמות על שם זה",
+  employee_guess: "כנראה עובד – לבדיקה",
+  text: "לפי התאמות קודמות של אותו טקסט בנק",
+};
+
 const nf = new Intl.NumberFormat("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nf0 = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 0 });
 
@@ -99,6 +109,13 @@ export const CSS = `
 .bank-recon .td{display:inline-block;font-size:.75em;background:#e05050;color:#fff;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
 .bank-recon .filter .of{color:#555;font-size:12px;margin-top:4px}
 .bank-recon td.guess{color:#8a5a00}
+.bank-recon td.acc{white-space:nowrap}
+.bank-recon td.acc .k{font-variant-numeric:tabular-nums;font-weight:700}
+.bank-recon td.acc .nm{color:#555}
+.bank-recon td.acc.sugg{border-bottom:2px dotted #9aa}
+.bank-recon td.acc-emp,.bank-recon .acc-emp.legend{background:#d6e9ff;color:#0b3d91}
+.bank-recon td.acc-emp.acc-guess,.bank-recon .acc-guess.legend{background:#eaf3ff;font-style:italic}
+.bank-recon .legend{padding:0 5px;border-radius:3px}
 .bank-recon a.chq-img{text-decoration:none;font-size:12px;margin-right:4px}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
@@ -122,7 +139,7 @@ function header(r) {
   <span><b>סנכרון אחרון:</b> ${esc(r.lastSync ? String(r.lastSync).slice(0, 16).replace("T", " ") : "")}</span>
   <span><b>הופק:</b> ${esc(r.generatedAt ? String(r.generatedAt).slice(0, 16).replace("T", " ") : "")}</span>
 </div>
-<div class="sign">סימנים: כניסה לבנק = פלוס, יציאה מהבנק = מינוס, גם בצד הבנק וגם בצד הספרים. "ימים" = ימים מתאריך התנועה עד ${fmtDate(r.to)}.</div>`;
+<div class="sign">סימנים: כניסה לבנק = פלוס, יציאה מהבנק = מינוס, גם בצד הבנק וגם בצד הספרים. "ימים" = ימים מתאריך התנועה עד ${fmtDate(r.to)}.${r.employees?.account ? ` <span class="acc-emp legend">כרטיס העובדים ${esc(r.employees.name ? `${r.employees.name} (${r.employees.account})` : r.employees.account)}</span> מסומן בכחול; <span class="acc-emp acc-guess legend">?</span> = כנראה עובד, לבדיקה.` : ""}</div>`;
 }
 
 function notes(r) {
@@ -228,20 +245,32 @@ const payeeCell = (x, opts) => {
   return `<td${cls ? ` class="${cls}"` : ""} data-f="${esc(text)}">${esc(text)}${link}</td>`;
 };
 
+// the card (כרטסת) to book the line on: "name (key)"; the one employees card in blue (a guess: lighter, with "?"); a card
+// that is not from the books is a suggestion — dotted, the tooltip says what it is based on
+const accountText = (x) => (x.counterAccount ? `${x.counterName || ""} (${x.counterAccount})`.trim() : "");
+export const accountCell = (x) => {
+  if (!x.counterAccount) return `<td class="acc" data-f=""></td>`;
+  const guess = x.counterSource === "employee_guess";
+  const cls = `acc${x.counterEmployee ? " acc-emp" : ""}${guess ? " acc-guess" : ""}${x.counterSource && x.counterSource !== "books" ? " sugg" : ""}`;
+  const title = x.counterSource ? `${ACCOUNT_SOURCE_LABEL[x.counterSource] || x.counterSource}${x.counterBasis ? ` – ${x.counterBasis}` : ""}` : "";
+  return `<td class="${cls}" data-f="${esc(accountText(x))}"${title ? ` title="${esc(title)}"` : ""}><span class="k">${esc(x.counterAccount)}</span>${guess ? "?" : ""} <span class="nm">${esc(x.counterName || "")}</span></td>`;
+};
+const counterCell = (x) => `<td${x.counterEmployee ? ' class="acc-emp"' : ""}>${esc(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}</td>`;
+
 function bankOpenTable(r, opts) {
   const rows = r.bankOpen || [];
   if (!rows.length) return omittedSection(r, "bankOpen") || `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.bankOpen}</h2>
 <table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("סוג")}${fth("מוטב")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
+  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("סוג")}${fth("מוטב")}${fth("כרטסת")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${payeeCell(x, opts)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${payeeCell(x, opts)}${accountCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
+    <tr class="total"><td colspan="6">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
   </tbody>
 </table>`;
 }
@@ -257,7 +286,7 @@ function bookOpenTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
+          `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "bookOpen", "תנועות")}</td>${money(totalOf(r, "bookOpen"))}<td></td><td></td><td></td></tr>
@@ -276,7 +305,7 @@ function bookFutureTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${cell(`${x.counterName || ""} ${x.counterAccount ? `(${x.counterAccount})` : ""}`.trim())}${money(x.amount)}${cell(x.batch)}</tr>`,
+          `<tr>${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.batch)}</tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "bookFutureMatched", "תנועות")}</td>${money(totalOf(r, "bookFutureMatched"))}<td></td></tr>
@@ -290,15 +319,15 @@ function chequesClearedTable(r) {
   return `
 <h2>${SECTION_TITLES.chequesCleared}</h2>
 <table>
-  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום הצ'ק</th><th>נפרע בבנק</th><th class="num">סכום בבנק</th><th>אסמכתא בבנק</th><th class="num">ימים מתאריך הצ'ק</th><th>סטטוס</th></tr></thead>
+  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום הצ'ק</th><th>נפרע בבנק</th><th class="num">סכום בבנק</th><th>אסמכתא בבנק</th><th class="num">ימים מתאריך הצ'ק</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(fmtDate(x.clearedDate))}${money(x.bankAmount)}${cell(x.bankReference)}${cell(x.daysAfterDue, "num")}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
+          `<tr>${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(fmtDate(x.clearedDate))}${money(x.bankAmount)}${cell(x.bankReference)}${cell(x.daysAfterDue, "num")}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="4">${totalText(r, "chequesCleared", "צ'קים")}</td>${money(totalOf(r, "chequesCleared"))}<td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="5">${totalText(r, "chequesCleared", "צ'קים")}</td>${money(totalOf(r, "chequesCleared"))}<td></td><td></td><td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
@@ -309,15 +338,15 @@ function chequesOpenTable(r) {
   return `
 <h2>${SECTION_TITLES.chequesOpen}</h2>
 <table>
-  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום</th><th class="num">ימים מתאריך הצ'ק</th><th>נמצא בבנק בתאריך</th><th>סטטוס</th></tr></thead>
+  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום</th><th class="num">ימים מתאריך הצ'ק</th><th>נמצא בבנק בתאריך</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr class="${todoClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
+          `<tr class="${todoClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="4">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="5">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }

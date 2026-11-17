@@ -228,6 +228,16 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12
   guesses, 7 left. Tests `scripts/test_cheque_archive.js` (no DB), `test_cheque_payees.js`, `test_bank_recon.js`, `test_finance_api.js`
   (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (`a046632`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet). On production that day, section 1 of 2026: 283 cheques named from the picture, 17 guesses, 19 missing (7 with a scan), 379 with a 📷.
+  **The card (כרטסת) next to every line** (2026-11-18, owner: "I want the card index number next to each line to improve the process; complete
+  every row. One card for all employees: make sure it is an employee by the admin's employees table or another way; no specific supplier or other
+  role → the employee card, marked by color"): `admin/server/modules/bankLineAccounts.js` gives every section-1 bank line `counterAccount` /
+  `counterName` / `counterSource` (`books`, `name` incl. `finance_map` `cardAliases`, `employee` = Priority's employees supplier 108 or the admin's
+  employee tables, `history` = past journal entries with that name, `employee_guess` = a person's name with no card, to check, `text` = the bank
+  text's past matches) / `counterBasis`, and `counterEmployee` for the one employees card (`finance_map` `employees.account` = 450001 "עובד");
+  sections 2 and 3 carry the books' own. Shown as a "כרטסת" column (blue = employees card, lighter + "?" = a guess, tooltip = why) in the page,
+  the Excel (3 columns, blue fill), `/finance/bank/open` (`meta.cards`), `/finance/bank/report` and Joya's chat (`card`, `cardSource`,
+  `employeesCard`; rule in `hq-analyst.js`). On the local copy, 2026 section 1: a card for 643 of 758 lines (147 employees, 38 guesses, 115 without a card). Tests
+  `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

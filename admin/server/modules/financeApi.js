@@ -8,6 +8,7 @@ import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees, isChequeLine } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
+import { addBankLineAccounts } from "./bankLineAccounts.js";
 import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "./priorityCheques.js";
 import { mergeCheques } from "./chequesAll.js";
 import { companyArchive, searchArchive, archiveCounts, driveImageUrl, readChequeImage } from "./chequeArchive.js";
@@ -1415,7 +1416,10 @@ route("/bank/open", async (req, ctx) => {
   // the lines still without a name (money in above all) get the other side from the bank file uploaded in the admin
   // (bank_transactions; payeeSource bank_file, payeeRole from | to, payeePurpose)
   const bankFile = side === "bank" ? await addBankFileNames(data, { accounts: fileAccountsOf({ financeCode: ctx.code }), date: (r) => r.date, reference: (r) => r.reference, amount: (r) => r.signedAmount }) : undefined;
-  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}), ...(events ? { events } : {}), ...(bankFile ? { bankFile } : {}) }, codes: ["bank_gap"] };
+  // the card (כרטסת) to book every bank line on (bankLineAccounts.js: counterAccount / counterName / counterSource / counterBasis,
+  // counterEmployee = the one employees card) — the books, an account with that name, the employees, the journal's history, the bank text
+  const cards = side === "bank" ? await addBankLineAccounts(data, { companyId: ctx.companyId, code: ctx.code, bankAccounts: keys, amount: (r) => r.signedAmount }) : undefined;
+  return { data, meta: { side, accounts: keys, minAge, from: from || null, to: hasRange ? to : null, includeUnposted, limit, offset, total: num(cnt?.n), amount: round2(cnt?.amount ?? cnt?.amt), ...(payees ? { payees } : {}), ...(events ? { events } : {}), ...(bankFile ? { bankFile } : {}), ...(cards ? { cards } : {}) }, codes: ["bank_gap"] };
 });
 
 // ── bank balance per day (readme → /bank/balances) ───────────────────────

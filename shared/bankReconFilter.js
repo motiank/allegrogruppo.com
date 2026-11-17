@@ -93,12 +93,15 @@ export function normName(s) {
 const has = (hay, needle) => needle !== "" && normName(hay).includes(needle);
 
 // ── decoration: kind + party on every row ────────────────────────────────
+// name = the payee / counter name on the row; key = the card (כרטסת: the counter account of a book line, the card
+// bankLineAccounts.js found for a bank line or a cheque); keyName = the card's own name when the row carries it (an
+// employee's cheque: name = the person, key = the one employees card, keyName = "עובד")
 const PARTY_OF = {
-  bankOpen: (x) => ({ name: x.payee || null, key: null, text: x.details }),
-  bookOpen: (x) => ({ name: x.counterName || null, key: x.counterAccount ? String(x.counterAccount) : null, text: x.description }),
-  bookFutureMatched: (x) => ({ name: x.counterName || null, key: x.counterAccount ? String(x.counterAccount) : null, text: x.description }),
-  chequesCleared: (x) => ({ name: x.payee || null, key: null, text: null }),
-  chequesOpen: (x) => ({ name: x.payee || null, key: null, text: null }),
+  bankOpen: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: x.details }),
+  bookOpen: (x) => ({ name: x.counterName || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: null, text: x.description }),
+  bookFutureMatched: (x) => ({ name: x.counterName || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: null, text: x.description }),
+  chequesCleared: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: null }),
+  chequesOpen: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: null }),
 };
 const KIND_OF = {
   bankOpen: (x) => bankKind(x.details, x.amount),
@@ -158,7 +161,7 @@ export function filterLabel(f) {
 
 const rowTexts = (x, section) => {
   const p = PARTY_OF[section](x);
-  return [x.details, x.description, p.name, p.key, x.reference, x.bankReference, x.chequeNo, x.transId, x.batch].filter((v) => v != null && v !== "");
+  return [x.details, x.description, p.name, p.key, p.keyName, x.reference, x.bankReference, x.chequeNo, x.transId, x.batch].filter((v) => v != null && v !== "");
 };
 
 /** True when the row of `section` passes the filter `f` (kind, party, q, amount). */
@@ -173,7 +176,7 @@ export function matchRow(x, section, f) {
     const p = PARTY_OF[section](x);
     const needles = [normName(f.party), ...(f.partyNames || [])];
     const byKey = p.key != null && p.key === f.party;
-    const byName = needles.some((needle) => (p.name && has(p.name, needle)) || (!p.name && p.text && has(p.text, needle)));
+    const byName = needles.some((needle) => (p.name && has(p.name, needle)) || (p.keyName && has(p.keyName, needle)) || (!p.name && p.text && has(p.text, needle)));
     if (!byKey && !byName) return false;
   }
   if (f.q) {
@@ -204,19 +207,25 @@ export function facetsOf(report, { withParties = false, maxParties = 400 } = {})
       if (!withParties) continue;
       const p = PARTY_OF[s](x);
       const name = p.name || (s === "bankOpen" && k !== "cheque" ? p.text : null);
-      if (!name) continue;
-      const id = p.key || normName(name);
-      const pc = parties.get(id) || { name, key: p.key, count: 0, total: 0, sections: [], bankOpen: 0, bankOpenTotal: 0 };
-      pc.count++;
-      pc.total += Number(x.amount) || 0;
-      if (s === "bankOpen") {
-        // bank moves missing from the books (section 1) — the owner wants this number in red next to the party
-        pc.bankOpen++;
-        pc.bankOpenTotal += Number(x.amount) || 0;
+      // the parties this row counts for: its card (named by the card when the row knows it) and, when the row's own name
+      // is another one (an employee on the shared employees card), that name too — so the picker has both
+      const entries = [];
+      if (p.key) entries.push({ id: p.key, name: p.keyName || name || p.key, key: p.key, keyName: p.keyName });
+      if (name && (!p.key || (p.keyName && normName(p.keyName) !== normName(name)))) entries.push({ id: normName(name), name, key: null, keyName: null });
+      for (const e of entries) {
+        const pc = parties.get(e.id) || { name: e.name, key: e.key, count: 0, total: 0, sections: [], bankOpen: 0, bankOpenTotal: 0 };
+        if (e.keyName && pc.name !== e.keyName) pc.name = e.keyName; // the card's own name wins over the first row's name
+        pc.count++;
+        pc.total += Number(x.amount) || 0;
+        if (s === "bankOpen") {
+          // bank moves missing from the books (section 1) — the owner wants this number in red next to the party
+          pc.bankOpen++;
+          pc.bankOpenTotal += Number(x.amount) || 0;
+        }
+        if (!pc.sections.includes(s)) pc.sections.push(s);
+        if (!pc.key && e.key) pc.key = e.key;
+        parties.set(e.id, pc);
       }
-      if (!pc.sections.includes(s)) pc.sections.push(s);
-      if (!pc.key && p.key) pc.key = p.key;
-      parties.set(id, pc);
     }
   }
   const out = { kinds: KINDS.filter((k) => kinds.has(k.kind)).map((k) => ({ ...kinds.get(k.kind), total: round2(kinds.get(k.kind).total) })) };

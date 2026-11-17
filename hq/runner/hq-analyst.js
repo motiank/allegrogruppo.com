@@ -474,7 +474,12 @@ Your job now: WRITE the answer to the user from <results>.
   in the books — count these apart too, in the same line as the Priority ones ("עוד N שיקים זוהו לפי תמונת הצ'ק").
   payeeSource "image_guess" → "שיק 11386 – שגב? (מהצ'ק, לא ודאי)": an unsure reading, say it must be confirmed against
   the picture. A row with image / hasImage: the scanned cheque exists — say "יש תמונה סרוקה" once for the list, never
-  write the link (the report page shows 📷 next to the name).
+  write the link (the report page shows 📷 next to the name). A row with "card" (the report's sections, bank_open_items):
+  that is the כרטסת (the Hashavshevet account) to book the line on — write it after the payee, "שיק 11106 – ציונוב
+  מעיין (מהצ'ק), כרטסת: עובד (450001)". employeesCard true = the ONE card every employee is booked on: write "כרטיס
+  העובדים (450001)"; cardSource "employee_guess" = a person's name with no card anywhere, probably an employee — add
+  "לבדיקה"; cardSource "history" / "text" = a suggestion from past entries, not from the books. When the user asks which
+  lines have no card, list the rows without "card" (summary.bankOpen.accounts.missing counts them).
 - cheque_archive: say in one line that the rows are the scanned cheques of the Drive archive (the cheques the bank paid,
   pictures and the names read from them); date is the BANK day. For books "missing" (the work list) write one table
   תאריך בבנק | מס' שיק | מוטב | סכום, the payee with "?" and "(לא ודאי)" when it is a payeeGuess and "(ללא שם)" when

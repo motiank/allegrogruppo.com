@@ -22,6 +22,20 @@ for (const c of PRIORITY_CHEQUES) {
   byNumber.get(k).push(c);
 }
 
+/**
+ * The payee names Priority booked on the given supplier numbers — e.g. 108, the one supplier "עובדים" every employee's
+ * cheque was written on (454 names): a bank cheque to one of these names is an employee's (bankLineAccounts.js).
+ * @param {Array<string|number>} supplierAccounts
+ * @returns {Set<string>} the names as written in Priority
+ */
+export function prioritySupplierNames(supplierAccounts) {
+  const wanted = new Set((supplierAccounts || []).map((k) => String(k).trim()).filter(Boolean));
+  const out = new Set();
+  if (!wanted.size) return out;
+  for (const c of PRIORITY_CHEQUES) if (c.supplier && wanted.has(String(c.supplierAccount ?? "").trim())) out.add(c.supplier);
+  return out;
+}
+
 const chequeNo = (v) => {
   const s = String(v ?? "").trim();
   return /^\d+$/.test(s) ? String(Number(s)) : null;

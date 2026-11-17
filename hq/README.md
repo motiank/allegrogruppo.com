@@ -254,6 +254,10 @@ for the chat only, by the owner's choice). The admin server does the filtering (
 API `/finance/bank/report?kind&party&q&amount&sections`), so a big report costs the AI nothing: the answer gets only
 the matching rows, `filter.label`, `filtered[section]` = kept of all, and the summary of the whole account. Eval
 fixtures `f-bank-recon-filter-*`.
+**The card next to every line** (owner 2026-11-18): the admin's report gives every line the כרטסת (the Hashavshevet account) to book it
+on — from the books, an account with that name, the employees (one shared card, 450001 "עובד", found through the admin's employee tables,
+Priority's employees supplier or past journal entries; a person's name with no card at all is a guess to check), or the bank text's past matches.
+The page shows a "כרטסת" column with the employees card in blue; the chat writes "כרטסת: עובד (450001)" after the payee, "לבדיקה" on a guess.
 
 **Payments (תשלומים, owner 2026-11-07: "a new section on the main menu … pay to someone now / in the future, see the
 payments for today / week / upcoming to feed the bank, move a payment, later side by side with the cash flow").** The

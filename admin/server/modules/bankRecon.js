@@ -14,6 +14,9 @@
 //       — the filters of shared/bankReconFilter.js: the sections keep only the matching rows, the summary stays whole
 //   GET /admin/bank-recon/facets?company=&account=&from=&to= → the kinds and the parties of the report, for the pickers
 //   GET /admin/bank-recon/cheque-image/:id                   → the scanned cheque (Drive archive, chequeArchive.js), for the 📷 links
+// Every row carries its card (כרטסת, owner 2026-11-18): counterAccount / counterName — the books' own on sections 2 and 3,
+// bankLineAccounts.js's on section 1 (counterSource books | name | employee | history | employee_guess | text, counterBasis
+// = why); counterEmployee = the one employees card (finance_map employees.account), colored blue on the pages.
 // HTML comes from shared/bankReconHtml.js (also used by the admin page); Excel from exceljs.
 
 import express from "express";
@@ -28,6 +31,7 @@ import { addChequePayees } from "./chequePayees.js";
 import { readChequeImage } from "./chequeArchive.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
 import { addBankFileNames } from "./bankFileNames.js";
+import { addBankLineAccounts, companyAccounts, employeesRule, ACCOUNT_SOURCE_LABEL } from "./bankLineAccounts.js";
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs");
@@ -160,10 +164,15 @@ export async function buildBankReconReport(query = {}) {
   // (all entries with a cheque) and joined to the cheques in JS. Cancelled cheques (a second entry with a negative
   // amount) are left out.
   const chequeMaster = await financeSql(
-    `SELECT c.cheque_id, c.reference AS cheque_no, c.payee_name, c.amount_to_pay, DATE_FORMAT(c.due_date, '%Y-%m-%d') AS due
+    `SELECT c.cheque_id, c.reference AS cheque_no, c.payee_name, c.amount_to_pay, c.account_key, DATE_FORMAT(c.due_date, '%Y-%m-%d') AS due
        FROM cheques c WHERE c.company_id = :companyId AND c.bank_key = :acc AND c.deleted_at IS NULL ORDER BY c.due_date, c.cheque_id`,
     p,
   );
+  // the card (כרטסת) of every row: the accounts list for the names, the one employees card (finance_map employees.account)
+  const accountNames = await companyAccounts(company.companyId);
+  const employees = employeesRule(company.code);
+  const isEmployeesCard = (key) => Boolean(employees && key != null && String(key) === employees.account);
+  const cardOf = (key) => (key == null || key === "" ? {} : { counterAccount: String(key), counterName: accountNames.get(String(key))?.name || null, counterSource: "books", ...(isEmployeesCard(key) ? { counterEmployee: true } : {}) });
   const chequeEntries = await financeSql(
     `SELECT e.cheque_id, e.trans_id, e.amount, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS issued, e.status, l.line_id, l.signed_amount,
             mk.fiscal_year AS m_year, mk.match_num, DATE_FORMAT(mk.matched_on, '%Y-%m-%d') AS matched_on
@@ -225,7 +234,7 @@ export async function buildBankReconReport(query = {}) {
     const amount = round2(c.signed_amount); // minus: money out
     const base = {
       chequeId: c.cheque_id, chequeNo: c.cheque_no, payee: c.payee_name, issueDate: c.issued, dueDate: c.due, amount,
-      posted: num(c.status) === 1, lineId: c.line_id, transId: c.trans_id,
+      posted: num(c.status) === 1, lineId: c.line_id, transId: c.trans_id, ...cardOf(c.account_key),
     };
     if (c.match_num != null) {
       const lines = groupBank.get(`${c.m_year}:${c.match_num}`) || [];
@@ -255,7 +264,7 @@ export async function buildBankReconReport(query = {}) {
     .map((r) => ({
       lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, date: r.d, reference: r.reference, type: r.trans_type, description: r.description || r.details,
       counterAccount: r.counter_account, counterName: r.counter_name, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to), batch: r.batch_no,
-      posted: num(r.status) === 1, chequeId: r.cheque_id || null,
+      posted: num(r.status) === 1, chequeId: r.cheque_id || null, ...(isEmployeesCard(r.counter_account) ? { counterEmployee: true } : {}),
     }));
   const bankOpen = bankOpenRows.map((r) => ({
     bankLineId: r.bank_line_id, year: r.fiscal_year, date: r.d, reference: r.reference, details: r.details, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to),
@@ -270,11 +279,16 @@ export async function buildBankReconReport(query = {}) {
   // the lines still without a name — money that came IN above all — get the other side from the bank file uploaded in the
   // admin (bank_transactions: "המבצע: <name>" = from, "לטובת: <name>" = to; payeeSource bank_file, payeeRole from | to)
   const fileNameStats = await addBankFileNames(bankOpen, { accounts: fileAccounts, date: (r) => r.date, reference: (r) => r.reference, amount: (r) => r.amount });
+  // the card (כרטסת) to book every line on (bankLineAccounts.js: counterAccount / counterName / counterSource / counterBasis;
+  // counterEmployee = the one employees card, shown in blue): the books, an account with the payee's name, the employees
+  // (Priority's employees supplier, the admin's employee tables), past journal entries with that name, a person's name
+  // with no card = probably an employee (to check), the bank text's past matches
+  const accountStats = await addBankLineAccounts(bankOpen, { companyId: company.companyId, code: company.code, bankAccounts: [accountKey] });
 
   const bookFutureMatched = futureMatchedRows.map((r) => ({
     lineId: r.line_id, year: r.fiscal_year, transId: r.trans_id, date: r.d, reference: r.reference, type: r.trans_type, description: r.description || r.details,
     counterAccount: r.counter_account, counterName: r.counter_name, amount: round2(r.signed_amount), ageDays: daysBetween(r.d, to), batch: r.batch_no,
-    posted: num(r.status) === 1, chequeId: r.cheque_id || null,
+    posted: num(r.status) === 1, chequeId: r.cheque_id || null, ...(isEmployeesCard(r.counter_account) ? { counterEmployee: true } : {}),
   }));
   // a book line paid by transfer (no cheque, money out) gets the matching order too — the books carry no instrument
   // word for a transfer; the event (same amount, given up to 4 days before the value date) says it was one
@@ -299,6 +313,8 @@ export async function buildBankReconReport(query = {}) {
         imageGuess: payeeStats.imageGuess || 0, imageGuessTotal: sum(bankOpen.filter((x) => x.payeeSource === "image_guess"), (x) => x.amount),
         withImage: payeeStats.withImage || 0, missingWithImage: bankOpen.filter((x) => x.payeeSource === "missing" && x.imageId).length,
       },
+      // the cards (כרטסת) of section 1: found of rows, and by source (books, name, employee, history, employeeGuess, text)
+      accounts: { ...accountStats, missingTotal: sum(bankOpen.filter((x) => !x.counterAccount), (x) => x.amount), employeeTotal: sum(bankOpen.filter((x) => x.counterEmployee), (x) => x.amount) },
     },
     bookOpen: { count: bookOpen.length, total: sum(bookOpen, (x) => x.amount), beforeCount: older(bookOpen).length, beforeTotal: sum(older(bookOpen), (x) => x.amount) },
     chequesOpen: {
@@ -339,6 +355,19 @@ export async function buildBankReconReport(query = {}) {
   if (fileNameStats.found)
     notes.push(`${fileNameStats.found} תנועות בסעיף 1 קיבלו שם מקובץ הבנק שהועלה באדמין${fileNameStats.from ? ` – ${fileNameStats.from} מהן כספים שנכנסו לחשבון ("מאת: …" = מי שהעביר אלינו)` : ""}.`);
   if (fileNameStats.error) notes.push(`קובץ הבנק שהועלה באדמין לא נקרא הפעם (${fileNameStats.error}).`);
+  if (accountStats.rows) {
+    const a = accountStats;
+    const parts = [
+      a.books ? `${a.books} מהספרים` : "", a.name ? `${a.name} לפי שם זהה לשם הכרטסת` : "",
+      a.employee ? `${a.employee} עובדים (כרטיס העובדים${a.employeesAccount ? ` ${a.employeesAccount}` : ""} – לפי רשימת העובדים באדמין או ספק העובדים בפריוריטי)` : "",
+      a.history ? `${a.history} לפי פקודות יומן קודמות על אותו שם` : "",
+      a.employeeGuess ? `${a.employeeGuess} כנראה עובדים (שם של אדם פרטי ללא כרטסת ספק – לבדיקה, מסומנים בכחול עם סימן שאלה)` : "",
+      a.text ? `${a.text} לפי התאמות קודמות של אותו טקסט בנק` : "",
+    ].filter(Boolean);
+    notes.push(`כרטסת: ל-${a.found} מתוך ${a.rows} תנועות בסעיף 1 הוצעה כרטסת לרישום (עמודת "כרטסת"${parts.length ? `: ${parts.join("; ")}` : ""}). ${a.missing ? `${a.missing} תנועות נשארו ללא כרטסת.` : "לכל התנועות יש כרטסת."} כרטיס העובדים מסומן בכחול בכל הסעיפים; כרטסת שאינה מהספרים היא הצעה – מעבר עם העכבר מראה על מה היא מבוססת.`);
+  }
+  if (accountStats.error) notes.push(`הכרטסות של תנועות הבנק לא נשלפו הפעם (${accountStats.error}).`);
+  if (accountStats.adminError) notes.push(`רשימת העובדים באדמין לא נקראה הפעם (${accountStats.adminError}); זיהוי העובדים נעשה לפי פריוריטי ופקודות היומן בלבד.`);
   if (cancelledCount) notes.push(`${cancelledCount} צ'קים מבוטלים (יש להם רישום הפוך) אינם מופיעים בסעיף 3.`);
   if (summary.chequesCleared.groupOnly) notes.push(`${summary.chequesCleared.groupOnly} צ'קים הותאמו בחשבשבת בתוך קבוצת התאמה גדולה ולא נמצאה שורת בנק עם אותו מספר צ'ק ואותו סכום; מוצג תאריך ההתאמה או שורת הבנק היחידה בקבוצה.`);
   if (clearedUnmatched.length) notes.push(`${clearedUnmatched.length} צ'קים כבר נפרעו בבנק (לפי מספר הצ'ק והסכום) אבל עדיין לא הותאמו בחשבשבת; הם נספרים כצ'קים פתוחים עד להתאמה.`);
@@ -351,6 +380,7 @@ export async function buildBankReconReport(query = {}) {
   return applyFilter({
     company: { code: company.code, name: company.name }, account: { key: accountKey, name: bank.name }, from, to,
     dataUpTo: bank.dataUpTo, lastSync: sync?.t ? String(sync.t).slice(0, 19) : null, generatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
+    employees: employees ? { account: employees.account, name: accountNames.get(employees.account)?.name || null } : null,
     summary, notes, bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen,
   }, filter);
 }
@@ -381,7 +411,11 @@ function sheet(wb, title, columns, rows, totalLabel, total) {
       out[c.key] = v ?? null;
     }
     const row = ws.addRow(out);
-    for (const c of columns) if (c.link && out[c.key]) row.getCell(c.key).font = { color: { argb: "FF1155CC" }, underline: true };
+    for (const c of columns) {
+      if (c.link && out[c.key]) row.getCell(c.key).font = { color: { argb: "FF1155CC" }, underline: true };
+      const fill = c.fill ? c.fill(r) : null; // e.g. the employees card in blue
+      if (fill) row.getCell(c.key).fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+    }
   }
   if (totalLabel) {
     const row = ws.addRow({ [columns[0].key]: `${totalLabel} (${rows.length})`, [columns.find((c) => c.money)?.key]: total });
@@ -438,15 +472,24 @@ export async function renderBankReconXlsx(r) {
   const tot = (key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : s[key].total);
   const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
   const noiseCol = { header: "רעש / לטיפול", key: "noise", width: 40, get: (x) => (x.noise ? `רעש: ${NOISE_LABEL[x.noise.rule] || x.noise.rule}` : x.todo ? `לטיפול: ${TODO_LABEL[x.todo.rule] || x.todo.rule}` : null) };
+  // the card (כרטסת) columns: the key, its name, why — the employees card in blue, a guess in a lighter blue
+  const EMP_FILL = "FFD6E9FF", GUESS_FILL = "FFEAF3FF";
+  const cardFill = (x) => (x.counterEmployee ? (x.counterSource === "employee_guess" ? GUESS_FILL : EMP_FILL) : null);
+  const cardCols = (withSource) => [
+    { header: "כרטסת", key: "counterAccount", width: 10, fill: cardFill },
+    { header: "שם הכרטסת", key: "counterName", width: 24, fill: cardFill },
+    ...(withSource ? [{ header: "מקור הכרטסת", key: "counterSource", width: 44, get: (x) => (x.counterSource ? `${ACCOUNT_SOURCE_LABEL[x.counterSource] || x.counterSource}${x.counterBasis ? ` – ${x.counterBasis}` : ""}` : null) }] : []),
+  ];
   sheet(wb, "1 בנק ללא ספרים", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol,
     { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, { header: "מקור השם", key: "payeeSource", width: 12, get: (x) => PAYEE_SOURCE_LABEL[x.payeeSource] || null },
+    ...cardCols(true),
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
     { header: "מזהה שורה", key: "bankLineId", width: 10 }, { header: "תמונת הצ'ק", key: "image", width: 14, link: "פתח תמונה", get: (x) => x.image || null },
   noiseCol], r.bankOpen, 'סה"כ', tot("bankOpen"));
   sheet(wb, "2 ספרים ללא בנק", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
-    { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12 }, { header: "שם חשבון נגדי", key: "counterName", width: 26 },
+    { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12, fill: cardFill }, { header: "שם חשבון נגדי", key: "counterName", width: 26, fill: cardFill },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "מנה", key: "batch", width: 8 },
     { header: "נקלט", key: "posted", width: 8, get: (x) => (x.posted ? "כן" : "לא") }, { header: "מס' תנועה", key: "transId", width: 10 },
   noiseCol], r.bookOpen, 'סה"כ', tot("bookOpen"));
@@ -457,14 +500,14 @@ export async function renderBankReconXlsx(r) {
       { header: "סכום", key: "amount", money: true, width: 16 }, { header: "מנה", key: "batch", width: 8 }, { header: "מס' תנועה", key: "transId", width: 10 },
     ], r.bookFutureMatched, 'סה"כ', tot("bookFutureMatched"));
   sheet(wb, "3א צ'קים שנפרעו", [
-    { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
+    { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, ...cardCols(false), { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום הצ'ק", key: "amount", money: true, width: 16 },
     { header: "נפרע בבנק", key: "clearedDate", date: true, width: 12 }, { header: "סכום בבנק", key: "bankAmount", money: true, width: 16 },
     { header: "אסמכתא בבנק", key: "bankReference", width: 12 }, { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10 },
     { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
   ], r.chequesCleared, 'סה"כ', tot("chequesCleared"));
   sheet(wb, "3ב צ'קים פתוחים", [
-    { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
+    { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, ...cardCols(false), { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום", key: "amount", money: true, width: 16 },
     { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) },
     { header: "נמצא בבנק בתאריך", key: "clearedDate", date: true, width: 14 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },

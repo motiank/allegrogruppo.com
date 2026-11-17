@@ -205,6 +205,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   The supplier picker (searchable, red count = the supplier's bank moves missing from the books) deployed 2026-11-13 (`43c3a18`).
   Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
   from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
+  **Cards (כרטסת, 2026-11-18):** the admin's report rows now carry the account to book each line on; `finance.js` passes `card` ("name (key)"),
+  `cardSource` and `employeesCard` (the one card of all employees) on the bank and cheque rows (`bank_open_items` passes the raw
+  `counterAccount` / `counterName` / `counterSource` / `counterEmployee`); the planner's WRITE rule says "כרטסת: עובד (450001)" after the payee,
+  "כרטיס העובדים" for the shared card and "לבדיקה" for `employee_guess`.
 - **Cheque archive** (2026-11-16, owner: use the Drive cheques folder's `index.json` to cut the "לא נמצא בחשבשבת" cases — all use
   cases): the admin reads the scanned-cheque archive (`admin/server/modules/chequeArchive.js`, root `CLAUDE.md` → "Cheque archive in
   Drive"). In Joya: `payeeSource` `image` ("(מהצ'ק)" — the name read from the picture) / `image_guess` ("? (מהצ'ק, לא ודאי)") on every bank
