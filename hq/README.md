@@ -621,6 +621,12 @@ ids in `meta.teamRules`. A rule never overrides the hard rules (no computed numb
 
 ## Other functions
 
+**System — data freshness** (`/system`, main-menu item "מערכת", chain admin; owner 2026-11-18): one page that says, for every data
+source, up to which date the data reaches, when it was last loaded, how many rows, and a state (מעודכן / מאחר / ישן), with notes
+that compare the sources ("the bank page in Hashavshevet ends on 05/11 while the uploaded bank file reaches 16/11"). The admin
+computes it (`GET /local-api/v1/system/freshness`, `admin/server/modules/dataFreshness.js`); Joya shows it (`pages/System.js`,
+`/api/joya/system/freshness`). Nothing is stored.
+
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
 (ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
 Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **labor cost

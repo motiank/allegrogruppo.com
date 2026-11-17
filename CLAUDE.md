@@ -244,6 +244,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   in `report.older`; filter `older=hide` drops them; the HTML page starts with them hidden behind a button, the Excel has a "לפני התקופה"
   column, Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`; planner rule). The summary always
   counts them. Tests `scripts/test_bank_recon_filter.js`, `test_bank_recon.js`.
+- **System page in Joya HQ** (2026-11-18, owner: "a system option in the main menu which displays this data" — the last update date of the
+  bank, Hashavshevet and the rest): `admin/server/modules/dataFreshness.js` → Local Data API `GET /system/freshness` (read only: the
+  Hashavshevet copy — sync run, bank page, matches, journal, cheques, batches; the bank files; Tabit; Beecomm; the Drive indexes; the Priority
+  file — each with the last business date, the last load, rows, `state` ok / late / stale against an expected cadence, and Hebrew notes
+  that compare the sources) → Joya `/api/joya/system/freshness` → page `/system`, main-menu item "מערכת" (chain admin). Test
+  `scripts/test_data_freshness.js` (no DB). Needs an hq client build on deploy.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

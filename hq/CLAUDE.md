@@ -192,6 +192,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   channel, a closing line on the channels not connected yet). Eval `f-drive-*`, `f-missing-*`. The admin needs the
   agent's Google files (`INVOICE_DRIVE_CREDENTIALS`, `INVOICE_DRIVE_TOKEN`), else the channel answers "not available"
   with the reason. Deployed 2026-11-08 (`3cce655`; the rename to missing_invoices the same day).
+- **System page** (2026-11-18, owner: "a system option in the main menu which displays this data" = the last update date of every
+  source): main-menu item "מערכת" → `/system` (`client/pages/System.js`, chain admin) ← `GET /api/joya/system/freshness`
+  (`routes.js`, `source.systemFreshness`) ← the admin's `GET /local-api/v1/system/freshness` (`admin/server/modules/dataFreshness.js`:
+  Hashavshevet copy, bank files, Tabit, Beecomm, Drive indexes, Priority file; state ok / late / stale per expected cadence; Hebrew
+  notes comparing the sources). Needs an hq client build on deploy.
 - **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (not in the menu — the chat answers it (suggestion 9 of the accounting area) and the buttons under the answer open the page;
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).

@@ -437,6 +437,16 @@ export async function status() {
   return { branches: data || [], sources: meta?.sources || {} };
 }
 
+/**
+ * How fresh every data source is (the admin's dataFreshness.js, GET /system/freshness): { today, generatedAt, notes,
+ * groups: [{ key, label, labelEn, items: [{ key, label, labelEn, lastDate, lastUpdate, count, detail, expectedDays, ageDays, state }] }] }.
+ * state: ok | late | stale | missing | fixed | error. Never cached: the page is about now.
+ */
+export async function systemFreshness() {
+  const { data, meta } = await get('/system/freshness');
+  return { today: meta?.today ?? null, generatedAt: meta?.generatedAt ?? null, notes: meta?.notes || [], groups: data || [] };
+}
+
 
 // ---------------------------------------------------------------- finance (the Hashavshevet books)
 

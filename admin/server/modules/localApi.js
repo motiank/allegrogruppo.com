@@ -8,6 +8,7 @@ import { normalizeRoles, effectiveHourlyRate } from "../../../shared/wage.js";
 import { norm, nameKey } from "../uploads/workbook.js";
 import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
 import { parseFiles, recognizeUploads, importUploads } from "./files.js";
+import { dataFreshness } from "./dataFreshness.js";
 import {
   bcomGetOrders,
   bcomGetExceptions,
@@ -532,6 +533,7 @@ const ENDPOINTS = [
   "GET /beecomm/payments/stored?from=&to=[&branch=a,b][&group=day|type|brand]",
   "GET /bank/transactions/stored?from=&to=[&company=a,b][&account=][&q=][&side=credit|debit][&group=none|day|action|details]",
   "GET /bank/events?from=&to=[&company=a,b][&account=][&type=transfer|authorization|cheque_cancel|government][&status=active|cancelled|all][&q=]",
+  "GET /system/freshness",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -1898,6 +1900,13 @@ const Router = () => {
   // The bank's transaction status file (bank_events, Bank Hapoalim "סטטוס עסקאות", uploaded on the Upload files page):
   // the orders given on the bank site — transfers (payee name + bank account, submitter, time, cancelled or not),
   // standing-order authorizations, cheque cancellations, government payments. from / to = the execution day.
+  // how fresh every data source is (Hashavshevet copy, bank files, Tabit, Beecomm, Drive, fixed files) — Joya's "System"
+  // page (owner 2026-11-18); admin/server/modules/dataFreshness.js, nothing stored, no parameters
+  get("/system/freshness", async () => {
+    const r = await dataFreshness();
+    return { data: r.groups, meta: { today: r.today, generatedAt: r.generatedAt, notes: r.notes, items: r.items.length } };
+  });
+
   get("/bank/events", async (req) => {
     const accounts = optionalBankAccounts(req);
     const { from, to } = requireDateRange(req, MAX_STORED_DAYS);

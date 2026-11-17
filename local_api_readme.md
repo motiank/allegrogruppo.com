@@ -141,6 +141,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /beecomm/payments/stored?from=&to=[&branch=][&group=day\|type\|brand]` | Payments report (דוח תשלומים): charges, refunds, transactions and service per payment type and card brand, per business day or summed (stored) | `bcom_payments_daily` ¹ |
 | `GET /bank/transactions/stored?from=&to=[&company=][&account=][&q=][&side=credit\|debit][&group=none\|day\|action\|details]` | Bank account transactions (uploaded bank files), per row, per day with the closing balance, or summed per action | `bank_transactions` |
 | `GET /bank/events?from=&to=[&company=][&account=][&type=transfer\|authorization\|cheque_cancel\|government][&status=active\|cancelled\|all][&q=]` | The bank's transaction status file (orders given on the bank site: transfers with the payee's bank account and submitter, standing-order authorizations, cheque cancellations) | `bank_events` |
+| `GET /system/freshness` | How fresh every data source is: the Hashavshevet copy, the bank files, Tabit, Beecomm, the Drive indexes, the fixed files — last business date, last load, rows, state; for Joya's "System" page (2026-11-18) | all of them, read only |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -881,6 +882,18 @@ changed is refreshed. The same events name the transfer lines of the statement �
 books' bank reconciliation (Finance API `/bank/open`, the detailed report, `payeeSource` `events`).
 
 ---
+
+### `GET /system/freshness`
+
+How fresh every data source is — Joya HQ's "System" page (owner 2026-11-18: "a system option in the main menu which displays this
+data"). `admin/server/modules/dataFreshness.js`, read only, no parameters, nothing stored. `data` = the groups
+(`hashavshevet`, `bank`, `tabit`, `beecomm`, `drive`, `files`), each with `items`: `{ key, label, labelEn, lastDate (the last
+business date the data reaches), lastUpdate (when it was loaded), count, detail, expectedDays (how often it should move; null =
+a fixed file), ageDays, state }` — `state` = `ok` (within `expectedDays`), `late` (up to twice that), `stale`, `missing`, `fixed`,
+`error` (the source could not be read; `error` says why — the others still answer). `meta.notes` = plain Hebrew comparisons
+(the bank page in Hashavshevet behind the uploaded bank file, the cheque archive behind the bank, the status file behind the bank
+file, a sync that did not run, Beecomm's lag, sources not read). Test: `node --test scripts/test_data_freshness.js` (the rules, no
+DB). Joya: `/api/joya/system/freshness` (chain admin) → page `/system`, main-menu item "מערכת".
 
 ## Data sources
 

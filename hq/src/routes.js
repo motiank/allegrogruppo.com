@@ -31,7 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
-import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeChequeImage } from './services/source.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeChequeImage, systemFreshness } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -206,6 +206,8 @@ r.get('/joya/payroll/lines', requirePayroll, h(async (req) => payroll.payrollLin
 // kind / party / q / amount / sections = the report's filters (shared/bankReconFilter.js), done by the admin server
 const reportParams = (req) => ({ company: req.query.company, account: req.query.account, from: req.query.from, to: req.query.to, kind: req.query.kind, party: req.query.party, q: req.query.q, amount: req.query.amount, sections: req.query.sections, noise: req.query.noise });
 r.get('/joya/finance/bank-recon/accounts', requireAdmin, h(async () => financeBankAccounts()));
+// the "System" page (owner 2026-11-18): how fresh every data source is — the admin computes it (dataFreshness.js), chain admin only
+r.get('/joya/system/freshness', requireAdmin, h(async () => systemFreshness()));
 r.get(
   '/joya/finance/bank-recon/facets',
   requireAdmin,

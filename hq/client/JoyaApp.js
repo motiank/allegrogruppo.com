@@ -26,6 +26,7 @@ import Menu from './pages/Menu.js';
 import Employees from './pages/Employees.js';
 import Area, { AREAS } from './pages/Area.js';
 import BankRecon from './pages/BankRecon.js';
+import System from './pages/System.js';
 import Payments from './pages/Payments.js';
 
 // The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
@@ -60,7 +61,8 @@ const useStyles = createUseStyles((theme) => ({
 }));
 
 // The main menu: the areas, each a chat (pages/Area.js); Bank and Payments (pages/Payments.js: the board of planned bank
-// transfers + its chat) only for the chain admin, Accounting for the chain admin and the accountant (who sees nothing else). The detailed bank reconciliation report (pages/BankRecon.js) is not in the menu:
+// transfers + its chat) only for the chain admin, Accounting for the chain admin and the accountant (who sees nothing else), System
+// (pages/System.js: how fresh every data source is — owner 2026-11-18) for the chain admin. The detailed bank reconciliation report (pages/BankRecon.js) is not in the menu:
 // the chat answers it and its buttons open the page. The detailed pages
 // (orders, staffing, payroll…) keep their routes, so links to them still work, but the menu does not list them.
 function navGroups(isAdmin, isAccountant) {
@@ -72,7 +74,7 @@ function navGroups(isAdmin, isAccountant) {
         ['/stock', 'joya.nav.stock'],
         ['/people', 'joya.nav.manpower'],
         ['/performance', 'joya.nav.performance'],
-        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting'], ['/payments', 'joya.nav.payments']] : []),
+        ...(isAdmin ? [['/bank', 'joya.nav.bank'], ['/accounting', 'joya.nav.accounting'], ['/payments', 'joya.nav.payments'], ['/system', 'joya.nav.system']] : []),
       ],
     },
   ];
@@ -201,6 +203,7 @@ function Shell() {
         <Route path="accounting" element={me.isAdmin ? <Area area="accounting" /> : <Navigate to="/" replace />} />
         <Route path="accounting/bank-recon" element={me.isAdmin ? <BankRecon /> : <Navigate to="/" replace />} />
         <Route path="payments" element={me.isAdmin ? <Payments /> : <Navigate to="/" replace />} />
+        <Route path="system" element={me.isAdmin ? <System /> : <Navigate to="/" replace />} />
         <Route path="overview" element={me.isAdmin ? <Overview /> : <Navigate to="/workspace" replace />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="orders" element={<Orders />} />
