@@ -237,7 +237,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   sections 2 and 3 carry the books' own. Shown as a "כרטסת" column (blue = employees card, lighter + "?" = a guess, tooltip = why) in the page,
   the Excel (3 columns, blue fill), `/finance/bank/open` (`meta.cards`), `/finance/bank/report` and Joya's chat (`card`, `cardSource`,
   `employeesCard`; rule in `hq-analyst.js`). On the local copy, 2026 section 1: a card for 643 of 758 lines (147 employees, 38 guesses, 115 without a card). Tests
-  `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`.
+  `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`. Deployed 2026-11-18 (`d2dad64`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted); on production that day, 2026 section 1: a card for 640 of 753 lines, 113 without.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own
