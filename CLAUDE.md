@@ -238,6 +238,11 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   the Excel (3 columns, blue fill), `/finance/bank/open` (`meta.cards`), `/finance/bank/report` and Joya's chat (`card`, `cardSource`,
   `employeesCard`; rule in `hq-analyst.js`). On the local copy, 2026 section 1: a card for 643 of 758 lines (147 employees, 38 guesses, 115 without a card). Tests
   `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`. Deployed 2026-11-18 (`d2dad64`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted); on production that day, 2026 section 1: a card for 640 of 753 lines, 113 without.
+  **Only the period's rows** (2026-11-18, owner: "when I ask bank recon for 2026 it ignores the date and shows tons of data from 25"):
+  `tagOlder` (`shared/bankReconFilter.js`) marks `older` on open rows dated before `from` (open cheques by the cheque's date) and counts them
+  in `report.older`; filter `older=hide` drops them; the HTML page starts with them hidden behind a button, the Excel has a "לפני התקופה"
+  column, Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`; planner rule). The summary always
+  counts them. Tests `scripts/test_bank_recon_filter.js`, `test_bank_recon.js`.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

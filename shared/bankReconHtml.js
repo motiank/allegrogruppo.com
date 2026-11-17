@@ -103,6 +103,10 @@ export const CSS = `
 .bank-recon tr.noise td{color:#8a6d3b;background:#fffaf0}
 .bank-recon .nz{display:inline-block;font-size:.75em;background:#f0c27a;color:#4a3000;border-radius:3px;padding:0 4px;margin-right:4px;vertical-align:middle}
 .bank-recon.noise-off tr.noise{display:none}
+.bank-recon .olderbox{background:#f1f3f6;border:1px solid #c9ced6;padding:8px 12px;margin:10px 0;border-radius:4px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+.bank-recon .olderbox button{padding:4px 12px;border:1px solid #556;background:#fff;color:#334;border-radius:4px;cursor:pointer;font-weight:700;font:inherit}
+.bank-recon .olderbox .rules{font-size:.85em;color:#555;flex-basis:100%}
+.bank-recon.older-off tr.older{display:none}
 .bank-recon .todobox{background:#fdecea;border:1px solid #f1998e;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .todobox .rules{font-size:.85em;color:#555;display:block;margin-top:2px}
 .bank-recon tr.todo td{background:#fff1f0}
@@ -191,6 +195,17 @@ function noiseBox(r) {
   <span class="rules">רעש = ${esc(NOISE_LABEL.reversal)}, עד ${n.pairDays} ימים זו מזו (בבנק: אותו מוטב או אותה אסמכתא, למשל שיק והחזרתו; בספרים: אותו חשבון נגדי). השורות מסומנות "רעש"; הסיכום למעלה כולל אותן.</span></div>`;
 }
 
+// the rows dated before the period (older: true, shared/bankReconFilter.js tagOlder): open as of `to`, in the summary, but a
+// report "for 2026" starts without them — a button shows them; with the server filter older=hide they are not in the report
+function olderBox(r) {
+  const n = r.older;
+  if (!n?.count || r.filter?.older === "hide") return "";
+  const parts = Object.entries(n.sections || {}).filter(([, x]) => x.count).map(([k, x]) => `${SECTION_SHORT[k] || k}: ${fmtInt(x.count)}`);
+  return `<div class="olderbox"><b>תנועות מלפני ${fmtDate(r.from)}:</b> ${fmtInt(n.count)} שורות (${esc(parts.join(" · "))}), סכום ${fmtMoney(n.total)} – פתוחות נכון ל-${fmtDate(r.to)} ונכללות בסיכום, אך אינן מהתקופה המבוקשת
+  <button type="button" class="older-tog" data-count="${n.count}">הצג גם תנועות מלפני התקופה (${fmtInt(n.count)})</button>
+  <span class="rules">הדוח מציג כברירת מחדל רק תנועות מתאריך ${fmtDate(r.from)} ואילך; הכפתור מוסיף את הישנות (בסעיף 3ב – לפי תאריך הצ'ק).</span></div>`;
+}
+
 function summary(r) {
   const s = r.summary;
   const line = (label, value, { count, strong, cls } = {}) =>
@@ -223,7 +238,7 @@ function summary(r) {
 </table>`;
 }
 
-const olderClass = (row, from) => (row.date && from && String(row.date) < String(from) ? "older" : "");
+const olderClass = (row, from) => (row.older || (row.date && from && String(row.date) < String(from)) ? "older" : "");
 
 // the beneficiary of a cheque line (payee from Hashavshevet; "priority" = named by the Priority cheque file, the
 // history before Hashavshevet; "image" = the name was read from the scanned cheque in the Drive archive, "image_guess" =
@@ -343,7 +358,7 @@ function chequesOpenTable(r) {
     ${rows
       .map(
         (x) =>
-          `<tr class="${todoClass(x).trim()}">${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
+          `<tr class="${`${todoClass(x)}${x.older ? " older" : ""}`.trim()}">${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
       )
       .join("")}
     <tr class="total"><td colspan="5">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
@@ -355,7 +370,8 @@ function chequesOpenTable(r) {
 // opts.imageHref(row) = the link of a cheque's scanned picture (default: "cheque-image/<imageId>" next to the report).
 export function renderBankReconBody(report, opts = {}) {
   const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
-  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}">${header(report)}${filterBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  const hideOlder = Boolean(report.older?.count) && report.filter?.older !== "hide"; // so do the rows dated before the period
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}${hideOlder ? " older-off" : ""}">${header(report)}${filterBox(report)}${olderBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -402,12 +418,14 @@ export function bankReconBehavior(root) {
     var active = {}; // column index → the values kept (a column that is absent shows everything)
     var valueOf = function (r, i) { var c = r.cells[i]; var t = c ? (c.getAttribute("data-f") != null ? c.getAttribute("data-f") : c.textContent).trim() : ""; return t || EMPTY; };
     var noiseRows = rows.filter(function (r) { return r.classList.contains("noise"); }).length;
+    var olderRows = rows.filter(function (r) { return r.classList.contains("older"); }).length;
     var apply = function () {
       var cols = Object.keys(active);
       var hideNoise = root.classList.contains("noise-off") && noiseRows > 0;
+      var hideOlder = root.classList.contains("older-off") && olderRows > 0;
       var shown = 0, sum = 0, hasSum = false;
       rows.forEach(function (r) {
-        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); }) && !(hideNoise && r.classList.contains("noise"));
+        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); }) && !(hideNoise && r.classList.contains("noise")) && !(hideOlder && r.classList.contains("older"));
         r.classList.toggle("hid", !ok);
         if (ok) {
           shown++;
@@ -416,7 +434,7 @@ export function bankReconBehavior(root) {
         }
       });
       var line = tbody.querySelector("tr.filtered");
-      if (!cols.length && !hideNoise) { if (line) line.parentNode.removeChild(line); }
+      if (!cols.length && !hideNoise && !hideOlder) { if (line) line.parentNode.removeChild(line); }
       else {
         if (!line) {
           line = document.createElement("tr");
@@ -426,7 +444,7 @@ export function bankReconBehavior(root) {
           line.appendChild(td);
           tbody.insertBefore(line, tbody.querySelector("tr.total"));
         }
-        line.firstChild.textContent = (cols.length ? "מסונן: " : "ללא רעשים: ") + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "") + (hideNoise ? " (רעשים מוסתרים: " + fmt(noiseRows, 0) + ")" : "");
+        line.firstChild.textContent = (cols.length ? "מסונן: " : hideOlder ? "רק מהתקופה: " : "ללא רעשים: ") + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "") + (hideNoise ? " (רעשים מוסתרים: " + fmt(noiseRows, 0) + ")" : "") + (hideOlder ? " (מלפני התקופה מוסתרות: " + fmt(olderRows, 0) + ")" : "");
       }
       Array.prototype.forEach.call(ths, function (th, i) { var b = th.querySelector(".flt"); if (b) b.classList.toggle("on", Boolean(active[i])); });
     };
@@ -503,7 +521,7 @@ export function bankReconBehavior(root) {
       btn.addEventListener("click", function (e) { e.stopPropagation(); if (th.querySelector(".br-panel")) closePanels(); else openPanel(th, i); });
     });
     table.__brApply = apply;
-    if (noiseRows) apply(); // the noise rows start hidden: show the "ללא רעשים" line at once
+    if (noiseRows || olderRows) apply(); // the noise rows and the older rows start hidden: show the count line at once
   });
   // 3. the noise toggle (the rows with the class "noise": de facto cancelled cheques, entry + cancellation pairs)
   var tog = root.querySelector(".noise-tog");
@@ -516,6 +534,18 @@ export function bankReconBehavior(root) {
       Array.prototype.forEach.call(root.querySelectorAll("table"), function (t) { if (t.__brApply) t.__brApply(); });
     });
     relabel();
+  }
+  // 4. the older-rows toggle (the rows with the class "older": dated before the period, still open)
+  var otog = root.querySelector(".older-tog");
+  if (otog) {
+    var ocount = otog.getAttribute("data-count");
+    var orelabel = function () { otog.textContent = root.classList.contains("older-off") ? "הצג גם תנועות מלפני התקופה (" + ocount + ")" : "הסתר תנועות מלפני התקופה (" + ocount + ")"; };
+    otog.addEventListener("click", function () {
+      root.classList.toggle("older-off");
+      orelabel();
+      Array.prototype.forEach.call(root.querySelectorAll("table"), function (t) { if (t.__brApply) t.__brApply(); });
+    });
+    orelabel();
   }
   document.addEventListener("click", closePanels);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePanels(); });

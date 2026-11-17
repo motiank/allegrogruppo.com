@@ -10,7 +10,7 @@
 // Mounted by auth/roles/admin.js at /admin/bank-recon (admin role only):
 //   GET /admin/bank-recon/accounts                      → companies and their bank accounts, default dates
 //   GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx
-//       [&kind=cheque,transfer,…][&party=<account key | name>][&q=<text>][&amount=<number>][&sections=…][&facets=1]
+//       [&kind=cheque,transfer,…][&party=<account key | name>][&q=<text>][&amount=<number>][&sections=…][&noise=hide][&older=hide][&facets=1]
 //       — the filters of shared/bankReconFilter.js: the sections keep only the matching rows, the summary stays whole
 //   GET /admin/bank-recon/facets?company=&account=&from=&to= → the kinds and the parties of the report, for the pickers
 //   GET /admin/bank-recon/cheque-image/:id                   → the scanned cheque (Drive archive, chequeArchive.js), for the 📷 links
@@ -462,6 +462,7 @@ export async function renderBankReconXlsx(r) {
   add("סכום כל תנועות הבנק עד התאריך", s.bankLinesSum);
   if (r.noise?.count) add(`רעשים (רישום וביטולו, סעיפים 1 ו-2): ${r.noise.count} שורות — מסומנות בעמודה "רעש / לטיפול"; בלי רעשים: noise=hide`, r.noise.total);
   if (r.todo?.count) add(`לטיפול: ${r.todo.count} צ'קים שמועדם עבר לפני יותר מ-${r.todo.staleDays} יום ולא נפרעו (סעיף 3ב) – לבטל בספרים או לברר`, r.todo.total);
+  if (r.older?.count) add(`תנועות מלפני ${fmtDate(r.from)} שעדיין פתוחות: ${r.older.count} שורות — מסומנות בעמודה "לפני התקופה"; רק התקופה: older=hide`, r.older.total);
   add("", null);
   add("הערות", null, true);
   for (const n of r.notes) add(n, null);
@@ -472,6 +473,7 @@ export async function renderBankReconXlsx(r) {
   const tot = (key) => (r.filtered?.sections?.[key] ? r.filtered.sections[key].total : s[key].total);
   const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
   const noiseCol = { header: "רעש / לטיפול", key: "noise", width: 40, get: (x) => (x.noise ? `רעש: ${NOISE_LABEL[x.noise.rule] || x.noise.rule}` : x.todo ? `לטיפול: ${TODO_LABEL[x.todo.rule] || x.todo.rule}` : null) };
+  const olderCol = { header: "לפני התקופה", key: "older", width: 12, get: (x) => (x.older ? "כן" : null) }; // dated before `from`, still open (older=hide leaves them out)
   // the card (כרטסת) columns: the key, its name, why — the employees card in blue, a guess in a lighter blue
   const EMP_FILL = "FFD6E9FF", GUESS_FILL = "FFEAF3FF";
   const cardFill = (x) => (x.counterEmployee ? (x.counterSource === "employee_guess" ? GUESS_FILL : EMP_FILL) : null);
@@ -486,13 +488,13 @@ export async function renderBankReconXlsx(r) {
     ...cardCols(true),
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "שנה", key: "year", width: 8 },
     { header: "מזהה שורה", key: "bankLineId", width: 10 }, { header: "תמונת הצ'ק", key: "image", width: 14, link: "פתח תמונה", get: (x) => x.image || null },
-  noiseCol], r.bankOpen, 'סה"כ', tot("bankOpen"));
+  olderCol, noiseCol], r.bankOpen, 'סה"כ', tot("bankOpen"));
   sheet(wb, "2 ספרים ללא בנק", [
     { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
     { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12, fill: cardFill }, { header: "שם חשבון נגדי", key: "counterName", width: 26, fill: cardFill },
     { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "מנה", key: "batch", width: 8 },
     { header: "נקלט", key: "posted", width: 8, get: (x) => (x.posted ? "כן" : "לא") }, { header: "מס' תנועה", key: "transId", width: 10 },
-  noiseCol], r.bookOpen, 'סה"כ', tot("bookOpen"));
+  olderCol, noiseCol], r.bookOpen, 'סה"כ', tot("bookOpen"));
   if (r.bookFutureMatched.length)
     sheet(wb, "2ב ספרים בתאריך מאוחר", [
       { header: "תאריך", key: "date", date: true, width: 12 }, { header: "אסמכתא", key: "reference", width: 14 }, kindCol,
@@ -511,7 +513,7 @@ export async function renderBankReconXlsx(r) {
     { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום", key: "amount", money: true, width: 16 },
     { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) },
     { header: "נמצא בבנק בתאריך", key: "clearedDate", date: true, width: 14 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
-  noiseCol], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
+  olderCol, noiseCol], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

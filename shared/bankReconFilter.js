@@ -13,6 +13,9 @@
 //   amount=<number>            the exact amount (either sign, ±0.01)
 //   sections=bankOpen,…        only these sections (bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen)
 //   noise=hide                 without the noise rows (shared/bankReconNoise.js: de facto cancelled cheques, reversal pairs)
+//   older=hide                 without the rows dated before `from` (open items of earlier years that are still open as of
+//                              `to`; every such row carries older: true and report.older counts them — owner 2026-11-18:
+//                              "a report for 2026 must not show tons of 2025 data"; the pages hide them by default)
 //   facets=1                   also the list of parties of the whole report (the kinds are always given)
 
 export const KINDS = [
@@ -141,8 +144,9 @@ export function parseFilter(query = {}) {
   const party = text(query.party) || null;
   const q = text(query.q) || null;
   const noise = /^(hide|1|true|yes|off)$/i.test(text(query.noise)) ? "hide" : null;
-  const f = { kinds: kinds.length ? kinds : null, party, q, amount, sections: sections.length ? sections : null, noise, facets: /^(1|true|yes)$/i.test(text(query.facets)) };
-  f.active = Boolean(f.kinds || f.party || f.q || f.amount != null || f.sections || f.noise);
+  const older = /^(hide|1|true|yes|off)$/i.test(text(query.older)) ? "hide" : null;
+  const f = { kinds: kinds.length ? kinds : null, party, q, amount, sections: sections.length ? sections : null, noise, older, facets: /^(1|true|yes)$/i.test(text(query.facets)) };
+  f.active = Boolean(f.kinds || f.party || f.q || f.amount != null || f.sections || f.noise || f.older);
   return f;
 }
 
@@ -156,6 +160,7 @@ export function filterLabel(f) {
   if (f.amount != null) parts.push(`סכום: ${f.amount.toLocaleString("he-IL", { minimumFractionDigits: 2 })}`);
   if (f.sections) parts.push(`סעיפים: ${f.sections.map((s) => SECTION_LABEL[s] || s).join(", ")}`);
   if (f.noise === "hide") parts.push("ללא רעשים");
+  if (f.older === "hide") parts.push("רק תנועות מהתקופה");
   return parts.join(" · ");
 }
 
@@ -167,6 +172,7 @@ const rowTexts = (x, section) => {
 /** True when the row of `section` passes the filter `f` (kind, party, q, amount). */
 export function matchRow(x, section, f) {
   if (f.noise === "hide" && x.noise) return false;
+  if (f.older === "hide" && x.older) return false;
   if (f.kinds && !f.kinds.includes(x.kind || KIND_OF[section](x))) return false;
   if (f.amount != null) {
     const ok = [x.amount, x.bankAmount].some((v) => v != null && Math.abs(Math.abs(Number(v)) - f.amount) < 0.011);
@@ -188,6 +194,30 @@ export function matchRow(x, section, f) {
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const sumOf = (rows) => round2(rows.reduce((a, r) => a + (Number(r.amount) || 0), 0));
+
+// the rows dated before the period: open bank / book lines by their date, open cheques by the cheque's date — still open
+// as of `to`, counted in the summary, but not what a report "for 2026" is asked for
+const OLDER_DATE = { bankOpen: (x) => x.date, bookOpen: (x) => x.date, chequesOpen: (x) => x.dueDate };
+/** Marks `older: true` on every row dated before report.from and sets report.older = { count, total, sections }. Idempotent. */
+export function tagOlder(report) {
+  const from = report.from ? String(report.from) : null;
+  const sections = {};
+  let count = 0;
+  let total = 0;
+  for (const s of Object.keys(OLDER_DATE)) {
+    const rows = report[s] || [];
+    for (const x of rows) {
+      const d = OLDER_DATE[s](x);
+      if (from && d && String(d) < from) x.older = true; else delete x.older;
+    }
+    const old = rows.filter((x) => x.older);
+    sections[s] = { count: old.length, total: sumOf(old) };
+    count += old.length;
+    total += sumOf(old);
+  }
+  report.older = { count, total: round2(total), sections };
+  return report;
+}
 
 /**
  * The facets of the (unfiltered) report: the kinds with count and total, and — with `withParties` — the parties
@@ -262,6 +292,7 @@ export function facetsOf(report, { withParties = false, maxParties = 400 } = {})
 export function applyFilter(report, f) {
   decorateReport(report);
   tagNoise(report); // the noise rows are marked on the whole report; noise=hide drops them, the page hides them with a toggle
+  tagOlder(report); // the rows dated before `from` likewise: older=hide drops them, the page starts without them
   report.facets = facetsOf(report, { withParties: f.facets });
   // a party given as an account key also matches that account's name on the bank side and in the cheques
   if (f.party && /^\d+$/.test(f.party)) {
@@ -269,7 +300,7 @@ export function applyFilter(report, f) {
     f.partyNames = keyed ? [normName(keyed.name)] : [];
     f.partyLabel = keyed ? `${keyed.name} (${keyed.key})` : null;
   }
-  report.filter = { kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections, noise: f.noise, active: f.active, label: filterLabel(f) };
+  report.filter = { kinds: f.kinds, party: f.party, q: f.q, amount: f.amount, sections: f.sections, noise: f.noise, older: f.older, active: f.active, label: filterLabel(f) };
   if (!f.active) {
     report.filtered = null;
     return report;

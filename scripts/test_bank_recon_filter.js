@@ -170,6 +170,32 @@ test("the HTML of a filtered report shows the filter, the kinds and 'מתוך'",
 
 // Noise and to-handle (shared/bankReconNoise.js, owner 2026-11-15): entry + cancellation pairs are noise (hidden by a
 // toggle, dropped by noise=hide); old unpaid cheques are "לטיפול" — tagged, counted, never hidden.
+test("tagOlder / older=hide: the rows dated before the period are marked, counted and left out on demand", () => {
+  const report = {
+    from: "2026-01-01", to: "2026-10-31", company: { code: "pastalina" }, account: { key: "110011", name: "בנק" }, notes: [],
+    summary: { bankBalance: 0, bankOpen: { count: 2, total: -300, beforeCount: 1, beforeTotal: -100, cheques: { count: 0, found: 0, missing: 0 } }, bookOpen: { count: 1, total: -300, beforeCount: 1, beforeTotal: -300 }, chequesOpen: { count: 2, total: -900, pastDueCount: 2, pastDueTotal: -900, notDueCount: 0, notDueTotal: 0, clearedUnmatchedCount: 0, clearedUnmatchedTotal: 0 }, bookFutureMatched: { count: 0, total: 0 }, chequesCleared: { count: 0, total: 0, groupOnly: 0 }, expectedBookBalance: 0, bookBalance: 0, unexplained: 0, bankLinesSum: 0 },
+    bankOpen: [{ date: "2025-12-30", details: "העברה", amount: -100 }, { date: "2026-02-01", details: "העברה", amount: -200 }],
+    bookOpen: [{ date: "2025-06-01", description: "x", counterAccount: "500001", amount: -300 }],
+    bookFutureMatched: [], chequesCleared: [],
+    chequesOpen: [{ chequeNo: 1, dueDate: "2025-11-01", issueDate: "2025-10-01", amount: -400, status: "past_due", daysAfterDue: 300 }, { chequeNo: 2, dueDate: "2026-03-01", issueDate: "2026-02-01", amount: -500, status: "past_due", daysAfterDue: 10 }],
+  };
+  const all = applyFilter(structuredClone(report), parseFilter({}));
+  assert.deepEqual(all.older, { count: 3, total: -800, sections: { bankOpen: { count: 1, total: -100 }, bookOpen: { count: 1, total: -300 }, chequesOpen: { count: 1, total: -400 } } });
+  assert.deepEqual(all.bankOpen.map((x) => Boolean(x.older)), [true, false]);
+  assert.equal(all.chequesOpen[0].older, true, "an open cheque is older by the cheque's date");
+  assert.equal(all.filter.active, false, "without older=hide nothing is dropped");
+  const html = renderBankReconBody(all);
+  assert.ok(html.includes('class="bank-recon older-off"') && html.includes("הצג גם תנועות מלפני התקופה (3)") && (html.match(/<tr class="[^"]*older/g) || []).length === 3, "three older rows (the old cheque is also 'todo')");
+  const only = applyFilter(structuredClone(report), parseFilter({ older: "hide" }));
+  assert.deepEqual([only.bankOpen.length, only.bookOpen.length, only.chequesOpen.length], [1, 0, 1]);
+  assert.deepEqual(only.filtered.sections.bankOpen, { count: 1, total: -200, of: 2, ofTotal: -300 });
+  assert.equal(only.filter.label, "רק תנועות מהתקופה");
+  assert.ok(!renderBankReconBody(only).includes("older-tog"), "nothing to toggle when the server left them out");
+  const none = applyFilter(structuredClone({ ...report, from: "2025-01-01" }), parseFilter({}));
+  assert.equal(none.older.count, 0);
+  assert.ok(!renderBankReconBody(none).includes("olderbox"));
+});
+
 test("tagNoise: reversal pairs on the bank and the books sides (noise), stale cheques (to handle), the window, the counts", async () => {
   const { tagNoise, STALE_DAYS, PAIR_DAYS, NOISE_LABEL, TODO_LABEL } = await import("../shared/bankReconNoise.js");
   const report = {

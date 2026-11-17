@@ -254,6 +254,8 @@ for the chat only, by the owner's choice). The admin server does the filtering (
 API `/finance/bank/report?kind&party&q&amount&sections`), so a big report costs the AI nothing: the answer gets only
 the matching rows, `filter.label`, `filtered[section]` = kept of all, and the summary of the whole account. Eval
 fixtures `f-bank-recon-filter-*`.
+**Only the period's rows** (owner 2026-11-18, "a report for 2026 showed tons of 2025 data"): the sections hold only the rows dated
+in the asked period; the older open rows are counted in the summary and named in one line, and "כולל תנועות ישנות" brings them back.
 **The card next to every line** (owner 2026-11-18): the admin's report gives every line the כרטסת (the Hashavshevet account) to book it
 on — from the books, an account with that name, the employees (one shared card, 450001 "עובד", found through the admin's employee tables,
 Priority's employees supplier or past journal entries; a person's name with no card at all is a guess to check), or the bank text's past matches.

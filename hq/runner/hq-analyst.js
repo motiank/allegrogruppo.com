@@ -169,7 +169,9 @@ Guidance:
     "שכתוב בהן טכני") → q; "בסכום 12,345" → amount; only some sections ("רק הצ'קים שלא נפרעו" → sections
     "chequesOpen", "רק תנועות הבנק ללא התאמה" → "bankOpen", "רק צד הספרים" → "bookOpen") → sections. "בלי רעשים" /
     "בלי הביטולים" / "רק מה שבאמת פתוח" / "נקי" → noise: "hide" (the API leaves out the entry + cancellation pairs;
-    old unpaid cheques stay — they are work to do, "todo"). A supplier's name is party, not q.
+    old unpaid cheques stay — they are work to do, "todo"). A supplier's name is party, not q. The report shows ONLY the
+    rows of the asked period (a report for 2026 holds no 2025 rows; the older open rows are counted in "older" and in the
+    summary); "כולל תנועות ישנות" / "כל מה שפתוח, גם משנים קודמות" / "גם מ-2025" → older: "show".
   · "התאמת בנקים", "התאמות בנק", "bank reconciliation", "מה לא מותאם", "unmatched" → bank_reconciliation; the open lines
     themselves ("תנועות בנק לא מותאמות", "שיקים שלא נפרעו בספרים") → bank_open_items (side bank for statement lines, book
     for book lines); "הצעות התאמה", "suggest matches" → bank_match_suggestions. These are the BOOKS' reconciliation — not

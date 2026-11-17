@@ -654,6 +654,12 @@ not cleared is NOT noise (owner, same day: "those lines should be handled"): it 
 hides them. `noise=hide` is a filter like the others (the rows are left out, `filtered` says
 kept of all, label "ללא רעשים"); the HTML page starts with the noise rows hidden and a button shows them (the summary always
 includes them); the Excel has a "רעש" column.
+**Rows dated before the period (2026-11-18, owner: "when I ask for 2026 it shows tons of data from 2025").** `tagOlder` in
+`shared/bankReconFilter.js` marks `older: true` on every open bank / book line dated before `from` and every open cheque whose
+cheque date is before `from` (still open as of `to`, so still in the summary) and sets `older` = `{ count, total, sections }`.
+`older=hide` is a filter (label "רק תנועות מהתקופה"); without it the JSON keeps the rows, the HTML page starts with them hidden
+(a grey box names them, a button "הצג גם תנועות מלפני התקופה" shows them), the Excel marks them in a "לפני התקופה" column, and
+Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`).
 **Filters (2026-11-13, owner: "filter by supplier, by the type of movement (cheque…) and by a name; the API should do
 it, to save AI tokens when the report is big").** `shared/bankReconFilter.js`, the same on `/admin/bank-recon/report`:
 `kind=` one or more of `cheque, transfer, card, direct_debit, deposit, fee, authorities, salary, other` (every row gets a

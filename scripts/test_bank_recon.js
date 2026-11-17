@@ -94,6 +94,15 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     }
     assert.ok(r.bankOpen.filter((x) => x.counterSource === "books").every((x) => x.booksAccount === x.counterAccount));
     assert.ok(r.notes.some((n) => n.startsWith("כרטסת:")), "a note counts the cards");
+    // the rows dated before `from` are marked older (open cheques by the cheque's date) and counted; older=hide drops them
+    assert.ok(r.bankOpen.every((x) => Boolean(x.older) === (x.date < from)) && r.bookOpen.every((x) => Boolean(x.older) === (x.date < from)) && r.chequesOpen.every((x) => Boolean(x.older) === (x.dueDate < from)));
+    assert.equal(r.older.count, [...r.bankOpen, ...r.bookOpen, ...r.chequesOpen].filter((x) => x.older).length);
+    assert.equal(r.older.sections.bankOpen.count, s.bankOpen.beforeCount);
+    if (r.older.count) {
+      const only = await buildBankReconReport({ from, to, older: "hide" });
+      assert.ok([...only.bankOpen, ...only.bookOpen, ...only.chequesOpen].every((x) => !x.older) && only.filtered.sections.bankOpen.of === r.bankOpen.length);
+      assert.equal(only.summary.bankOpen.total, s.bankOpen.total, "the summary is always for the whole account");
+    }
     // Every row is dated up to `to`; cleared cheques inside the period.
     assert.ok(r.bankOpen.every((x) => x.date <= to));
     assert.ok(r.bookOpen.every((x) => x.date <= to && !r.chequesOpen.some((c) => c.lineId === x.lineId)));
@@ -137,7 +146,7 @@ test("HTML and Excel", async () => {
   const html = renderBankReconHtml(r);
   assert.ok(html.startsWith("<!doctype html>"));
   assert.ok(html.includes('dir="rtl"'));
-  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "data-filter=\"1\">כרטסת</th>", "כרטיס העובדים עובד (450001)", 'class="acc acc-emp', "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
+  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "data-filter=\"1\">כרטסת</th>", ...(r.older?.count ? ['older-off"', "older-tog"] : []), "כרטיס העובדים עובד (450001)", 'class="acc acc-emp', "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
     assert.ok(html.includes(t), t);
   // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
   assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
@@ -156,7 +165,7 @@ test("HTML and Excel", async () => {
   const s1 = wb.getWorksheet("1 בנק ללא ספרים");
   assert.equal(s1.rowCount, r.bankOpen.length + 2); // header + rows + total
   assert.ok(s1.getRow(1).values.includes("מוטב"), "the Excel has the beneficiary column");
-  for (const h of ["כרטסת", "שם הכרטסת", "מקור הכרטסת"]) assert.ok(s1.getRow(1).values.includes(h), h);
+  for (const h of ["כרטסת", "שם הכרטסת", "מקור הכרטסת", "לפני התקופה"]) assert.ok(s1.getRow(1).values.includes(h), h);
   const empRow = r.bankOpen.findIndex((x) => x.counterEmployee);
   const cardCol = s1.getRow(1).values.indexOf("כרטסת"); // a loaded workbook keeps no column keys: find it by its header
   if (empRow >= 0) assert.equal(s1.getRow(empRow + 2).getCell(cardCol).fill?.fgColor?.argb, r.bankOpen[empRow].counterSource === "employee_guess" ? "FFEAF3FF" : "FFD6E9FF", "the employees card is blue in the Excel too");
