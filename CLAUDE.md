@@ -222,7 +222,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   scan — so the report (section 1, Excel column "תמונת הצ'ק", notes and `summary.bankOpen.cheques.image / imageGuess / withImage`), `/finance/bank/open`,
   `/bank/suggestions`, the Local Data API stored rows and Joya's bank chat all get them; the 📷 link streams the picture through
   `/admin/bank-recon/cheque-image/:id` (admin page) or `/finance/cheques/image/:id` → Joya `/api/joya/finance/cheque-image/:id` (only ids in the
-  index); (2) Finance API `GET /finance/cheques/archive` (`books=missing` = the bookkeeper's work list: name, amount, bank day, picture, and the
+  index) and opens it in a modal over the report (close button, backdrop, Escape; "פתח בחלון חדש" inside; owner 2026-11-18 — `bankReconBehavior`
+  in `shared/bankReconHtml.js`, so the admin page, the print page and Joya's frame all do it); (2) Finance API `GET /finance/cheques/archive` (`books=missing` = the bookkeeper's work list: name, amount, bank day, picture, and the
   account with that name) + Joya calc `cheque_archive`; (3) `/cheques/all` joins the scans and adds archive-only rows (`source` `archive`) — so Joya's
   cheques file too; (4) Joya `statement_compare`: an onlyTheirs payment gets `archiveCheque` when a scanned cheque has that amount near that date;
   (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12

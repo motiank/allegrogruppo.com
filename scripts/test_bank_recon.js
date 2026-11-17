@@ -150,6 +150,8 @@ test("HTML and Excel", async () => {
     assert.ok(html.includes(t), t);
   // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
   assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
+  // the scanned cheque opens in a modal (the script) — the CSS and the link's data for the modal's title are in the page
+  assert.ok(html.includes(".chq-modal{") && html.includes("chq-close") && (!r.bankOpen.some((x) => x.imageId) || /<a class="chq-img" href="cheque-image\/[^"]+" target="_blank" rel="noreferrer" title="[^"]+" data-cheque="\d+" data-payee="/.test(html)));
   assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
   assert.equal((html.match(/data-filter="1"/g) || []).length, 11 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table + כרטסת in 1, 3א, 3ב
   const body = renderBankReconBody(r);

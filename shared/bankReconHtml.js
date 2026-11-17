@@ -120,7 +120,16 @@ export const CSS = `
 .bank-recon td.acc-emp,.bank-recon .acc-emp.legend{background:#d6e9ff;color:#0b3d91}
 .bank-recon td.acc-emp.acc-guess,.bank-recon .acc-guess.legend{background:#eaf3ff;font-style:italic}
 .bank-recon .legend{padding:0 5px;border-radius:3px}
-.bank-recon a.chq-img{text-decoration:none;font-size:12px;margin-right:4px}
+.bank-recon a.chq-img{text-decoration:none;font-size:12px;margin-right:4px;cursor:zoom-in}
+.chq-modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px;direction:rtl}
+.chq-modal .chq-box{position:relative;background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);max-width:min(96vw,1400px);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.chq-modal .chq-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-bottom:1px solid #ddd;font:700 14px Arial,"Segoe UI",Tahoma,sans-serif;color:#222}
+.chq-modal .chq-close{font:inherit;font-size:20px;line-height:1;border:1px solid #bbb;background:#fff;border-radius:4px;padding:2px 10px;cursor:pointer}
+.chq-modal .chq-close:hover{background:#eee}
+.chq-modal .chq-body{overflow:auto;padding:8px;background:#f4f4f4;display:flex;align-items:center;justify-content:center;min-width:280px;min-height:160px}
+.chq-modal img{max-width:100%;max-height:calc(92vh - 70px);display:block;background:#fff}
+.chq-modal .chq-open{font-size:12px;font-weight:400;color:#1a73e8;text-decoration:none;margin-right:auto}
+.chq-modal .chq-err{color:#b00020;padding:24px;font:13px Arial,sans-serif}
 .bank-recon .notes{background:#fff8e1;border:1px solid #f0d58c;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .notes li{margin:2px 0}
 .bank-recon .summary{max-width:720px}
@@ -256,7 +265,8 @@ const defaultImageHref = (x) => `cheque-image/${encodeURIComponent(x.imageId)}`;
 const payeeCell = (x, opts) => {
   const text = payeeText(x);
   const cls = x.payeeSource === "missing" ? "missing" : x.payeeSource === "image_guess" ? "guess" : "";
-  const link = x.imageId ? ` <a class="chq-img" href="${esc((opts?.imageHref || defaultImageHref)(x))}" target="_blank" rel="noreferrer" title="תמונת הצ'ק הסרוק">📷</a>` : "";
+  // the page's script (bankReconBehavior) opens the picture in a modal; without a script (or with a middle click) the link opens a tab
+  const link = x.imageId ? ` <a class="chq-img" href="${esc((opts?.imageHref || defaultImageHref)(x))}" target="_blank" rel="noreferrer" title="תמונת הצ'ק הסרוק" data-cheque="${esc(x.reference ?? x.chequeNo ?? "")}" data-payee="${esc(x.payee || "")}">📷</a>` : "";
   return `<td${cls ? ` class="${cls}"` : ""} data-f="${esc(text)}">${esc(text)}${link}</td>`;
 };
 
@@ -535,6 +545,49 @@ export function bankReconBehavior(root) {
     });
     relabel();
   }
+  // 5. the scanned cheque in a modal (owner 2026-11-18: "display the cheque jpg in a modal popup, with a close button"):
+  //    a click on 📷 opens the picture over the page; the close button, the backdrop or Escape closes it; the link itself
+  //    still opens a tab with a middle click or without the script
+  var modal = null;
+  var closeModal = function () { if (modal) { modal.parentNode.removeChild(modal); modal = null; } };
+  var openModal = function (href, title) {
+    closeModal();
+    var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    modal = el("div", "chq-modal");
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", title);
+    var box = el("div", "chq-box");
+    var head = el("div", "chq-head");
+    var ttl = el("span", "", title);
+    var open = el("a", "chq-open", "פתח בחלון חדש");
+    open.href = href; open.target = "_blank"; open.rel = "noreferrer";
+    var close = el("button", "chq-close", "✕");
+    close.type = "button";
+    close.title = "סגור";
+    close.setAttribute("aria-label", "סגור");
+    head.appendChild(ttl); head.appendChild(open); head.appendChild(close);
+    var body = el("div", "chq-body");
+    var img = document.createElement("img");
+    img.alt = title;
+    img.src = href;
+    img.addEventListener("error", function () { body.textContent = ""; body.appendChild(el("div", "chq-err", "התמונה לא נטענה (אין הרשאה או שהקובץ חסר בארכיון).")); });
+    body.appendChild(img);
+    box.appendChild(head); box.appendChild(body); modal.appendChild(box);
+    close.addEventListener("click", closeModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+    document.body.appendChild(modal);
+    close.focus();
+  };
+  root.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a.chq-img") : null;
+    if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    var no = a.getAttribute("data-cheque"), who = a.getAttribute("data-payee");
+    openModal(a.getAttribute("href"), "תמונת הצ'ק" + (no ? " " + no : "") + (who ? " – " + who : ""));
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+
   // 4. the older-rows toggle (the rows with the class "older": dated before the period, still open)
   var otog = root.querySelector(".older-tog");
   if (otog) {
