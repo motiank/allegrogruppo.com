@@ -2791,6 +2791,161 @@
         },
         "maxCalcs": 2
       }
+    },
+    {
+      "key": "l-story-he",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "מה הסיפור עם בלודמן?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-story-en",
+      "kind": "LEGAL",
+      "lang": "en",
+      "question": "what was the story with baldman?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-verdict-name",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "מה היה פסק הדין בתיק של נאמן?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-last-decision-number",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "מה ההחלטה האחרונה בתיק 65577-02-26?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "params": {
+          "legal_case": {
+            "number": "65577-02-26"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-next-hearing-case",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "מתי הדיון הבא בתיק של בלודמן?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-hearings",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "מתי הדיונים הקרובים?",
+      "expect": {
+        "calcs": [
+          "legal_hearings"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-open-cases",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "אילו תיקים פתוחים יש כרגע?",
+      "expect": {
+        "calcs": [
+          "legal_cases"
+        ],
+        "params": {
+          "legal_cases": {
+            "status": "open"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-verdicts-list",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "תראה לי את כל פסקי הדין שניתנו",
+      "expect": {
+        "calcs": [
+          "legal_documents"
+        ],
+        "params": {
+          "legal_documents": {
+            "type": "פסק דין"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-text-followup",
+      "kind": "LEGAL",
+      "lang": "he",
+      "question": "ומה בדיוק כתוב בפסק הדין על הוצאות משפט?",
+      "history": [
+        {
+          "question": "מה הסיפור עם נאמן?",
+          "calcs": [
+            {
+              "calc": "legal_case",
+              "params": {
+                "number": "64015-08-23"
+              }
+            }
+          ],
+          "answer": "נאמן נ' ג'ויה רום בע\"מ ואח' (64015-08-23), בית הדין האזורי לעבודה בת ים – סגור. ניתן פסק דין ביום 9.7.2026."
+        }
+      ],
+      "expect": {
+        "calcs": [
+          "legal_document"
+        ],
+        "params": {
+          "legal_document": {
+            "number": "64015-08-23",
+            "which": "verdict"
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "l-from-general",
+      "kind": "GENERAL",
+      "lang": "he",
+      "question": "מה קרה בתביעה של בלודמן נגד פסטה לינה?",
+      "expect": {
+        "calcs": [
+          "legal_case"
+        ],
+        "maxCalcs": 1
+      }
     }
   ]
 }

@@ -624,6 +624,36 @@ rules of its area (`context.teamRules`; a page chat with no area gets all of the
 ids in `meta.teamRules`. A rule never overrides the hard rules (no computed numbers, no saved changes, nothing sent).
 "Show the rules" → calc `team_rules`. Eval: fixtures `r-*`.
 
+### Legal (משפטי) — the owners' court cases
+
+Main-menu area for the chain admin (owner 2026-11-18). The data is the legal archive in Google Drive — court papers from
+נט המשפט, with a story of every case and a description of every key paper written by AI on the owner's machine — read
+through the admin's Legal API (`../legal_api_readme.md`). Joya keeps nothing and the user needs no Drive access.
+
+- **Page** `/legal` (`client/pages/Legal.js`), three tabs: **שאלות** = the area's chat (AREA 7 `LEGAL`); **תיקים** = the
+  case list (search by a name in Hebrew or Latin letters, a case number or words; open / closed; whose archive);
+  **דיונים** = the hearings ahead. `/legal/:number` = one case: the story, the verdict, the last decision, the hearings
+  and every paper, each with Open and Download.
+- **Routes** (`src/routes.js`, chain admin): `/api/joya/legal/people`, `/cases`, `/cases/:number`, `/hearings`,
+  `/files/:driveId[?download=1]` (the PDF, proxied from the admin).
+- **Calcs** (`src/services/legal.js`, chain admin only — `LEGAL_CALCS`):
+
+| Calc | For | Params |
+|---|---|---|
+| `legal_case` | "מה הסיפור עם בלודמן", "what was the verdict", "the last decision", "when is the next hearing in the X case" | `q` (a name, any spelling; `a\|b` for several) or `number`; `papers: "all"` |
+| `legal_cases` | "which cases are open", "the labour cases", "the cases against X" | `q`, `status`, `person`, `from`, `to` |
+| `legal_hearings` | "the next hearings", "what do we have in court this month" | `from`, `to`, `person`, `cancelled` |
+| `legal_documents` | "all the verdicts", "the decisions of last month" | `q`, `number`, `type`, `key`, `from`, `to` |
+| `legal_document` | "what exactly does the verdict say about …" (the paper's full text) | `documentId`, or `number` + `which` (`verdict`, `last_decision`, `claim`, `defence`) |
+
+- **Rules of the answer** (WRITE "Legal"): answer the question first; only what the results say — no legal opinion, no
+  forecast; one closing line that the summary was written from the papers; no links in the text — the buttons under the
+  answer (`LegalFiles` in `AskBox.js`) open the case page and the verdict / last decision PDF.
+- **Limits to know**: a hearing date is sure only when it comes from the court's list of sittings (kept for the cases
+  read from the new court site); for the other open cases the answer shows the future dates the last decisions mention
+  (a hearing or a deadline). A closed case of Itzik holds only its opening paper and verdict, so its story is partial.
+- Eval fixtures `l-*` (context kind `LEGAL`); access test in `test/test_joya_lib.mjs`.
+
 ## Other functions
 
 **System — data freshness** (`/system`, main-menu item "מערכת", chain admin; owner 2026-11-18): one page that says, for every data

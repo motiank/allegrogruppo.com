@@ -232,6 +232,20 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   rules "A cheque by its NUMBER" → three calcs, and "The scanned cheques … WORK LIST"); `statement_compare` adds `archiveCheque` to an
   onlyTheirs payment that a scanned cheque explains (same amount, within `days`); `/cheques/all` rows (the cheques file) may be
   `source` `archive` with `payeeGuess` / `image` (`fixedSheets.js` SOURCE_HE). Eval `ca-*`, `pc-number` (3 calcs). Deployed 2026-11-16 (`a046632`, no hq client build needed).
+- **Legal** (משפטי, owner 2026-11-18: "a main menu item: legal; complete browsing and download of any file; the AI should address
+  questions like what was the story with <name>, what was the verdict, the last decision, when is the next hearing"): main-menu area
+  for the **chain admin only** (AREA 7 `LEGAL`; menu, routes and calcs). Data = the owners' court cases in the legal archive in Drive,
+  through the admin's Legal API (`../legal_api_readme.md`; `source.legal()` / `source.legalFile()`); Joya keeps nothing. Page `/legal`
+  (`client/pages/Legal.js`): tabs שאלות (the area's chat) / תיקים (search by a name in any spelling, a number or words; open / closed;
+  whose archive) / דיונים (hearings ahead); `/legal/:number` = one case: story, verdict, last decision, hearings and every paper with
+  Open / Download (`/api/joya/legal/files/:driveId[?download=1]`, proxied — no Drive access needed). Calcs (`src/services/legal.js`,
+  `LEGAL_CALCS` in `ai.js`): `legal_case` (ONE case by `q` = a name or `number`: history, parties, verdict, lastDecision, nextHearing,
+  key papers), `legal_cases` (the list), `legal_hearings`, `legal_documents`, `legal_document` (a paper's full text, by `documentId` or
+  `number` + `which`). Prompts: PLAN "Legal" (one `legal_case` answers story + verdict + last decision + next hearing; a follow-up uses
+  the case number), WRITE "Legal" (answer the question first, no legal opinion, one closing line that the summary was written from the
+  papers; never write links — `LegalFiles` in `AskBox.js` shows the case and PDF buttons). The stories are AI-written from the papers; a
+  closed case of Itzik holds only its opening paper and verdict (`partial`). Tests: `test/test_joya_lib.mjs` (access), admin
+  `scripts/test_legal_archive.js`; eval `l-*` 10/10 (context kind `LEGAL`). Needs an hq client build on deploy. Not deployed yet.
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

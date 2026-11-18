@@ -518,3 +518,29 @@ export async function financeBankReportExport(body) {
 export async function financeChequeImage(id) {
   return getFile(`/finance/cheques/image/${encodeURIComponent(String(id || ''))}`);
 }
+
+// ---------------------------------------------------------------- legal (the owners' court cases)
+
+// The admin's Legal API (../legal_api_readme.md): the court cases archive in Google Drive (papers from נט המשפט, a
+// catalog with a short story of every case and a description of every paper), read only. Nothing is kept here.
+/**
+ * GET /legal/<path> → { available: true, data, meta }, or { available: false, reason } when the admin has no Legal
+ * API, the archive cannot be read, or the case / paper is unknown (reason = the admin's message). Other errors are thrown.
+ */
+export async function legal(path, params = {}) {
+  try {
+    const { data, meta } = await get(`/legal${path}`, params);
+    return { available: true, data, meta: meta || {} };
+  } catch (e) {
+    if (/ 404 no endpoint/.test(e.message)) return { available: false, reason: 'the Allegro admin has no Legal API yet (legal_api_readme.md)' };
+    if (/ 404 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, ''), notFound: true };
+    if (/ 503 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, '') };
+    if (/ 400 /.test(e.message)) return { available: false, reason: e.message.replace(/^Allegro API: \d+ /, ''), badRequest: true };
+    throw e;
+  }
+}
+
+/** A court paper (PDF) of the legal archive by its Drive id → { buffer, fileName, headers }. Never cached. */
+export async function legalFile(id, download = false) {
+  return getFile(`/legal/files/${encodeURIComponent(String(id || ''))}`, download ? { download: 1 } : {});
+}

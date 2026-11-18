@@ -278,6 +278,47 @@ function PayrollFiles({ r, classes }) {
     ));
 }
 
+/** The court cases of a legal_case / legal_document calc: the case's page in Joya and the PDFs of its verdict and last decision. */
+function LegalFiles({ r, classes }) {
+  const { t } = useT();
+  const cases = (r.calcs || []).filter((c) => c.calc === 'legal_case').flatMap((c) => c.result?.cases || []);
+  const papers = (r.calcs || []).filter((c) => c.calc === 'legal_document' && c.result?.paper).map((c) => c.result.paper);
+  const seen = new Set(cases.map((x) => x.number));
+  const pdf = (href, label) => (
+    <a className={classes.fileBtn} href={href} target="_blank" rel="noopener noreferrer">
+      {label}
+    </a>
+  );
+  return (
+    <>
+      {cases.map((x) => (
+        <div key={x.number} className={classes.files}>
+          <span dir="auto">
+            {x.name} · <Term>{x.number}</Term>
+          </span>
+          <a className={classes.fileBtn} href={x.page}>
+            {t('joya.ask.file.legalCase')}
+          </a>
+          {x.verdict?.links ? pdf(x.verdict.links.open, t('joya.ask.file.legalVerdict')) : null}
+          {x.lastDecision?.links && x.lastDecision.documentID !== x.verdict?.documentID ? pdf(x.lastDecision.links.open, t('joya.ask.file.legalDecision')) : null}
+        </div>
+      ))}
+      {papers
+        .filter((p) => !seen.has(p.case))
+        .map((p) => (
+          <div key={p.documentID} className={classes.files}>
+            <span dir="auto">
+              {p.caseName} · <Term>{p.case}</Term>
+            </span>
+            <a className={classes.fileBtn} href={p.page}>
+              {t('joya.ask.file.legalCase')}
+            </a>
+          </div>
+        ))}
+    </>
+  );
+}
+
 /** The detailed bank reconciliation report of a bank_recon_report calc: per company, the full page and the Excel. */
 function BankReconFiles({ r, classes }) {
   const { t } = useT();
@@ -338,6 +379,7 @@ export function Answer({ r, onChanged, head = true }) {
           <SheetFile r={r} classes={classes} />
           <PayrollFiles r={r} classes={classes} />
       <BankReconFiles r={r} classes={classes} />
+      <LegalFiles r={r} classes={classes} />
           {unverified.length ? (
             <div className={classes.warn}>
               ⚠ {t('joya.ask.unverified')} <Term>{unverified.join(', ')}</Term>

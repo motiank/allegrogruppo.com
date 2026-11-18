@@ -17,6 +17,8 @@ export const AREAS = {
   accounting: { id: 5, suggestions: 8, adminSuggestions: 11 },
   // the payments area (chain admin): its page is pages/Payments.js (the board + this chat)
   payments: { id: 6, suggestions: 6 },
+  // the legal area (chain admin): its page is pages/Legal.js (this chat, the case list, the hearings)
+  legal: { id: 7, suggestions: 6 },
 };
 
 export default function Area({ area }) {

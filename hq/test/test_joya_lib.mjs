@@ -445,7 +445,7 @@ console.log(`\n${n} passed${process.exitCode ? ', some FAILED' : ''}`);
 
 console.log('finance (the books)');
 const { dates: finDates, warningsOf } = await import('../src/services/finance.js');
-const { mayRun, FINANCE_CALCS, CALCS, catalogue } = await import('../src/services/ai.js');
+const { mayRun, FINANCE_CALCS, LEGAL_CALCS, AREAS, CALCS, catalogue } = await import('../src/services/ai.js');
 t('finance dates: from required, to optional, order checked', () => {
   assert.deepEqual(finDates({ from: '2026-01-01', to: '2026-03-31' }), { from: '2026-01-01', to: '2026-03-31' });
   assert.deepEqual(finDates({ from: '2026-01-01' }), { from: '2026-01-01' });
@@ -461,11 +461,24 @@ t('finance warnings: high first, affects kept only when present', () => {
   assert.ok(!('affects' in w[1]));
   assert.deepEqual(warningsOf(null), []);
 });
+t('the legal calcs (the owners\' court cases) are for the chain admin only', () => {
+  const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
+  const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
+  const accountant = { role: 'ACCOUNTANT', isAdmin: false };
+  assert.deepEqual([...LEGAL_CALCS].sort(), ['legal_case', 'legal_cases', 'legal_document', 'legal_documents', 'legal_hearings']);
+  for (const name of LEGAL_CALCS) {
+    assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
+    assert.equal(mayRun(admin, name), true);
+    assert.equal(mayRun(manager, name), false, `${name} not for a manager`);
+    assert.equal(mayRun(accountant, name), false, `${name} not for the accountant`);
+  }
+  assert.equal(AREAS[7], 'LEGAL');
+});
 t('the books are for the chain admin only; every finance calc is in the catalogue', () => {
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 30); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques, cheques_file
+  assert.equal(FINANCE_CALCS.size, 31); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques, cheques_file; 2026-11-16: + cheque_archive
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);

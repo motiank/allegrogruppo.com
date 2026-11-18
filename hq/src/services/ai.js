@@ -20,6 +20,7 @@ import * as work from './work.js';
 import * as shiftModel from './shiftModel.js';
 import * as bank from './bank.js';
 import * as fin from './finance.js';
+import * as legal from './legal.js';
 import { createSheet, sheetsUnavailable } from './sheets.js';
 import * as payments from './payments.js';
 import * as fixedSheets from './fixedSheets.js';
@@ -237,6 +238,11 @@ const finCalc = (fn) => async (a, p) => {
   const cos = await financeCompanies(a, p || {});
   cos.asked = Boolean(p?.companyKeys || p?.companyKey); // named companies get an answer each, even without books
   return fn(cos, p || {});
+};
+// the legal calcs (services/legal.js): the owners' court cases, chain admin only (owner 2026-11-18)
+const legalCalc = (fn) => async (a, p) => {
+  if (!a.isAdmin) throw err('FORBIDDEN', 'the legal area is for the chain admin only');
+  return fn(p || {});
 };
 const FIN_PERIOD = 'from: "YYYY-MM-DD", to?: "YYYY-MM-DD" (default today)';
 
@@ -604,7 +610,33 @@ export const CALCS = {
       return payments.listForCalc(await bankCompanies(a, p || {}), p || {}, todayLocal());
     },
   },
-  team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING|PAYMENTS" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
+  // Legal (משפטי; owner 2026-11-18): the owners' court cases from the legal archive in Drive (services/legal.js), chain admin only
+  legal_cases: {
+    params: '{ q?: "a party\'s name (Hebrew or Latin letters), a case number, a subject or words of the story; several spellings apart by |", status?: "open" | "closed", person?: "moti" | "itzik" (whose archive; default both), from?, to? (the dates of the case\'s papers), limit? }',
+    about: 'the LIST of court cases (תיקים משפטיים, תביעות, נט המשפט) of the owners: number, name (claimant נ\' defendant), court, type, status (פתוח / סגור), a 1–2 sentence summary, the outcome, the amount, the verdict date, the last decision date, the next hearing. For "which cases are open", "all the labour cases", "the cases against <company>", "how many claims", and to find a case by a name when several may match. For the full story of ONE case use legal_case',
+    run: legalCalc(legal.cases),
+  },
+  legal_case: {
+    params: '{ q?: "the name of the claimant / the other party / the business (Hebrew or Latin letters; several spellings apart by |)", number?: "the case number, e.g. 68499-05-26", person?: "moti" | "itzik", papers?: "all" (every paper the AI read, with longer descriptions — only when the user asks for all the papers / the full file) }',
+    about: 'ONE court case in full: the story (history: who sued whom, about what, the steps and decisions with dates), the parties, the outcome and the amount, the VERDICT (פסק דין — what was ruled), the LAST DECISION (ההחלטה האחרונה), the NEXT HEARING and the hearings list (הדיון הבא), and the key papers with a description and a link to each PDF. For "what was the story with <name>", "מה הסיפור עם <שם>", "what was the verdict", "מה פסק הדין", "what is the last decision", "when is the next hearing in the <name> case", "how much was claimed / awarded". Finds the case by a name even in another spelling or in Latin letters',
+    run: legalCalc(legal.caseStory),
+  },
+  legal_hearings: {
+    params: '{ from?: "YYYY-MM-DD" (default today), to?: "YYYY-MM-DD", person?: "moti" | "itzik", cancelled?: boolean (also the cancelled ones) }',
+    about: 'the HEARINGS (דיונים) ahead over ALL the court cases, by date: the court\'s scheduled sittings (date, hour, kind, judge) and, for open cases without a sittings list, the future dates the last decisions mention. For "when is the next hearing" (no case named), "which hearings do we have this month", "מה הדיונים הקרובים", "what is coming up in court"',
+    run: legalCalc(legal.hearings),
+  },
+  legal_documents: {
+    params: '{ q?: "words of the paper\'s type, sender or description", number?: "a case number (only that case)", type?: "a paper type, e.g. פסק דין, החלטה, כתב תביעה, כתב הגנה, פרוטוקול", key?: boolean (true = only the papers the AI read), person?, from?, to? (the paper\'s date), limit? }',
+    about: 'court PAPERS by words, over all cases or inside one case, newest first, each with its description and a link to the PDF. For "all the verdicts", "the decisions of the last month", "the protocol of the hearing in case X", "find the paper about <words>", "give me the statement of claim of <case>"',
+    run: legalCalc(legal.documents),
+  },
+  legal_document: {
+    params: '{ documentId?: number (a documentID from legal_case / legal_documents), number?: "a case number" + which?: "verdict" | "last_decision" | "claim" | "defence" }',
+    about: 'the FULL TEXT of one court paper (up to ~30,000 characters; a scan is read by OCR), to answer a detailed question the short description does not answer: "what exactly does the verdict say about <topic>", "מה כתוב בפסק הדין על …", "what are the claims in the statement of claim", "quote the operative part". Needs the case number (from the question, the earlier answer, or plan legal_case first in an earlier turn) — at most 2 per request, the texts are long',
+    run: legalCalc(legal.documentText),
+  },
+  team_rules: { params: '{ area?: "STOCK|MANPOWER|PERFORMANCE|BANK|ACCOUNTING|PAYMENTS|LEGAL" }', about: 'the team rules the chain admin added from the chat (id, text, area; area null = all areas)', run: async (a, p) => ({ source: 'teamRules (joya_settings)', rules: await teamRules(p.area || null) }) },
   pending_decisions: { params: '{ locationIds? }', about: 'drafts waiting for approval, open payroll issues, recent shortages per location', run: async (a, p) => ({ source: 'joya_* status columns', pending: await work.pending(a, locs(a, p)) }) },
 };
 
@@ -637,13 +669,15 @@ const shape = (r) => ({
 });
 
 // the main-menu areas; a question asked in one is context AREA + the area's number
-export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS' };
+export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5: 'ACCOUNTING', 6: 'PAYMENTS', 7: 'LEGAL' };
 // the calculations of the accounting area — the only ones the accountant may run (supplier invoices: later, from an
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
 export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheque_archive', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
-export const mayRun = (access, name) => (FINANCE_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
+// the owners' court cases (services/legal.js): chain admin only (owner 2026-11-18)
+export const LEGAL_CALCS = new Set(['legal_cases', 'legal_case', 'legal_hearings', 'legal_documents', 'legal_document']);
+export const mayRun = (access, name) => (FINANCE_CALCS.has(name) || LEGAL_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));
 
 // ---------------------------------------------------------------- team rules
 // Lasting rules for the AI team, given in the chat by the chain admin ("from now on…", "כלל חדש: …"). The planner
@@ -713,6 +747,7 @@ async function contextAllowed(access, kind, id) {
     if (!AREAS[id]) throw err('BAD_REQUEST', 'unknown area');
     if (AREAS[id] === 'BANK' && !access.isAdmin) throw err('FORBIDDEN', 'the bank area is for the chain admin only');
     if (AREAS[id] === 'PAYMENTS' && !access.isAdmin) throw err('FORBIDDEN', 'the payments area is for the chain admin only');
+    if (AREAS[id] === 'LEGAL' && !access.isAdmin) throw err('FORBIDDEN', 'the legal area is for the chain admin only');
     if (AREAS[id] === 'ACCOUNTING' && !access.accounting) throw err('FORBIDDEN', 'the accounting area is for the chain admin and the accountant only');
     if (access.role === 'ACCOUNTANT' && AREAS[id] !== 'ACCOUNTING') throw err('FORBIDDEN', 'the accountant sees the accounting area only');
     return null;
@@ -1025,7 +1060,7 @@ export async function compute(id, { calcs = [], ops = null, whatIf = null, rule 
     }
     const def = CALCS[c?.calc];
     if (def && !mayRun(user, c.calc)) {
-      results.push({ calc: c.calc, params: c.params, error: c.calc === 'payments_due' ? 'payments are for the chain admin only' : FINANCE_CALCS.has(c.calc) ? 'the books (finance data) are for the chain admin only' : 'not in the accounting area: the accountant may not run it' });
+      results.push({ calc: c.calc, params: c.params, error: c.calc === 'payments_due' ? 'payments are for the chain admin only' : LEGAL_CALCS.has(c.calc) ? 'the legal area (court cases) is for the chain admin only' : FINANCE_CALCS.has(c.calc) ? 'the books (finance data) are for the chain admin only' : 'not in the accounting area: the accountant may not run it' });
       continue;
     }
     if (!def) {

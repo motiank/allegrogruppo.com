@@ -33,6 +33,7 @@ const managementRouter = managementModule.default;
 const { Router: orderSystemRouter } = await import("./modules/orderSystem.js");
 const { Router: localApiRouter } = await import("./modules/localApi.js");
 const { Router: financeApiRouter, driveCheckAll } = await import("./modules/financeApi.js");
+const { Router: legalApiRouter } = await import("./modules/legalApi.js");
 
 const app = express();
 const PORT = process.env.ADMIN_PORT || 3021;
@@ -79,6 +80,8 @@ app.get("/config", (req, res) => {
 // Read-only data API (shifts, payroll, beecomm) - no login, loopback connections only.
 // The Finance API (allegro_finance, finance_api_readme.md) comes first: the local API ends with a 404 catch-all.
 app.use("/local-api/v1/finance", financeApiRouter());
+// The Legal API (the court cases archive in Drive, legal_api_readme.md) — before the local API for the same reason.
+app.use("/local-api/v1/legal", legalApiRouter());
 app.use("/local-api/v1", localApiRouter());
 
 // Protected admin routes - require authentication

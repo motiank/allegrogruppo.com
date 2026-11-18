@@ -31,7 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
-import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeBankReportExport, financeChequeImage, systemFreshness } from './services/source.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeBankReportExport, financeChequeImage, systemFreshness, legal as legalApi, legalFile } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -260,6 +260,39 @@ r.get(
     const file = await financeChequeImage(req.params.id);
     res.setHeader('Content-Type', file.headers['content-type'] || 'image/jpeg');
     res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(file.buffer);
+  }),
+);
+
+// ---------------------------------------------------------------- legal (משפטי): the owners' court cases
+// The legal archive in Drive through the admin's Legal API (services/source.js legal; ../../legal_api_readme.md), chain
+// admin only (owner 2026-11-18): the people, the case list, one case with every paper, the hearings ahead, and any
+// paper as a PDF (opened in the browser, or ?download=1). Joya keeps nothing; the user needs no Drive access.
+const legalGet = async (path, params) => {
+  const out = await legalApi(path, params);
+  if (!out.available) throw Object.assign(new Error(out.reason), { code: out.badRequest ? 'BAD_REQUEST' : out.notFound ? 'NOT_FOUND' : 'NOT_LOADED' });
+  return out;
+};
+r.get('/joya/legal/people', requireAdmin, h(async () => ({ people: (await legalGet('/people')).data })));
+r.get(
+  '/joya/legal/cases',
+  requireAdmin,
+  h(async (req) => {
+    const out = await legalGet('/cases', { person: req.query.person, q: req.query.q, status: req.query.status, downloaded: req.query.downloaded, limit: req.query.limit || 500 });
+    return { cases: out.data, total: out.meta.total ?? out.data.length, builtAt: out.meta.builtAt ?? null };
+  }),
+);
+r.get('/joya/legal/cases/:number', requireAdmin, h(async (req) => ({ case: (await legalGet(`/cases/${encodeURIComponent(req.params.number)}`, { person: req.query.person })).data })));
+r.get('/joya/legal/hearings', requireAdmin, h(async (req) => ({ hearings: (await legalGet('/hearings', { person: req.query.person, from: req.query.from, to: req.query.to })).data })));
+r.get(
+  '/joya/legal/files/:id',
+  requireAdmin,
+  h(async (req, res) => {
+    const download = ['1', 'true'].includes(String(req.query.download || ''));
+    const file = await legalFile(req.params.id, download);
+    res.setHeader('Content-Type', file.headers['content-type'] || 'application/pdf');
+    res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     res.send(file.buffer);
   }),
 );
