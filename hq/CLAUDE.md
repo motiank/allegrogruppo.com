@@ -215,6 +215,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   The supplier picker (searchable, red count = the supplier's bank moves missing from the books) deployed 2026-11-13 (`43c3a18`).
   Cheque lines in every bank list (bank_transactions, bank_open_items, the report's section 1) carry `payee` / `payeeSource`
   from the admin (Hashavshevet); the analyst writes "שיק <no> – <payee>" and "לא נמצא בחשבשבת" for `missing`.
+  **Section 3ג + export (2026-11-18):** the report's `chequesStale` (stale cheques, `suggestedAction`, `bounced`) is passed in
+  `bank_recon_report` (`sections.chequesStale`, `summary.chequesStale`); the page's selection mode posts its export to the relative
+  "export" = `POST /api/joya/finance/export` (`routes.js`, `source.financeBankReportExport` → the admin's `POST /finance/bank/report/export`).
+  Planner WRITE rule: name the 3ג count and sum, point to "בחירה" on the page, never invent moves.
   **Cards (כרטסת, 2026-11-18):** the admin's report rows now carry the account to book each line on; `finance.js` passes `card` ("name (key)"),
   `cardSource` and `employeesCard` (the one card of all employees) on the bank and cheque rows (`bank_open_items` passes the raw
   `counterAccount` / `counterName` / `counterSource` / `counterEmployee`); the planner's WRITE rule says "כרטסת: עובד (450001)" after the payee,

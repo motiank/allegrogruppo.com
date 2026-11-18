@@ -98,6 +98,23 @@ export async function getFile(path, params = {}) {
   return { buffer: Buffer.from(await res.arrayBuffer()), fileName: m ? decodeURIComponent(m[1]) : 'file.xlsx', headers: Object.fromEntries(res.headers) };
 }
 
+/** POST a JSON body and get a file back (the bank reconciliation exports) → { buffer, fileName, headers }. Never cached. */
+export async function postFile(path, body) {
+  let res;
+  try {
+    res = await fetch(`${base()}${path}`, { method: 'POST', body: JSON.stringify(body || {}), headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(Math.max(timeout(), 120_000)) });
+  } catch (e) {
+    throw upstream(`not reachable (${e.cause?.code || e.name})`);
+  }
+  if (!res.ok) {
+    const b = await res.json().catch(() => null);
+    throw upstream(`${res.status} ${b?.error?.message || res.statusText}`, res.status === 400 ? 'BAD_REQUEST' : res.status === 404 ? 'NOT_SUPPORTED' : 'UPSTREAM');
+  }
+  const cd = res.headers.get('content-disposition') || '';
+  const m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  return { buffer: Buffer.from(await res.arrayBuffer()), fileName: m ? decodeURIComponent(m[1]) : 'export.xlsx', headers: Object.fromEntries(res.headers) };
+}
+
 /** Forget every cached answer (after a change in Allegro the user wants to see now). */
 export function clearCache() {
   cache.clear();

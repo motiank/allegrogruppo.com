@@ -20,7 +20,7 @@
 // What Joya keeps is its own: decisions, edits, rules, notes, corrections (keyed by the ids above),
 // and the roleAliases config (Allegro role name → Joya role code). Dated data is fetched per branch and
 // calendar month, so the 5-minute memory cache serves every question about the same month.
-import { get, getFile } from '../../lib/allegro.js';
+import { get, getFile, postFile } from '../../lib/allegro.js';
 import { getConfig, todayLocal } from '../db.js';
 import { addDays } from '../lib/recommend.js';
 import log from '../../lib/log.js';
@@ -507,6 +507,11 @@ export async function financeBankReportFacets(params) {
 /** The same report as a file: format html (the Hebrew page) or xlsx → { buffer, fileName, headers }. Never cached. */
 export async function financeBankReportFile(params, format) {
   return getFile('/finance/bank/report', { ...params, format });
+}
+
+/** The report page's exports (selection mode): the chosen rows as Excel, or the Hashavshevet import file of section 3ג. */
+export async function financeBankReportExport(body) {
+  return postFile('/finance/bank/report/export', body);
 }
 
 /** The scanned cheque of the Drive archive (the report's 📷 links; admin chequeArchive.js) → { buffer, headers }. */

@@ -54,9 +54,18 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     assert.equal(sum(r.chequesCleared, (x) => x.amount), s.chequesCleared.total);
     assert.equal(r.bankOpen.length, s.bankOpen.count);
     assert.equal(r.chequesOpen.filter((x) => x.status === "past_due").length, s.chequesOpen.pastDueCount);
+    // section 3ג: the cheques past their date by more than 60 days, out of 3ב, in the tie-out like 3ב
+    assert.equal(r.chequesStale.length, s.chequesStale.count);
+    assert.equal(sum(r.chequesStale, (x) => x.amount), s.chequesStale.total);
+    assert.ok(r.chequesStale.every((x) => x.status === "past_due" && x.daysAfterDue > 60 && x.todo?.rule === "stale_cheque" && ["cancel", "bounced"].includes(x.suggestedAction)));
+    assert.ok(r.chequesOpen.every((x) => !(x.status === "past_due" && x.daysAfterDue > 60)), "no stale cheque stays in 3ב");
+    assert.equal(r.todo.count, r.chequesStale.length);
+    assert.equal(s.chequesStale.bounced, r.chequesStale.filter((x) => x.bounced).length);
+    assert.ok(r.chequesStale.filter((x) => x.bounced).every((x) => x.suggestedAction === "bounced" && r.bankOpen.some((b) => b.bankLineId === x.bounced.bankLineId && /החזרת שיק/.test(b.details))));
+    assert.equal(s.chequesStale.buckets["61-120"] + s.chequesStale.buckets["121-240"] + s.chequesStale.buckets["241+"], s.chequesStale.count);
     assert.equal(r.chequesOpen.filter((x) => x.status === "not_due").length, s.chequesOpen.notDueCount);
     // The reconciliation formula.
-    const expected = Math.round((s.bankBalance - s.bankOpen.total + s.bookOpen.total + s.chequesOpen.total - s.bookFutureMatched.total) * 100) / 100;
+    const expected = Math.round((s.bankBalance - s.bankOpen.total + s.bookOpen.total + s.chequesOpen.total + s.chequesStale.total - s.bookFutureMatched.total) * 100) / 100;
     assert.equal(s.expectedBookBalance, expected);
     assert.equal(s.unexplained, Math.round((s.bookBalance - expected) * 100) / 100);
     assert.equal(s.unexplained, 0, "Hashavshevet's matches should explain the whole gap");
@@ -96,11 +105,12 @@ for (const [from, to] of [["2026-01-01", "2026-11-05"], ["2025-01-01", "2025-12-
     assert.ok(r.notes.some((n) => n.startsWith("כרטסת:")), "a note counts the cards");
     // the rows dated before `from` are marked older (open cheques by the cheque's date) and counted; older=hide drops them
     assert.ok(r.bankOpen.every((x) => Boolean(x.older) === (x.date < from)) && r.bookOpen.every((x) => Boolean(x.older) === (x.date < from)) && r.chequesOpen.every((x) => Boolean(x.older) === (x.dueDate < from)));
-    assert.equal(r.older.count, [...r.bankOpen, ...r.bookOpen, ...r.chequesOpen].filter((x) => x.older).length);
+    assert.equal(r.older.count, [...r.bankOpen, ...r.bookOpen, ...r.chequesOpen, ...r.chequesStale].filter((x) => x.older).length);
+    assert.ok(r.chequesStale.every((x) => Boolean(x.older) === (x.dueDate < from)));
     assert.equal(r.older.sections.bankOpen.count, s.bankOpen.beforeCount);
     if (r.older.count) {
       const only = await buildBankReconReport({ from, to, older: "hide" });
-      assert.ok([...only.bankOpen, ...only.bookOpen, ...only.chequesOpen].every((x) => !x.older) && only.filtered.sections.bankOpen.of === r.bankOpen.length);
+      assert.ok([...only.bankOpen, ...only.bookOpen, ...only.chequesOpen, ...only.chequesStale].every((x) => !x.older) && only.filtered.sections.bankOpen.of === r.bankOpen.length);
       assert.equal(only.summary.bankOpen.total, s.bankOpen.total, "the summary is always for the whole account");
     }
     // Every row is dated up to `to`; cleared cheques inside the period.
@@ -141,19 +151,57 @@ test("cleared cheques are paired to a bank line with the same cheque number and 
   assert.ok(r.notes.some((n) => n.includes("מבוטלים")), "cancelled cheques are explained in the notes");
 });
 
+test("exports of the selection mode: chosen rows as Excel, the Hashavshevet import file of 3ג (xlsx and movein)", async () => {
+  const { bankReconExport } = await import("../admin/server/modules/bankRecon.js");
+  const r = await buildBankReconReport({ from: "2026-01-01", to: "2026-11-07" });
+  const q = { company: r.company.code, account: r.account.key, from: r.from, to: r.to };
+  // chosen rows of section 1
+  const two = r.bankOpen.slice(0, 2).map((x) => x.bankLineId);
+  const rows = await bankReconExport({ ...q, kind: "rows", section: "bankOpen", ids: two });
+  const wb1 = new ExcelJS.Workbook();
+  await wb1.xlsx.load(rows.buffer);
+  assert.equal(wb1.getWorksheet("1 בנק ללא ספרים").rowCount, 2 + 2);
+  assert.match(rows.fileName, /_bankOpen_selected\.xlsx$/);
+  await assert.rejects(bankReconExport({ ...q, kind: "rows", section: "nope" }), /unknown section/);
+  if (!r.chequesStale.length) return;
+  // the reversal moves of two stale cheques: one cancelled today, one kept (not exported)
+  const [a, b] = r.chequesStale;
+  const out = await bankReconExport({ ...q, kind: "hashavshevet", format: "xlsx", ids: [a.chequeId, ...(b ? [b.chequeId] : [])], actions: { [a.chequeId]: { action: "cancel" }, ...(b ? { [b.chequeId]: { action: "keep" } } : {}) } });
+  const wb2 = new ExcelJS.Workbook();
+  await wb2.xlsx.load(out.buffer);
+  const ws = wb2.getWorksheet("תנועות");
+  assert.equal(ws.rowCount, 2, "one move: the kept cheque is not exported");
+  assert.equal(String(ws.getRow(2).getCell(2).value), String(a.chequeNo));
+  assert.equal(ws.getRow(2).getCell(8).value, -Math.abs(a.amount));
+  assert.equal(String(ws.getRow(2).getCell(7).value), String(a.counterAccount));
+  assert.equal(String(ws.getRow(2).getCell(9).value), r.account.key);
+  assert.ok(wb2.definedNames.getRanges("jurnal").ranges.length === 1);
+  // a cheque that is not in 3ג cannot be reversed from here
+  await assert.rejects(bankReconExport({ ...q, kind: "hashavshevet", ids: [r.chequesOpen[0]?.chequeId || -1] }), /no cheques of section 3ג/);
+  // movein for a 5-digit number, refusal for a longer one
+  const five = r.chequesStale.find((x) => String(x.chequeNo).length <= 5);
+  const six = r.chequesStale.find((x) => String(x.chequeNo).length > 5);
+  if (five) {
+    const m = await bankReconExport({ ...q, kind: "hashavshevet", format: "movein", ids: [five.chequeId] });
+    assert.equal(m.fileName, "movein.dat");
+    assert.equal(m.buffer.length, 90);
+  }
+  if (six) await assert.rejects(bankReconExport({ ...q, kind: "hashavshevet", format: "movein", ids: [six.chequeId] }), /more than 5 digits/);
+});
+
 test("HTML and Excel", async () => {
   const r = await buildBankReconReport({ from: "2026-10-01", to: "2026-10-31" });
   const html = renderBankReconHtml(r);
   assert.ok(html.startsWith("<!doctype html>"));
   assert.ok(html.includes('dir="rtl"'));
-  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "data-filter=\"1\">כרטסת</th>", ...(r.older?.count ? ['older-off"', "older-tog"] : []), "כרטיס העובדים עובד (450001)", 'class="acc acc-emp', "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
+  for (const t of ["דוח התאמת בנק מפורט", "data-filter=\"1\">מוטב</th>", "data-filter=\"1\">כרטסת</th>", ...(r.older?.count ? ['older-off"', "older-tog"] : []), ...(r.chequesStale.length ? ["3ג. צ'קים שלא נפרעו מעל 60 יום", '<select class="act"', 'data-section="chequesStale"'] : []), 'data-export="export"', 'class="sel-all"', "כרטיס העובדים עובד (450001)", 'class="acc acc-emp', "1. תנועות בנק ללא התאמה בספרים", "2. תנועות ספרים ללא התאמה בבנק", "3א. פירעון צ'קים", "3ב. צ'קים שהונפקו וטרם נפרעו", "הפרש לא מוסבר"])
     assert.ok(html.includes(t), t);
   // the page carries the filters' script; the body (the admin page) stays script-free and calls bankReconBehavior itself
   assert.ok(html.includes("<script>(function bankReconBehavior(root)") && html.includes('data-filter="1">מוטב') && html.includes('data-filter="1">פרטים'));
   // the scanned cheque opens in a modal (the script) — the CSS and the link's data for the modal's title are in the page
   assert.ok(html.includes(".chq-modal{") && html.includes("chq-close") && (!r.bankOpen.some((x) => x.imageId) || /<a class="chq-img" href="cheque-image\/[^"]+" target="_blank" rel="noreferrer" title="[^"]+" data-cheque="\d+" data-payee="/.test(html)));
   assert.ok(!html.includes("</script>".slice(0, 8) + "<"), "the embedded script does not close itself early");
-  assert.equal((html.match(/data-filter="1"/g) || []).length, 11 + (r.bookFutureMatched.length ? 3 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table + כרטסת in 1, 3א, 3ב
+  assert.equal((html.match(/data-filter="1"/g) || []).length, 11 + (r.bookFutureMatched.length ? 3 : 0) + (r.chequesStale.length ? 4 : 0)); // פרטים, סוג, מוטב / חשבון נגדי per table + כרטסת in 1, 3א, 3ב + מוטב, כרטסת, חזר בבנק, פעולה in 3ג
   const body = renderBankReconBody(r);
   assert.ok(body.startsWith('<div class="bank-recon') && !body.includes("<html"));
   assert.ok(body.includes("<script") === false);
@@ -171,7 +219,8 @@ test("HTML and Excel", async () => {
   const empRow = r.bankOpen.findIndex((x) => x.counterEmployee);
   const cardCol = s1.getRow(1).values.indexOf("כרטסת"); // a loaded workbook keeps no column keys: find it by its header
   if (empRow >= 0) assert.equal(s1.getRow(empRow + 2).getCell(cardCol).fill?.fgColor?.argb, r.bankOpen[empRow].counterSource === "employee_guess" ? "FFEAF3FF" : "FFD6E9FF", "the employees card is blue in the Excel too");
-  for (const name of ["3א צ'קים שנפרעו", "3ב צ'קים פתוחים"]) assert.ok(wb.getWorksheet(name).getRow(1).values.includes("כרטסת"), name);
+  for (const name of ["3א צ'קים שנפרעו", "3ב צ'קים פתוחים", "3ג צ'קים ישנים"]) assert.ok(wb.getWorksheet(name).getRow(1).values.includes("כרטסת"), name);
+  assert.ok(wb.getWorksheet("3ג צ'קים ישנים").getRow(1).values.includes("פעולה מוצעת"));
 });
 
 test("filters: kind, party, q, sections and the facets (shared/bankReconFilter.js)", async () => {

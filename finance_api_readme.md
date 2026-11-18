@@ -632,7 +632,8 @@ have a Google-Sheets-like filter — icon in the header, a panel with a search b
 chequesOpen, bookFutureMatched, chequesCleared with counts and totals; expectedBookBalance; unexplained), `notes`
 (Hebrew), and the rows `bankOpen` (cheque lines with `payee` / `payeeSource` and `imageId` / `image` of the scanned cheque, see `/bank/open`; `summary.bankOpen.cheques` =
 `{ count, found, missing, missingTotal }`), `bookOpen` (cheques excluded), `bookFutureMatched`, `chequesCleared` (clearing
-date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched). **Every row carries its card
+date in the period; status cleared / cleared_group), `chequesOpen` (past_due / not_due / cleared_unmatched), `chequesStale` (section
+3ג: past due by more than 60 days, see below). **Every row carries its card
 (כרטסת, 2026-11-18)**: `counterAccount` / `counterName` — the books' own on sections 2 and 3 (section 3 from the cheques module, `counterSource`
 `books`), `bankLineAccounts.js`'s on section 1 (`counterSource`, `counterBasis`, see `/bank/open`); `counterEmployee` = the one employees card
 in every section; `report.employees` = `{ account, name }`; `summary.bankOpen.accounts` = `meta.cards` of `/bank/open` + `missingTotal`,
@@ -654,6 +655,36 @@ not cleared is NOT noise (owner, same day: "those lines should be handled"): it 
 hides them. `noise=hide` is a filter like the others (the rows are left out, `filtered` says
 kept of all, label "ללא רעשים"); the HTML page starts with the noise rows hidden and a button shows them (the summary always
 includes them); the Excel has a "רעש" column.
+**Section 3ג and the Hashavshevet import file (2026-11-18, owner: "the unpaid old cheques: a section 3ג of cheques over 60 days;
+cancelled — never reached the beneficiary — or rejected by the bank; export to Hashavshevet moves import Excel; checkboxes per row,
+select all, filters").** The cheques past their date by more than 60 days and not cleared leave 3ב for `chequesStale` (section 3ג;
+`summary.chequesStale` = `{ count, total, staleDays, bounced, bouncedTotal, employees, buckets }`, part of the tie-out like 3ב). Each row
+carries `bounced: { date, bankLineId }` when an open bank line "החזרת שיק" has its number and amount, and `suggestedAction` `bounced` /
+`cancel`. A cheque reversed by a plain journal entry (the import below: same reference, same accounts, negative amount — or the accounts
+swapped with a positive one, no cheque_id) is treated as cancelled (`summary.reversedCheques`, a note) although Hashavshevet's cheques
+module does not know it. The HTML has a selection mode in every section (`bankReconBehavior`: "בחירה" → a checkbox column, "בחר הכל"
+for the rows the filters leave visible, count and sum, "Excel של השורות שנבחרו"); section 3ג adds a date, an action per row (בוטל /
+חזר מהבנק / להשאיר) and the buttons "קובץ ייבוא לחשבשבת (Excel)" / "movein.dat". The page posts a form field `payload` (JSON) to the
+relative `export`: `POST /admin/bank-recon/export` (admin) or `POST /finance/bank/report/export` here (Joya: `/api/joya/finance/export`).
+Body: `{ company, account, from, to, kind: "rows" | "hashavshevet", section, ids, format: "xlsx" | "movein", actions: { chequeId: { action,
+date } }, date }` → the file (`admin/server/modules/bankRecon.js` `bankReconExport`; only cheques that are in 3ג can be reversed).
+
+*What Hashavshevet imports (investigated 2026-11-18 from its own tables `ImportJournal`, `ImportJournalErrCode`, `ImportLog` in the copy
+and the guides jurnalfromexcel.pdf / exceltohash.pdf / ImportTextJournal.pdf on h-erp.co.il; `admin/server/modules/hashavshevetMoves.js`):*
+- Excel: כללי › ממשקים › יבוא תנועות הנה"ח › "יבוא מטבלת ODBC" › Excel Files. The sheet needs a header row, a **defined name on the data
+  range** (Hashavshevet lists the table by it; "NONAME" = missing), text cells for keys / references, numbers for amounts. The bookkeeper maps
+  the columns to Hashavshevet's fields once and saves the mapping. Our headers are the field names of Hashavshevet's staging table
+  `ImportJournal` (TransType, Reference, Reference2, DueDate = תאריך אסמכתא, ValueDate, Description, DebID1, DebsuF1, CredID1, CredsuF1,
+  DET2), the defined name is `jurnal`, a second sheet "הסבר" holds the steps. Checks on import (error codes Journal.001–055): 9-digit
+  references, existing accounts, debit = credit when both sides are given, valid dates.
+- movein.dat (the "short method" the bookkeeper already imports — ImportLog "ShortJournal", `C:\hash\rep\movein.dat`): fixed 90-character
+  records in cp1255 — debit key 1–8, credit key 9–16, reference 17–21 (5 digits: a 6-digit cheque number is refused), reference date ddmmyy
+  22–27, reference 2 28–32, value date 33–38, amount 39–50, currency 51–53, details 54–75, foreign amount 76–87, filler, CRLF.
+- The move itself = Hashavshevet's own storno of a cheque (seen in the copy): the cheque's entry again with a **negative amount** on both
+  sides — debit the supplier / employees card, credit the bank, reference = the cheque number, value date = the cancellation day (bounced:
+  the bank's return day), details "ביטול שיק N – לא נפרע" / "שיק N חזר מהבנק DD/MM". The import cannot set `cheque_id`: the cheques module
+  keeps listing the cheque until it is cancelled there too; the books are right after the import.
+
 **Rows dated before the period (2026-11-18, owner: "when I ask for 2026 it shows tons of data from 2025").** `tagOlder` in
 `shared/bankReconFilter.js` marks `older: true` on every open bank / book line dated before `from` and every open cheque whose
 cheque date is before `from` (still open as of `to`, so still in the summary) and sets `older` = `{ count, total, sections }`.

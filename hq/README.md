@@ -256,6 +256,11 @@ the matching rows, `filter.label`, `filtered[section]` = kept of all, and the su
 fixtures `f-bank-recon-filter-*`.
 **Only the period's rows** (owner 2026-11-18, "a report for 2026 showed tons of 2025 data"): the sections hold only the rows dated
 in the asked period; the older open rows are counted in the summary and named in one line, and "כולל תנועות ישנות" brings them back.
+**Old unpaid cheques — section 3ג and the Hashavshevet import file** (owner 2026-11-18): cheques not cleared more than 60 days after
+their date have their own section in the report. On the page, "בחירה" in a section shows a checkbox per row (select all, the filters
+apply); in 3ג each row has an action (בוטל / חזר מהבנק / להשאיר) and the buttons export a Hashavshevet import file with the cancellation
+moves (Excel with the defined name `jurnal`, or movein.dat) — the bookkeeper imports it in חשבשבת (כללי › ממשקים › יבוא תנועות הנה"ח). In
+the chat the report names the 3ג count and sum as work to do and points to the page; it never writes journal moves itself.
 **The card next to every line** (owner 2026-11-18): the admin's report gives every line the כרטסת (the Hashavshevet account) to book it
 on — from the books, an account with that name, the employees (one shared card, 450001 "עובד", found through the admin's employee tables,
 Priority's employees supplier or past journal entries; a person's name with no card at all is a guess to check), or the bank text's past matches.

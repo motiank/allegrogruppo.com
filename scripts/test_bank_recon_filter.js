@@ -56,7 +56,7 @@ test("parseFilter: kinds, sections, amount, refusals", () => {
   assert.match(filterLabel(f), /סוג: שיקים \/ העברות · ספק \/ מוטב: 500084 · סכום: 1,234.50 · סעיפים: 2 ספרים ללא בנק/);
   assert.equal(filterLabel(parseFilter({})), "");
   assert.equal(KINDS.length, 9);
-  assert.equal(SECTIONS.length, 5);
+  assert.equal(SECTIONS.length, 6);
 });
 
 const sample = () => ({

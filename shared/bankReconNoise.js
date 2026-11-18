@@ -71,16 +71,24 @@ const sumOf = (rows) => round2(rows.reduce((sum, x) => sum + Number(x.amount || 
 /**
  * Marks the noise rows (sections 1 and 2) and the to-handle rows (section 3ב) of the report, before any filter, and sets
  * `report.noise` = { staleDays, pairDays, count, total, sections: { bankOpen: { count, total }, bookOpen: … }, rules } and
- * `report.todo` = { count, total, sections: { chequesOpen: { count, total } }, rules }. Idempotent. Returns the report.
+ * `report.todo` = { count, total, sections: { chequesOpen: { count, total }[, chequesStale] }, rules }. Idempotent. Returns the report.
  */
 export function tagNoise(report, { staleDays = STALE_DAYS, pairDays = PAIR_DAYS } = {}) {
   for (const s of NOISE_SECTIONS) for (const x of report[s] || []) if (x.noise) delete x.noise;
-  for (const x of report.chequesOpen || []) {
-    delete x.todo;
-    if (x.status === "past_due" && Number(x.daysAfterDue) > staleDays) x.todo = { rule: "stale_cheque" };
+  // the stale cheques live in section 3ג (report.chequesStale, split off by bankRecon.js); a report built elsewhere may still
+  // carry them in chequesOpen — both arrays are tagged
+  const todoSections = {};
+  let stale = [];
+  for (const key of ["chequesOpen", "chequesStale"]) {
+    for (const x of report[key] || []) {
+      delete x.todo;
+      if (x.status === "past_due" && Number(x.daysAfterDue) > staleDays) x.todo = { rule: "stale_cheque" };
+    }
+    const rows = (report[key] || []).filter((x) => x.todo);
+    if (rows.length || key === "chequesOpen") todoSections[key] = { count: rows.length, total: sumOf(rows) };
+    stale = stale.concat(rows);
   }
-  const stale = (report.chequesOpen || []).filter((x) => x.todo);
-  report.todo = { staleDays, count: stale.length, total: sumOf(stale), sections: { chequesOpen: { count: stale.length, total: sumOf(stale) } }, rules: TODO_LABEL };
+  report.todo = { staleDays, count: stale.length, total: sumOf(stale), sections: todoSections, rules: TODO_LABEL };
   const bank = report.bankOpen || [];
   pairOpposites(bank, bankName, pairDays);
   pairOpposites(bank, bankRef, pairDays);

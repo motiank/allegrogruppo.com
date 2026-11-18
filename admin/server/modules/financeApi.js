@@ -3,7 +3,7 @@ import { createRequire } from "module";
 import { financeSql } from "../sources/financePool.js";
 import { executeSql } from "../sources/dbpool.js";
 import { localOnly, ApiError, badRequest, isIsoDate, laborDays, loadBranches } from "./localApi.js";
-import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts, bankReconFacets } from "./bankRecon.js";
+import { buildBankReconReport, renderBankReconXlsx, listBankReportAccounts, bankReconFacets, bankReconExport, parseExportBody } from "./bankRecon.js";
 import { renderBankReconHtml } from "../../../shared/bankReconHtml.js";
 import { addChequePayees, isChequeLine } from "./chequePayees.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
@@ -2253,6 +2253,16 @@ const Router = () => {
       res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(img.name)}`);
       res.setHeader("Cache-Control", "private, max-age=86400");
       return res.send(img.buffer);
+    } catch (err) { sendError(res, err); }
+  });
+  // the selection mode of the report page shown in Joya (its form posts to the relative "export" → Joya's
+  // /api/joya/finance/export → here): the chosen rows as Excel, or the Hashavshevet import file of section 3ג
+  router.post("/bank/report/export", async (req, res) => {
+    try {
+      const out = await bankReconExport(parseExportBody(req));
+      res.setHeader("Content-Type", out.contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(out.fileName)}"; filename*=UTF-8''${encodeURIComponent(out.fileName)}`);
+      return res.send(out.buffer);
     } catch (err) { sendError(res, err); }
   });
   router.get("/bank/report", async (req, res) => {

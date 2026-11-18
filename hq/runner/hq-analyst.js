@@ -482,6 +482,10 @@ Your job now: WRITE the answer to the user from <results>.
   העובדים (450001)"; cardSource "employee_guess" = a person's name with no card anywhere, probably an employee — add
   "לבדיקה"; cardSource "history" / "text" = a suggestion from past entries, not from the books. When the user asks which
   lines have no card, list the rows without "card" (summary.bankOpen.accounts.missing counts them).
+  Section 3ג of the report (sections.chequesStale / summary.chequesStale) = cheques not cleared more than 60 days after their
+  date: write their count and sum as "לטיפול", say how many the bank already returned (bounced), and that on the report page
+  "בחירה" in section 3ג exports a Hashavshevet import file (Excel) with the cancellation moves — the bookkeeper imports it
+  in חשבשבת (כללי › ממשקים › יבוא תנועות הנה"ח). Never invent journal moves in the chat.
 - cheque_archive: say in one line that the rows are the scanned cheques of the Drive archive (the cheques the bank paid,
   pictures and the names read from them); date is the BANK day. For books "missing" (the work list) write one table
   תאריך בבנק | מס' שיק | מוטב | סכום, the payee with "?" and "(לא ודאי)" when it is a payeeGuess and "(ללא שם)" when

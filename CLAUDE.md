@@ -244,6 +244,17 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   in `report.older`; filter `older=hide` drops them; the HTML page starts with them hidden behind a button, the Excel has a "לפני התקופה"
   column, Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`; planner rule). The summary always
   counts them. Tests `scripts/test_bank_recon_filter.js`, `test_bank_recon.js`.
+  **Section 3ג + Hashavshevet import file** (2026-11-18, owner: "the unpaid old cheques: a section 3ג of cheques over 60 days — cancelled (never
+  reached the beneficiary → delete) or rejected by the bank; export to Hashavshevet moves import Excel; checkboxes per row, select all, filters"):
+  the stale cheques (`todo.stale_cheque`) leave 3ב for `chequesStale` (`summary.chequesStale`, in the tie-out; `bounced` when an open "החזרת
+  שיק" bank line has the number and amount; `suggestedAction`); a cheque reversed by a plain journal entry counts as cancelled. Every section
+  has a selection mode ("בחירה": checkbox column, select all visible, count + sum, Excel of the chosen rows); 3ג exports the reversal moves
+  as Hashavshevet's import Excel (headers = its `ImportJournal` fields, defined name `jurnal`, text keys) or movein.dat (short method, cp1255,
+  5-digit references only) — `admin/server/modules/hashavshevetMoves.js`, `POST /admin/bank-recon/export`, Finance API `POST
+  /bank/report/export`, Joya `POST /api/joya/finance/export`. The move = Hashavshevet's own storno (negative amount on both sides, reference =
+  the cheque number); an import cannot set cheque_id, so the cheques module still lists the cheque until cancelled there. Format facts in
+  `finance_api_readme.md` → "What Hashavshevet imports". Tests `scripts/test_hashavshevet_moves.js` (no DB), `test_bank_recon.js`,
+  `test_bank_recon_filter.js`.
 - **System page in Joya HQ** (2026-11-18, owner: "a system option in the main menu which displays this data" — the last update date of the
   bank, Hashavshevet and the rest): `admin/server/modules/dataFreshness.js` → Local Data API `GET /system/freshness` (read only: the
   Hashavshevet copy — sync run, bank page, matches, journal, cheques, batches; the bank files; Tabit; Beecomm; the Drive indexes; the Priority

@@ -2,7 +2,9 @@
 // Read only. Three sections for one bank account and a date range, as of the range's end date:
 //   1. bank lines with no book match          (bank_lines open as of `to`)
 //   2. book lines with no bank match, cheques excluded (journal lines on the bank account, no bank_matches row)
-//   3. cheques: cleared in the period (paired to their bank line) and issued but not yet cleared
+//   3. cheques: cleared in the period (paired to their bank line), issued but not yet cleared (3ב), and not cleared more
+//      than 60 days after their date (3ג — the ones to cancel or re-issue; POST /export writes their reversal moves for
+//      Hashavshevet's import, hashavshevetMoves.js)
 // Summary: bank balance − (1) + (2) + (3b) = expected book balance; the rest is "unexplained".
 // Signs: money into the bank is plus on both sides (bank_lines.signed_amount; journal_lines.signed_amount is
 // debit-plus, and a debit on the bank account is money in).
@@ -14,6 +16,7 @@
 //       — the filters of shared/bankReconFilter.js: the sections keep only the matching rows, the summary stays whole
 //   GET /admin/bank-recon/facets?company=&account=&from=&to= → the kinds and the parties of the report, for the pickers
 //   GET /admin/bank-recon/cheque-image/:id                   → the scanned cheque (Drive archive, chequeArchive.js), for the 📷 links
+//   POST /admin/bank-recon/export                            → the chosen rows of a section as Excel, or the Hashavshevet import file (3ג)
 // Every row carries its card (כרטסת, owner 2026-11-18): counterAccount / counterName — the books' own on sections 2 and 3,
 // bankLineAccounts.js's on section 1 (counterSource books | name | employee | history | employee_guess | text, counterBasis
 // = why); counterEmployee = the one employees card (finance_map employees.account), colored blue on the pages.
@@ -26,7 +29,8 @@ import { ApiError, badRequest, isIsoDate } from "./localApi.js";
 import { today, daysBetween, financeErrorResponse } from "./financeApi.js";
 import { renderBankReconHtml, fmtDate, CHEQUE_STATUS_LABEL, SECTION_TITLES, payeeText } from "../../../shared/bankReconHtml.js";
 import { parseFilter, applyFilter, KIND_LABEL } from "../../../shared/bankReconFilter.js";
-import { NOISE_LABEL, TODO_LABEL } from "../../../shared/bankReconNoise.js";
+import { NOISE_LABEL, TODO_LABEL, STALE_DAYS } from "../../../shared/bankReconNoise.js";
+import { loadChequeEntries, reversalMoves, movesWorkbook, movesMovein, ACTIONS } from "./hashavshevetMoves.js";
 import { addChequePayees } from "./chequePayees.js";
 import { readChequeImage } from "./chequeArchive.js";
 import { addTransferEvents, fileAccountsOf } from "./bankEvents.js";
@@ -224,12 +228,34 @@ export async function buildBankReconReport(query = {}) {
     bankByChequeNo.get(k).push(r);
   }
 
+  // A cheque reversed by a plain journal entry (our export, imported in Hashavshevet — hashavshevetMoves.js: same reference,
+  // the same accounts with a negative amount, or the accounts swapped with a positive one, no cheque_id) is cancelled too,
+  // although Hashavshevet's cheques module does not know it: it must not stay open in 3ב / 3ג.
+  const unmatchedNos = [...new Set(chequeRows.filter((c) => !num(c.cancelled) && c.line_id != null && c.match_num == null).map((c) => String(c.cheque_no)))];
+  const reversedByEntry = new Set(); // "chequeNo|amount"
+  if (unmatchedNos.length) {
+    const p3 = { companyId: company.companyId, acc: accountKey };
+    const rlist = unmatchedNos.map((n, i) => ((p3[`r${i}`] = n), `:r${i}`)).join(",");
+    const rows = await financeSql(
+      `SELECT e.reference, e.amount, e.debit_account, e.credit_account, DATE_FORMAT(e.value_date, '%Y-%m-%d') AS d FROM journal_entries e
+        WHERE e.company_id = :companyId AND e.deleted_at IS NULL AND e.status = 1 AND (e.cheque_id IS NULL OR e.cheque_id = 0) AND e.reference IN (${rlist})
+          AND (e.credit_account = :acc OR e.debit_account = :acc)`,
+      p3,
+    );
+    for (const r of rows) {
+      // the storno: bank credited with a minus (both sides negative), or the bank debited with a plus
+      const a = num(r.amount);
+      if ((r.credit_account === accountKey && a < 0) || (r.debit_account === accountKey && a > 0)) reversedByEntry.add(`${r.reference}|${round2(Math.abs(a))}|${r.credit_account === accountKey ? r.debit_account : r.credit_account}`);
+    }
+  }
   const cheques = { cleared: [], open: [] };
   let cancelledCount = 0;
+  let reversedCount = 0;
   const chequeLineIds = new Set();
   for (const c of chequeRows) {
     if (num(c.cancelled)) { cancelledCount++; continue; }
     if (c.line_id == null) continue;
+    if (c.match_num == null && reversedByEntry.has(`${c.cheque_no}|${round2(Math.abs(num(c.amount_to_pay)))}|${c.account_key}`)) { reversedCount++; chequeLineIds.add(c.line_id); continue; }
     chequeLineIds.add(c.line_id);
     const amount = round2(c.signed_amount); // minus: money out
     const base = {
@@ -295,7 +321,19 @@ export async function buildBankReconReport(query = {}) {
   const bookEventStats = await addTransferEvents(bookOpen, { accounts: fileAccounts, date: (r) => r.date, amount: (r) => (r.amount < 0 && !r.chequeId ? -r.amount : null), name: (r) => r.counterName, transfer: () => true });
   for (const r of bookOpen) if (r.event) { r.payeeSource = r.payeeSource || "events"; r.kind = "transfer"; }
   const older = (rows) => rows.filter((x) => x.date < from);
-  const chequesOpen = cheques.open;
+  // Section 3ג (owner 2026-11-18): the cheques past their date by more than STALE_DAYS and not cleared, out of 3ב. Each one
+  // says whether the bank already shows it returned ("החזרת שיק" open line with the same number and amount → bounced) and the
+  // action the bookkeeper will most likely take (bounced → "חזר מהבנק", else "בוטל"); the export (POST /export) writes the moves.
+  const returnedByNo = new Map();
+  for (const b of bankOpen) if (/החזרת שיק/.test(String(b.details || "")) && b.amount > 0) returnedByNo.set(`${b.reference}|${round2(b.amount)}`, b);
+  const chequesStale = [];
+  const chequesOpen = [];
+  for (const x of cheques.open) {
+    if (x.status === "past_due" && Number(x.daysAfterDue) > STALE_DAYS) {
+      const ret = returnedByNo.get(`${x.chequeNo}|${round2(Math.abs(x.amount))}`) || null;
+      chequesStale.push({ ...x, bounced: ret ? { date: ret.date, bankLineId: ret.bankLineId } : null, suggestedAction: ret ? ACTIONS.bounced : ACTIONS.cancel });
+    } else chequesOpen.push(x);
+  }
   const pastDue = chequesOpen.filter((x) => x.status === "past_due");
   const notDue = chequesOpen.filter((x) => x.status === "not_due");
   const clearedUnmatched = chequesOpen.filter((x) => x.status === "cleared_unmatched");
@@ -324,10 +362,17 @@ export async function buildBankReconReport(query = {}) {
       clearedUnmatchedCount: clearedUnmatched.length, clearedUnmatchedTotal: sum(clearedUnmatched, (x) => x.amount),
     },
     bookFutureMatched: { count: bookFutureMatched.length, total: sum(bookFutureMatched, (x) => x.amount) },
+    // 3ג: not cleared more than STALE_DAYS after the cheque's date — part of the tie-out like 3ב (the books still carry them)
+    chequesStale: {
+      count: chequesStale.length, total: sum(chequesStale, (x) => x.amount), staleDays: STALE_DAYS,
+      bounced: chequesStale.filter((x) => x.bounced).length, bouncedTotal: sum(chequesStale.filter((x) => x.bounced), (x) => x.amount),
+      employees: chequesStale.filter((x) => x.counterEmployee).length,
+      buckets: { "61-120": chequesStale.filter((x) => x.daysAfterDue <= 120).length, "121-240": chequesStale.filter((x) => x.daysAfterDue > 120 && x.daysAfterDue <= 240).length, "241+": chequesStale.filter((x) => x.daysAfterDue > 240).length },
+    },
     chequesCleared: { count: chequesCleared.length, total: sum(chequesCleared, (x) => x.amount), groupOnly: chequesCleared.filter((x) => x.status === "cleared_group").length },
-    cancelledCheques: cancelledCount,
+    cancelledCheques: cancelledCount, reversedCheques: reversedCount,
   };
-  summary.expectedBookBalance = round2(bankBalance - summary.bankOpen.total + summary.bookOpen.total + summary.chequesOpen.total - summary.bookFutureMatched.total);
+  summary.expectedBookBalance = round2(bankBalance - summary.bankOpen.total + summary.bookOpen.total + summary.chequesOpen.total + summary.chequesStale.total - summary.bookFutureMatched.total);
   summary.unexplained = round2(bookBalance - summary.expectedBookBalance);
 
   const notes = [];
@@ -369,6 +414,9 @@ export async function buildBankReconReport(query = {}) {
   if (accountStats.error) notes.push(`הכרטסות של תנועות הבנק לא נשלפו הפעם (${accountStats.error}).`);
   if (accountStats.adminError) notes.push(`רשימת העובדים באדמין לא נקראה הפעם (${accountStats.adminError}); זיהוי העובדים נעשה לפי פריוריטי ופקודות היומן בלבד.`);
   if (cancelledCount) notes.push(`${cancelledCount} צ'קים מבוטלים (יש להם רישום הפוך) אינם מופיעים בסעיף 3.`);
+  if (reversedCount) notes.push(`${reversedCount} צ'קים בוטלו בפקודת יומן (תנועת ביטול שיובאה לחשבשבת, לא במודול הצ'קים) ואינם מופיעים בסעיף 3; כדי שייעלמו גם מרשימת הצ'קים של חשבשבת יש לבטלם במודול הצ'קים.`);
+  if (chequesStale.length)
+    notes.push(`סעיף 3ג: ${chequesStale.length} צ'קים שמועדם עבר לפני יותר מ-${STALE_DAYS} יום ולא נפרעו, סכום ${summary.chequesStale.total.toLocaleString("he-IL", { minimumFractionDigits: 2 })} ₪${summary.chequesStale.bounced ? ` (${summary.chequesStale.bounced} מהם חזרו מהבנק – שורת "החזרת שיק" בסעיף 1)` : ""}. בוחרים שורות בכפתור "בחירה", קובעים פעולה (בוטל / חזר מהבנק) ומייצאים קובץ ייבוא לחשבשבת.`);
   if (summary.chequesCleared.groupOnly) notes.push(`${summary.chequesCleared.groupOnly} צ'קים הותאמו בחשבשבת בתוך קבוצת התאמה גדולה ולא נמצאה שורת בנק עם אותו מספר צ'ק ואותו סכום; מוצג תאריך ההתאמה או שורת הבנק היחידה בקבוצה.`);
   if (clearedUnmatched.length) notes.push(`${clearedUnmatched.length} צ'קים כבר נפרעו בבנק (לפי מספר הצ'ק והסכום) אבל עדיין לא הותאמו בחשבשבת; הם נספרים כצ'קים פתוחים עד להתאמה.`);
   if (chqStart?.d && bank.from && day(chqStart.d) > bank.from)
@@ -381,7 +429,7 @@ export async function buildBankReconReport(query = {}) {
     company: { code: company.code, name: company.name }, account: { key: accountKey, name: bank.name }, from, to,
     dataUpTo: bank.dataUpTo, lastSync: sync?.t ? String(sync.t).slice(0, 19) : null, generatedAt: new Date().toISOString().slice(0, 19).replace("T", " "),
     employees: employees ? { account: employees.account, name: accountNames.get(employees.account)?.name || null } : null,
-    summary, notes, bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen,
+    summary, notes, bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen, chequesStale,
   }, filter);
 }
 
@@ -450,6 +498,7 @@ export async function renderBankReconXlsx(r) {
   add(`פחות: תנועות בנק ללא התאמה בספרים (סעיף 1) – ${s.bankOpen.count} תנועות`, -s.bankOpen.total);
   add(`ועוד: תנועות ספרים ללא התאמה בבנק (סעיף 2) – ${s.bookOpen.count} תנועות`, s.bookOpen.total);
   add(`ועוד: צ'קים שהונפקו וטרם נפרעו (סעיף 3ב) – ${s.chequesOpen.count} צ'קים`, s.chequesOpen.total);
+  if (s.chequesStale) add(`ועוד: צ'קים שלא נפרעו מעל ${s.chequesStale.staleDays} יום (סעיף 3ג) – ${s.chequesStale.count} צ'קים${s.chequesStale.bounced ? `, ${s.chequesStale.bounced} חזרו מהבנק` : ""}`, s.chequesStale.total);
   add(`   מתוכם – מועד הפירעון עבר (${s.chequesOpen.pastDueCount})`, s.chequesOpen.pastDueTotal);
   add(`   מתוכם – טרם הגיע מועד הפירעון (${s.chequesOpen.notDueCount})`, s.chequesOpen.notDueTotal);
   if (s.chequesOpen.clearedUnmatchedCount) add(`   מתוכם – נפרעו בבנק אך טרם הותאמו (${s.chequesOpen.clearedUnmatchedCount})`, s.chequesOpen.clearedUnmatchedTotal);
@@ -514,7 +563,115 @@ export async function renderBankReconXlsx(r) {
     { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) },
     { header: "נמצא בבנק בתאריך", key: "clearedDate", date: true, width: 14 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status },
   olderCol, noiseCol], r.chequesOpen, 'סה"כ', tot("chequesOpen"));
+  if (r.chequesStale?.length || r.summary.chequesStale)
+    sheet(wb, "3ג צ'קים ישנים", staleColumns(cardCols, olderCol), r.chequesStale || [], 'סה"כ', tot("chequesStale"));
   return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+const ACTION_HE = { cancel: "בוטל – לא הגיע למוטב", bounced: "חזר מהבנק", keep: "להשאיר" };
+const staleColumns = (cardCols, olderCol) => [
+  { header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, ...cardCols(false), { header: "תאריך רישום", key: "issueDate", date: true, width: 12 },
+  { header: "תאריך הצ'ק", key: "dueDate", date: true, width: 12 }, { header: "סכום", key: "amount", money: true, width: 16 },
+  { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10 }, { header: "חזר בבנק", key: "bounced", date: true, width: 12, get: (x) => x.bounced?.date || null },
+  { header: "פעולה מוצעת", key: "suggestedAction", width: 20, get: (x) => ACTION_HE[x.suggestedAction] || null }, { header: "מס' תנועה", key: "transId", width: 10 },
+  olderCol,
+];
+
+/**
+ * The Excel of chosen rows of one section (the selection mode of the page): the section's own columns. `ids` = bankLineId /
+ * lineId / chequeId of the rows to keep (strings or numbers); an empty list = the whole section.
+ */
+export async function renderSectionXlsx(r, section, ids = []) {
+  const ID_OF = { bankOpen: (x) => x.bankLineId, bookOpen: (x) => x.lineId, bookFutureMatched: (x) => x.lineId, chequesCleared: (x) => x.chequeId, chequesOpen: (x) => x.chequeId, chequesStale: (x) => x.chequeId };
+  if (!ID_OF[section]) throw badRequest(`unknown section ${section}`);
+  const want = new Set((ids || []).map(String));
+  const rows = (r[section] || []).filter((x) => !want.size || want.has(String(ID_OF[section](x))));
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Allegro admin";
+  const cols = sectionColumns(section);
+  sheet(wb, SECTION_SHEET[section], cols, rows, 'סה"כ', sum(rows, (x) => x.amount));
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+const SECTION_SHEET = { bankOpen: "1 בנק ללא ספרים", bookOpen: "2 ספרים ללא בנק", bookFutureMatched: "2ב ספרים בתאריך מאוחר", chequesCleared: "3א צ'קים שנפרעו", chequesOpen: "3ב צ'קים פתוחים", chequesStale: "3ג צ'קים ישנים" };
+function sectionColumns(section) {
+  const kindCol = { header: "סוג", key: "kind", width: 14, get: (x) => KIND_LABEL[x.kind] || x.kind || null };
+  const noiseCol = { header: "רעש / לטיפול", key: "noise", width: 40, get: (x) => (x.noise ? `רעש: ${NOISE_LABEL[x.noise.rule] || x.noise.rule}` : x.todo ? `לטיפול: ${TODO_LABEL[x.todo.rule] || x.todo.rule}` : null) };
+  const olderCol = { header: "לפני התקופה", key: "older", width: 12, get: (x) => (x.older ? "כן" : null) };
+  const cardFill = (x) => (x.counterEmployee ? (x.counterSource === "employee_guess" ? "FFEAF3FF" : "FFD6E9FF") : null);
+  const cardCols = (withSource) => [
+    { header: "כרטסת", key: "counterAccount", width: 10, fill: cardFill }, { header: "שם הכרטסת", key: "counterName", width: 24, fill: cardFill },
+    ...(withSource ? [{ header: "מקור הכרטסת", key: "counterSource", width: 44, get: (x) => (x.counterSource ? `${ACCOUNT_SOURCE_LABEL[x.counterSource] || x.counterSource}${x.counterBasis ? ` – ${x.counterBasis}` : ""}` : null) }] : []),
+  ];
+  const date = (header, key, width = 12) => ({ header, key, date: true, width });
+  switch (section) {
+    case "bankOpen": return [date("תאריך", "date"), { header: "אסמכתא", key: "reference", width: 14 }, { header: "פרטים", key: "details", width: 28 }, kindCol, { header: "מוטב", key: "payee", width: 30, get: (x) => payeeText(x) || null }, ...cardCols(true), { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים", key: "ageDays", width: 8 }, { header: "מזהה שורה", key: "bankLineId", width: 10 }, olderCol, noiseCol];
+    case "bookOpen":
+    case "bookFutureMatched": return [date("תאריך", "date"), { header: "אסמכתא", key: "reference", width: 14 }, kindCol, { header: "פרטים", key: "description", width: 30 }, { header: "חשבון נגדי", key: "counterAccount", width: 12, fill: cardFill }, { header: "שם חשבון נגדי", key: "counterName", width: 26, fill: cardFill }, { header: "סכום", key: "amount", money: true, width: 16 }, { header: "מנה", key: "batch", width: 8 }, { header: "מס' תנועה", key: "transId", width: 10 }, olderCol, noiseCol];
+    case "chequesCleared": return [{ header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, ...cardCols(false), date("תאריך רישום", "issueDate"), date("תאריך הצ'ק", "dueDate"), { header: "סכום הצ'ק", key: "amount", money: true, width: 16 }, date("נפרע בבנק", "clearedDate"), { header: "סכום בבנק", key: "bankAmount", money: true, width: 16 }, { header: "אסמכתא בבנק", key: "bankReference", width: 12 }, { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status }];
+    case "chequesOpen": return [{ header: "מס' צ'ק", key: "chequeNo", width: 10 }, { header: "מוטב", key: "payee", width: 28 }, ...cardCols(false), date("תאריך רישום", "issueDate"), date("תאריך הצ'ק", "dueDate"), { header: "סכום", key: "amount", money: true, width: 16 }, { header: "ימים מתאריך הצ'ק", key: "daysAfterDue", width: 10, get: (x) => (x.daysAfterDue > 0 ? x.daysAfterDue : null) }, date("נמצא בבנק בתאריך", "clearedDate", 14), { header: "סטטוס", key: "status", width: 30, get: (x) => CHEQUE_STATUS_LABEL[x.status] || x.status }, olderCol, noiseCol];
+    case "chequesStale": return staleColumns(cardCols, olderCol);
+    default: throw badRequest(`unknown section ${section}`);
+  }
+}
+
+/**
+ * The Hashavshevet import file of the chosen stale cheques (hashavshevetMoves.js): `actions` = { chequeId: { action, date } },
+ * format "xlsx" (the Excel with the defined name) or "movein" (movein.dat, short method). The cheques must be in the report's
+ * section 3ג (the ids are checked against it — nothing else can be reversed from here).
+ * @returns {Promise<{ buffer: Buffer, fileName: string, contentType: string, moves: number, skipped: Array }>}
+ */
+export async function renderChequeReversals(query, { ids = [], actions = {}, format = "xlsx", date = null } = {}) {
+  if (!["xlsx", "movein"].includes(format)) throw badRequest("format must be xlsx or movein");
+  const report = await buildBankReconReport({ ...query, sections: undefined, kind: undefined, party: undefined, q: undefined, amount: undefined, noise: undefined, older: undefined });
+  const stale = new Map((report.chequesStale || []).map((x) => [String(x.chequeId), x]));
+  const chosen = [...new Set((ids || []).map(String))].filter((id) => stale.has(id));
+  if (!chosen.length) throw badRequest("no cheques of section 3ג were chosen");
+  const { company } = await resolveParams(query);
+  const entries = await loadChequeEntries(company.companyId, chosen.map(Number));
+  const todayIso = today();
+  const acts = {};
+  for (const id of chosen) {
+    const a = actions?.[id] || {};
+    const x = stale.get(id);
+    const action = a.action || x.suggestedAction || ACTIONS.cancel;
+    const d = isIsoDate(a.date) ? a.date : action === ACTIONS.bounced && x.bounced?.date ? x.bounced.date : isIsoDate(date) ? date : todayIso;
+    acts[id] = { action, date: d };
+  }
+  const { moves, skipped } = reversalMoves([...entries.values()], acts, { today: todayIso });
+  for (const id of chosen) if (!entries.has(Number(id))) skipped.push({ chequeId: Number(id), reason: "no journal entry found for this cheque" });
+  if (!moves.length) throw badRequest(`nothing to export: ${skipped.map((s) => `${s.chequeId}: ${s.reason}`).join("; ")}`);
+  const stem = `hashavshevet_cheque_reversals_${report.account.key}_${todayIso}`;
+  if (format === "movein") return { buffer: movesMovein(moves), fileName: "movein.dat", contentType: "application/octet-stream", moves: moves.length, skipped };
+  return { buffer: await movesWorkbook(moves, { company: report.company.name || report.company.code, account: report.account.key, today: todayIso }), fileName: `${stem}.xlsx`, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", moves: moves.length, skipped };
+}
+
+// ── export of chosen rows ────────────────────────────────────────────────
+
+/** The export request: a JSON body, or a form field `payload` holding the JSON (the page's hidden form). */
+export function parseExportBody(req) {
+  let body = req.body;
+  if (body && typeof body.payload === "string") {
+    try { body = JSON.parse(body.payload); } catch { throw badRequest("payload is not valid JSON"); }
+  }
+  if (!body || typeof body !== "object") throw badRequest("a JSON body is required");
+  return body;
+}
+
+/**
+ * { company, account, from, to, kind: "rows" | "hashavshevet", section, ids, format, actions, date } →
+ * { buffer, fileName, contentType[, skipped] }. "rows" = the chosen rows of `section` with that section's Excel columns;
+ * "hashavshevet" = the reversal moves of the chosen 3ג cheques (xlsx or movein).
+ */
+export async function bankReconExport(body) {
+  const kind = String(body.kind || "rows");
+  const query = { company: body.company, account: body.account, from: body.from, to: body.to };
+  const ids = Array.isArray(body.ids) ? body.ids : [];
+  if (kind === "hashavshevet") return renderChequeReversals(query, { ids, actions: body.actions || {}, format: body.format || "xlsx", date: body.date || null });
+  if (kind !== "rows") throw badRequest("kind must be rows or hashavshevet");
+  const section = String(body.section || "");
+  const report = await buildBankReconReport(query);
+  const buffer = await renderSectionXlsx(report, section, ids);
+  return { buffer, fileName: `${fileStem(report)}_${section}${ids.length ? "_selected" : ""}.xlsx`, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
 }
 
 // ── router ───────────────────────────────────────────────────────────────
@@ -552,6 +709,20 @@ export function Router() {
       res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(img.name)}`);
       res.setHeader("Cache-Control", "private, max-age=86400");
       return res.send(img.buffer);
+    } catch (err) { fail(res, err); }
+  });
+
+  // the selection mode of the page (owner 2026-11-18): the chosen rows of a section as Excel, or — section 3ג — the Hashavshevet
+  // import file of the cheques' reversals. The page posts a form with one field `payload` (JSON) to the relative "export", so
+  // the same HTML works under /admin/bank-recon and under Joya's /api/joya/finance/bank-recon
+  router.post("/export", async (req, res) => {
+    try {
+      const body = parseExportBody(req);
+      const out = await bankReconExport(body);
+      res.setHeader("Content-Type", out.contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(out.fileName)}"; filename*=UTF-8''${encodeURIComponent(out.fileName)}`);
+      if (out.skipped?.length) res.setHeader("X-Skipped", encodeURIComponent(JSON.stringify(out.skipped)));
+      return res.send(out.buffer);
     } catch (err) { fail(res, err); }
   });
 

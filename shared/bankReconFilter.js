@@ -11,7 +11,7 @@
 //   party=<account key | name> the supplier / payee: the counter account key, or a part of the name
 //   q=<text>                   a text in any column (details, payee, description, counter account, references)
 //   amount=<number>            the exact amount (either sign, ±0.01)
-//   sections=bankOpen,…        only these sections (bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen)
+//   sections=bankOpen,…        only these sections (bankOpen, bookOpen, bookFutureMatched, chequesCleared, chequesOpen, chequesStale)
 //   noise=hide                 without the noise rows (shared/bankReconNoise.js: de facto cancelled cheques, reversal pairs)
 //   older=hide                 without the rows dated before `from` (open items of earlier years that are still open as of
 //                              `to`; every such row carries older: true and report.older counts them — owner 2026-11-18:
@@ -32,8 +32,8 @@ export const KINDS = [
 export const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.kind, k.label]));
 import { tagNoise } from "./bankReconNoise.js";
 
-export const SECTIONS = ["bankOpen", "bookOpen", "bookFutureMatched", "chequesCleared", "chequesOpen"];
-const SECTION_LABEL = { bankOpen: "1 בנק ללא ספרים", bookOpen: "2 ספרים ללא בנק", bookFutureMatched: "2ב", chequesCleared: "3א צ'קים שנפרעו", chequesOpen: "3ב צ'קים פתוחים" };
+export const SECTIONS = ["bankOpen", "bookOpen", "bookFutureMatched", "chequesCleared", "chequesOpen", "chequesStale"];
+const SECTION_LABEL = { bankOpen: "1 בנק ללא ספרים", bookOpen: "2 ספרים ללא בנק", bookFutureMatched: "2ב", chequesCleared: "3א צ'קים שנפרעו", chequesOpen: "3ב צ'קים פתוחים", chequesStale: "3ג צ'קים ישנים" };
 
 // ── text rules ───────────────────────────────────────────────────────────
 // Hebrew has no \b: the rules anchor on the start of the text or use plain substrings.
@@ -105,6 +105,7 @@ const PARTY_OF = {
   bookFutureMatched: (x) => ({ name: x.counterName || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: null, text: x.description }),
   chequesCleared: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: null }),
   chequesOpen: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: null }),
+  chequesStale: (x) => ({ name: x.payee || null, key: x.counterAccount ? String(x.counterAccount) : null, keyName: x.counterName || null, text: null }),
 };
 const KIND_OF = {
   bankOpen: (x) => bankKind(x.details, x.amount),
@@ -112,6 +113,7 @@ const KIND_OF = {
   bookFutureMatched: bookKind,
   chequesCleared: () => "cheque",
   chequesOpen: () => "cheque",
+  chequesStale: () => "cheque",
 };
 
 /** Adds `kind` (and keeps the party fields as they are) to every row of every section. Returns the report. */
@@ -197,7 +199,7 @@ const sumOf = (rows) => round2(rows.reduce((a, r) => a + (Number(r.amount) || 0)
 
 // the rows dated before the period: open bank / book lines by their date, open cheques by the cheque's date — still open
 // as of `to`, counted in the summary, but not what a report "for 2026" is asked for
-const OLDER_DATE = { bankOpen: (x) => x.date, bookOpen: (x) => x.date, chequesOpen: (x) => x.dueDate };
+const OLDER_DATE = { bankOpen: (x) => x.date, bookOpen: (x) => x.date, chequesOpen: (x) => x.dueDate, chequesStale: (x) => x.dueDate };
 /** Marks `older: true` on every row dated before report.from and sets report.older = { count, total, sections }. Idempotent. */
 export function tagOlder(report) {
   const from = report.from ? String(report.from) : null;
@@ -205,7 +207,8 @@ export function tagOlder(report) {
   let count = 0;
   let total = 0;
   for (const s of Object.keys(OLDER_DATE)) {
-    const rows = report[s] || [];
+    if (!Array.isArray(report[s])) continue; // a report without section 3ג (older callers, tests) has no entry for it
+    const rows = report[s];
     for (const x of rows) {
       const d = OLDER_DATE[s](x);
       if (from && d && String(d) < from) x.older = true; else delete x.older;

@@ -31,7 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
-import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeChequeImage, systemFreshness } from './services/source.js';
+import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeBankReportExport, financeChequeImage, systemFreshness } from './services/source.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -237,6 +237,22 @@ r.get(
 
 // the scanned cheque behind a 📷 link of the report (the HTML's relative "cheque-image/<id>" lands here): streamed from the
 // admin's Finance API, which reads the Drive archive with the invoice agent's login — the Joya user needs no Drive access
+// the report page's selection mode posts its export to the relative "export" — next to /joya/finance/bank-recon that is
+// /joya/finance/export (owner 2026-11-18): the chosen rows as Excel, or the Hashavshevet import file of section 3ג (the
+// cheques' reversal moves). The admin builds the file; Joya passes it through. The page posts a form field `payload` (JSON).
+r.post(
+  '/joya/finance/export',
+  requireAdmin,
+  h(async (req, res) => {
+    let body = req.body || {};
+    if (typeof body.payload === 'string') { try { body = JSON.parse(body.payload); } catch { throw Object.assign(new Error('payload is not valid JSON'), { code: 'BAD_REQUEST' }); } }
+    const file = await financeBankReportExport(body);
+    res.setHeader('Content-Type', file.headers['content-type'] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    res.send(file.buffer);
+  }),
+);
+
 r.get(
   '/joya/finance/cheque-image/:id',
   requireAdmin,

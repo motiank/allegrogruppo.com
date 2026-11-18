@@ -210,7 +210,7 @@ const BankRecon = () => {
         {bank && <span style={styles.hint}>נתוני הבנק בחשבשבת: {bank.from} עד {bank.dataUpTo} ({bank.lines} תנועות)</span>}
       </div>
       {error && <div style={styles.error}>{String(error)}</div>}
-      {report && <div ref={reportRef} style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report, { imageHref: chequeImageHref }) }} />}
+      {report && <div ref={reportRef} style={styles.report} dangerouslySetInnerHTML={{ __html: renderBankReconBody(report, { imageHref: chequeImageHref, exportHref: "/admin/bank-recon/export" }) }} />}
       {!report && !error && !loading && <p style={styles.hint}>בחר חשבון ותקופה ולחץ "הצג דוח". הדוח נבנה מספרי חשבשבת (allegro_finance) לקריאה בלבד.</p>}
     </div>
   );

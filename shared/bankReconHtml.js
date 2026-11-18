@@ -42,6 +42,9 @@ const money = (n, { strong = false } = {}) => {
 // a column with a filter icon (the page's script, bankReconBehavior, opens a Google-Sheets-like panel on it)
 const fth = (label) => `<th data-filter="1">${label}</th>`;
 const cell = (s, cls = "") => `<td${cls ? ` class="${cls}"` : ""}>${esc(s)}</td>`;
+// the selection column (hidden until the section's "בחירה" button is pressed — bankReconBehavior)
+const SEL_TH = `<th class="sel"><input type="checkbox" class="sel-all" aria-label="בחר הכל"></th>`;
+const selTd = (id) => `<td class="sel"><input type="checkbox" class="pick" value="${esc(id ?? "")}" aria-label="בחר שורה"></td>`;
 
 export const CHEQUE_STATUS_LABEL = {
   cleared: "נפרע",
@@ -57,6 +60,7 @@ const SECTION_TITLES = {
   bookFuture: "2ב. תנועות ספרים בתאריך מאוחר שכבר הותאמו לבנק",
   chequesCleared: "3א. פירעון צ'קים – צ'קים שנפרעו בבנק",
   chequesOpen: "3ב. צ'קים שהונפקו וטרם נפרעו",
+  chequesStale: "3ג. צ'קים שלא נפרעו מעל 60 יום – לטיפול",
 };
 
 export const CSS = `
@@ -120,6 +124,22 @@ export const CSS = `
 .bank-recon td.acc-emp,.bank-recon .acc-emp.legend{background:#d6e9ff;color:#0b3d91}
 .bank-recon td.acc-emp.acc-guess,.bank-recon .acc-guess.legend{background:#eaf3ff;font-style:italic}
 .bank-recon .legend{padding:0 5px;border-radius:3px}
+.bank-recon th.sel,.bank-recon td.sel{display:none}
+.bank-recon table.selecting th.sel,.bank-recon table.selecting td.sel{display:table-cell;width:1.8em;text-align:center;padding:2px}
+.bank-recon table.selecting tr.picked td{background:#fffde7}
+.bank-recon .sel-btn{font:inherit;font-size:12px;font-weight:400;margin-right:10px;padding:2px 10px;border:1px solid #888;border-radius:4px;background:#fff;color:#333;cursor:pointer;vertical-align:middle}
+.bank-recon .sel-btn.on{background:#1a73e8;border-color:#1a73e8;color:#fff}
+.bank-recon .selbar{display:none;background:#eef6ff;border:1px solid #a9c4f5;border-radius:4px;padding:6px 10px;margin:4px 0 6px;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:12px}
+.bank-recon table.selecting + .selbar,.bank-recon .selbar.show{display:flex}
+.bank-recon .selbar button{font:inherit;font-size:12px;padding:3px 10px;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer}
+.bank-recon .selbar button.main{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:700}
+.bank-recon .selbar button:disabled{opacity:.5;cursor:default}
+.bank-recon .selbar input[type=date]{font:inherit;font-size:12px;padding:2px 4px}
+.bank-recon .selbar .cnt{font-weight:700}
+.bank-recon .selbar .msg{color:#b00020;flex-basis:100%}
+.bank-recon select.act{font:inherit;font-size:12px;padding:1px 2px;max-width:170px}
+.bank-recon td.bounced{color:#b00020;font-weight:700}
+@media print{.bank-recon .sel-btn,.bank-recon .selbar,.bank-recon th.sel,.bank-recon td.sel{display:none !important}}
 .bank-recon a.chq-img{text-decoration:none;font-size:12px;margin-right:4px;cursor:zoom-in}
 .chq-modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px;direction:rtl}
 .chq-modal .chq-box{position:relative;background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);max-width:min(96vw,1400px);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
@@ -160,7 +180,7 @@ function notes(r) {
   return `<div class="notes"><b>הערות</b><ul>${r.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></div>`;
 }
 
-const SECTION_SHORT = { bankOpen: "סעיף 1", bookOpen: "סעיף 2", bookFutureMatched: "סעיף 2ב", chequesCleared: "סעיף 3א", chequesOpen: "סעיף 3ב" };
+const SECTION_SHORT = { bankOpen: "סעיף 1", bookOpen: "סעיף 2", bookFutureMatched: "סעיף 2ב", chequesCleared: "סעיף 3א", chequesOpen: "סעיף 3ב", chequesStale: "סעיף 3ג" };
 
 // the active filter (kind / party / text / amount / sections) and what it kept of each section
 function filterBox(r) {
@@ -189,7 +209,8 @@ const todoClass = (x) => (x.todo ? " todo" : "");
 function todoBox(r) {
   const n = r.todo;
   if (!n?.count) return "";
-  return `<div class="todobox"><b>לטיפול:</b> ${fmtInt(n.count)} צ'קים שמועדם עבר לפני יותר מ-${n.staleDays} יום ולא נפרעו, סכום ${fmtMoney(n.total)} (סעיף 3ב, מסומנים "לטיפול")<span class="rules">${esc(TODO_LABEL.stale_cheque)}. הם אינם רעש ואינם מוסתרים.</span></div>`;
+  const where = r.chequesStale ? 'סעיף 3ג' : 'סעיף 3ב, מסומנים "לטיפול"';
+  return `<div class="todobox"><b>לטיפול:</b> ${fmtInt(n.count)} צ'קים שמועדם עבר לפני יותר מ-${n.staleDays} יום ולא נפרעו, סכום ${fmtMoney(n.total)} (${where})<span class="rules">${esc(TODO_LABEL.stale_cheque)}. הם אינם רעש ואינם מוסתרים.${r.chequesStale ? ' בסעיף 3ג: "בחירה" → מסמנים שורות, קובעים פעולה (בוטל / חזר מהבנק) ומייצאים קובץ ייבוא לחשבשבת.' : ""}</span></div>`;
 }
 const kindCell = (x) => `<td>${esc(KIND_LABEL[x.kind] || x.kind || "")}${noiseBadge(x)}</td>`;
 
@@ -232,6 +253,8 @@ function summary(r) {
     ${line("ועוד: צ'קים שהונפקו וטרם נפרעו (סעיף 3ב)", s.chequesOpen.total, { count: s.chequesOpen.count })}
     ${line("מתוכם – מועד הפירעון עבר", s.chequesOpen.pastDueTotal, { count: s.chequesOpen.pastDueCount, cls: "sub" })}
     ${line("מתוכם – טרם הגיע מועד הפירעון", s.chequesOpen.notDueTotal, { count: s.chequesOpen.notDueCount, cls: "sub" })}
+    ${s.chequesStale ? line(`ועוד: צ'קים שלא נפרעו מעל ${s.chequesStale.staleDays || 60} יום – לטיפול (סעיף 3ג)`, s.chequesStale.total, { count: s.chequesStale.count }) : ""}
+    ${s.chequesStale?.bounced ? line("מתוכם – חזרו מהבנק (שורת החזרת שיק בסעיף 1)", s.chequesStale.bouncedTotal, { count: s.chequesStale.bounced, cls: "sub" }) : ""}
     ${s.chequesOpen.clearedUnmatchedCount ? line("מתוכם – נפרעו בבנק אך טרם הותאמו בספרים", s.chequesOpen.clearedUnmatchedTotal, { count: s.chequesOpen.clearedUnmatchedCount, cls: "sub" }) : ""}
     ${s.bookFutureMatched?.count ? line(`פחות: תנועות ספרים בתאריך מאוחר מ-${fmtDate(r.to)} שכבר הותאמו לבנק (סעיף 2ב)`, -s.bookFutureMatched.total, { count: s.bookFutureMatched.count }) : ""}
     ${line("= יתרה צפויה בספרים", s.expectedBookBalance, { strong: true, cls: "total" })}
@@ -287,15 +310,15 @@ function bankOpenTable(r, opts) {
   if (!rows.length) return omittedSection(r, "bankOpen") || `<h2>${SECTION_TITLES.bankOpen}</h2><div class="empty">אין תנועות בנק פתוחות${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.bankOpen}</h2>
-<table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("סוג")}${fth("מוטב")}${fth("כרטסת")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
+<table data-section="bankOpen">
+  <thead><tr>${SEL_TH}<th>תאריך</th><th>אסמכתא</th>${fth("פרטים")}${fth("סוג")}${fth("מוטב")}${fth("כרטסת")}<th class="num">סכום</th><th class="num">ימים</th><th>שנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
-        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${payeeCell(x, opts)}${accountCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
+        (x) => `<tr class="${olderClass(x, r.from)}${noiseClass(x)}" data-id="${esc(x.bankLineId)}">${selTd(x.bankLineId)}${cell(fmtDate(x.date))}${cell(x.reference)}${cell(x.details)}${kindCell(x)}${payeeCell(x, opts)}${accountCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.year)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="6">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
+    <tr class="total"><td colspan="7">${totalText(r, "bankOpen", "תנועות")}</td>${money(totalOf(r, "bankOpen"))}<td></td><td></td></tr>
   </tbody>
 </table>`;
 }
@@ -305,16 +328,16 @@ function bookOpenTable(r) {
   if (!rows.length) return omittedSection(r, "bookOpen") || `<h2>${SECTION_TITLES.bookOpen}</h2><div class="empty">אין תנועות ספרים פתוחות (ללא צ'קים)${r.filter?.active ? " שעוברות את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.bookOpen}</h2>
-<table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th class="num">ימים</th><th>מנה</th><th>סטטוס</th></tr></thead>
+<table data-section="bookOpen">
+  <thead><tr>${SEL_TH}<th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th class="num">ימים</th><th>מנה</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr class="${olderClass(x, r.from)}${noiseClass(x)}">${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
+          `<tr class="${olderClass(x, r.from)}${noiseClass(x)}" data-id="${esc(x.lineId)}">${selTd(x.lineId)}${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.ageDays, "num")}${cell(x.batch)}${cell(x.posted ? "" : "לא נקלט")}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">${totalText(r, "bookOpen", "תנועות")}</td>${money(totalOf(r, "bookOpen"))}<td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="6">${totalText(r, "bookOpen", "תנועות")}</td>${money(totalOf(r, "bookOpen"))}<td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
@@ -324,16 +347,16 @@ function bookFutureTable(r) {
   if (!rows.length) return r.filtered?.sections?.bookFutureMatched?.of ? omittedSection(r, "bookFutureMatched") || "" : "";
   return `
 <h2>${SECTION_TITLES.bookFuture}</h2>
-<table>
-  <thead><tr><th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th>מנה</th></tr></thead>
+<table data-section="bookFutureMatched">
+  <thead><tr>${SEL_TH}<th>תאריך</th><th>אסמכתא</th>${fth("סוג")}${fth("פרטים")}${fth("חשבון נגדי")}<th class="num">סכום</th><th>מנה</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.batch)}</tr>`,
+          `<tr data-id="${esc(x.lineId)}">${selTd(x.lineId)}${cell(fmtDate(x.date))}${cell(x.reference)}${kindCell(x)}${cell(x.description)}${counterCell(x)}${money(x.amount)}${cell(x.batch)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">${totalText(r, "bookFutureMatched", "תנועות")}</td>${money(totalOf(r, "bookFutureMatched"))}<td></td></tr>
+    <tr class="total"><td colspan="6">${totalText(r, "bookFutureMatched", "תנועות")}</td>${money(totalOf(r, "bookFutureMatched"))}<td></td></tr>
   </tbody>
 </table>`;
 }
@@ -343,16 +366,16 @@ function chequesClearedTable(r) {
   if (!rows.length) return omittedSection(r, "chequesCleared") || `<h2>${SECTION_TITLES.chequesCleared}</h2><div class="empty">לא נפרעו צ'קים בתקופה${r.filter?.active ? " שעוברים את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.chequesCleared}</h2>
-<table>
-  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום הצ'ק</th><th>נפרע בבנק</th><th class="num">סכום בבנק</th><th>אסמכתא בבנק</th><th class="num">ימים מתאריך הצ'ק</th><th>סטטוס</th></tr></thead>
+<table data-section="chequesCleared">
+  <thead><tr>${SEL_TH}<th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום הצ'ק</th><th>נפרע בבנק</th><th class="num">סכום בבנק</th><th>אסמכתא בבנק</th><th class="num">ימים מתאריך הצ'ק</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr>${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(fmtDate(x.clearedDate))}${money(x.bankAmount)}${cell(x.bankReference)}${cell(x.daysAfterDue, "num")}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
+          `<tr data-id="${esc(x.chequeId)}">${selTd(x.chequeId)}${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(fmtDate(x.clearedDate))}${money(x.bankAmount)}${cell(x.bankReference)}${cell(x.daysAfterDue, "num")}${cell(CHEQUE_STATUS_LABEL[x.status] || x.status)}</tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">${totalText(r, "chequesCleared", "צ'קים")}</td>${money(totalOf(r, "chequesCleared"))}<td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="6">${totalText(r, "chequesCleared", "צ'קים")}</td>${money(totalOf(r, "chequesCleared"))}<td></td><td></td><td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
@@ -362,26 +385,55 @@ function chequesOpenTable(r) {
   if (!rows.length) return omittedSection(r, "chequesOpen") || `<h2>${SECTION_TITLES.chequesOpen}</h2><div class="empty">אין צ'קים פתוחים${r.filter?.active ? " שעוברים את הסינון" : ""}.</div>`;
   return `
 <h2>${SECTION_TITLES.chequesOpen}</h2>
-<table>
-  <thead><tr><th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום</th><th class="num">ימים מתאריך הצ'ק</th><th>נמצא בבנק בתאריך</th><th>סטטוס</th></tr></thead>
+<table data-section="chequesOpen">
+  <thead><tr>${SEL_TH}<th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום</th><th class="num">ימים מתאריך הצ'ק</th><th>נמצא בבנק בתאריך</th><th>סטטוס</th></tr></thead>
   <tbody>
     ${rows
       .map(
         (x) =>
-          `<tr class="${`${todoClass(x)}${x.older ? " older" : ""}`.trim()}">${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
+          `<tr class="${`${todoClass(x)}${x.older ? " older" : ""}`.trim()}" data-id="${esc(x.chequeId)}">${selTd(x.chequeId)}${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue > 0 ? x.daysAfterDue : "", "num")}${cell(fmtDate(x.clearedDate))}<td>${esc(CHEQUE_STATUS_LABEL[x.status] || x.status)}${todoBadge(x)}</td></tr>`,
       )
       .join("")}
-    <tr class="total"><td colspan="5">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
+    <tr class="total"><td colspan="6">${totalText(r, "chequesOpen", "צ'קים")}</td>${money(totalOf(r, "chequesOpen"))}<td></td><td></td><td></td></tr>
+  </tbody>
+</table>`;
+}
+
+// section 3ג (owner 2026-11-18): the cheques not cleared more than 60 days after their date — to cancel in the books (never
+// reached the beneficiary) or to record as returned by the bank. The last column is the action the export will write;
+// "בחירה" (the page's selection mode) shows the checkboxes and the export buttons.
+export const ACTION_LABEL = { cancel: "בוטל – לא הגיע למוטב", bounced: "חזר מהבנק", keep: "להשאיר" };
+const actionSelect = (x) =>
+  `<select class="act" data-id="${esc(x.chequeId)}" aria-label="פעולה לצ'ק ${esc(x.chequeNo)}">${Object.entries(ACTION_LABEL).map(([k, v]) => `<option value="${k}"${(x.suggestedAction || "cancel") === k ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>`;
+function chequesStaleTable(r) {
+  if (!r.chequesStale && !r.summary?.chequesStale) return "";
+  const rows = r.chequesStale || [];
+  if (!rows.length) return omittedSection(r, "chequesStale") || `<h2>${SECTION_TITLES.chequesStale}</h2><div class="empty">אין צ'קים שלא נפרעו מעל 60 יום${r.filter?.active ? " שעוברים את הסינון" : ""}.</div>`;
+  return `
+<h2>${SECTION_TITLES.chequesStale}</h2>
+<table data-section="chequesStale">
+  <thead><tr>${SEL_TH}<th>מס' צ'ק</th>${fth("מוטב")}${fth("כרטסת")}<th>תאריך רישום</th><th>תאריך הצ'ק</th><th class="num">סכום</th><th class="num">ימים מתאריך הצ'ק</th>${fth("חזר בבנק")}${fth("פעולה")}</tr></thead>
+  <tbody>
+    ${rows
+      .map(
+        (x) =>
+          `<tr class="todo${x.older ? " older" : ""}" data-id="${esc(x.chequeId)}" data-bounced="${esc(x.bounced?.date || "")}">${selTd(x.chequeId)}${cell(x.chequeNo)}${cell(x.payee)}${accountCell(x)}${cell(fmtDate(x.issueDate))}${cell(fmtDate(x.dueDate))}${money(x.amount)}${cell(x.daysAfterDue, "num")}<td${x.bounced ? ' class="bounced"' : ""} data-f="${x.bounced ? esc(fmtDate(x.bounced.date)) : ""}">${x.bounced ? `${esc(fmtDate(x.bounced.date))} <span class="td">החזרת שיק</span>` : ""}</td><td data-f="${esc(ACTION_LABEL[x.suggestedAction] || "")}">${actionSelect(x)}</td></tr>`,
+      )
+      .join("")}
+    <tr class="total"><td colspan="6">${totalText(r, "chequesStale", "צ'קים")}</td>${money(totalOf(r, "chequesStale"))}<td></td><td></td><td></td></tr>
   </tbody>
 </table>`;
 }
 
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
-// opts.imageHref(row) = the link of a cheque's scanned picture (default: "cheque-image/<imageId>" next to the report).
+// opts.imageHref(row) = the link of a cheque's scanned picture (default: "cheque-image/<imageId>" next to the report);
+// opts.exportHref = where the selection mode posts its export (default: the relative "export").
 export function renderBankReconBody(report, opts = {}) {
   const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
   const hideOlder = Boolean(report.older?.count) && report.filter?.older !== "hide"; // so do the rows dated before the period
-  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}${hideOlder ? " older-off" : ""}">${header(report)}${filterBox(report)}${olderBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}</div>`;
+  // data-export = where the selection mode posts (default: the relative "export" next to the report; the admin page passes its own)
+  const attrs = ` data-export="${esc(opts.exportHref || "export")}" data-company="${esc(report.company?.code || "")}" data-account="${esc(report.account?.key || "")}" data-from="${esc(report.from || "")}" data-to="${esc(report.to || "")}"`;
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}${hideOlder ? " older-off" : ""}"${attrs}>${header(report)}${filterBox(report)}${olderBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}${chequesStaleTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -587,6 +639,110 @@ export function bankReconBehavior(root) {
     openModal(a.getAttribute("href"), "תמונת הצ'ק" + (no ? " " + no : "") + (who ? " – " + who : ""));
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModal(); });
+
+  // 6. selection mode (owner 2026-11-18): "בחירה" on a section shows a checkbox per row, "בחר הכל" (the rows the filters leave
+  //    visible), the count and the sum of the picked rows, and the exports: every section → the chosen rows as Excel; section
+  //    3ג → the Hashavshevet import file of the cheques' reversals (Excel, or movein.dat) with a date and an action per row.
+  //    The export is a form POST (field `payload` = JSON) to root's data-export, into a hidden iframe, so the page stays.
+  var exportHref = root.getAttribute("data-export") || "export";
+  var ctx = { company: root.getAttribute("data-company"), account: root.getAttribute("data-account"), from: root.getAttribute("data-from"), to: root.getAttribute("data-to") };
+  var todayIso = new Date().toISOString().slice(0, 10);
+  var postExport = function (payload, bar) {
+    var msg = bar.querySelector(".msg");
+    msg.textContent = "";
+    var frame = root.querySelector("iframe.br-export");
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.className = "br-export";
+      frame.name = "br-export";
+      frame.style.display = "none";
+      root.appendChild(frame);
+    }
+    frame.onload = function () {
+      try {
+        var text = frame.contentDocument && frame.contentDocument.body ? frame.contentDocument.body.textContent : "";
+        if (text && text.trim().charAt(0) === "{") { var j = JSON.parse(text); msg.textContent = "הייצוא נכשל: " + ((j.error && j.error.message) || text); }
+      } catch (e) { /* the download happened: nothing to read */ }
+    };
+    var form = document.createElement("form");
+    form.method = "POST";
+    form.action = exportHref;
+    form.target = "br-export";
+    form.style.display = "none";
+    var input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  };
+  Array.prototype.forEach.call(root.querySelectorAll("table[data-section]"), function (table) {
+    var section = table.getAttribute("data-section");
+    var h = table.previousElementSibling;
+    while (h && h.tagName !== "H2") h = h.previousElementSibling;
+    if (!h) return;
+    var rows = Array.prototype.filter.call(table.tBodies[0].rows, function (r) { return !r.classList.contains("total") && !r.classList.contains("filtered"); });
+    if (!rows.length) return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sel-btn";
+    btn.textContent = "בחירה";
+    btn.addEventListener("click", function (e) { e.stopPropagation(); var on = table.classList.toggle("selecting"); btn.classList.toggle("on", on); bar.classList.toggle("show", on); update(); });
+    h.appendChild(btn);
+    var bar = document.createElement("div");
+    bar.className = "selbar";
+    var el = function (tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; };
+    var all = el("button", "", "בחר הכל (הנראות)"), none = el("button", "", "נקה"), cnt = el("span", "cnt", ""), xls = el("button", "", "Excel של השורות שנבחרו"), msg = el("div", "msg", "");
+    [all, none, xls].forEach(function (b) { b.type = "button"; });
+    bar.appendChild(all); bar.appendChild(none); bar.appendChild(cnt); bar.appendChild(xls);
+    var dateIn = null, hashBtn = null, moveinBtn = null;
+    if (section === "chequesStale") {
+      var lab = el("label", "", "תאריך הביטול: ");
+      dateIn = document.createElement("input");
+      dateIn.type = "date";
+      dateIn.value = todayIso;
+      lab.appendChild(dateIn);
+      hashBtn = el("button", "main", "קובץ ייבוא לחשבשבת (Excel)");
+      moveinBtn = el("button", "", "movein.dat");
+      [hashBtn, moveinBtn].forEach(function (b) { b.type = "button"; });
+      bar.appendChild(lab); bar.appendChild(hashBtn); bar.appendChild(moveinBtn);
+      var hint = el("span", "", "הקובץ מכיל תנועת ביטול (סטורנו) לכל צ'ק שנבחר, לפי הפעולה שבעמודה האחרונה; \"להשאיר\" לא מיוצא. צ'ק שחזר מהבנק מקבל את תאריך ההחזרה.");
+      hint.style.fontSize = ".9em";
+      hint.style.color = "#555";
+      hint.style.flexBasis = "100%";
+      bar.appendChild(hint);
+    }
+    bar.appendChild(msg);
+    table.parentNode.insertBefore(bar, table.nextSibling);
+    var picked = function () { return rows.filter(function (r) { var cb = r.querySelector("input.pick"); return cb && cb.checked; }); };
+    var update = function () {
+      var p = picked(), sum = 0;
+      p.forEach(function (r) { var m = r.querySelector("td[data-v]"); if (m) sum += Number(m.getAttribute("data-v")) || 0; r.classList.add("picked"); });
+      rows.forEach(function (r) { var cb = r.querySelector("input.pick"); if (!cb || !cb.checked) r.classList.remove("picked"); });
+      cnt.textContent = "נבחרו " + fmt(p.length, 0) + " שורות, סכום " + fmt(sum, 2);
+      [xls, hashBtn, moveinBtn].forEach(function (b) { if (b) b.disabled = !p.length; });
+      var selAll = table.querySelector("input.sel-all");
+      if (selAll) { var vis = rows.filter(function (r) { return !r.classList.contains("hid"); }); var n = vis.filter(function (r) { return r.querySelector("input.pick").checked; }).length; selAll.checked = n > 0 && n === vis.length; selAll.indeterminate = n > 0 && n < vis.length; }
+    };
+    rows.forEach(function (r) { var cb = r.querySelector("input.pick"); if (cb) cb.addEventListener("change", update); });
+    var selAll = table.querySelector("input.sel-all");
+    var pickVisible = function (on) { rows.forEach(function (r) { if (!r.classList.contains("hid")) { var cb = r.querySelector("input.pick"); if (cb) cb.checked = on; } }); update(); };
+    if (selAll) selAll.addEventListener("change", function () { pickVisible(selAll.checked); });
+    all.addEventListener("click", function () { pickVisible(true); });
+    none.addEventListener("click", function () { rows.forEach(function (r) { var cb = r.querySelector("input.pick"); if (cb) cb.checked = false; }); update(); });
+    var ids = function () { return picked().map(function (r) { return r.getAttribute("data-id"); }); };
+    xls.addEventListener("click", function () { postExport({ kind: "rows", section: section, ids: ids(), company: ctx.company, account: ctx.account, from: ctx.from, to: ctx.to }, bar); });
+    var hashPayload = function (format) {
+      var actions = {};
+      picked().forEach(function (r) { var sel = r.querySelector("select.act"); actions[r.getAttribute("data-id")] = { action: sel ? sel.value : "cancel", date: (sel && sel.value === "bounced" && r.getAttribute("data-bounced")) || dateIn.value || todayIso }; });
+      return { kind: "hashavshevet", format: format, ids: ids(), actions: actions, date: dateIn.value || todayIso, company: ctx.company, account: ctx.account, from: ctx.from, to: ctx.to };
+    };
+    if (hashBtn) hashBtn.addEventListener("click", function () { postExport(hashPayload("xlsx"), bar); });
+    if (moveinBtn) moveinBtn.addEventListener("click", function () { postExport(hashPayload("movein"), bar); });
+    update();
+  });
 
   // 4. the older-rows toggle (the rows with the class "older": dated before the period, still open)
   var otog = root.querySelector(".older-tog");
