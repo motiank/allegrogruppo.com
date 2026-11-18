@@ -182,8 +182,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   **Legal API** `GET /local-api/v1/legal/*` (`legalApi.js`, spec `legal_api_readme.md`): people, cases (search by a name in any spelling —
   consonant skeleton, so "baldman" finds "בלודמן"), one case with its key facts (verdict, last decision, next hearing), hearings ahead,
   papers by words, a paper's text, the PDF by its Drive id (only ids in a catalog). Joya HQ: main-menu area "משפטי" (`/legal`, chain
-  admin only), calcs `legal_*` — see `hq/CLAUDE.md`. Tests `node --test scripts/test_legal_archive.js` (no Drive, no DB). NOT committed
-  and NOT deployed yet (deploy = pull, `allegro-admin` restart, hq build, `joya-hq` + `joya-runner` restart; no new settings needed).
+  admin only), calcs `legal_*` — see `hq/CLAUDE.md`. Tests `node --test scripts/test_legal_archive.js` (no Drive, no DB). Deployed
+  2026-11-18 (`313adb9`: pull, `allegro-admin` restart, hq build, `joya-hq` + `joya-runner` restart; no new settings needed; the
+  API answered on the droplet — people, name search, hearings, a 6 MB PDF).
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`

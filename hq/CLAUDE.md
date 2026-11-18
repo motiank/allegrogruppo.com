@@ -245,7 +245,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   the case number), WRITE "Legal" (answer the question first, no legal opinion, one closing line that the summary was written from the
   papers; never write links — `LegalFiles` in `AskBox.js` shows the case and PDF buttons). The stories are AI-written from the papers; a
   closed case of Itzik holds only its opening paper and verdict (`partial`). Tests: `test/test_joya_lib.mjs` (access), admin
-  `scripts/test_legal_archive.js`; eval `l-*` 10/10 (context kind `LEGAL`). Needs an hq client build on deploy. Not deployed yet.
+  `scripts/test_legal_archive.js`; eval `l-*` 10/10 (context kind `LEGAL`). Deployed 2026-11-18 (`313adb9`, hq build).
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the
