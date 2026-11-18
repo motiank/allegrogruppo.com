@@ -27,6 +27,7 @@ import Employees from './pages/Employees.js';
 import Area, { AREAS } from './pages/Area.js';
 import BankRecon from './pages/BankRecon.js';
 import System from './pages/System.js';
+import UpdateDialog from './UpdateDialog.js';
 import Payments from './pages/Payments.js';
 
 // The one picker: '' = all (admin), 'co:<key>' = all restaurants of a company (admin), else a restaurant id.
@@ -112,6 +113,7 @@ function Shell() {
 
   return (
     <div style={{ minHeight: '100vh', background: theme.background, color: theme.text }}>
+      <UpdateDialog />
       <div className={c.bar}>
         <div className={c.barStart}>
           <button className={c.iconBtn} onClick={() => setOpen(true)} aria-label={t('menu.open')} aria-expanded={open}>

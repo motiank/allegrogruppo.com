@@ -197,6 +197,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   (`routes.js`, `source.systemFreshness`) ← the admin's `GET /local-api/v1/system/freshness` (`admin/server/modules/dataFreshness.js`:
   Hashavshevet copy, bank files, Tabit, Beecomm, Drive indexes, Priority file; state ok / late / stale per expected cadence; Hebrew
   notes comparing the sources). Needs an hq client build on deploy.
+  **App update** (same day, owner: "every 1 hour the app should check for a new version = a new build; if there is one, suggest a
+  reload dialog; an app update button in the System page"): `vite.config.js` defines `__JOYA_BUILD__` (git sha + minute) and writes
+  `prod/version.json`; `server.js` `GET /api/version` (public, no-store); `client/version.js` (`useUpdateCheck`, `checkForUpdate`,
+  `reloadApp`), `client/UpdateDialog.js` in the shell, the version card + button in `pages/System.js`. A deploy = a new build id, so
+  every open tab offers the reload within the hour.
 - **Bank reconciliation report in Joya** (2026-11-07): page `/accounting/bank-recon` (not in the menu — the chat answers it (suggestion 9 of the accounting area) and the buttons under the answer open the page;
   admin) showing the admin's report through `/api/joya/finance/bank-recon?format=html|xlsx|json` (Finance API
   `/finance/bank/report`), and the calc `bank_recon_report` (24th finance calc; buttons under the answer in `AskBox.js`).

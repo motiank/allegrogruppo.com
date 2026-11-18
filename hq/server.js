@@ -6,7 +6,7 @@ import express from 'express';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
-import { existsSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { SERVICE_ROOT } from './lib/env.js';
 import log from './lib/log.js';
 import { getDbPool } from './lib/dbpool.js';
@@ -44,6 +44,17 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// the build the server runs (prod/version.json, written by vite.config.js at build time) — client/version.js compares it with
+// its own build id every hour and offers a reload when they differ; public, never cached
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const v = JSON.parse(readFileSync(path.join(PROD_DIR, 'version.json'), 'utf8'));
+    res.json({ build: v.build || 'unknown', builtAt: v.builtAt || null, commit: v.commit || null });
+  } catch {
+    res.json({ build: 'unknown', builtAt: null, commit: null });
+  }
+});
 app.use('/api', sessionRoutes);
 app.use('/api', joyaRoutes);
 app.use('/api', (req, res) => res.status(404).json({ error: `not found: ${req.method} ${req.originalUrl}` }));

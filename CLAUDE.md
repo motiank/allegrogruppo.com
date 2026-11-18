@@ -249,7 +249,9 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   Hashavshevet copy — sync run, bank page, matches, journal, cheques, batches; the bank files; Tabit; Beecomm; the Drive indexes; the Priority
   file — each with the last business date, the last load, rows, `state` ok / late / stale against an expected cadence, and Hebrew notes
   that compare the sources) → Joya `/api/joya/system/freshness` → page `/system`, main-menu item "מערכת" (chain admin). Test
-  `scripts/test_data_freshness.js` (no DB). Needs an hq client build on deploy.
+  `scripts/test_data_freshness.js` (no DB). Needs an hq client build on deploy. **App update** (same day): every hq build has an id
+  (`hq/vite.config.js` → `__JOYA_BUILD__` + `prod/version.json`), `GET /api/version` serves it, the app checks hourly and offers a reload
+  dialog when the server's build differs (`hq/client/version.js`, `UpdateDialog.js`); the System page has an "עדכן אפליקציה" button.
 - **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
   the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
   and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own

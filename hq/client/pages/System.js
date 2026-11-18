@@ -7,6 +7,7 @@ import { createUseStyles, useTheme } from 'react-jss';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { Page, Card, Btn, Badge, Loading, ErrorBox, useLoad, fmtDay, fmtWhen } from '../ui.js';
+import { BUILD, checkForUpdate, reloadApp } from '../version.js';
 
 const useStyles = createUseStyles((theme) => ({
   note: { fontSize: '0.82rem', color: theme.textSecondary, margin: '0 0 0.6rem', lineHeight: 1.5 },
@@ -19,9 +20,38 @@ const useStyles = createUseStyles((theme) => ({
   err: { color: '#f2a3a8', fontSize: '0.78rem' },
   age: { color: theme.textSecondary, fontSize: '0.74rem', display: 'block' },
   wrap: { overflowX: 'auto' },
+  ver: { display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.86rem', marginBottom: '0.3rem' },
+  ok: { color: '#3fb950' },
 }));
 
 const TONE = { ok: 'ok', late: 'warn', stale: 'bad', missing: 'bad', error: 'bad', fixed: 'muted' };
+
+// the app's own version: this bundle's build id against the server's (client/version.js); the button checks now and loads
+// the new build when there is one (owner 2026-11-18: "an app update button in the System page")
+function AppVersion({ c }) {
+  const { t } = useT();
+  const [state, setState] = React.useState({ busy: false, result: null, error: null });
+  const check = async () => {
+    setState({ busy: true, result: null, error: null });
+    try {
+      const r = await checkForUpdate();
+      if (r.isNew) { await reloadApp(); return; }
+      setState({ busy: false, result: r, error: null });
+    } catch (e) {
+      setState({ busy: false, result: null, error: e });
+    }
+  };
+  return (
+    <Card title={t('joya.update.cardTitle')} right={<Btn small kind="primary" onClick={check} disabled={state.busy}>{state.busy ? t('joya.update.checking') : t('joya.update.button')}</Btn>}>
+      <div className={c.ver}>
+        <span>{t('joya.update.current')}: <bdi dir="ltr">{BUILD}</bdi></span>
+        {state.result ? <span className={c.ok}>{t('joya.update.upToDate', { when: state.result.builtAt ? fmtWhen(state.result.builtAt) : '' })}</span> : null}
+        {state.error ? <span className={c.err}>{String(state.error.message || state.error)}</span> : null}
+      </div>
+      <p className={c.note}>{t('joya.update.hint')}</p>
+    </Card>
+  );
+}
 
 export default function System() {
   const theme = useTheme();
@@ -38,6 +68,7 @@ export default function System() {
     >
       {r.loading && !r.data ? <Loading /> : null}
       {r.error ? <ErrorBox error={r.error} /> : null}
+      <AppVersion c={c} />
       {r.data ? (
         <>
           {r.data.notes?.length ? (

@@ -627,6 +627,13 @@ that compare the sources ("the bank page in Hashavshevet ends on 05/11 while the
 computes it (`GET /local-api/v1/system/freshness`, `admin/server/modules/dataFreshness.js`); Joya shows it (`pages/System.js`,
 `/api/joya/system/freshness`). Nothing is stored.
 
+**App update** (owner 2026-11-18): every build gets an id (`vite.config.js`: git short sha + build minute, in the bundle as
+`__JOYA_BUILD__` and in `prod/version.json`); the server answers `GET /api/version` with the file (no cache). The app checks
+every hour, and when the tab comes back after an hour away, whether the server's build differs from its own (`client/version.js`)
+and then shows a dialog "יש גרסה חדשה של Joya" with "טען מחדש עכשיו" / "אחר כך" (`client/UpdateDialog.js`, in the shell). The
+System page has an "עדכן אפליקציה" button that checks now and reloads at once when there is a new build, else says the app is
+up to date. The service worker keeps no cache, so a reload is enough.
+
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
 (ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
 Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **labor cost
