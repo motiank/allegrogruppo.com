@@ -328,6 +328,7 @@ r.post(
   express.raw({ type: 'application/octet-stream', limit: '2mb' }),
   h(async (req) => legalSync.putChunk(req.params.id, { doc: req.query.doc, caseNumber: String(req.query.case || ''), index: req.query.i, last: req.query.last === '1' }, req.body)),
 );
+r.post('/joya/legal/sync/:id/cancel', requireAdmin, h(async (req) => legalSync.cancel(req.params.id, req.body?.why)));
 r.post('/joya/legal/sync/:id/finish', requireAdmin, h(async (req) => legalSync.finish(req.params.id, req.body?.summary)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers

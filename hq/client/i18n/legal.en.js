@@ -66,6 +66,8 @@ export default {
   // the legal update card on the System page (client/LegalUpdate.js)
   'joya.legalSync.title': 'Legal update – Net HaMishpat',
   'joya.legalSync.button': 'Update from Net HaMishpat',
+  'joya.legalSync.cancel': 'Cancel',
+  'joya.legalSync.tabClosed': 'The court tab was closed – the update stopped ({papers} papers already fetched were kept). You can press the update button again.',
   'joya.legalSync.stop': 'Stop',
   'joya.legalSync.person': 'Archive of',
   'joya.legalSync.hint': 'The extension opens Net HaMishpat in a normal tab. You log in there yourself (government login), and the extension brings only new papers of the open cases. Keep this page open until it ends.',

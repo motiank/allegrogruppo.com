@@ -67,6 +67,8 @@ export default {
   'joya.legalSync.title': 'עדכון משפטי – נט המשפט',
   'joya.legalSync.button': 'עדכן מנט המשפט',
   'joya.legalSync.stop': 'עצור',
+  'joya.legalSync.cancel': 'בטל',
+  'joya.legalSync.tabClosed': 'לשונית נט המשפט נסגרה – העדכון נעצר ({papers} מסמכים שכבר ירדו נשמרו). אפשר ללחוץ שוב על "עדכן מנט המשפט".',
   'joya.legalSync.person': 'ארכיון של',
   'joya.legalSync.hint': 'התוסף פותח את נט המשפט בלשונית רגילה. נכנסים שם לבד (הזדהות ממשלתית), והתוסף מביא רק מסמכים חדשים בתיקים הפתוחים. השאירו את הדף הזה פתוח עד הסיום.',
   'joya.legalSync.agentOn': 'מחשב העיבוד מחובר',

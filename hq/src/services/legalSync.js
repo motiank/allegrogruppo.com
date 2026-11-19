@@ -181,6 +181,18 @@ export function finish(id, summary) {
   return brief(b);
 }
 
+/** An update that was left in the middle (the court tab or the page was closed, the user stopped it): close it. */
+export function cancel(id, why) {
+  const b = load(id);
+  if (b.state !== 'open') return brief(b);
+  b.state = 'failed';
+  b.doneAt = new Date().toISOString();
+  b.error = String(why || 'cancelled').slice(0, 300);
+  removeFiles(b);
+  save(b);
+  return brief(b);
+}
+
 function removeFiles(b) {
   const d = dirOf(b.id);
   if (!fs.existsSync(d)) return;

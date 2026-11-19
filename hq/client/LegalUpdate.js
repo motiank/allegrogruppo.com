@@ -44,6 +44,7 @@ export default function LegalUpdate() {
       if (m.type === 'hello') return setExt(m.version || extVersion());
       if (m.type !== 'progress') return;
       setProg(m);
+      if (m.phase === 'idle') return setBusy(false); // the extension runs nothing (e.g. after a page reload)
       if (['done', 'error', 'stopped'].includes(m.phase)) { setBusy(false); load(); }
       if (m.phase === 'running') setBusy(true);
     };
@@ -76,11 +77,16 @@ export default function LegalUpdate() {
     }
   };
   const stop = () => window.postMessage({ source: 'joya-page', type: 'stop' }, window.location.origin);
+  // an update left in the middle (the court tab or this page was closed): close it by hand
+  const cancel = (id) => api(`/legal/sync/${id}/cancel`, { method: 'POST', body: { why: 'cancelled by the user' } }).then(load).catch(setError);
+  // only a batch that waits for processing blocks a new update; one left in the middle is replaced by a new start
+  const processing = (state?.batches || []).some((b) => b.person === person && (b.state === 'ready' || b.state === 'taken'));
 
   if (!state || (!ext && !active)) return null;
   const line = () => {
     if (!prog) return null;
     if (prog.phase === 'done') return t('joya.legalSync.phase.done', { cases: prog.summary?.casesChecked ?? 0, papers: prog.summary?.newPapers ?? 0 });
+    if (/tab was closed/.test(prog.text || '')) return t('joya.legalSync.tabClosed', { papers: prog.summary?.newPapers ?? 0 });
     const key = `joya.legalSync.phase.${prog.phase}`;
     const s = t(key, { text: prog.text || '' });
     return s === key ? prog.text : s;
@@ -91,7 +97,7 @@ export default function LegalUpdate() {
       title={t('joya.legalSync.title')}
       right={
         ext ? (
-          busy ? <Btn small onClick={stop}>{t('joya.legalSync.stop')}</Btn> : <Btn small kind="primary" onClick={start} disabled={!person || active}>{t('joya.legalSync.button')}</Btn>
+          busy ? <Btn small onClick={stop}>{t('joya.legalSync.stop')}</Btn> : <Btn small kind="primary" onClick={start} disabled={!person || processing}>{t('joya.legalSync.button')}</Btn>
         ) : null
       }
     >
@@ -124,6 +130,7 @@ export default function LegalUpdate() {
               <span>{b.result?.nothingNew ? t('joya.legalSync.nothing') : t('joya.legalSync.row', { papers: b.files, cases: b.cases })}</span>
               {b.step ? <span className={c.dim} dir="auto">{b.step}</span> : null}
               {b.error ? <span className={c.err} dir="auto">{b.error}</span> : null}
+              {b.state === 'open' && !busy ? <Btn small onClick={() => cancel(b.id)}>{t('joya.legalSync.cancel')}</Btn> : null}
             </li>
           ))}
         </ul>

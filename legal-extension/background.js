@@ -22,7 +22,8 @@ chrome.runtime.onConnect.addListener((port) => {
     if (m.type === 'start') {
       if (run) return port.postMessage({ type: 'progress', phase: 'error', text: 'an update is already running in this browser' });
       run = { port, stop: false, last: '' };
-      update(run, m).catch((e) => say(run, 'error', String(e.message || e))).finally(() => { run = null; });
+      const r = run;
+      update(r, m).catch((e) => say(r, 'error', String(e.message || e))).finally(() => { if (run === r) run = null; });
     }
   });
   port.onDisconnect.addListener(() => { if (run && run.port === port) run.stop = true; });
@@ -140,13 +141,30 @@ async function update(r, { person, batchId, plan, only }) {
   cases.sort((a, b) => ym(b.number) - ym(a.number));
   const sum = { person, casesPlanned: cases.length, casesChecked: 0, newPapers: 0, bytes: 0, failedCases: [], failedPapers: [], stopped: false };
 
+  // However the run ends, Joya is told: papers already fetched go on to processing; a run with none is closed,
+  // so the update button is free again at once.
+  const close = async (why) => {
+    sum.stopped = !!r.stop;
+    if (why) sum.error = why;
+    r.stop = false; // the closing message must still go out
+    try {
+      if (!sum.newPapers && (why || sum.stopped)) {
+        await toJoya(r, `/legal/sync/${batchId}/cancel`, { json: { why: why || 'stopped by the user' } });
+        say(r, why ? 'error' : 'stopped', why || 'stopped', { summary: sum });
+      } else {
+        const b = await toJoya(r, `/legal/sync/${batchId}/finish`, { json: { summary: sum } });
+        say(r, why ? 'error' : 'done', why ? `${why} — ${sum.newPapers} papers were kept` : `checked ${sum.casesChecked} cases, ${sum.newPapers} new papers`, { summary: sum, batch: b });
+      }
+    } catch (e) {
+      say(r, 'error', why || String(e.message || e), { summary: sum });
+    }
+  };
+
+  try {
   const tab = await chrome.tabs.create({ url: START, active: true });
   r.tabId = tab.id;
   say(r, 'login', 'log in to נט המשפט in the tab that opened');
-  if (!(await waitForLogin(r))) {
-    say(r, 'error', r.stop ? 'stopped' : 'no login within 15 minutes');
-    return;
-  }
+  if (!(await waitForLogin(r))) return close(r.stop ? '' : 'no login within 15 minutes');
 
   for (let i = 0; i < cases.length && !r.stop; i++) {
     const c = cases[i];
@@ -182,15 +200,12 @@ async function update(r, { person, batchId, plan, only }) {
         i--; // the same case again
         continue;
       }
+      if (/tab was closed/.test(e.message || '')) throw e;
       sum.failedCases.push({ case: c.number, why: String(e.message || e).slice(0, 160) });
     }
   }
-  sum.stopped = !!r.stop;
-  r.stop = false; // the closing message must still go out
-  try {
-    const b = await toJoya(r, `/legal/sync/${batchId}/finish`, { json: { summary: sum } });
-    say(r, 'done', `checked ${sum.casesChecked} cases, ${sum.newPapers} new papers`, { summary: sum, batch: b });
   } catch (e) {
-    say(r, 'error', String(e.message || e), { summary: sum });
+    return close(String(e.message || e));
   }
+  return close('');
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joya Legal — נט המשפט update",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive. Works only when started from the Joya HQ System page, after you log in to נט המשפט yourself.",
   "permissions": ["tabs"],
   "host_permissions": [
