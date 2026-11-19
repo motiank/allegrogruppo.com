@@ -11,9 +11,10 @@
 //   GET /documents[?person=&number=&q=&type=&key=1|0&from=&to=&limit=]   papers by words
 //   GET /documents/:documentID/text[?max=]       the plain text of a paper (for the AI)
 //   GET /files/:driveId[?download=1]             the PDF itself
+//   GET /sync/plan?person=[&fresh=1]             the update plan for the browser extension: every case with the paper ids already held
 import express from "express";
 import { localOnly, ApiError, badRequest, isIsoDate } from "./localApi.js";
-import { loadLegalArchive, peopleOf, listCases, findCase, hearings, searchDocuments, readLegalFile, readLegalText } from "./legalArchive.js";
+import { loadLegalArchive, peopleOf, listCases, findCase, hearings, searchDocuments, readLegalFile, readLegalText, syncPlan, forgetLegalArchive } from "./legalArchive.js";
 
 const unavailable = (why) => new ApiError(503, "legal_archive_unavailable", why);
 const dateParam = (q, name) => {
@@ -59,6 +60,14 @@ const Router = () => {
   route("/people", async () => {
     const a = await archive();
     return { data: peopleOf(a.catalogs), meta: metaOf(a) };
+  });
+
+  route("/sync/plan", async (req) => {
+    if (flag(req.query.fresh)) forgetLegalArchive(); // after an update run, so the next plan knows the new papers
+    const a = await archive();
+    const person = personOf(a, req.query.person);
+    if (!person) throw badRequest("person is required");
+    return { data: syncPlan(a.catalogs, person), meta: metaOf(a) };
   });
 
   route("/cases", async (req) => {

@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Joya Legal — נט המשפט update",
+  "version": "0.1.0",
+  "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive. Works only when started from the Joya HQ System page, after you log in to נט המשפט yourself.",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://securesso.court.gov.il/*",
+    "https://*.s3.il-central-1.amazonaws.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://hq.allegrogruppo.com/*", "http://localhost:4300/*", "http://127.0.0.1:4300/*"], "js": ["hq.js"], "run_at": "document_start" },
+    { "matches": ["https://securesso.court.gov.il/Ngcs.Web.Secured/*"], "js": ["court.js"], "run_at": "document_idle" },
+    { "matches": ["https://securesso.court.gov.il/Ngcs.Web.Secured/*"], "js": ["court_main.js"], "run_at": "document_idle", "world": "MAIN" }
+  ]
+}

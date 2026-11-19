@@ -28,6 +28,7 @@ import multer from 'multer';
 import { extractAttachment, MAX_FILE_BYTES } from './services/attachments.js';
 const askUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 1 } }).single('file');
 import { forecastWeek } from './services/demand.js';
+import * as legalSync from './services/legalSync.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
@@ -71,6 +72,14 @@ r.post('/joya/ai/runner/:id/claim', requireMachineKey, h(async (req) => ({ claim
 r.get('/joya/ai/runner/:id/context', requireMachineKey, h(async (req) => ai.contextFor(id(req))));
 r.post('/joya/ai/runner/:id/compute', requireMachineKey, h(async (req) => ai.compute(id(req), req.body || {})));
 r.post('/joya/ai/runner/:id/answer', requireMachineKey, h(async (req) => (await ai.answer(id(req), req.body || {}), { ok: true })));
+
+// the legal agent on the owner's computer (services/legalSync.js) — machine key, before the user gate
+r.post('/joya/legal/agent/poll', requireMachineKey, h(async (req) => legalSync.agentPoll({ host: req.body?.host })));
+r.get('/joya/legal/agent/:id/file/:doc', requireMachineKey, h(async (req, res) => {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.sendFile(legalSync.agentFile(req.params.id, req.params.doc));
+}));
+r.post('/joya/legal/agent/:id/report', requireMachineKey, h(async (req) => legalSync.agentReport(req.params.id, req.body || {})));
 
 r.use('/joya', requireJoya, limitAccountant);
 
@@ -296,6 +305,30 @@ r.get(
     res.send(file.buffer);
   }),
 );
+
+// ---------------------------------------------------------------- legal update (new papers from נט המשפט)
+// services/legalSync.js: the Joya Legal browser extension sends new court papers through the open Joya page, they wait
+// in an inbox, and the legal agent on the owner's computer files them into the archive. Chain admin only; the agent's
+// routes take the machine key (X-Joya-Key). The System page shows the button and the state.
+r.get(
+  '/joya/legal/sync/state',
+  requireAdmin,
+  h(async (req) => {
+    const people = await legalGet('/people').then((o) => o.data.map((p) => p.person)).catch(() => []);
+    const me = String(req.joya.username || '').toLowerCase();
+    return { agent: legalSync.agentState(), batches: legalSync.listBatches(), people, mine: people.includes(me) ? me : null };
+  }),
+);
+r.get('/joya/legal/sync/plan', requireAdmin, h(async (req) => (await legalGet('/sync/plan', { person: req.query.person, fresh: 1 })).data));
+r.post('/joya/legal/sync/start', requireAdmin, h(async (req) => legalSync.start({ person: req.body?.person, by: req.joya.username })));
+r.post('/joya/legal/sync/:id/case', requireAdmin, h(async (req) => legalSync.putCase(req.params.id, req.body)));
+r.post(
+  '/joya/legal/sync/:id/file',
+  requireAdmin,
+  express.raw({ type: 'application/octet-stream', limit: '2mb' }),
+  h(async (req) => legalSync.putChunk(req.params.id, { doc: req.query.doc, caseNumber: String(req.query.case || ''), index: req.query.i, last: req.query.last === '1' }, req.body)),
+);
+r.post('/joya/legal/sync/:id/finish', requireAdmin, h(async (req) => legalSync.finish(req.params.id, req.body?.summary)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
 // Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank

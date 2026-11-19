@@ -301,6 +301,25 @@ export async function loadLegalArchive({ fresh = false } = {}) {
 export const forgetLegalArchive = () => (cache = { at: 0, value: null, error: null });
 
 /** The people of the archive with their counts: [{ person, cases, saved, open, documents, builtAt }]. */
+// The update plan of one person, for the browser extension that reads נט המשפט (owner 2026-11-19): every known case
+// with the ids of the papers the archive already holds, so the extension asks the site only for what is new.
+export function syncPlan(catalogs, person) {
+  const cat = catalogs.find((c) => c.person === person);
+  if (!cat) return null;
+  return {
+    person,
+    builtAt: cat.builtAt || null,
+    cases: (cat.cases || []).map((c) => ({
+      number: c.number,
+      caseID: c.caseID || null,
+      name: c.name || "",
+      open: !/סגור/.test(c.status || ""),
+      downloaded: !!c.downloaded,
+      ids: (Array.isArray(c.documents) ? c.documents : []).map((d) => d.documentID).filter(Boolean),
+    })),
+  };
+}
+
 export function peopleOf(catalogs) {
   return catalogs.map((cat) => ({
     person: cat.person,
