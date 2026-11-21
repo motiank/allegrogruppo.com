@@ -478,7 +478,7 @@ t('the books are for the chain admin only; every finance calc is in the catalogu
   const admin = { role: 'CHAIN_ADMIN', isAdmin: true };
   const manager = { role: 'LOCATION_MANAGER', isAdmin: false };
   const accountant = { role: 'ACCOUNTANT', isAdmin: false };
-  assert.equal(FINANCE_CALCS.size, 31); // 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques, cheques_file; 2026-11-16: + cheque_archive
+  assert.equal(FINANCE_CALCS.size, 32); // 2026-11-22: + latest_invoices; 2026-11-08: + missing_invoices; 2026-11-09: + supplier_invoices; 2026-11-10: + statement_compare; 2026-11-11: + priority_cheques, cheques_file; 2026-11-16: + cheque_archive
   for (const name of FINANCE_CALCS) {
     assert.ok(CALCS[name] && typeof CALCS[name].run === 'function', `${name} is a calc`);
     assert.equal(mayRun(admin, name), true);

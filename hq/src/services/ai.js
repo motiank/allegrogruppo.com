@@ -582,6 +582,14 @@ export const CALCS = {
     about: 'allocation numbers (מספרי הקצאה) on supplier invoices: which invoices are over the legal limit of their date and need one (required), which have a real number (ok), which are missing or suspect; counts for the period',
     run: finCalc(fin.allocationNumbers),
   },
+  latest_invoices: {
+    params: '{ limit?: number (default 20, the newest found), days?: number (found in the last N days, today included), since?, until? (FOUND days, YYYY-MM-DD, Israel time), company?: "part of a company name of ours (פסטה לינה, אן-קור…)", direction?: "expense" | "income", mailbox?: "main" (the accountant\'s mailbox) | "an email address", unmatched?: "hide" | "only" (invoices of no company of ours), q?: "part of the supplier / customer name or an invoice number" }',
+    about: 'the LATEST INVOICES THE INVOICE AGENT FOUND in the mailboxes and filed in Drive, newest FOUND first — sorted by the time the agent found them, NOT by the date on the invoice: found time, our company, expense / income, the supplier or customer, number, total, the invoice date, the mailbox, the books flag, the file link; plus how many were found per day and the time of the last one. Every company the agent knows (the restaurants and the owner\'s other companies) and the unmatched ones. Not per company (no companyKeys) and not the books',
+    run: async (a, p) => {
+      if (!a.isAdmin) throw err('FORBIDDEN', 'the invoices the agent found are for the chain admin only');
+      return fin.latestInvoices(p || {});
+    },
+  },
   missing_invoices: {
     params: '{ companyKeys?, from?, to? (invoice dates; default this year to today), direction?: "expense" | "income", status?: "not_booked" | "pending" | "amount_differs" | "no_account" | "booked" | "all" (default all; several: "not_booked,amount_differs"), q?: "part of a supplier / customer name or an invoice number", channels?: ["drive"] (default every channel), limit? }',
     about: "invoices that are NOT booked yet in Hashavshevet (and the ones that are), checked channel by channel — the answer is one part per channel. Channels today: drive = every invoice that reached the accountant's mailbox (filed in Drive by the invoice agent), matched with the books and flagged there; more channels later (bank debits without an invoice…). Per channel: counts and totals per status (booked / pending / not_booked / amount_differs / no_account), the rows asked for, and how many book entries of the period have no document in that channel",
@@ -674,7 +682,7 @@ export const AREAS = { 1: 'STOCK', 2: 'MANPOWER', 3: 'PERFORMANCE', 4: 'BANK', 5
 // uploaded Excel file — owner 2026-10-31)
 const ACCOUNTANT_CALCS = new Set(['team_rules', 'vat_report', 'cards_vs_bank', 'bank_summary', 'bank_transactions', 'payments_summary', 'card_income_week', 'sales_summary', 'sales_daily']);
 // the books (the Finance API): chain admin only (owner 2026-11-07); the accountant may get them later by adding them to ACCOUNTANT_CALCS
-export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheque_archive', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
+export const FINANCE_CALCS = new Set(['finance_status', 'pnl', 'cash_position', 'branch_costs', 'sales_vs_books', 'spending', 'aging', 'intercompany', 'trial_balance', 'account_card', 'journal_search', 'bank_reconciliation', 'bank_recon_report', 'bank_open_items', 'bank_match_suggestions', 'customer_invoices', 'supplier_invoices', 'statement_compare', 'account_statement', 'cheques', 'priority_cheques', 'cheque_archive', 'cheques_file', 'vat_summary', 'withholding', 'allocation_numbers', 'missing_invoices', 'latest_invoices', 'payroll_check', 'exceptions', 'change_history', 'payments_due']);
 // the owners' court cases (services/legal.js): chain admin only (owner 2026-11-18)
 export const LEGAL_CALCS = new Set(['legal_cases', 'legal_case', 'legal_hearings', 'legal_documents', 'legal_document']);
 export const mayRun = (access, name) => (FINANCE_CALCS.has(name) || LEGAL_CALCS.has(name) ? !!access.isAdmin : access.role !== 'ACCOUNTANT' || ACCOUNTANT_CALCS.has(name));

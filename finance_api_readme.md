@@ -189,6 +189,7 @@ All endpoints are built and run by the test in [section 11](#11-tests) on the re
 | 22 | Salary entries compared with payroll | `/payroll-check` | No 2026 salaries in the books; payroll data from April 2026 |
 | 23 | Exceptions | `/exceptions` | "Wrong account" has no rule yet |
 | 25 | Drive invoices (the invoice agent) against the books, with a flag written back into Drive | `/invoices/drive-check` | Added 2026-11-08; the match rules are not confirmed by the accountant |
+| 26 | The latest invoices the invoice agent found, newest found first (no company; not the books) | `/invoices/drive-latest` | Added 2026-11-22 |
 | 24 | Change history | `/changes` | Hashavshevet logs account changes, not journal edits |
 
 ---
@@ -957,6 +958,39 @@ Production: the files are `/home/twit/.secrets/invoice-drive/{credentials,token}
 has no Drive folder. The admin runs this check for every company with a `drive` block **daily at 06:45**
 (`INVOICE_DRIVE_AUTO=1`, `driveCheckAll` in `server.js`), so the flags in Drive stay current. Pure rules test:
 `node --test scripts/test_invoice_match.js`.
+
+### `GET /finance/invoices/drive-latest[?limit=][&days=][&since=][&until=][&company=][&direction=expense|income][&mailbox=][&unmatched=only|hide][&q=][&fresh=1]`
+
+Added 2026-11-22 (owner: "I want to see the latest invoices it found — not the date of creation"). The invoices the
+invoice agent filed in Drive, **newest FOUND first**: sorted by `filed_at` (the time the agent filed the invoice), never
+by the date printed on the invoice. It takes **no `company`** and reads no books: the rows come from the agent's
+`index.json` files alone (`admin/server/modules/invoiceDrive.js` `listAllIndexes`, rules `shared/invoiceLatest.js`,
+5-minute cache, `fresh=1` reads again).
+
+It covers every folder the agent files into: the main `Invoices` folder in the accountant's Drive (the restaurant
+companies and `_unmatched`) and the extra folders of `INVOICE_DRIVE_EXTRA_FOLDERS` (`name:folderId, …`; default
+`owner` = the owner's own Drive folder for his other companies, shared with the agent's login). An extra folder that
+cannot be read is named in `meta.errors`; the rest still answer.
+
+| Parameter | Meaning |
+|---|---|
+| `limit` | how many of the newest (default 20, 1–the API maximum). With `since` / `until` / `days`, every row of those days is returned |
+| `days` | found in the last N days, today included |
+| `since`, `until` | found days, `YYYY-MM-DD`, **Israel time** |
+| `company` | part of our company's name (the folder name; spaces, hyphens and quotes do not matter) |
+| `direction` | `expense` or `income` |
+| `mailbox` | `main` = the accountant's mailbox, or the address of another mailbox |
+| `unmatched` | `only` = the invoices of no company of ours, `hide` = without them |
+| `q` | part of the supplier / customer name, or of the invoice number |
+
+Each row: `foundAt` (UTC), `foundLocal` (Israel time, `YYYY-MM-DD HH:mm`), `company` (null when `unmatched`), `target`
+(`main` / `owner`), `direction`, `party` (the supplier for an expense, the customer for an income), `partyTaxId`,
+`issuedTo`, `number`, `docType`, `total`, `currency`, `date` (the invoice date), `allocationNumber`, `mailbox`, `books`
+(the status of the last match with Hashavshevet, when one was made), `driveFileId`, `fileUrl`.
+`meta`: `total` (rows that match), `shown`, `lastFoundAt`, `byDay` (the last 10 found days with a count), `allInvoices`,
+`mailboxes` (rows per mailbox), `folders` (every folder with its row count). Errors: `503 drive_unavailable` without the
+agent's Google files, `400 bad_request`. Tests: `node --test scripts/test_invoice_latest.js` (no Drive, no DB),
+`scripts/test_finance_api.js`. Joya calc `latest_invoices`.
 
 ### `GET /finance/payroll-check?company=&month=[&branch=]`
 

@@ -182,6 +182,14 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
 - **Supplier invoices from the books** (2026-11-09, owner): calc `supplier_invoices` (`fin.supplierInvoices`, Finance API
   `/invoices?side=supplier`: date, `entryDate`, supplier, expense account, credit notes minus) — "חשבוניות ספקים שבספרים",
   "תאריך הזנה ותאריך הוצאה"; the planner never uses `missing_invoices` for it. Eval `f-supplier-*`.
+- **The latest invoices the agent found** (2026-11-22, owner: "I want to ask the agent: show me the latest invoices —
+  not the date of creation"): calc `latest_invoices` (`fin.latestInvoices`, chain admin only, in `FINANCE_CALCS`) →
+  the admin's `/finance/invoices/drive-latest`: the invoice agent's Drive rows of every folder (the restaurant
+  companies, the owner's other companies in his own Drive folder, `_unmatched`), newest FOUND first (`foundLocal`,
+  Israel time) — never sorted by the invoice date. Not per company (no `companyKeys`), not the books. Params: `limit`,
+  `days`, `since` / `until` (found days), `company`, `direction`, `mailbox`, `unmatched`, `q`. PLAN rule "THE LATEST
+  INVOICES THE AGENT FOUND" (never `supplier_invoices` / `missing_invoices` for it); WRITE rule "The latest invoices
+  the agent found" (a table by found time, no Drive links unless asked). Eval `li-*`. No client change.
 - **Missing invoices** (2026-11-08, owner): calc `missing_invoices` (`fin.missingInvoices`) = "which invoices are not
   booked yet", answered PER CHANNEL (`INVOICE_CHANNELS` in `finance.js`; the owner: Drive is the first channel, not the
   only one, and it must be transparent — the user asks about missing expense invoices and the Drive list is one part

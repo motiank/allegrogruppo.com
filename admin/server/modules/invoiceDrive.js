@@ -8,6 +8,9 @@
 // Settings (admin .env): INVOICE_DRIVE_CREDENTIALS = the OAuth client file (default invoice-agent/credentials.json),
 // INVOICE_DRIVE_TOKEN = the saved login (default invoice-agent/data/token.json), INVOICE_DRIVE_ROOT = the main folder
 // (default "Invoices"). Without the two files the feature answers "not configured" and nothing breaks.
+// INVOICE_DRIVE_EXTRA_FOLDERS = more folders the agent files into (invoice-agent/config/targets.json), as
+// "name:folderId, name:folderId" (default: owner = the owner's own Drive folder, for his other companies; owner
+// 2026-11-22). They are shared with the agent's login; only /invoices/drive-latest reads them.
 import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
@@ -98,7 +101,52 @@ export async function listCompanyIndexes({ fresh = false } = {}) {
   cache = { at: Date.now(), value: out };
   return out;
 }
-export const forgetIndexes = () => (cache = { at: 0, value: null });
+// The owner's folder for the companies outside the restaurants (אן-קור, ניוראל לוגיק, ווסט פרונט, אבוקדו פלאנט).
+const DEFAULT_EXTRA = "owner:1liJwaBHEr8FXtgbqOYCD75e0lnwVsPwU";
+export function extraFolders(env = process.env) {
+  return String(env.INVOICE_DRIVE_EXTRA_FOLDERS ?? DEFAULT_EXTRA).split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+    const i = s.indexOf(":");
+    return i > 0 ? { name: s.slice(0, i).trim(), folderId: s.slice(i + 1).trim() } : { name: "extra", folderId: s };
+  });
+}
+
+async function indexesIn(parent, target) {
+  const r = await files().list({ q: `${quote(parent)} in parents and mimeType='${FOLDER}' and trashed=false`, fields: "files(id,name)", pageSize: 200 });
+  const out = [];
+  for (const folder of r.data.files || []) {
+    const idx = await findOne(`name='index.json' and ${quote(folder.id)} in parents`);
+    if (!idx) continue;
+    const index = await readJson(idx.id);
+    if (!index || !Array.isArray(index.invoices)) continue;
+    out.push({ folderId: folder.id, name: folder.name, indexId: idx.id, modifiedTime: idx.modifiedTime, index, unmatched: folder.name === "_unmatched", target });
+  }
+  return out;
+}
+
+let allCache = { at: 0, value: null };
+/**
+ * The indexes of EVERY folder the agent files into: the main "Invoices" folder (target "main") and the extra folders
+ * (INVOICE_DRIVE_EXTRA_FOLDERS). An extra folder that cannot be read is reported in `errors`, the rest still answer.
+ * @returns {{ indexes: [...], errors: [{ target, message }] }}
+ */
+export async function listAllIndexes({ fresh = false } = {}) {
+  if (!fresh && allCache.value && Date.now() - allCache.at < CACHE_MS) return allCache.value;
+  const indexes = (await listCompanyIndexes({ fresh })).map((x) => ({ ...x, target: "main" }));
+  const errors = [];
+  for (const f of extraFolders()) {
+    try {
+      indexes.push(...(await indexesIn(f.folderId, f.name)));
+    } catch (e) {
+      errors.push({ target: f.name, message: e.message });
+    }
+  }
+  allCache = { at: Date.now(), value: { indexes, errors } };
+  return allCache.value;
+}
+export const forgetIndexes = () => {
+  cache = { at: 0, value: null };
+  allCache = { at: 0, value: null };
+};
 
 /**
  * Writes the match flags into a company's index.json: `flags` = Map(drive_file_id → books). The index is read again

@@ -272,8 +272,12 @@ describe("endpoints", () => {
   test("route list covers the readme", () => {
     const want = ["/companies", "/status", "/accounts", "/branches", "/pnl", "/cash", "/branch-costs", "/sales-vs-books", "/spending", "/aging", "/intercompany",
       "/trial-balance", "/ledger", "/journal", "/journal/:year/:transId", "/bank/reconciliation", "/bank/open", "/bank/balances", "/bank/suggestions", "/invoices", "/statement",
-      "/cheques", "/cheques/priority", "/cheques/all", "/cheques/archive", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/payroll-check", "/exceptions", "/changes"];
+      "/cheques", "/cheques/priority", "/cheques/all", "/cheques/archive", "/vat", "/vat/issues", "/withholding", "/allocation-numbers", "/invoices/drive-check", "/invoices/drive-latest", "/payroll-check", "/exceptions", "/changes"];
     assert.deepEqual(financeRoutes().sort(), want.sort());
+  });
+
+  test("GET /invoices/drive-latest: bad parameters", async () => {
+    for (const q of ["limit=0", "limit=abc", "direction=sideways", "unmatched=maybe", "since=2026-13-01", "since=2026-11-10&until=2026-11-01", "days=-1"]) await fail(`/invoices/drive-latest?${q}`, 400, "bad_request");
   });
 
   test("GET /invoices/drive-check: without the agent's Google login it says so (503 drive_unavailable); bad parameters", async () => {
@@ -283,6 +287,8 @@ describe("endpoints", () => {
       await fail(`/invoices/drive-check?company=${COMPANY}&from=2026-01-01`, 503, "drive_unavailable");
       await fail(`/invoices/drive-check?company=${COMPANY}&from=2026-01-01&status=nope`, 400, "bad_request");
       await fail(`/invoices/drive-check?company=${COMPANY}&from=2026-01-01&direction=sideways`, 400, "bad_request");
+      // the latest invoices the agent found: no company needed
+      await fail(`/invoices/drive-latest`, 503, "drive_unavailable");
     } finally {
       if (saved == null) delete process.env.INVOICE_DRIVE_TOKEN;
       else process.env.INVOICE_DRIVE_TOKEN = saved;

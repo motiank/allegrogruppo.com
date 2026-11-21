@@ -2946,6 +2946,64 @@
         ],
         "maxCalcs": 1
       }
+    },
+    {
+      "key": "li-latest",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תראה לי את החשבוניות האחרונות",
+      "expect": {
+        "calcs": [
+          "latest_invoices"
+        ],
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "li-days",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "אילו חשבוניות הסוכן מצא ב-3 הימים האחרונים?",
+      "expect": {
+        "calcs": [
+          "latest_invoices"
+        ],
+        "params": {
+          "latest_invoices": {
+            "days": 3
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "li-company",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "מה 50 החשבוניות האחרונות שנמצאו של פרימיום איטליה?",
+      "expect": {
+        "calcs": [
+          "latest_invoices"
+        ],
+        "params": {
+          "latest_invoices": {
+            "limit": 50
+          }
+        },
+        "maxCalcs": 1
+      }
+    },
+    {
+      "key": "li-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Show me the latest invoices the agent found",
+      "expect": {
+        "calcs": [
+          "latest_invoices"
+        ],
+        "maxCalcs": 1
+      }
     }
   ]
 }

@@ -674,6 +674,36 @@ const INVOICE_CHANNELS = {
 };
 const PLANNED_CHANNELS = 'not connected yet: bank debits and card charges with no invoice in the books, supplier statements';
 
+/**
+ * The latest invoices the invoice agent FOUND, newest found first (owner 2026-11-22: "show me the latest invoices —
+ * not the date of creation"): from the agent's Drive indexes of every folder (the restaurant companies, the owner's
+ * other companies, _unmatched), sorted by the time the agent filed them. Not per company and not from the books.
+ */
+export async function latestInvoices(p = {}) {
+  const limit = limitOf(p, 20, 200);
+  const days = p.days == null || p.days === '' ? {} : { days: clamp(p.days, 1, 3660) };
+  const found = {};
+  for (const k of ['since', 'until']) {
+    if (p[k] == null || p[k] === '') continue;
+    if (!DATE.test(String(p[k]))) throw bad(`${k} must be YYYY-MM-DD`);
+    found[k] = String(p[k]);
+  }
+  const params = { ...found, ...days, ...textOf(p, 'company'), ...oneOf(p, 'direction', ['expense', 'income']), ...textOf(p, 'mailbox'), ...oneOf(p, 'unmatched', ['only', 'hide']), ...textOf(p, 'q'), limit };
+  const r = await finance('/invoices/drive-latest', params);
+  if (!r.available) return { report: 'latest_invoices', params, available: false, note: r.reason };
+  const m = r.meta || {};
+  const cap = p.export ? EXPORT_MAX : found.since || found.until || days.days ? 200 : limit;
+  return {
+    report: 'latest_invoices',
+    source: "the invoice agent's Google Drive indexes (every invoice the agent filed from the mailboxes), through the Allegro admin Finance API; NOT the Hashavshevet books",
+    params, available: true,
+    total: m.total, shown: Math.min(r.data.length, cap), lastFoundAt: m.lastFoundAt ? r.data[0]?.foundLocal ?? m.lastFoundAt : null, byDay: m.byDay,
+    allInvoices: m.allInvoices, mailboxes: m.mailboxes, folders: m.folders, ...(m.errors ? { errors: m.errors } : {}),
+    rows: r.data.slice(0, cap).map(({ foundAt, driveFileId, ...row }) => row),
+    note: 'sorted by foundLocal = when the agent FOUND and filed the invoice (Israel time), newest first — not by date (the date printed on the invoice). company null + unmatched true = not from or to a company on the agent\'s list (often a private invoice). mailbox main = the accountant\'s mailbox (read every 15 minutes); another address = found by a one-time scan of that mailbox. books = the last match with Hashavshevet when one was made (booked / pending / not_booked / amount_differs / no_account), else null. fileUrl = the invoice file in Drive. total = all rows that match, shown = the rows given.',
+  };
+}
+
 /** Invoices not booked yet in Hashavshevet, from every channel the system can check — today the Drive channel. */
 export async function missingInvoices(companies, p = {}) {
   const limit = limitOf(p, LIMITS.invoices, 500);

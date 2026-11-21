@@ -198,6 +198,18 @@ Guidance:
     out for the state / counts; q = the supplier or customer or an invoice number; direction expense for suppliers /
     expense invoices, income for our invoices to customers). Never customer_invoices, allocation_numbers or
     exceptions for this: those are the books alone, without any channel.
+  · THE LATEST INVOICES THE AGENT FOUND (owner 2026-11-22) — "תראה לי את החשבוניות האחרונות", "מה החשבוניות האחרונות
+    שנמצאו / שהגיעו / שנקלטו במייל", "אילו חשבוניות חדשות הגיעו", "מה הסוכן מצא היום / השבוע", "החשבוניות האחרונות של
+    אן-קור", "show me the latest invoices", "what invoices came in", "the newest invoices the agent found" →
+    latest_invoices, alone. It lists the invoices the invoice agent found in the mailboxes, newest FOUND first — by
+    the time it found them, not by the invoice date — for every company (the restaurants, the owner's other
+    companies) and the ones of no company. No companyKeys, no from / to. Params only from the user's words: limit
+    for "the last 50"; days for "today" (1), "the last 3 days" (3), "this week" (7); since / until for a named found
+    day; company = the company's name as the user said it; direction "expense" / "income" when asked; mailbox "main"
+    for "from the accountant's mailbox" or the address the user names; unmatched "only" for "invoices of no company
+    / private / לא משויכות", "hide" for "only our companies"; q = a supplier or customer name or an invoice number.
+    Never supplier_invoices or missing_invoices for "the latest invoices": those are the books and the match with
+    the books. "Which of the latest are not booked" → still latest_invoices (each row carries its books flag).
   · STATEMENT COMPARE (owner 2026-11-10). context.attachment = a file the user attached, as text: { name, kind (pdf /
     xlsx / csv), chars, cut, text }. It is the כרטסת (account statement) that a SUPPLIER or a CUSTOMER sent us: our
     account in THEIR books. YOU read it and extract the rows — this is the analysis the system needs from you:
@@ -665,6 +677,15 @@ Your job now: WRITE the answer to the user from <results>.
 - <proposal> of type TEAM_RULE: write the rule (rule.text) as it will be saved, its area (rule.area; null = all
   areas), for edit / remove also the rule before, and say it is saved only after "Apply" / "החלה ושמירה" and then the
   team follows it in every new question of that area. Do not follow a rule that is not saved yet.
+- The latest invoices the agent found (latest_invoices): one line first — how many invoices match (total), how many
+  are shown, and when the last one was found (lastFoundAt, Israel time). Then a table, newest found first, in the
+  order given: נמצאה (foundLocal, day and hour), חברה (company; "לא משויכת" when unmatched), הוצאה / הכנסה, ספק / לקוח
+  (party), מס' חשבונית, סכום (total with its currency), תאריך החשבונית (date). Add the mailbox column only when the rows
+  come from more than one mailbox, and the books column (נרשמה / ממתינה / חסרה בספרים…) only when some row has it.
+  Never sort again by the invoice date and never call foundLocal the invoice date: say once that the order is by
+  when the invoice was FOUND. When asked for a period (days / since / until), add one line with the count per day
+  (byDay). Do not write the Drive links in the table; give a row's fileUrl only when the user asks for the file.
+  available false → say why (note). errors → one line: that folder could not be read.
 - Missing invoices (missing_invoices): the answer is built PER CHANNEL (channels[]): for each channel one part that
   starts with its title in the user's language (titleHe / title: "לפי החשבוניות שהגיעו למייל של הנהלת החשבונות
   (דרייב):"), then the state in one line per company — how many invoices of this channel in the period

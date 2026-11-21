@@ -218,7 +218,10 @@ amount with VAT (a credit note minus), the expense account and the batch — "ח
 הזנה ותאריך הוצאה"; never `missing_invoices` for it (that one compares Drive with the books). Amounts are without VAT except supplier
 invoices, customer invoices and cheques. `vat_summary` (the books) is not `vat_report` (Beecomm). An account named by
 text (`q`) that matches several accounts comes back `ambiguous` with the matches, and the answer asks which one. The
-accounting menu suggests 8 more questions for the chain admin (`joya.area.accounting.s9`–`s16`). **Missing invoices
+accounting menu suggests 8 more questions for the chain admin (`joya.area.accounting.s9`–`s16`). **The latest invoices the agent found (owner
+2026-11-22)**: `latest_invoices` — "תראה לי את החשבוניות האחרונות": the invoices the invoice agent found in the mailboxes,
+newest found first (by the time it found them, not the invoice date), for every company and the unmatched ones; from the
+admin's `/finance/invoices/drive-latest`. **Missing invoices
 (owner 2026-11-08)**: `missing_invoices` — "which invoices are not booked yet" is one question with several CHANNELS to
 look in, and the answer is one part per channel (`channels[]`, each with its title); the user asks about missing
 invoices, never about a channel. First channel `drive` → `/finance/invoices/drive-check`: the invoices the invoice agent

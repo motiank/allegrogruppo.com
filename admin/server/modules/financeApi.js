@@ -13,7 +13,8 @@ import { searchPriorityCheques, PRIORITY_CHEQUES_META, PRIORITY_CHEQUES } from "
 import { mergeCheques } from "./chequesAll.js";
 import { companyArchive, searchArchive, archiveCounts, driveImageUrl, readChequeImage } from "./chequeArchive.js";
 import { chequePayees, pickPayee } from "./chequePayees.js";
-import { listCompanyIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
+import { listCompanyIndexes, listAllIndexes, writeFlags, driveUnavailable } from "./invoiceDrive.js";
+import { latestInvoices, latestRow } from "../../../shared/invoiceLatest.js";
 import { matchInvoices, booksFlag, flagChanged, normDigits, STATUSES } from "../../../shared/invoiceMatch.js";
 
 // Finance API: read-only, localhost-only JSON API over allegro_finance (the Hashavshevet copy made by hash-sync),
@@ -2049,6 +2050,46 @@ route("/invoices/drive-check", async (req, ctx, facts) => {
   return { data: data.slice(offset, offset + limit), meta: { ...meta, status: wanted.length ? wanted : "all", q: q || null, limit, offset, total: data.length }, codes: ["unposted_entries"], range: { from, to } };
 });
 const flagReq = flag;
+
+// The latest invoices the agent FOUND, newest found first (owner 2026-11-22): every folder the agent files into —
+// the companies of the main "Invoices" folder, _unmatched, and the extra folders (the owner's other companies).
+// Not a books question, so no company: the rows come from the Drive indexes alone (shared/invoiceLatest.js).
+route("/invoices/drive-latest", async (req) => {
+  const why = driveUnavailable();
+  if (why) throw new ApiError(503, "drive_unavailable", why);
+  const limit = req.query.limit == null || req.query.limit === "" ? 20 : Number(req.query.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) throw badRequest(`limit must be 1-${MAX_LIMIT}`);
+  const days = positiveInt(req, "days", 0);
+  let since = optionalDate(req, "since", null);
+  const until = optionalDate(req, "until", null);
+  if (!since && days) since = addDays(today(), -(days - 1));
+  if (since && until && since > until) throw badRequest("until must not be before since");
+  const f = {
+    since, until,
+    company: String(req.query.company || "").trim() || null,
+    direction: oneOf(req, "direction", ["expense", "income"], null),
+    mailbox: String(req.query.mailbox || "").trim().toLowerCase() || null,
+    unmatched: oneOf(req, "unmatched", ["only", "hide"], null),
+    q: String(req.query.q || "").trim() || null,
+  };
+  const { indexes, errors } = await listAllIndexes({ fresh: flag(req, "fresh") });
+  const all = indexes.flatMap((x) => x.index.invoices.map((inv) => latestRow(inv, x)));
+  const r = latestInvoices(all, f);
+  // with found days asked, every row of those days is the answer (up to the API's limit); else the last `limit`
+  const rows = r.rows.slice(0, since || until ? MAX_LIMIT : limit);
+  const mailboxes = {};
+  for (const x of all) mailboxes[x.mailbox] = (mailboxes[x.mailbox] || 0) + 1;
+  return {
+    data: rows,
+    meta: {
+      ...f, limit, total: r.total, shown: rows.length, lastFoundAt: r.lastFoundAt, byDay: r.byDay,
+      allInvoices: all.length, mailboxes,
+      folders: indexes.map((x) => ({ target: x.target, folder: x.name, invoices: x.index.invoices.length, updatedAt: x.index.updated_at || null })),
+      ...(errors.length ? { errors } : {}),
+      note: "foundAt = when the invoice agent filed the invoice in Drive (UTC), the sort key; foundLocal = the same in Israel time (since / until / days / byDay are Israel days); date = the date printed on the invoice. mailbox main = the accountant's mailbox, read every 15 minutes; another mailbox is read only when the owner runs a backfill. unmatched = the invoice is not from or to one of the companies on the agent's list. books = the last match with Hashavshevet, when one was made.",
+    },
+  };
+}, { company: false });
 
 /** The daily job (server.js, INVOICE_DRIVE_AUTO=1): checks this year's Drive invoices of every company that has a Drive folder and writes the flags. */
 export async function driveCheckAll({ log = console } = {}) {
