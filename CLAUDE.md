@@ -185,6 +185,23 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   admin only), calcs `legal_*` — see `hq/CLAUDE.md`. Tests `node --test scripts/test_legal_archive.js` (no Drive, no DB). Deployed
   2026-11-18 (`313adb9`: pull, `allegro-admin` restart, hq build, `joya-hq` + `joya-runner` restart; no new settings needed; the
   API answered on the droplet — people, name search, hearings, a 6 MB PDF).
+- **Bank update from the bank site** (2026-11-22, owner: "update the bank data in the system the same way we have with the legal: click
+  the button, it opens the login to the Poalim bank, downloads the missing bank data of the Allegro account and the Pasta Lina account
+  and pushes it to the database — the transactions, the transfers, and the new cheque images"): the Joya browser extension
+  (`joya-extension/`, renamed from `legal-extension/`, one extension for both jobs — reload it from the new folder) opens the Bank
+  Hapoalim business site (`biz2.bankhapoalim.co.il`), the user logs in by himself, and the extension reads the site's own JSON: the
+  moves of every configured account (`shared/restaurants.json` `bank_accounts`; Pasta Lina 12-584-136663; the Allegro account
+  12-584-136661 is seen in the statement but NOT configured yet — add it when the owner confirms) from 7 days before the last stored
+  day, and the front picture of every paid cheque the Drive archive lacks. Joya HQ (`hq/src/services/bankSync.js`, card
+  `hq/client/BankUpdate.js` on the System page) passes everything to the admin's Local Data API `/bank/sync/*`
+  (`admin/server/modules/bankSync.js`, `local_api_readme.md` → "Bank update from the bank site"): the site rows are mapped to the
+  Excel row shape with the same `row_key`, plus a text-free move key against the older Excel rows, so nothing is stored twice; a
+  `file_uploads` row "bank-site …" per import; the pictures go to Drive through `chequeArchive.js` `addChequeImage` (payee from the
+  books / Priority, else `_unknown`). Not yet: the transaction status file (סטטוס עסקאות — the site's page for it was never mapped;
+  the Upload page still takes it) and the payee read from the picture. The site's field names follow the open-source
+  israeli-bank-scrapers (same backend) and the owner's 2026-11-15 cheque session (memory `bank-cheque-images`); the first real run
+  must be watched: the site's `accountId` format and the exact JSON shape are confirmed only then. Tests `scripts/test_bank_sync.js`,
+  `hq/test/test_bank_extension.mjs`. Not deployed yet.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`

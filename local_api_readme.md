@@ -142,6 +142,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /bank/transactions/stored?from=&to=[&company=][&account=][&q=][&side=credit\|debit][&group=none\|day\|action\|details]` | Bank account transactions (uploaded bank files), per row, per day with the closing balance, or summed per action | `bank_transactions` |
 | `GET /bank/events?from=&to=[&company=][&account=][&type=transfer\|authorization\|cheque_cancel\|government][&status=active\|cancelled\|all][&q=]` | The bank's transaction status file (orders given on the bank site: transfers with the payee's bank account and submitter, standing-order authorizations, cheque cancellations) | `bank_events` |
 | `GET /system/freshness` | How fresh every data source is: the Hashavshevet copy, the bank files, Tabit, Beecomm, the Drive indexes, the fixed files — last business date, last load, rows, state; for Joya's "System" page (2026-11-18) | all of them, read only |
+| `GET /bank/sync/plan`, `GET /bank/sync/cheques`, `POST /bank/sync/transactions`, `POST /bank/sync/cheque-image` | The bank update from the bank site (the Joya browser extension through Joya HQ, 2026-11-22): what to fetch, the site's rows → stored, the paid cheques without a picture, a cheque picture → the Drive archive. Admin only (`X-Joya-Admin: 1`) | `bank_transactions`, `file_uploads`, the Drive cheque archive |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -894,6 +895,45 @@ a fixed file), ageDays, state }` — `state` = `ok` (within `expectedDays`), `la
 (the bank page in Hashavshevet behind the uploaded bank file, the cheque archive behind the bank, the status file behind the bank
 file, a sync that did not run, Beecomm's lag, sources not read). Test: `node --test scripts/test_data_freshness.js` (the rules, no
 DB). Joya: `/api/joya/system/freshness` (chain admin) → page `/system`, main-menu item "מערכת".
+
+---
+
+### Bank update from the bank site — `/bank/sync/*` (admin only)
+
+Owner 2026-11-22: "update the bank data in the system the same way we have with the legal: click the button, it opens the login to the
+Poalim bank, downloads the missing bank data of the Allegro account and the Pasta Lina account and pushes it to the database — the
+transactions, the transfers, and the new cheque images". The Joya browser extension (`joya-extension/`, bank part) opens the Bank
+Hapoalim business site in the user's Chrome, the user logs in by himself, the extension reads the site's own JSON and sends it to Joya
+HQ, which forwards it here with the user's rights (`X-Joya-Admin: 1`, `X-Joya-User`). `admin/server/modules/bankSync.js`. Every call
+without `X-Joya-Admin: 1` is `403 forbidden`.
+
+- `GET /bank/sync/plan` → `{ today, overlapDays, accounts: [{ company, companyLabel, bank, account, financeCode, archiveFolder, lastDay,
+  rows, from, to }], events: { supported: false, lastSubmitted, note }, cheques: { lookbackDays, max }, archive: { <financeCode>: {
+  configured, folder, error, cheques } } }` — the configured accounts (`shared/restaurants.json` → `bank_accounts`) with the last stored
+  bank day; `from` = that day minus 7 (`2025-01-01` when nothing is stored), `to` = today. `events.supported` is false: the transaction
+  status file (סטטוס עסקאות) is not fetched from the site yet — the Upload page takes it.
+- `POST /bank/sync/transactions` JSON `{ account, rows: [the site's transaction rows], from?, to? }` → `{ account, company, from, to,
+  rows, mapped, newRows, alreadyStored, pending, uploadId }`. A site row (`eventDate` / `valueDate` YYYYMMDD, `activityTypeCode`,
+  `activityDescription`, `beneficiaryDetailsData { partyHeadline, partyName, messageHeadline, messageDetail }`, `referenceNumber`,
+  `eventAmount` + `eventActivityTypeCode` 2 = debit, `currentBalance`, `serialNumber` 0 = pending) is mapped to the row the Excel file
+  of the Upload page would have stored (`siteRowToStored`: the same `row_key` formula as `parseBankHapoalim`), and a move an older Excel
+  upload already stored (same account, day, action code, reference, debit, credit — the texts may differ a little) is not stored again
+  (`moveKey` / `dropStored`). New rows get one `file_uploads` row (`kind` BANK_HAPOALIM, `file_name` `bank-site <account> <from>..<to>`,
+  `result_json.source` `bank_site`), so the Upload history and `/system/freshness` show the update. Nothing is written when nothing is new.
+- `GET /bank/sync/cheques?account=[&since=YYYY-MM-DD]` → `data` = `[{ date, reference, amount }]` (newest first, at most 400): the paid
+  cheques of the stored rows (action code 493 / "שיק", money out) of the last 120 days (or since `since`) that the Drive cheque archive
+  has no picture of (same number and amount). `meta`: `from`, `archive { configured, error, cheques }`, `checked`, `reason` (why nothing
+  is asked: no archive for the company, Drive unreadable).
+- `POST /bank/sync/cheque-image?account=&date=&reference=&amount=` with the picture as the body (`image/jpeg` or `image/png`) →
+  `{ ok, skipped?, imageId, path, folder, name, payee, payeeSource }`: the front picture is filed in the Drive archive
+  (`chequeArchive.js` `addChequeImage`: `<company folder>/cheques/<payee or _unknown>/<number>.jpg` + a row in `index.json`, keyed by
+  date | number | amount, `filedBy` `admin`), the payee from the books / Priority (the cheque lookup, `payeeSource` cheques | journal |
+  priority, else `missing` → folder `_unknown`; the name is read from the picture in a later step, as before). A cheque that already has
+  a picture is `skipped` (nothing uploaded). Errors: `400 bad_request` (missing date / number / amount, not a picture), `404 not_found`
+  (an account not configured, a company without an archive folder).
+
+Tests: `node --test scripts/test_bank_sync.js` (the mapping and the keys, no DB). Joya side: `hq/src/services/bankSync.js`,
+`/api/joya/bank/sync/*`, the card on the System page; the extension: `joya-extension/README.md`.
 
 ## Data sources
 

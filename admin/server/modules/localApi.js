@@ -9,6 +9,7 @@ import { norm, nameKey } from "../uploads/workbook.js";
 import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
 import { parseFiles, recognizeUploads, importUploads } from "./files.js";
 import { dataFreshness } from "./dataFreshness.js";
+import * as bankSync from "./bankSync.js";
 import {
   bcomGetOrders,
   bcomGetExceptions,
@@ -534,6 +535,10 @@ const ENDPOINTS = [
   "GET /bank/transactions/stored?from=&to=[&company=a,b][&account=][&q=][&side=credit|debit][&group=none|day|action|details]",
   "GET /bank/events?from=&to=[&company=a,b][&account=][&type=transfer|authorization|cheque_cancel|government][&status=active|cancelled|all][&q=]",
   "GET /system/freshness",
+  "GET /bank/sync/plan  (admin: X-Joya-Admin: 1)",
+  "GET /bank/sync/cheques?account=[&since=]  (admin)",
+  "POST /bank/sync/transactions  JSON { account, rows: [site rows], from?, to? }  (admin)",
+  "POST /bank/sync/cheque-image?account=&date=&reference=&amount=  image/jpeg body  (admin)",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -1921,6 +1926,57 @@ const Router = () => {
     const data = rows.map((r) => ({ company: bankCompany(r.account), ...r }));
     const sum = (f) => Math.round(data.filter(f).reduce((a, r) => a + (r.amount || 0), 0) * 100) / 100;
     return { data, meta: { ...meta, transfers: data.filter((r) => r.typeCode === "transfer" && !r.cancelled).length, transfersAmount: sum((r) => r.typeCode === "transfer" && !r.cancelled), cancelled: data.filter((r) => r.cancelled).length } };
+  });
+
+  // ── bank update from the bank site (bankSync.js): what the Joya browser extension brings, through Joya HQ ──
+  // Admin only (X-Joya-Admin: 1 — Joya sends the user's rights, as for the files). Writes bank_transactions and the
+  // Drive cheque archive; see local_api_readme.md → "Bank update from the bank site".
+  const adminOnly = (req) => {
+    if (req.get("X-Joya-Admin") !== "1") throw new ApiError(403, "forbidden", "admin only");
+  };
+  // bankSync.js throws plain errors with { status, code } (no express there) → the API's error shape
+  const asApiError = (err) => (!(err instanceof ApiError) && err.status && err.code ? new ApiError(err.status, err.code, err.message) : err);
+  const syncError = (req, res, err) => {
+    const e = asApiError(err);
+    if (e instanceof ApiError) return res.status(e.status).json({ error: { code: e.code, message: e.message } });
+    console.error(`local-api ${req.path} error:`, err);
+    res.status(500).json({ error: { code: "internal_error", message: err.message } });
+  };
+  get("/bank/sync/plan", async (req) => {
+    adminOnly(req);
+    return { data: await bankSync.plan() };
+  });
+  get("/bank/sync/cheques", async (req) => {
+    adminOnly(req);
+    const account = String(req.query.account || "").trim();
+    if (!account) throw badRequest("account is required");
+    const since = String(req.query.since || "").trim() || null;
+    if (since && !isIsoDate(since)) throw badRequest("since must be YYYY-MM-DD");
+    const r = await bankSync.chequesWithoutImage(account, { since }).catch((e) => {
+      throw asApiError(e);
+    });
+    return { data: r.cheques, meta: { account, from: r.from || null, archive: r.archive, checked: r.checked || 0, reason: r.reason || null } };
+  });
+  router.post("/bank/sync/transactions", express.json({ limit: "40mb" }), async (req, res) => {
+    try {
+      adminOnly(req);
+      const account = String(req.body?.account || "").trim();
+      if (!account) throw badRequest("account is required");
+      if (!Array.isArray(req.body?.rows)) throw badRequest("rows must be an array");
+      const data = await bankSync.importSiteRows(account, req.body.rows, { user: String(req.get("X-Joya-User") || "") || null, from: req.body.from || null, to: req.body.to || null });
+      res.json({ data });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  router.post("/bank/sync/cheque-image", express.raw({ type: ["image/jpeg", "image/png", "application/octet-stream"], limit: "6mb" }), async (req, res) => {
+    try {
+      adminOnly(req);
+      const data = await bankSync.fileChequeImage({ account: String(req.query.account || "").trim(), date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body);
+      res.json({ data });
+    } catch (err) {
+      syncError(req, res, err);
+    }
   });
 
   router.use((req, res) =>

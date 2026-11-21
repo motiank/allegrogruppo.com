@@ -8,32 +8,32 @@
   const firstCaseNumber = () => (document.body.innerText.match(/\b\d{1,6}-\d{2}-\d{2}\b/) || [null])[0];
   const generalError = () => /שגיאה כללית/.test(document.body.innerText.slice(0, 4000));
 
-  function askMain(type) {
+  // Clicks are done by court_main.js, in the page's own world: many links of this site are "javascript:" links, and
+  // the browser blocks those when an extension's own script clicks them.
+  function askMain(type, what) {
     return new Promise((resolve) => {
       const id = Math.random().toString(36).slice(2);
       const on = (ev) => { if (ev.source === window && ev.data?.source === 'joya-court-main' && ev.data.id === id) { window.removeEventListener('message', on); resolve(ev.data); } };
       window.addEventListener('message', on);
-      window.postMessage({ source: 'joya-court', type, id }, location.origin);
+      window.postMessage({ source: 'joya-court', type, what, id }, location.origin);
       setTimeout(() => { window.removeEventListener('message', on); resolve(null); }, 4000);
     });
   }
 
   const handlers = {
     where: () => ({ path: location.pathname, title: document.title, hasSearch: !!$(H + 'BamaCaseNumberTextBoxHT'), generalError: generalError(), firstCase: firstCaseNumber() }),
-    openCase: ({ number }) => {
+    openCase: async ({ number }) => {
       const m = /^(\d+)-(\d\d)-(\d\d)$/.exec(number);
       const no = $(H + 'BamaCaseNumberTextBoxHT'), my = $(H + 'BamaMonthYearTextBoxHT'), go = $(H + 'SearchHeaderCaseButton');
       if (!m || !no || !my || !go) return { ok: false, error: 'the case search box was not found' };
       setValue(no, m[1]);
       setValue(my, m[2] + m[3]);
-      setTimeout(() => go.click(), 150);
-      return { ok: true };
+      const c = await askMain('click', 'search');
+      return c?.ok ? { ok: true } : { ok: false, error: c?.error || 'the page did not answer the search click' };
     },
-    openPaperFolder: () => {
-      const a = [...document.querySelectorAll('a')].find((x) => /תיק נייר/.test(x.innerText || ''));
-      if (!a) return { ok: false, error: 'the paper folder link was not found' };
-      setTimeout(() => a.click(), 150);
-      return { ok: true };
+    openPaperFolder: async () => {
+      const c = await askMain('click', 'paper');
+      return c?.ok ? { ok: true } : { ok: false, error: c?.error || 'the page did not answer the paper folder click' };
     },
     rows: async () => {
       const r = await askMain('rows');

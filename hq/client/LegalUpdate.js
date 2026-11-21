@@ -42,7 +42,7 @@ export default function LegalUpdate() {
       if (ev.source !== window || ev.data?.source !== 'joya-ext') return;
       const m = ev.data;
       if (m.type === 'hello') return setExt(m.version || extVersion());
-      if (m.type !== 'progress') return;
+      if (m.type !== 'progress' || (m.job && m.job !== 'legal')) return; // the same extension also runs the bank update
       setProg(m);
       if (m.phase === 'idle') return setBusy(false); // the extension runs nothing (e.g. after a page reload)
       if (['done', 'error', 'stopped'].includes(m.phase)) { setBusy(false); load(); }
@@ -69,7 +69,7 @@ export default function LegalUpdate() {
     try {
       const plan = await api(`/legal/sync/plan${qs({ person })}`);
       const batch = await api('/legal/sync/start', { method: 'POST', body: { person } });
-      window.postMessage({ source: 'joya-page', type: 'start', person, batchId: batch.id, plan }, window.location.origin);
+      window.postMessage({ source: 'joya-page', type: 'start', job: 'legal', person, batchId: batch.id, plan }, window.location.origin);
       load();
     } catch (e) {
       setError(e);

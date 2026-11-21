@@ -246,6 +246,12 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   papers; never write links — `LegalFiles` in `AskBox.js` shows the case and PDF buttons). The stories are AI-written from the papers; a
   closed case of Itzik holds only its opening paper and verdict (`partial`). Tests: `test/test_joya_lib.mjs` (access), admin
   `scripts/test_legal_archive.js`; eval `l-*` 10/10 (context kind `LEGAL`). Deployed 2026-11-18 (`313adb9`, hq build).
+- **Bank update from the bank site** (2026-11-22, owner: "the same way we have with the legal"): a card on the System page
+  (`client/BankUpdate.js`) for a Chrome with the Joya browser extension (`../joya-extension/`, one extension for the legal and the bank
+  jobs — progress messages carry `job`); `src/services/bankSync.js` = a pass-through to the admin's `/local-api/v1/bank/sync/*` with the
+  admin rights in the `X-Joya-*` headers + `runs.json` (`JOYA_BANK_SYNC_DIR`, default `~/.joya-bank-sync`); routes `/joya/bank/sync/*`
+  (chain admin). Joya stores nothing: the admin writes `bank_transactions` and the Drive cheque archive. README → "Bank update from the
+  bank site". Tests `test/test_bank_extension.mjs` (in `npm test`). Needs an hq client build on deploy. Not deployed yet.
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

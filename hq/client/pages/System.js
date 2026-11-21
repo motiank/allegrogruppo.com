@@ -9,6 +9,7 @@ import { useT } from '../i18n/index.js';
 import { Page, Card, Btn, Badge, Loading, ErrorBox, useLoad, fmtDay, fmtWhen } from '../ui.js';
 import { BUILD, checkForUpdate, reloadApp } from '../version.js';
 import LegalUpdate from '../LegalUpdate.js';
+import BankUpdate from '../BankUpdate.js';
 
 const useStyles = createUseStyles((theme) => ({
   note: { fontSize: '0.82rem', color: theme.textSecondary, margin: '0 0 0.6rem', lineHeight: 1.5 },
@@ -70,6 +71,7 @@ export default function System() {
       {r.loading && !r.data ? <Loading /> : null}
       {r.error ? <ErrorBox error={r.error} /> : null}
       <AppVersion c={c} />
+      <BankUpdate />
       <LegalUpdate />
       {r.data ? (
         <>

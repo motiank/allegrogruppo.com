@@ -669,6 +669,25 @@ and then shows a dialog "יש גרסה חדשה של Joya" with "טען מחדש
 System page has an "עדכן אפליקציה" button that checks now and reloads at once when there is a new build, else says the app is
 up to date. The service worker keeps no cache, so a reload is enough.
 
+**Bank update from the bank site** (owner 2026-11-22: "update the bank data in the system the same way we have with the legal: click
+the button, it opens the login to the Poalim bank, downloads the missing bank data of the Allegro account and the Pasta Lina account
+and pushes it to the database — the transactions, the transfers, and the new cheque images"): a card "עדכון מהבנק – בנק הפועלים" on the
+System page (`client/BankUpdate.js`), shown only in a Chrome that has the Joya browser extension (`../joya-extension/`, the same one
+that updates the legal archive; `data-joya-ext` on the page). The button asks the admin for the plan (`GET /api/joya/bank/sync/plan`:
+per configured account the last stored bank day), opens a run (`POST /api/joya/bank/sync/start`) and hands it to the extension, which
+opens the Poalim business site in a normal tab; **the user logs in by himself**. The extension then reads the site's own JSON — the
+moves of each account from 7 days before the last stored day to today, in 10-day parts — and sends them through the open Joya page
+to `POST /api/joya/bank/sync/:id/transactions`; Joya passes them to the admin's `POST /local-api/v1/bank/sync/transactions`
+(`src/services/bankSync.js`: a thin pass-through with the user's admin rights in the `X-Joya-*` headers, plus `runs.json` under
+`JOYA_BANK_SYNC_DIR` for the card). The admin stores only what is new, in the same row shape as the Excel upload, so the two ways never
+store a move twice. Then, per account, `GET /api/joya/bank/sync/:id/cheques` = the paid cheques whose picture the Drive cheque archive
+lacks (the admin decides, the rows just stored count), the extension fetches each front picture from the site and
+`POST /api/joya/bank/sync/:id/cheque-image` files it in Drive through the admin (payee from the books / Priority, else `_unknown`).
+`finish` / `cancel` close the run; the card shows the last runs per account (new rows, pictures, errors) and the Upload history gets a
+row "bank-site <account> <from>..<to>". Not yet: the transaction status file (the transfers' payees) — still uploaded on the Upload page;
+the payee read from the cheque picture is still a separate step. Admin side: `../local_api_readme.md` → "Bank update from the bank site".
+Tests: `test/test_bank_extension.mjs` (the extension's pure helpers), admin `scripts/test_bank_sync.js`.
+
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
 (ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
 Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **labor cost

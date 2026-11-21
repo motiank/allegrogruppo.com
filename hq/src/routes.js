@@ -29,6 +29,7 @@ import { extractAttachment, MAX_FILE_BYTES } from './services/attachments.js';
 const askUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 1 } }).single('file');
 import { forecastWeek } from './services/demand.js';
 import * as legalSync from './services/legalSync.js';
+import * as bankSync from './services/bankSync.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
@@ -330,6 +331,23 @@ r.post(
 );
 r.post('/joya/legal/sync/:id/cancel', requireAdmin, h(async (req) => legalSync.cancel(req.params.id, req.body?.why)));
 r.post('/joya/legal/sync/:id/finish', requireAdmin, h(async (req) => legalSync.finish(req.params.id, req.body?.summary)));
+
+// ---------------------------------------------------------------- bank update (the bank site → the admin)
+// services/bankSync.js: the same browser extension brings the bank's moves and the new cheque pictures through the open
+// Joya page; Joya passes them to the admin's Local Data API (/bank/sync/*), which stores them at once. Chain admin only.
+r.get('/joya/bank/sync/state', requireAdmin, h(async () => bankSync.state()));
+r.get('/joya/bank/sync/plan', requireAdmin, h(async (req) => bankSync.plan(req.joya)));
+r.post('/joya/bank/sync/start', requireAdmin, h(async (req) => bankSync.start({ by: req.joya.username, plan: req.body?.plan })));
+r.post('/joya/bank/sync/:id/transactions', requireAdmin, express.json({ limit: '40mb' }), h(async (req) => bankSync.transactions(req.joya, req.params.id, req.body || {})));
+r.get('/joya/bank/sync/:id/cheques', requireAdmin, h(async (req) => bankSync.cheques(req.joya, req.params.id, String(req.query.account || ''), { since: req.query.since || null })));
+r.post(
+  '/joya/bank/sync/:id/cheque-image',
+  requireAdmin,
+  express.raw({ type: ['image/jpeg', 'image/png', 'application/octet-stream'], limit: '6mb' }),
+  h(async (req) => bankSync.chequeImage(req.joya, req.params.id, { account: req.query.account, date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body, req.get('content-type'))),
+);
+r.post('/joya/bank/sync/:id/finish', requireAdmin, h(async (req) => bankSync.finish(req.params.id, { summary: req.body?.summary, error: req.body?.error })));
+r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.cancel(req.params.id, req.body?.why)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
 // Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank

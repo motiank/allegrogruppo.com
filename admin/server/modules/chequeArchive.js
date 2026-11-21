@@ -126,7 +126,71 @@ export async function companyArchive(companyCode) {
   if (!folder) return { cheques: [], error: null, folder: null, indexId: null, modifiedTime: null, configured: false };
   const { companies, error } = await loadChequeArchive();
   const co = companies.find((c) => c.name === folder || c.company === folder);
-  return { cheques: co?.cheques || [], error, folder, indexId: co?.indexId || null, modifiedTime: co?.modifiedTime || null, configured: true };
+  return { cheques: co?.cheques || [], error, folder, folderId: co?.folderId || null, indexId: co?.indexId || null, modifiedTime: co?.modifiedTime || null, configured: true };
+}
+
+// ── writing: a new cheque picture from the bank update (bankSync.js) ─────────
+// The same files the owner's machine wrote (~/bank-cheques/tools/upload2.mjs): <company>/cheques/<payee or _unknown>/
+// <reference>.jpg (+ "_<date>" when the payee already has that number) and a row in index.json keyed by
+// date | reference | amount. One writer (this process), one cheque at a time; the index is read again before every
+// write so a row filed by the owner's machine in the meantime is kept.
+
+const safeName = (s) => String(s || "").replace(/[\/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+const entryKey = (date, reference, amount) => `${String(date).slice(0, 10)}|${String(reference)}|${Math.round(Math.abs(Number(amount)) * 100)}`;
+let writing = Promise.resolve(); // serialises the index writes
+
+async function findOrCreateFolder(name, parentId) {
+  const files = driveFiles();
+  const r = await files.list({ q: `name=${driveQuote(name)} and ${driveQuote(parentId)} in parents and mimeType='${FOLDER}' and trashed=false`, fields: "files(id,name)", pageSize: 1 });
+  if (r.data.files?.[0]) return r.data.files[0].id;
+  const c = await files.create({ requestBody: { name, mimeType: FOLDER, parents: [parentId] }, fields: "id" });
+  return c.data.id;
+}
+
+/**
+ * Files one cheque picture (the front) in the company's archive: entry = { date 'YYYY-MM-DD', reference (the cheque
+ * number), amount (minus = money out), payee ('' = unknown), payeeSource (the archive's word: "פריוריטי" | "פקודת יומן" |
+ * "מודול צ'קים" | "חסר") }. A cheque that already has a front picture is skipped. Returns { skipped?, imageId, path, folder, name }.
+ */
+export async function addChequeImage(companyCode, entry, buffer, mimeType = "image/jpeg") {
+  const why = driveUnavailable();
+  if (why) throw new Error(why);
+  const folder = archiveFolderOf(companyCode);
+  if (!folder) throw new Error(`no cheque archive folder is configured for ${companyCode}`);
+  const run = async () => {
+    const { Readable } = await import("stream");
+    const files = driveFiles();
+    const companyId = await findOrCreateFolder(folder, rootFolderId());
+    const idx = await files.list({ q: `name='index.json' and ${driveQuote(companyId)} in parents and trashed=false`, fields: "files(id)", pageSize: 1 });
+    const indexId = idx.data.files?.[0]?.id || null;
+    const index = indexId ? await readDriveJson(indexId) : null;
+    const cheques = Array.isArray(index?.cheques) ? index.cheques : [];
+    const key = entryKey(entry.date, entry.reference, entry.amount);
+    let row = cheques.find((c) => entryKey(c.date, c.reference, c.amount) === key);
+    if (row?.files?.front?.id) return { skipped: true, imageId: row.files.front.id, path: row.files.front.path, folder: row.party_folder, name: row.name };
+    const party = safeName(entry.payee) || "_unknown";
+    const chequesId = await findOrCreateFolder("cheques", companyId);
+    const partyId = await findOrCreateFolder(party, chequesId);
+    if (!row) {
+      const clash = cheques.some((c) => c.party_folder === party && c.name === String(entry.reference));
+      row = { date: entry.date, reference: String(entry.reference), amount: Number(entry.amount), details: "שיק", payee: entry.payee || "", payeeSource: entry.payeeSource || "חסר", party_folder: party, name: clash ? `${entry.reference}_${entry.date}` : String(entry.reference), files: {} };
+      cheques.push(row);
+    }
+    const ext = mimeType === "image/png" ? "png" : "jpg";
+    const fileName = `${row.name}.${ext}`;
+    const up = await files.create({ requestBody: { name: fileName, parents: [partyId] }, media: { mimeType, body: Readable.from([buffer]) }, fields: "id" });
+    row.files = { ...(row.files || {}), front: { id: up.data.id, path: `cheques/${party}/${fileName}` } };
+    row.filedBy = "admin";
+    row.filedAt = new Date().toISOString();
+    const body = Buffer.from(JSON.stringify({ ...(index || {}), company: index?.company || folder, cheques }, null, 2));
+    if (indexId) await files.update({ fileId: indexId, media: { mimeType: "application/json", body: Readable.from([body]) } });
+    else await files.create({ requestBody: { name: "index.json", parents: [companyId] }, media: { mimeType: "application/json", body: Readable.from([body]) }, fields: "id" });
+    forgetChequeArchive();
+    return { imageId: up.data.id, path: row.files.front.path, folder: party, name: row.name };
+  };
+  const p = writing.then(run, run);
+  writing = p.catch(() => {});
+  return p;
 }
 
 /**

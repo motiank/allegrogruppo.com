@@ -1,9 +1,13 @@
-// The manager of an update run. Started only by the Joya HQ System page (through hq.js):
+// The manager of an update run. Started only by the Joya HQ System page (through hq.js). Two jobs share it:
+//   job 'legal' (this file) — נט המשפט:
 //   1. opens נט המשפט in a normal tab and waits until the USER has logged in (it never touches the login);
 //   2. for every open case of the plan: finds the case, opens its paper folder, reads the paper list;
 //   3. asks the site for each paper the archive does not hold (the page's own form request — what the "הורדת מסמך"
 //      icon sends; the site answers with a short-lived address of the file) and hands the PDF to the Joya page;
 //   4. tells Joya it is done. Nothing is saved on this computer.
+//   job 'bank' (bank-run.js) — the Bank Hapoalim business site: the new moves and the new cheque pictures.
+// One run at a time in this browser, whichever job; every progress message carries its `job`.
+importScripts('bank-run.js');
 const COURT = 'https://securesso.court.gov.il/Ngcs.Web.Secured/';
 const START = COURT + 'PersonalAreaPage.aspx';
 const CHUNK = 700 * 1024; // pieces small enough for any upload limit on the way
@@ -17,13 +21,15 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((m) => {
     if (m.type === 'ping') return;
     if (m.type === 'uploaded') { const p = pending.get(m.reqId); if (p) { pending.delete(m.reqId); p(m); } return; }
-    if (m.type === 'status') return port.postMessage({ type: 'progress', phase: run ? 'running' : 'idle', text: run ? run.last : '' });
-    if (m.type === 'stop') { if (run) run.stop = true; return; }
+    const job = m.job === 'bank' ? 'bank' : 'legal';
+    if (m.type === 'status') return port.postMessage({ type: 'progress', job, phase: run && run.job === job ? 'running' : 'idle', text: run && run.job === job ? run.last : '' });
+    if (m.type === 'stop') { if (run && run.job === job) run.stop = true; return; }
     if (m.type === 'start') {
-      if (run) return port.postMessage({ type: 'progress', phase: 'error', text: 'an update is already running in this browser' });
-      run = { port, stop: false, last: '' };
+      if (run) return port.postMessage({ type: 'progress', job, phase: 'error', text: `an update (${run.job}) is already running in this browser` });
+      run = { port, stop: false, last: '', job };
       const r = run;
-      update(r, m).catch((e) => say(r, 'error', String(e.message || e))).finally(() => { if (run === r) run = null; });
+      const work = job === 'bank' ? self.joyaBank.update(r, m) : update(r, m);
+      work.catch((e) => say(r, 'error', String(e.message || e))).finally(() => { if (run === r) run = null; });
     }
   });
   port.onDisconnect.addListener(() => { if (run && run.port === port) run.stop = true; });
@@ -31,11 +37,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
 function say(r, phase, text, extra = {}) {
   r.last = text;
-  try { r.port.postMessage({ type: 'progress', phase, text, ...extra }); } catch { r.stop = true; }
+  try { r.port.postMessage({ type: 'progress', job: r.job || 'legal', phase, text, ...extra }); } catch { r.stop = true; }
 }
 
 function toJoya(r, path, body) {
-  // body: { json } or { b64 }; answered by hq.js after the same-origin request
+  // body: { json } or { b64 [, contentType] }; answered by hq.js after the same-origin request (a bare path = GET)
   return new Promise((resolve, reject) => {
     const reqId = Math.random().toString(36).slice(2);
     const t = setTimeout(() => { pending.delete(reqId); reject(new Error('Joya did not answer (is the Joya page still open?)')); }, 120000);

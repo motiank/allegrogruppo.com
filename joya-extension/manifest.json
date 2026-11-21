@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Joya Update — נט המשפט + בנק הפועלים",
+  "version": "1.0.0",
+  "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive, and the new bank moves and cheque pictures from the Bank Hapoalim business site into the admin. Works only when started from the Joya HQ System page, after you log in to the site yourself.",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "https://securesso.court.gov.il/*",
+    "https://*.s3.il-central-1.amazonaws.com/*",
+    "https://biz2.bankhapoalim.co.il/*",
+    "https://www.bankhapoalim.biz/*",
+    "https://login.bankhapoalim.co.il/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://hq.allegrogruppo.com/*", "http://localhost:4300/*", "http://127.0.0.1:4300/*", "http://localhost:4301/*", "http://127.0.0.1:4301/*"], "js": ["hq.js"], "run_at": "document_start" },
+    { "matches": ["https://securesso.court.gov.il/Ngcs.Web.Secured/*"], "js": ["court.js"], "run_at": "document_idle" },
+    { "matches": ["https://securesso.court.gov.il/Ngcs.Web.Secured/*"], "js": ["court_main.js"], "run_at": "document_idle", "world": "MAIN" },
+    { "matches": ["https://biz2.bankhapoalim.co.il/*"], "js": ["bank.js"], "run_at": "document_idle" }
+  ]
+}

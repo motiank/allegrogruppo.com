@@ -3,7 +3,7 @@
 // login (same-origin requests), so the extension never holds a Joya password or key.
 (() => {
   const VERSION = chrome.runtime.getManifest().version;
-  const mark = () => { document.documentElement.dataset.joyaLegalExt = VERSION; window.postMessage({ source: 'joya-ext', type: 'hello', version: VERSION }, location.origin); };
+  const mark = () => { document.documentElement.dataset.joyaLegalExt = VERSION; document.documentElement.dataset.joyaExt = VERSION; window.postMessage({ source: 'joya-ext', type: 'hello', version: VERSION }, location.origin); };
   mark();
   document.addEventListener('DOMContentLoaded', mark);
 
@@ -13,13 +13,14 @@
   const b64ToBytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
   async function upload(m) {
-    // { reqId, path, json? , b64? } → POST /api/joya<path>
+    // { reqId, path, json? , b64? [, contentType] } → POST /api/joya<path>; neither json nor b64 → GET
     try {
+      const isGet = m.json === undefined && m.b64 == null;
       const res = await fetch('/api/joya' + m.path, {
-        method: 'POST',
+        method: isGet ? 'GET' : 'POST',
         credentials: 'same-origin',
-        headers: { 'content-type': m.b64 != null ? 'application/octet-stream' : 'application/json' },
-        body: m.b64 != null ? b64ToBytes(m.b64) : JSON.stringify(m.json ?? {}),
+        headers: isGet ? undefined : { 'content-type': m.b64 != null ? m.contentType || 'application/octet-stream' : 'application/json' },
+        body: isGet ? undefined : m.b64 != null ? b64ToBytes(m.b64) : JSON.stringify(m.json ?? {}),
       });
       let data = null;
       try { data = await res.json(); } catch { data = null; }
