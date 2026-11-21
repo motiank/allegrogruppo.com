@@ -3,6 +3,7 @@
 import { getDbPool } from "../sources/dbpool.js";
 import { loadWorkbook } from "./workbook.js";
 import { parseTabitDetailed, parseBankHapoalim, parseBankEvents } from "./parsers.js";
+import { moveKey, dropStored } from "../modules/bankSync.js";
 
 const CHUNK = 500;
 
@@ -119,13 +120,31 @@ export const saveTabitRota = async (rows, { rest, weekStart, keepBefore = null }
     return { replacedOldRows: del.affectedRows || 0, slots: inserted, keptPastSlots: rows.length - write.length, ...(keepBefore ? { keptDaysBefore: keepBefore } : {}) };
   });
 
-// Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped.
+// Bank Hapoalim transactions → bank_transactions. Rows already stored are skipped: by row_key (the same file, or a
+// file of an overlapping period) and, since 2026-11-22, by the text-free move key of bankSync.js — a move the bank update
+// from the bank site already stored (its texts can differ a little from the Excel's) is not stored again either.
 export const importBankHapoalim = async (buffer, { uploadId }) => {
   const wb = await loadWorkbook(buffer);
   const parsed = parseBankHapoalim(wb.worksheets.find((w) => w.rowCount > 0));
   if (parsed.error) throw new Error(parsed.error);
   if (!parsed.account) throw new Error("account number not found");
-  const rows = parsed.rows.map((r) => [
+  let fileRows = parsed.rows;
+  let storedBefore = 0;
+  if (fileRows.length) {
+    const days = fileRows.map((r) => r.tx_date).sort();
+    const pool = await getDbPool();
+    const [stored] = await pool.query(
+      `SELECT account, DATE_FORMAT(tx_date, '%Y-%m-%d') AS tx_date, action_code, reference, debit, credit, COUNT(*) AS n
+         FROM bank_transactions WHERE account = ? AND tx_date BETWEEN ? AND ?
+        GROUP BY account, tx_date, action_code, reference, debit, credit`,
+      [parsed.account, days[0], days[days.length - 1]],
+    );
+    const existing = new Map(stored.map((r) => [moveKey(r), Number(r.n)]));
+    const d = dropStored(fileRows, existing);
+    fileRows = d.fresh;
+    storedBefore = d.alreadyStored;
+  }
+  const rows = fileRows.map((r) => [
     "hapoalim",
     r.account,
     r.tx_date,
@@ -148,7 +167,7 @@ export const importBankHapoalim = async (buffer, { uploadId }) => {
          balance, note, row_key, upload_id) VALUES ?`,
       rows,
     );
-    return { account: parsed.account, from: parsed.from, to: parsed.to, rows: rows.length, newRows: inserted, alreadyStored: rows.length - inserted };
+    return { account: parsed.account, from: parsed.from, to: parsed.to, rows: parsed.rows.length, newRows: inserted, alreadyStored: storedBefore + rows.length - inserted };
   });
 };
 

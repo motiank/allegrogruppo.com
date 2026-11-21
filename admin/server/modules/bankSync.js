@@ -30,8 +30,8 @@ const FINANCE_MAP = require("../../../shared/finance_map.json");
 
 export const OVERLAP_DAYS = 7; // the site is asked again for the last stored days: a late row, a corrected one
 export const FIRST_DAY = "2025-01-01"; // an account with nothing stored starts here
-const CHEQUE_LOOKBACK_DAYS = 120; // cheque lines this old are checked for a missing picture
-const MAX_CHEQUES = 400;
+const CHEQUE_LOOKBACK_DAYS = 400; // cheque lines this old are checked for a missing picture (2026-11-22: the archive held May–Nov 2025 and ~85 of 2026)
+const MAX_CHEQUES = 600; // per run, newest first; the next run continues with the older ones
 const CHUNK = 500;
 
 const inTransaction = async (fn) => {
@@ -100,19 +100,21 @@ export function siteRowToStored(t, account) {
   const valueDate = dayOf(t.valueDate);
   let action = text(t.activityDescription);
   if (action && valueDate && valueDate !== tx_date) action = `${action} (תאריך ערך: ${valueDate.slice(8, 10)}/${valueDate.slice(5, 7)})`;
+  // the "פרטים" text: the site's headlines already end with ":" ("לטובת:", "עבור:" — seen on production 2026-11-22);
+  // the row's own `details` field is a link to a service (the cheque picture), never the Excel's text
   const b = t.beneficiaryDetailsData && typeof t.beneficiaryDetailsData === "object" ? t.beneficiaryDetailsData : null;
   let details = null;
   if (b) {
+    const label = (v) => text(v)?.replace(/\s*:+\s*$/, "") || null;
     const party = text(b.partyName);
-    const head = text(b.partyHeadline);
+    const head = label(b.partyHeadline);
     const purpose = text(b.messageDetail);
-    const purposeHead = text(b.messageHeadline) || "עבור";
+    const purposeHead = label(b.messageHeadline) || "עבור";
     const parts = [];
     if (party) parts.push(head ? `${head}: ${party}` : party);
     if (purpose) parts.push(`${purposeHead}: ${purpose}`);
     details = parts.join(" ") || null;
   }
-  if (!details) details = text(t.details) || text(t.comment) || null;
   const amount = Math.abs(Number(t.eventAmount) || 0);
   const debit = Number(t.eventActivityTypeCode) === 2 ? r2(amount) : null;
   const credit = Number(t.eventActivityTypeCode) === 2 ? null : r2(amount);
@@ -224,6 +226,14 @@ export async function importSiteRows(account, siteRows, { user = null, from = nu
   const days = mapped.map((r) => r.tx_date).sort();
   const out = { account, company: acc.company, from: from || days[0] || null, to: to || days[days.length - 1] || null, rows: list.length, mapped: mapped.length, newRows: 0, alreadyStored: 0, pending, uploadId: null };
   if (!mapped.length) return out;
+  // one raw row per action code, kept with the upload: the site's field names are confirmed from these (the "צרור" field
+  // of the Excel is still unknown in the JSON)
+  const rawSamples = {};
+  for (const t of list) {
+    const code = String(t?.activityTypeCode ?? "?");
+    if (rawSamples[code] || Object.keys(rawSamples).length >= 20) continue;
+    rawSamples[code] = t;
+  }
   const [stored] = await executeSql(
     `SELECT account, DATE_FORMAT(tx_date, '%Y-%m-%d') AS tx_date, action_code, reference, debit, credit, COUNT(*) AS n
        FROM bank_transactions WHERE account = :account AND tx_date BETWEEN :d0 AND :d1
@@ -254,7 +264,7 @@ export async function importSiteRows(account, siteRows, { user = null, from = nu
       }
       out.newRows = inserted;
       out.alreadyStored += fresh.length - inserted;
-      await conn.query(`UPDATE file_uploads SET result_json = CAST(? AS JSON) WHERE id = ?`, [JSON.stringify({ ...out, source: "bank_site" }), out.uploadId]);
+      await conn.query(`UPDATE file_uploads SET result_json = CAST(? AS JSON) WHERE id = ?`, [JSON.stringify({ ...out, source: "bank_site", rawSamples }), out.uploadId]);
     });
   }
   return out;

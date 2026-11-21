@@ -18,15 +18,16 @@ test("a transfer out of the site becomes the Excel row: date, 3-digit code, acti
   );
 });
 
-test("money in: credit, 'המבצע: name account', a purpose adds ' עבור: …'", () => {
-  const r = siteRowToStored(site({ activityTypeCode: 175, activityDescription: "העברה", eventActivityTypeCode: 1, eventAmount: 50000, beneficiaryDetailsData: { partyHeadline: "המבצע", partyName: 'אלגרו גרופו בע"מ 12-584-136661', messageHeadline: "עבור", messageDetail: "הלוואה" } }), ACC);
+test("money in: credit, 'המבצע: name account', a purpose adds ' עבור: …'; the site's headlines end with ':' already", () => {
+  const r = siteRowToStored(site({ activityTypeCode: 175, activityDescription: "העברה", eventActivityTypeCode: 1, eventAmount: 50000, beneficiaryDetailsData: { partyHeadline: "המבצע:", partyName: 'אלגרו גרופו בע"מ 12-584-136661', messageHeadline: "עבור:", messageDetail: "הלוואה" } }), ACC);
   assert.equal(r.credit, 50000);
   assert.equal(r.debit, null);
   assert.equal(r.details, 'המבצע: אלגרו גרופו בע"מ 12-584-136661 עבור: הלוואה');
+  assert.equal(siteRowToStored(site({ beneficiaryDetailsData: { partyHeadline: "לטובת:", partyName: "ליאור אניס" } }), ACC).details, "לטובת: ליאור אניס");
 });
 
-test("a cheque: no details; a value date that differs is written after the action like the Excel; pending rows are dropped", () => {
-  const c = siteRowToStored(site({ activityTypeCode: 493, activityDescription: "שיק", referenceNumber: 17669, eventAmount: 1689, beneficiaryDetailsData: null }), ACC);
+test("a cheque: no details (the row's own `details` is a service link, not text); a value date that differs is written after the action like the Excel; pending rows are dropped", () => {
+  const c = siteRowToStored(site({ activityTypeCode: 493, activityDescription: "שיק", referenceNumber: 17669, eventAmount: 1689, beneficiaryDetailsData: null, details: "/ServerServices/current-account/cheques/17669?view=paying" }), ACC);
   assert.equal(c.details, null);
   assert.equal(c.reference, "17669");
   const v = siteRowToStored(site({ activityTypeCode: 213, activityDescription: 'החזר חיוב-אכ"מ', eventDate: 20261116, valueDate: 20261115, eventActivityTypeCode: 1, eventAmount: 117031 }), ACC);

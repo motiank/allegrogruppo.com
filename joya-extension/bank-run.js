@@ -243,6 +243,21 @@
         } catch (e) {
           sum.failed.push(`${a.account}: cheque list: ${String(e.message || e).slice(0, 160)}`);
         }
+        // the site is asked for the next picture while Joya / Drive still files the previous one (2026-11-22: ~7 s per
+        // cheque when everything ran one after the other)
+        let pendingUpload = null;
+        const settleUpload = async () => {
+          if (!pendingUpload) return;
+          const { p, ch } = pendingUpload;
+          pendingUpload = null;
+          try {
+            const out = await p;
+            if (out?.skipped) sum.imagesSkipped++;
+            else sum.images++;
+          } catch (e) {
+            sum.failed.push(`cheque ${ch.reference} (${ch.date}): not filed: ${String(e.message || e).slice(0, 120)}`);
+          }
+        };
         for (let k = 0; k < want.length && !r.stop; k++) {
           const ch = want[k];
           prog('cheques', `${label} ${k + 1}/${want.length}`, { done: i, total: accounts.length });
@@ -261,19 +276,20 @@
               sum.failed.push(`cheque ${ch.reference} (${ch.date}): ${img?.error || 'no picture'}`);
               continue;
             }
-            const out = await toJoya(r, `/bank/sync/${runId}/cheque-image?account=${encodeURIComponent(a.account)}&date=${ch.date}&reference=${encodeURIComponent(ch.reference)}&amount=${encodeURIComponent(ch.amount)}`, { b64: img.b64, contentType: img.type });
-            if (out?.skipped) sum.imagesSkipped++;
-            else sum.images++;
+            await settleUpload(); // one upload in flight at a time, but it overlaps the next site calls
+            pendingUpload = { ch, p: toJoya(r, `/bank/sync/${runId}/cheque-image?account=${encodeURIComponent(a.account)}&date=${ch.date}&reference=${encodeURIComponent(ch.reference)}&amount=${encodeURIComponent(ch.amount)}`, { b64: img.b64, contentType: img.type }) };
           } catch (e) {
             if (e.message === 'LOGIN') {
+              await settleUpload();
               li = await relogin(r);
               k--; // the same cheque again
               continue;
             }
             sum.failed.push(`cheque ${ch.reference} (${ch.date}): ${String(e.message || e).slice(0, 120)}`);
           }
-          await sleep(700);
+          await sleep(250);
         }
+        await settleUpload();
       }
     } catch (e) {
       return close(String(e.message || e));

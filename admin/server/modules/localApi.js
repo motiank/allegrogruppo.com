@@ -10,6 +10,7 @@ import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
 import { parseFiles, recognizeUploads, importUploads } from "./files.js";
 import { dataFreshness } from "./dataFreshness.js";
 import * as bankSync from "./bankSync.js";
+import { flushChequeArchive } from "./chequeArchive.js";
 import {
   bcomGetOrders,
   bcomGetExceptions,
@@ -1965,6 +1966,15 @@ const Router = () => {
       if (!Array.isArray(req.body?.rows)) throw badRequest("rows must be an array");
       const data = await bankSync.importSiteRows(account, req.body.rows, { user: String(req.get("X-Joya-User") || "") || null, from: req.body.from || null, to: req.body.to || null });
       res.json({ data });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  // the end of a run: the cheque archive's index is written now (it is batched while the pictures arrive)
+  router.post("/bank/sync/finish", async (req, res) => {
+    try {
+      adminOnly(req);
+      res.json({ data: { indexWritten: await flushChequeArchive() } });
     } catch (err) {
       syncError(req, res, err);
     }

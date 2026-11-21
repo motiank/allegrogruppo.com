@@ -137,7 +137,10 @@ export async function companyArchive(companyCode) {
 
 const safeName = (s) => String(s || "").replace(/[\/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
 const entryKey = (date, reference, amount) => `${String(date).slice(0, 10)}|${String(reference)}|${Math.round(Math.abs(Number(amount)) * 100)}`;
-let writing = Promise.resolve(); // serialises the index writes
+const WRITE_AFTER_MS = 4000; // the index is written once per burst of pictures, not once per picture (2026-11-22: ~7 s per cheque before)
+const WRITE_EVERY = 25;
+let writing = Promise.resolve(); // serialises the archive writes
+const batches = new Map(); // company folder → { companyId, chequesId, indexId, index, cheques, partyIds, dirty, timer }
 
 async function findOrCreateFolder(name, parentId) {
   const files = driveFiles();
@@ -147,10 +150,67 @@ async function findOrCreateFolder(name, parentId) {
   return c.data.id;
 }
 
+/** The company's open batch: the folder ids and the index, read from Drive once (fresh) and kept while pictures arrive. */
+async function batchOf(folder) {
+  let b = batches.get(folder);
+  if (b) return b;
+  const files = driveFiles();
+  const companyId = await findOrCreateFolder(folder, rootFolderId());
+  const idx = await files.list({ q: `name='index.json' and ${driveQuote(companyId)} in parents and trashed=false`, fields: "files(id)", pageSize: 1 });
+  const indexId = idx.data.files?.[0]?.id || null;
+  const index = indexId ? await readDriveJson(indexId) : null;
+  b = { folder, companyId, chequesId: null, indexId, index: index || { company: folder, cheques: [] }, partyIds: new Map(), dirty: 0, timer: null };
+  if (!Array.isArray(b.index.cheques)) b.index.cheques = [];
+  batches.set(folder, b);
+  return b;
+}
+
+async function writeIndex(b) {
+  if (!b.dirty) return;
+  const { Readable } = await import("stream");
+  const files = driveFiles();
+  const body = Buffer.from(JSON.stringify(b.index, null, 2));
+  if (b.indexId) await files.update({ fileId: b.indexId, media: { mimeType: "application/json", body: Readable.from([body]) } });
+  else b.indexId = (await files.create({ requestBody: { name: "index.json", parents: [b.companyId] }, media: { mimeType: "application/json", body: Readable.from([body]) }, fields: "id" })).data.id;
+  b.dirty = 0;
+  forgetChequeArchive();
+}
+
+/** Writes every pending index now (the end of a run, or a test). Returns how many companies were written. */
+export async function flushChequeArchive() {
+  let n = 0;
+  const run = async () => {
+    for (const b of batches.values()) {
+      if (b.timer) clearTimeout(b.timer);
+      b.timer = null;
+      if (b.dirty) {
+        await writeIndex(b);
+        n++;
+      }
+    }
+    batches.clear(); // the next picture reads the index again (the owner's machine may have changed it meanwhile)
+  };
+  const p = writing.then(run, run);
+  writing = p.catch(() => {});
+  await p;
+  return n;
+}
+
+const scheduleWrite = (b) => {
+  if (b.timer) clearTimeout(b.timer);
+  b.timer = setTimeout(() => {
+    b.timer = null;
+    const run = () => writeIndex(b).catch((e) => console.error("cheque archive: index not written:", e.message));
+    writing = writing.then(run, run);
+  }, WRITE_AFTER_MS);
+};
+
 /**
  * Files one cheque picture (the front) in the company's archive: entry = { date 'YYYY-MM-DD', reference (the cheque
  * number), amount (minus = money out), payee ('' = unknown), payeeSource (the archive's word: "פריוריטי" | "פקודת יומן" |
- * "מודול צ'קים" | "חסר") }. A cheque that already has a front picture is skipped. Returns { skipped?, imageId, path, folder, name }.
+ * "מודול צ'קים" | "חסר") }. A cheque that already has a front picture is skipped. The picture goes up at once; the index
+ * is written after a short quiet time or every WRITE_EVERY pictures (flushChequeArchive writes it now). Returns
+ * { skipped?, imageId, path, folder, name }.
  */
 export async function addChequeImage(companyCode, entry, buffer, mimeType = "image/jpeg") {
   const why = driveUnavailable();
@@ -160,17 +220,15 @@ export async function addChequeImage(companyCode, entry, buffer, mimeType = "ima
   const run = async () => {
     const { Readable } = await import("stream");
     const files = driveFiles();
-    const companyId = await findOrCreateFolder(folder, rootFolderId());
-    const idx = await files.list({ q: `name='index.json' and ${driveQuote(companyId)} in parents and trashed=false`, fields: "files(id)", pageSize: 1 });
-    const indexId = idx.data.files?.[0]?.id || null;
-    const index = indexId ? await readDriveJson(indexId) : null;
-    const cheques = Array.isArray(index?.cheques) ? index.cheques : [];
+    const b = await batchOf(folder);
+    const cheques = b.index.cheques;
     const key = entryKey(entry.date, entry.reference, entry.amount);
     let row = cheques.find((c) => entryKey(c.date, c.reference, c.amount) === key);
     if (row?.files?.front?.id) return { skipped: true, imageId: row.files.front.id, path: row.files.front.path, folder: row.party_folder, name: row.name };
     const party = safeName(entry.payee) || "_unknown";
-    const chequesId = await findOrCreateFolder("cheques", companyId);
-    const partyId = await findOrCreateFolder(party, chequesId);
+    if (!b.chequesId) b.chequesId = await findOrCreateFolder("cheques", b.companyId);
+    if (!b.partyIds.has(party)) b.partyIds.set(party, await findOrCreateFolder(party, b.chequesId));
+    const partyId = b.partyIds.get(party);
     if (!row) {
       const clash = cheques.some((c) => c.party_folder === party && c.name === String(entry.reference));
       row = { date: entry.date, reference: String(entry.reference), amount: Number(entry.amount), details: "שיק", payee: entry.payee || "", payeeSource: entry.payeeSource || "חסר", party_folder: party, name: clash ? `${entry.reference}_${entry.date}` : String(entry.reference), files: {} };
@@ -182,10 +240,12 @@ export async function addChequeImage(companyCode, entry, buffer, mimeType = "ima
     row.files = { ...(row.files || {}), front: { id: up.data.id, path: `cheques/${party}/${fileName}` } };
     row.filedBy = "admin";
     row.filedAt = new Date().toISOString();
-    const body = Buffer.from(JSON.stringify({ ...(index || {}), company: index?.company || folder, cheques }, null, 2));
-    if (indexId) await files.update({ fileId: indexId, media: { mimeType: "application/json", body: Readable.from([body]) } });
-    else await files.create({ requestBody: { name: "index.json", parents: [companyId] }, media: { mimeType: "application/json", body: Readable.from([body]) }, fields: "id" });
-    forgetChequeArchive();
+    b.dirty++;
+    if (b.dirty >= WRITE_EVERY) {
+      if (b.timer) clearTimeout(b.timer);
+      b.timer = null;
+      await writeIndex(b);
+    } else scheduleWrite(b);
     return { imageId: up.data.id, path: row.files.front.path, folder: party, name: row.name };
   };
   const p = writing.then(run, run);

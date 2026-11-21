@@ -199,8 +199,8 @@ export async function chequeImage(access, id, { account, date, reference, amount
   }
 }
 
-/** The extension is done (or stopped / failed): the run is closed with its summary. */
-export function finish(id, { summary, error } = {}) {
+/** The extension is done (or stopped / failed): the run is closed with its summary; the admin writes its archive index now. */
+export async function finish(access, id, { summary, error } = {}) {
   const { runs, r } = load(id);
   if (r.state !== 'open') return r;
   r.state = error ? 'failed' : 'done';
@@ -210,10 +210,11 @@ export function finish(id, { summary, error } = {}) {
   r.error = error ? String(error).slice(0, 300) : null;
   save(runs);
   if (r.accounts.some((a) => a.newRows)) clearAllegroCache();
+  await admin('/bank/sync/finish', { method: 'POST', access, json: {} }).catch((e) => log.warn(`[bank-sync] the admin did not write the archive index now: ${e.message}`));
   return r;
 }
 
-export const cancel = (id, why) => finish(id, { error: why || 'cancelled' });
+export const cancel = (access, id, why) => finish(access, id, { error: why || 'cancelled' });
 
 /** For the System page: the runs and whether one is open. */
 export function state() {

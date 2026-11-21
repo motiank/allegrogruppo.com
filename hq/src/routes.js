@@ -346,8 +346,8 @@ r.post(
   express.raw({ type: ['image/jpeg', 'image/png', 'application/octet-stream'], limit: '6mb' }),
   h(async (req) => bankSync.chequeImage(req.joya, req.params.id, { account: req.query.account, date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body, req.get('content-type'))),
 );
-r.post('/joya/bank/sync/:id/finish', requireAdmin, h(async (req) => bankSync.finish(req.params.id, { summary: req.body?.summary, error: req.body?.error })));
-r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.cancel(req.params.id, req.body?.why)));
+r.post('/joya/bank/sync/:id/finish', requireAdmin, h(async (req) => bankSync.finish(req.joya, req.params.id, { summary: req.body?.summary, error: req.body?.error })));
+r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.cancel(req.joya, req.params.id, req.body?.why)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
 // Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank
