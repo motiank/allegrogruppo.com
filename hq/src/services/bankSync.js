@@ -18,14 +18,22 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { apiBase, clearCache as clearAllegroCache } from '../../lib/allegro.js';
+import log from '../../lib/log.js';
 
-export const DIR = process.env.JOYA_BANK_SYNC_DIR || path.join(os.homedir(), '.joya-bank-sync');
+// Where the run records live: JOYA_BANK_SYNC_DIR, else next to the legal inbox (the service user on the droplet has no
+// home folder — HOME is unset, os.homedir() gives /nonexistent), else ~/.joya-bank-sync. The records are only for the
+// System page: when the folder cannot be written they stay in memory and a warning is logged, the update itself goes on.
+export const DIR =
+  process.env.JOYA_BANK_SYNC_DIR || (process.env.JOYA_LEGAL_INBOX ? path.join(path.dirname(process.env.JOYA_LEGAL_INBOX), 'joya-bank-sync') : path.join(os.homedir(), '.joya-bank-sync'));
 const RUNS = () => path.join(DIR, 'runs.json');
 const KEEP = 12;
 const OPEN_STALE_MS = 3 * 3600 * 1000; // a run nobody finished (the tab or the page was closed)
 
 const err = (code, message) => Object.assign(new Error(message), { code });
+let memory = null; // the runs when the folder is not writable
+let warned = false;
 const readRuns = () => {
+  if (memory) return memory;
   try {
     const v = JSON.parse(fs.readFileSync(RUNS(), 'utf8'));
     return Array.isArray(v) ? v : [];
@@ -34,10 +42,23 @@ const readRuns = () => {
   }
 };
 const writeRuns = (runs) => {
-  fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
-  const tmp = `${RUNS()}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(runs.slice(0, KEEP)), { mode: 0o600 });
-  fs.renameSync(tmp, RUNS());
+  const list = runs.slice(0, KEEP);
+  if (memory) {
+    memory = list;
+    return;
+  }
+  try {
+    fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
+    const tmp = `${RUNS()}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(list), { mode: 0o600 });
+    fs.renameSync(tmp, RUNS());
+  } catch (e) {
+    memory = list;
+    if (!warned) {
+      warned = true;
+      log.warn(`[bank-sync] the run records cannot be written to ${DIR} (${e.code || e.message}) — kept in memory only; set JOYA_BANK_SYNC_DIR to a writable folder`);
+    }
+  }
 };
 const okId = (id) => /^[a-z0-9]{6,14}-[a-f0-9]{8}$/.test(String(id || ''));
 const load = (id) => {
