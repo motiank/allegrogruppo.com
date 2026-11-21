@@ -201,7 +201,8 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   the Upload page still takes it) and the payee read from the picture. The site's field names follow the open-source
   israeli-bank-scrapers (same backend) and the owner's 2026-11-15 cheque session (memory `bank-cheque-images`); the first real run
   must be watched: the site's `accountId` format and the exact JSON shape are confirmed only then. Tests `scripts/test_bank_sync.js`,
-  `hq/test/test_bank_extension.mjs`. Not deployed yet.
+  `hq/test/test_bank_extension.mjs`. Deployed 2026-11-22 (`3ebc271`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner`
+  restarted; `/bank/sync/plan` answered on the droplet). The owner must load `joya-extension/` in Chrome in place of the old one.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
