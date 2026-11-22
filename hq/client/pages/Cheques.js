@@ -1,42 +1,49 @@
 // /cheques — the שקלפ page (שיקים לפרעון; owner 2026-11-22: "list forward the daily cheques or expenses like known bank
 // payments (הוראות קבע) by date; when the date is clicked open a card with the cheques and orders for that day (cheque
-// number, beneficiary and sum); move forward (next month) and backward (start of this month and month by month)").
-// One month of one company (chain admin): a row per day that has cheques, known bank payments or planned payments, with
-// the day's sums and the bank balance (green = real, red = expected); a click opens the day's card. The data is the
-// admin's, through GET /api/joya/cheques/month (src/services/finance.js chequesMonth + standingOrders.js); nothing is
-// stored here. The chat's future-cheques answer links here with the company and the month.
+// number, beneficiary and sum); move forward (next month) and backward (start of this month and month by month)" and,
+// the same day: "a table — date, cheques, standing orders and balance in one line, with enough space to click; arrows
+// for the months; the card floating").
+// One month of one company (chain admin): a four-column table with a tall row per day that has something to pay, the
+// bank balance green = real / red = expected; a tap opens the day's card in a dialog. The data is the admin's, through
+// GET /api/joya/cheques/month (src/services/finance.js chequesMonth + standingOrders.js); nothing is stored here. The
+// chat's future-cheques answer links here with the company and the month.
 import React, { useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { useSearchParams } from 'react-router-dom';
 import { api, qs } from '../api.js';
 import { useT, Term } from '../i18n/index.js';
-import { Page, Card, Btn, Badge, Select, Loading, Empty, ErrorBox, useLoad, fmtILS, fmtDay } from '../ui.js';
+import { Page, Card, Btn, Badge, Select, Modal, Loading, Empty, ErrorBox, useLoad, fmtILS, fmtDay } from '../ui.js';
 
 const useStyles = createUseStyles((theme) => ({
-  bar: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.8rem' },
-  month: { fontWeight: 700, fontSize: '1.05rem', minWidth: 140, textAlign: 'center' },
-  grow: { flex: 1 },
-  sum: { display: 'flex', gap: '0.6rem 1.2rem', flexWrap: 'wrap', fontSize: '0.84rem', color: theme.textSecondary, marginBottom: '0.8rem', lineHeight: 1.6 },
+  bar: { display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' },
+  arrow: { minWidth: 44, minHeight: 40, fontSize: '1.3rem', lineHeight: 1, padding: '0 0.6rem' },
+  month: { fontWeight: 700, fontSize: '1rem', flex: 1, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  sum: { display: 'flex', gap: '0.3rem 1rem', flexWrap: 'wrap', fontSize: '0.8rem', color: theme.textSecondary, marginBottom: '0.6rem', lineHeight: 1.5 },
   sumVal: { color: theme.text, fontWeight: 650 },
-  day: { display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.2rem', borderTop: `1px solid ${theme.border}`, cursor: 'pointer', flexWrap: 'wrap', '&:hover': { background: 'rgba(127,127,127,0.06)' } },
-  dayOpen: { background: 'rgba(127,127,127,0.08)' },
-  past: { opacity: 0.72 },
-  today: { borderInlineStart: `3px solid ${theme.primary}`, paddingInlineStart: '0.5rem' },
-  date: { minWidth: 118, fontWeight: 650, whiteSpace: 'nowrap' },
-  wd: { fontSize: '0.74rem', color: theme.textSecondary, fontWeight: 400, display: 'block' },
-  cell: { fontSize: '0.84rem', whiteSpace: 'nowrap' },
-  lbl: { color: theme.textSecondary, fontSize: '0.74rem', marginInlineEnd: '0.3rem' },
-  bal: { marginInlineStart: 'auto', fontWeight: 650, whiteSpace: 'nowrap', fontSize: '0.9rem' },
+  wrap: { margin: '0 -0.2rem' },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: '0.86rem', fontVariantNumeric: 'tabular-nums' },
+  th: { textAlign: 'start', fontWeight: 650, color: theme.textSecondary, fontSize: '0.74rem', padding: '0.3rem 0.35rem', borderBottom: `1px solid ${theme.border}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  num: { textAlign: 'end' },
+  row: { cursor: 'pointer', '&:hover td': { background: 'rgba(127,127,127,0.08)' }, '&:active td': { background: 'rgba(127,127,127,0.14)' } },
+  td: { padding: '0.55rem 0.35rem', height: 54, borderBottom: `1px solid ${theme.border}`, verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  past: { opacity: 0.6 },
+  todayRow: { '& td:first-child': { boxShadow: `inset 3px 0 0 ${theme.primary}` } },
+  date: { fontWeight: 650 },
+  wd: { display: 'block', fontSize: '0.7rem', color: theme.textSecondary, fontWeight: 400 },
+  cnt: { display: 'block', fontSize: '0.7rem', color: theme.textSecondary },
+  strong: { fontWeight: 650 },
   green: { color: '#3fb950' },
   red: { color: '#f2a3a8' },
-  card: { margin: '0.2rem 0 0.6rem', padding: '0.6rem 0.8rem', borderRadius: 10, background: theme.cardAlt || 'rgba(127,127,127,0.07)', border: `1px solid ${theme.border}` },
-  sec: { fontSize: '0.78rem', color: theme.textSecondary, fontWeight: 650, margin: '0.5rem 0 0.2rem', '&:first-child': { marginTop: 0 } },
-  line: { display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.3rem 0', borderTop: `1px dashed ${theme.border}`, fontSize: '0.86rem', flexWrap: 'wrap' },
-  no: { minWidth: 70, color: theme.textSecondary, fontSize: '0.8rem' },
-  payee: { flex: 1, minWidth: 140, overflowWrap: 'anywhere' },
+  dim: { color: theme.textSecondary },
+  // the day's card (in the dialog)
+  sec: { fontSize: '0.76rem', color: theme.textSecondary, fontWeight: 650, margin: '0.7rem 0 0.2rem', '&:first-child': { marginTop: 0 } },
+  line: { display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderTop: `1px dashed ${theme.border}`, fontSize: '0.88rem', flexWrap: 'wrap' },
+  no: { minWidth: 64, color: theme.textSecondary, fontSize: '0.8rem' },
+  payee: { flex: 1, minWidth: 120, overflowWrap: 'anywhere' },
   amt: { fontWeight: 650, whiteSpace: 'nowrap' },
-  total: { display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: `1px solid ${theme.border}`, fontWeight: 650, fontSize: '0.86rem' },
-  hint: { fontSize: '0.76rem', color: theme.textSecondary, lineHeight: 1.5, margin: '0.6rem 0 0' },
+  total: { display: 'flex', justifyContent: 'space-between', marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: `1px solid ${theme.border}`, fontWeight: 650 },
+  balLine: { marginTop: '0.4rem', fontSize: '0.84rem', display: 'flex', justifyContent: 'space-between' },
+  hint: { fontSize: '0.74rem', color: theme.textSecondary, lineHeight: 1.5, margin: '0.6rem 0 0' },
   known: { fontSize: '0.8rem', lineHeight: 1.7, margin: 0, paddingInlineStart: '1.1rem' },
   warn: { fontSize: '0.8rem', color: '#f2a3a8', margin: '0.3rem 0' },
 }));
@@ -51,24 +58,25 @@ const shiftMonth = (month, n) => {
   const d = new Date(Date.UTC(y, m - 1 + n, 1));
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
 };
-const monthLabel = (month, lang) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString(lang === 'en' ? 'en-US' : 'he-IL', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-const weekday = (ymd, lang) => new Date(`${ymd}T00:00:00Z`).toLocaleDateString(lang === 'en' ? 'en-US' : 'he-IL', { weekday: 'long', timeZone: 'UTC' });
+const locale = (lang) => (lang === 'en' ? 'en-US' : 'he-IL');
+const monthLabel = (month, lang) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString(locale(lang), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const weekday = (ymd, lang, form = 'short') => new Date(`${ymd}T00:00:00Z`).toLocaleDateString(locale(lang), { weekday: form, timeZone: 'UTC' });
+const dayMonth = (ymd) => `${Number(ymd.slice(8, 10))}.${Number(ymd.slice(5, 7))}`;
+const isBank = (p) => p.kind === 'standing_order';
+const sumOf = (xs) => xs.reduce((s, x) => s + (Number(x.amount) || 0), 0);
 
 function DayCard({ d, c, t }) {
   const cheques = d.cheques || [];
-  const bank = (d.payments || []).filter((p) => p.kind === 'standing_order');
-  const planned = (d.payments || []).filter((p) => p.kind !== 'standing_order');
-  const total = cheques.reduce((s, x) => s + (Number(x.amount) || 0), 0) + (d.payments || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const bank = (d.payments || []).filter(isBank);
+  const planned = (d.payments || []).filter((p) => !isBank(p));
   return (
-    <div className={c.card}>
+    <>
       {cheques.length ? (
         <>
-          <div className={c.sec}>{t('joya.chq.cheques')} ({cheques.length})</div>
+          <div className={c.sec}>{t('joya.chq.cheques')} ({cheques.length}) · {fmtILS(sumOf(cheques))}</div>
           {cheques.map((x, i) => (
             <div key={`${x.reference}-${i}`} className={c.line}>
-              <span className={c.no}>
-                {t('joya.chq.chequeNo')} <Term>{x.reference ?? '—'}</Term>
-              </span>
+              <span className={c.no}><Term>{x.reference ?? '—'}</Term></span>
               <span className={c.payee} dir="auto">{x.payee || '—'}</span>
               <span className={c.amt}>{fmtILS(x.amount)}</span>
               {x.paid ? <Badge tone="ok">{t('joya.chq.paid')}</Badge> : null}
@@ -79,7 +87,7 @@ function DayCard({ d, c, t }) {
       ) : null}
       {bank.length ? (
         <>
-          <div className={c.sec}>{t('joya.chq.bankPayments')} ({bank.length})</div>
+          <div className={c.sec}>{t('joya.chq.bankPayments')} ({bank.length}) · {fmtILS(sumOf(bank))}</div>
           {bank.map((x, i) => (
             <div key={`b${i}`} className={c.line}>
               <span className={c.no}>{x.reference != null ? <Term>{x.reference}</Term> : ''}</span>
@@ -92,7 +100,7 @@ function DayCard({ d, c, t }) {
       ) : null}
       {planned.length ? (
         <>
-          <div className={c.sec}>{t('joya.chq.planned')} ({planned.length})</div>
+          <div className={c.sec}>{t('joya.chq.planned')} ({planned.length}) · {fmtILS(sumOf(planned))}</div>
           {planned.map((x, i) => (
             <div key={`p${x.id ?? i}`} className={c.line}>
               <span className={c.no}>{x.id ? <Term>#{x.id}</Term> : t('joya.chq.transfer')}</span>
@@ -104,28 +112,34 @@ function DayCard({ d, c, t }) {
       ) : null}
       <div className={c.total}>
         <span>{t('joya.chq.dayTotal')}</span>
-        <span>{fmtILS(total)}</span>
+        <span>{fmtILS(sumOf(cheques) + sumOf(d.payments || []))}</span>
       </div>
-    </div>
+      {d.balance ? (
+        <div className={`${c.balLine} ${d.balance.kind === 'actual' ? c.green : c.red}`}>
+          <span>{d.balance.kind === 'actual' ? t('joya.chq.balanceActual') : t('joya.chq.balanceExpected')}</span>
+          <span className={c.strong}>{fmtILS(d.balance.amount)}</span>
+        </div>
+      ) : null}
+    </>
   );
 }
 
 export default function Cheques() {
   const theme = useTheme();
   const c = useStyles(theme);
-  const { t, lang } = useT();
+  const { t, lang, dir } = useT();
   const [sp, setSp] = useSearchParams();
   const today = localToday();
-  const month = /^\d{4}-\d{2}$/.test(sp.get('month') || '') ? sp.get('month') : today.slice(0, 7);
+  const thisMonth = today.slice(0, 7);
+  const month = /^\d{4}-\d{2}$/.test(sp.get('month') || '') ? sp.get('month') : thisMonth;
   const company = sp.get('company') || '';
-  const [open, setOpen] = useState(() => new Set());
+  const [openDay, setOpenDay] = useState(null);
   const r = useLoad(() => api(`/cheques/month${qs({ company: company || undefined, month })}`), [company, month]);
   const go = (m, co = company) => setSp({ ...(co ? { company: co } : {}), month: m });
-  const toggle = (k) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const d = r.data;
-  const bal = (x) => (x?.balance ? <span className={`${c.bal} ${x.balance.kind === 'actual' ? c.green : c.red}`} title={x.balance.kind === 'actual' ? t('joya.chq.balanceActual') : t('joya.chq.balanceExpected')}>{x.balance.kind === 'actual' ? '🟢' : '🔴'} {fmtILS(x.balance.amount)}</span> : null);
-  const bankSum = (x) => (x.payments || []).filter((p) => p.kind === 'standing_order').reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const plannedSum = (x) => (x.payments || []).filter((p) => p.kind !== 'standing_order').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const open = openDay && d?.byDay?.find((x) => x.dueDate === openDay);
+  const back = dir === 'rtl' ? '›' : '‹';
+  const fwd = dir === 'rtl' ? '‹' : '›';
   return (
     <Page
       title={t('joya.chq.title')}
@@ -141,11 +155,10 @@ export default function Cheques() {
       }
     >
       <div className={c.bar}>
-        <Btn small onClick={() => go(shiftMonth(month, -1))}>{t('joya.chq.prev')}</Btn>
+        <Btn className={c.arrow} onClick={() => go(shiftMonth(month, -1))} aria-label={t('joya.chq.prev')} title={t('joya.chq.prev')}>{back}</Btn>
         <span className={c.month}>{monthLabel(month, lang)}</span>
-        <Btn small onClick={() => go(shiftMonth(month, 1))}>{t('joya.chq.next')}</Btn>
-        <span className={c.grow} />
-        <Btn small kind={month === today.slice(0, 7) ? 'default' : 'primary'} onClick={() => go(today.slice(0, 7))} disabled={month === today.slice(0, 7)}>{t('joya.chq.thisMonth')}</Btn>
+        <Btn className={c.arrow} onClick={() => go(shiftMonth(month, 1))} aria-label={t('joya.chq.next')} title={t('joya.chq.next')}>{fwd}</Btn>
+        {month !== thisMonth ? <Btn small kind="primary" onClick={() => go(thisMonth)}>{t('joya.chq.thisMonth')}</Btn> : null}
       </div>
       {r.loading && !d ? <Loading /> : null}
       {r.error ? <ErrorBox error={r.error} /> : null}
@@ -165,27 +178,56 @@ export default function Cheques() {
           ))}
           <Card>
             {!d.byDay?.length ? <Empty>{t('joya.chq.empty')}</Empty> : null}
-            {d.byDay?.map((x) => {
-              const k = x.dueDate;
-              const isOpen = open.has(k);
-              const bs = bankSum(x);
-              const ps = plannedSum(x);
-              return (
-                <React.Fragment key={k}>
-                  <div className={`${c.day} ${isOpen ? c.dayOpen : ''} ${k < today ? c.past : ''} ${k === today ? c.today : ''}`} onClick={() => toggle(k)} role="button" aria-expanded={isOpen}>
-                    <span className={c.date}>
-                      <Term>{fmtDay(k)}</Term>
-                      <span className={c.wd}>{k === today ? t('joya.chq.today') : weekday(k, lang)}</span>
-                    </span>
-                    {x.count ? <span className={c.cell}><span className={c.lbl}>{t('joya.chq.cheques')}</span>{t('joya.chq.chequesSum', { n: x.count, sum: fmtILS(x.amount) })}</span> : null}
-                    {bs ? <span className={c.cell}><span className={c.lbl}>{t('joya.chq.bankPayments')}</span>{fmtILS(bs)}</span> : null}
-                    {ps ? <span className={c.cell}><span className={c.lbl}>{t('joya.chq.planned')}</span>{fmtILS(ps)}</span> : null}
-                    {bal(x)}
-                  </div>
-                  {isOpen ? <DayCard d={x} c={c} t={t} /> : null}
-                </React.Fragment>
-              );
-            })}
+            {d.byDay?.length ? (
+              <div className={c.wrap}>
+                <table className={c.table}>
+                  <colgroup>
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '26%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className={c.th}>{t('joya.chq.date')}</th>
+                      <th className={`${c.th} ${c.num}`}>{t('joya.chq.cheques')}</th>
+                      <th className={`${c.th} ${c.num}`}>{t('joya.chq.bankPayments')}</th>
+                      <th className={`${c.th} ${c.num}`}>{t('joya.chq.balance')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.byDay.map((x) => {
+                      const k = x.dueDate;
+                      const bank = (x.payments || []).filter(isBank);
+                      const planned = (x.payments || []).filter((p) => !isBank(p));
+                      return (
+                        <tr key={k} className={`${c.row} ${k < today ? c.past : ''} ${k === today ? c.todayRow : ''}`} onClick={() => setOpenDay(k)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpenDay(k)}>
+                          <td className={c.td}>
+                            <span className={c.date}><Term>{dayMonth(k)}</Term></span>
+                            <span className={c.wd}>{k === today ? t('joya.chq.today') : weekday(k, lang)}</span>
+                          </td>
+                          <td className={`${c.td} ${c.num}`}>
+                            {x.count ? (
+                              <>
+                                <span className={c.strong}>{fmtILS(x.amount)}</span>
+                                <span className={c.cnt}>{t('joya.chq.n', { n: x.count })}</span>
+                              </>
+                            ) : <span className={c.dim}>—</span>}
+                          </td>
+                          <td className={`${c.td} ${c.num}`}>
+                            {bank.length ? <span className={c.strong}>{fmtILS(sumOf(bank))}</span> : planned.length ? null : <span className={c.dim}>—</span>}
+                            {planned.length ? <span className={c.cnt}>+ {t('joya.chq.plannedShort')} {fmtILS(sumOf(planned))}</span> : null}
+                          </td>
+                          <td className={`${c.td} ${c.num} ${x.balance ? (x.balance.kind === 'actual' ? c.green : c.red) : c.dim}`} title={x.balance ? (x.balance.kind === 'actual' ? t('joya.chq.balanceActual') : t('joya.chq.balanceExpected')) : undefined}>
+                            {x.balance ? <span className={c.strong}>{fmtILS(x.balance.amount)}</span> : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </Card>
           <p className={c.hint}>{t('joya.chq.balanceHint')}</p>
           <p className={c.hint}>{t('joya.chq.bankPaymentsHint')}{d.bankPayments?.available === false && d.bankPayments.reason ? ` (${d.bankPayments.reason})` : ''}</p>
@@ -199,6 +241,11 @@ export default function Cheques() {
             </Card>
           ) : null}
         </>
+      ) : null}
+      {open ? (
+        <Modal title={<span><Term>{fmtDay(open.dueDate)}</Term> · {open.dueDate === today ? t('joya.chq.today') : weekday(open.dueDate, lang, 'long')}</span>} onClose={() => setOpenDay(null)}>
+          <DayCard d={open} c={c} t={t} />
+        </Modal>
       ) : null}
     </Page>
   );
