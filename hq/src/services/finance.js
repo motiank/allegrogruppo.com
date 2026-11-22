@@ -5,7 +5,8 @@
 // books have real gaps (no 2026 salaries, no income after August 2026, a bank gap…), and the writer must show a
 // `high` warning next to the number it affects.
 import { finance, financeCompanies } from './source.js';
-import { plannedByDay } from './payments.js';
+import { plannedByDay, companiesOf, resolveCompany } from './payments.js';
+import { knownBankPayments } from './standingOrders.js';
 import { compareStatements } from '../../../shared/statementCompare.js';
 
 const SOURCE = 'the Hashavshevet books (allegro_finance), through the Allegro admin Finance API; posted entries only unless said otherwise; data as of the last nightly sync (dataUpTo)';
@@ -478,17 +479,69 @@ const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.am
  * the last bank day and the window's start are read too, so the expected balance already counts them.
  * → { available, meta, rows (the window), byDay, balances, payments, totals, balance }
  */
-export async function futureChequesData({ financeCode, companyKey = null }, { from, to = null, today = todayISO() }) {
+export async function futureChequesData({ financeCode, companyKey = null }, { from, to = null, today = todayISO(), bankPayments = false }) {
   const balances = await bankBalances(financeCode, from < monthStart(today) ? from : monthStart(today), today);
   const fetchFrom = balances.last && balances.last.date < from ? balances.last.date : from;
   const r = await finance('/cheques/all', { company: financeCode, from: fetchFrom, ...(to ? { to } : {}), limit: EXPORT_MAX });
   if (!r.available) return { available: false, reason: r.reason };
   const all = (r.data || []).map(mapChequeRow);
-  const payments = await plannedByDay(companyKey, fetchFrom, to || '2099-12-31');
+  const planned = (await plannedByDay(companyKey, fetchFrom, to || '2099-12-31')).map((p) => ({ ...p, kind: 'planned' }));
+  // the שקלפ page also counts the known bank payments (standing orders, standingOrders.js); the chat and the Drive file do not (yet)
+  const known = bankPayments && companyKey ? await knownBankPayments(companyKey, fetchFrom, to || '2099-12-31', { today, lastBankDay: balances.last?.date || null }) : null;
+  const payments = known?.available ? [...planned, ...known.items] : planned;
   const inWindow = (d) => d >= from && (!to || d <= to);
   const byDay = chequesByDay(all, { balances, payments, today }).filter((d) => inWindow(d.dueDate));
   const rows = all.filter((x) => inWindow(x.dueDate));
-  return { available: true, meta: r.meta || {}, rows, byDay, balances, payments: payments.filter((p) => inWindow(p.date)), totals: chequeTotals(rows, today), balance: balanceSummary(byDay, balances, { to }) };
+  return {
+    available: true, meta: r.meta || {}, rows, byDay, balances, payments: planned.filter((p) => inWindow(p.date)), totals: chequeTotals(rows, today), balance: balanceSummary(byDay, balances, { to }),
+    ...(known ? { bankPayments: { available: known.available, reason: known.reason || null, items: known.items.filter((x) => inWindow(x.date)), known: known.known } } : {}),
+  };
+}
+
+const monthWindow = (month) => {
+  const [y, m] = String(month).split('-').map(Number);
+  return { from: `${month}-01`, to: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10) };
+};
+
+/**
+ * The שקלפ page (owner 2026-11-22): one month of one company — every day with cheques, known bank payments (standing
+ * orders, learned from the bank file) or planned payments, with the day's details and the bank balance per day; the
+ * page walks month by month. → { companies, company, month, from, to, today, available, byDay, totals, balance,
+ * bankPayments: { expected, paid, late }, payments, warnings, reason? }
+ */
+export async function chequesMonth(access, { companyKey = null, month = null, today = todayISO() } = {}) {
+  if (month && !MONTH.test(month)) throw bad('month must be YYYY-MM');
+  const m = month || today.slice(0, 7);
+  const { from, to } = monthWindow(m);
+  const companies = await companiesOf(access);
+  const co = await resolveCompany(access, companyKey);
+  const [linked] = await linkCompanies([co]);
+  const base = { companies, company: co, month: m, from, to, today, lastBankDay: null };
+  if (!linked.finance) return { ...base, available: false, reason: linked.reason };
+  const d = await futureChequesData({ financeCode: linked.finance.code, companyKey: co.key }, { from, to, today, bankPayments: true });
+  if (!d.available) return { ...base, available: false, reason: d.reason };
+  const sum = (xs) => r2(xs.reduce((s, x) => s + (Number(x.amount) || 0), 0));
+  const bp = d.bankPayments?.items || [];
+  const byDay = d.byDay.filter((x) => x.count || x.payments?.length); // bank days with nothing to pay are not rows on the page
+  return {
+    ...base,
+    lastBankDay: d.balances?.last?.date || null,
+    available: true,
+    dataUpTo: d.meta?.sync?.dataUpTo ?? null,
+    warnings: warningsOf(d.meta?.warnings),
+    byDay,
+    totals: d.totals,
+    balance: d.balance,
+    payments: { count: d.payments.length, amount: sum(d.payments) },
+    bankPayments: {
+      available: d.bankPayments?.available ?? false,
+      reason: d.bankPayments?.reason || null,
+      expected: { count: bp.filter((x) => x.expected && !x.late).length, amount: sum(bp.filter((x) => x.expected && !x.late)) },
+      paid: { count: bp.filter((x) => x.paid).length, amount: sum(bp.filter((x) => x.paid)) },
+      late: { count: bp.filter((x) => x.late).length, amount: sum(bp.filter((x) => x.late)) },
+      known: (d.bankPayments?.known || []).map((k) => ({ payee: k.payee, day: k.day, amount: k.lastAmount, months: k.months, lastDate: k.lastDate })),
+    },
+  };
 }
 
 /**
@@ -558,8 +611,9 @@ export function chequesByDay(rows, { balances = null, payments = [], today = nul
   }
   for (const p of payments) {
     const d = day(p.date);
-    d.payments.push({ id: p.id, payee: p.payee, amount: p.amount, ...(p.dueKind === 'WEEK' ? { window: `${p.date}–${p.dueTo}` } : {}) });
-    d.paymentsAmount = r2(d.paymentsAmount + (Number(p.amount) || 0));
+    d.payments.push({ id: p.id ?? null, payee: p.payee, amount: p.amount, ...(p.dueKind === 'WEEK' ? { window: `${p.date}–${p.dueTo}` } : {}), ...(p.kind ? { kind: p.kind } : {}), ...(p.paid ? { paid: true } : {}), ...(p.expected ? { expected: true } : {}), ...(p.late ? { late: true } : {}), ...(p.reference != null ? { reference: p.reference } : {}) });
+    // a bank payment the bank already paid is in the real balance; a late one (its day passed with no line) is not deducted either
+    if (!p.paid && !p.late) d.paymentsAmount = r2(d.paymentsAmount + (Number(p.amount) || 0));
   }
   const last = balances?.last || null;
   if (last) for (const b of balances.series || []) if (b.date <= last.date) day(b.date);

@@ -212,6 +212,12 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   same day: the production server never loaded Beecomm — its `.env` had no `BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` and the 06:00
   job failed every night; the owner's own admin (port 3021) did the load, and stopped after 16/11. The owner put the two settings
   on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+- **The שקלפ page in Joya HQ** (2026-11-22, owner: "a convenient UX for the שקלפ: a page that lists forward the daily cheques or
+  expenses like known bank payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day —
+  cheque number, beneficiary, sum; move forward and backward month by month"): Joya menu "שיקים לפרעון" → `/cheques`
+  (`hq/client/pages/Cheques.js`), data `hq/src/services/finance.js` `chequesMonth` (the chat's future-cheques data + the known bank
+  payments of `hq/src/services/standingOrders.js`, learned from the stored bank file's standing-order lines 515 / 469: seen in ≥ 2 of
+  the last 4 months → expected on the usual day with the last amount). No admin change. `hq/README.md` → "The שקלפ page".
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`

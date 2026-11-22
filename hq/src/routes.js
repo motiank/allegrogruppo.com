@@ -31,6 +31,7 @@ import { forecastWeek } from './services/demand.js';
 import * as legalSync from './services/legalSync.js';
 import * as bankSync from './services/bankSync.js';
 import * as beecommSync from './services/beecommSync.js';
+import * as fin from './services/finance.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
@@ -360,6 +361,8 @@ r.post('/joya/beecomm/sync/start', requireAdmin, h(async (req) => beecommSync.st
 const paymentOp = async (req, op) => payments.applyOps(req.joya, await payments.checkOps(req.joya, [op], { companyKey: req.body?.companyKey ?? req.query.company ?? null }), { via: 'API' });
 r.get('/joya/payments', requireAdmin, h(async (req) => payments.list(req.joya, { companyKey: req.query.company || null, from: req.query.from || null, to: req.query.to || null, status: req.query.status || 'PLANNED' })));
 r.get('/joya/payments/payees', requireAdmin, h(async (req) => ({ payees: await payments.payees(req.query.company || null) })));
+// the שקלפ page (pages/Cheques.js, owner 2026-11-22): one month of cheques, known bank payments and planned payments by day
+r.get('/joya/cheques/month', requireAdmin, h(async (req) => fin.chequesMonth(req.joya, { companyKey: req.query.company || null, month: req.query.month || null })));
 r.post('/joya/payments', requireAdmin, h(async (req) => paymentOp(req, { ...(req.body || {}), op: 'add' })));
 r.patch(
   '/joya/payments/:id',

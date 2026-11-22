@@ -339,6 +339,28 @@ function BankReconFiles({ r, classes }) {
     ));
 }
 
+/** A future-cheques answer (calc cheques, state future): the button to the שקלפ page of that company and month (owner 2026-11-22). */
+function ChequesPage({ r, classes }) {
+  const { t } = useT();
+  const calcs = (r.calcs || []).filter((c) => c.calc === 'cheques' && c.params?.state === 'future' && c.result?.companies?.length);
+  const seen = new Set();
+  return calcs.flatMap((c) =>
+    (c.result.companies || [])
+      .filter((x) => x.available !== false && x.companyKey && !seen.has(x.companyKey) && seen.add(x.companyKey))
+      .map((x) => {
+        const month = String(c.result.params?.from || c.params?.from || '').slice(0, 7);
+        return (
+          <div key={x.companyKey} className={classes.files}>
+            <span dir="auto">{x.company}</span>
+            <a className={classes.fileBtn} href={`/cheques?company=${encodeURIComponent(x.companyKey)}${/^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ''}`}>
+              {t('joya.ask.file.chequesPage')}
+            </a>
+          </div>
+        );
+      }),
+  );
+}
+
 /** The answer to one question: the text, how it was calculated, and a proposed change. head = show the question and time. */
 export function Answer({ r, onChanged, head = true }) {
   const theme = useTheme();
@@ -379,6 +401,7 @@ export function Answer({ r, onChanged, head = true }) {
           <SheetFile r={r} classes={classes} />
           <PayrollFiles r={r} classes={classes} />
       <BankReconFiles r={r} classes={classes} />
+      <ChequesPage r={r} classes={classes} />
       <LegalFiles r={r} classes={classes} />
           {unverified.length ? (
             <div className={classes.warn}>

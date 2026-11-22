@@ -593,6 +593,26 @@ colours such a cell green / red (`cellTone` in `lib/answerTables.js`, `AskBox.js
 colour, `answerExcel.js`) — then the totals, the expected end and lowest balance, and the all-dates total. A question
 about one payee / number / account keeps the plain list (no balance). Eval `f-shaklap`, `f-cheques`.
 
+**The שקלפ page (owner 2026-11-22: "a convenient UX for the שקלפ: a page that lists forward the daily cheques or expenses like
+known bank payments (הוראות קבע) by date; when the date is clicked open a card with the cheques and orders for that day — cheque
+number, beneficiary and sum; move forward (next month) and backward (start of this month and month by month)").** Main-menu item
+"שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month of one company (`?company=&month=YYYY-MM`; the
+current month by default; buttons ‹ previous month / this month / next month ›; a company picker when the admin has several). A row
+per day that has something to pay — the date and weekday (today marked, past days dimmer), the day's cheques (count · sum), its
+standing orders, its planned payments and the bank balance (🟢 real / 🔴 expected, the same numbers as the chat) — and a click opens
+the day's card: the cheques (number, payee, sum, "נפרע" / "פריוריטי"), the standing orders (payee, sum, נפרע / צפוי / לא נראה בבנק)
+and Joya's planned payments, with the day's total. Under the list: the balance legend, how the standing orders are learned, and the
+list of known standing orders. The chat's future-cheques answer gets a button "📅 דף שיקים לפרעון" to the page of that company and
+month (`AskBox.js` `ChequesPage`; WRITE rule). Data: `GET /api/joya/cheques/month` → `chequesMonth` in `src/services/finance.js` =
+`futureChequesData` with `bankPayments: true`, so the cheques, the balance per day and the planned payments are the ones of the chat
+and the Drive file, plus the **known bank payments** (`src/services/standingOrders.js`): nothing is typed in — a money-out line of
+the admin's stored bank file with action code 515 (a standing order; the payee is the action text) or 469 ("הוראת-קבע") that came in
+at least two of the four months before the window is expected again on the same day of the month (the middle one of its past days,
+clamped to the month's length) with its last month's total; days the bank file already covers show the real lines (`paid`); an
+expected line whose day passed with no bank line stays in the list as `late` and is not deducted. The expected balance deducts the
+expected standing orders too (only on the page — the chat and the Drive file do not count them yet). Card debits (491 ישראכרט) are
+irregular and are not predicted. Tests: `test/test_standing_orders.mjs` (in `npm test`). Needs an hq client build on deploy.
+
 **Calculate when it is needed (owner, 2026-11-08, the first hard rule of both prompts).** The model separates DATA
 (sales, hours, balances, bank lines — only from the system's calculations or the user's words, never guessed) from
 ARITHMETIC on that data (a sum, a difference, a split into N payments, a share, an average, a per-unit value, a VAT

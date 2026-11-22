@@ -267,6 +267,15 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   a run goes on and reloads the freshness table at its end. README → "Beecomm update on demand". Needs an hq client build on deploy.
   Found the same day: the production server never loaded Beecomm (no `BCOM_BO_*` in its `.env`, the cron failed every night) — the
   owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+- **The שקלפ page** (2026-11-22, owner: "a convenient UX for the שקלפ … list forward the daily cheques or expenses like known bank
+  payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day; move month by month"):
+  menu item "שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month per view, a row per day, a card per
+  day, ‹ / this month / ›. `GET /joya/cheques/month?company=&month=` → `chequesMonth` (`src/services/finance.js`; `futureChequesData`
+  got `bankPayments: true`, `chequesByDay` passes `kind` / `paid` / `expected` / `late` on the payments). The **known bank payments**
+  = `src/services/standingOrders.js`, learned from the bank file's 515 / 469 lines (≥ 2 of the last 4 months → expected on the usual
+  day with the last amount; real lines where the bank covers the day; `late` when the day passed without a line, never deducted).
+  The chat's future-cheques answer shows a button to the page (`AskBox.js` `ChequesPage`, WRITE rule). README → "The שקלפ page".
+  Tests `test/test_standing_orders.mjs`. Needs an hq client build on deploy.
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

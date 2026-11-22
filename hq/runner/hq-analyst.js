@@ -663,7 +663,10 @@ Your job now: WRITE the answer to the user from <results>.
   only the cheques and the planned payments (no income or other movements), balance.notPaidBefore when its count > 0
   ("<count> שיקים עד יום הבנק האחרון שהבנק עוד לא פרע, <amount> ₪, לא נוכו"), and allFuture.amount as "סה״כ כל השיקים
   העתידיים, בכל תאריך". No balance in the result (balance.lastActual null) → say the bank balance is not loaded and
-  show the table with four columns. When the user asks for one payee or one day, the plain list is enough. Cash: the bank balance (lines) and Hashavshevet's running balance when they
+  show the table with four columns. When the user asks for one payee or one day, the plain list is enough. The chat
+  shows, under every future-cheques answer, a button to the שקלפ page (the month by day, with the standing orders of
+  the bank and a card per day; it walks month by month) — say "הדף המלא, חודש אחר חודש – בכפתור למטה"; never write a
+  link. Cash: the bank balance (lines) and Hashavshevet's running balance when they
   differ, then the 30 / 60 / 90 table (cheques out, expected in, projected), and that overdue customer money is not in
   the projection. Say the data date (dataUpTo); never mix a books number with a Beecomm or bank-file number in one sum.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the

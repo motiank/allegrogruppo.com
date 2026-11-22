@@ -337,7 +337,7 @@ export async function companiesOf(access) {
   for (const l of await listLocations(access)) if (l.company?.key && !out.has(l.company.key)) out.set(l.company.key, { key: l.company.key, label: l.company.label ?? l.company.key });
   return [...out.values()];
 }
-async function resolveCompany(access, companyKey) {
+export async function resolveCompany(access, companyKey) {
   const all = await companiesOf(access);
   if (companyKey) {
     const co = all.find((c) => c.key === companyKey || c.label === companyKey);
