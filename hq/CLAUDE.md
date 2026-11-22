@@ -266,7 +266,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   loader `scripts/server/analoader/index.js` as a child process, one at a time, shared with the admin's 06:00 cron). The card polls while
   a run goes on and reloads the freshness table at its end. README → "Beecomm update on demand". Needs an hq client build on deploy.
   Found the same day: the production server never loaded Beecomm (no `BCOM_BO_*` in its `.env`, the cron failed every night) — the
-  owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on.
+  owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

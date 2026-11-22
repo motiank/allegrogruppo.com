@@ -211,7 +211,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   errors and exits 0, so the result is read from its output (`verdict`). Tests `node --test scripts/test_beecomm_sync.js`. Found the
   same day: the production server never loaded Beecomm — its `.env` had no `BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` and the 06:00
   job failed every night; the owner's own admin (port 3021) did the load, and stopped after 16/11. The owner put the two settings
-  on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on.
+  on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
