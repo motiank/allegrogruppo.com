@@ -212,7 +212,7 @@ async function beecommItems() {
   for (const [key, label, labelEn, table, dateCol, loadCol] of defs) {
     out.push(...(await safe({ key, group: g, label, labelEn, expectedDays: 2 }, async () => {
       const [r] = await adminRows(`SELECT COUNT(*) AS n, MAX(\`${dateCol}\`) AS d1${loadCol ? `, MAX(\`${loadCol}\`) AS loaded` : ""} FROM \`${table}\``);
-      return [item({ key, group: g, label, labelEn, expectedDays: 2, lastDate: day(r?.d1), lastUpdate: stamp(r?.loaded), count: num(r?.n), detail: "יום העסקים האחרון; נמשך כל לילה ב-04:00" })];
+      return [item({ key, group: g, label, labelEn, expectedDays: 2, lastDate: day(r?.d1), lastUpdate: stamp(r?.loaded), count: num(r?.n), detail: "יום העסקים האחרון; נמשך כל בוקר ב-06:00 (שעון ישראל)" })];
     })));
   }
   return out;
