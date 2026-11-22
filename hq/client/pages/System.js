@@ -10,6 +10,7 @@ import { Page, Card, Btn, Badge, Loading, ErrorBox, useLoad, fmtDay, fmtWhen } f
 import { BUILD, checkForUpdate, reloadApp } from '../version.js';
 import LegalUpdate from '../LegalUpdate.js';
 import BankUpdate from '../BankUpdate.js';
+import BeecommUpdate from '../BeecommUpdate.js';
 
 const useStyles = createUseStyles((theme) => ({
   note: { fontSize: '0.82rem', color: theme.textSecondary, margin: '0 0 0.6rem', lineHeight: 1.5 },
@@ -72,6 +73,7 @@ export default function System() {
       {r.error ? <ErrorBox error={r.error} /> : null}
       <AppVersion c={c} />
       <BankUpdate />
+      <BeecommUpdate onDone={r.reload} />
       <LegalUpdate />
       {r.data ? (
         <>

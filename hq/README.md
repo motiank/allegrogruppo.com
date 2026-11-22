@@ -691,6 +691,18 @@ row "bank-site <account> <from>..<to>". Not yet: the transaction status file (th
 the payee read from the cheque picture is still a separate step. Admin side: `../local_api_readme.md` → "Bank update from the bank site".
 Tests: `test/test_bank_extension.mjs` (the extension's pure helpers), admin `scripts/test_bank_sync.js`.
 
+**Beecomm update on demand** (owner 2026-11-22: "add the update button to the Beecomm as well — to initiate the update process on the
+server"): a card "עדכון מביקום (מכירות)" on the System page (`client/BeecommUpdate.js`). The button starts, on the server, the admin's
+nightly Beecomm loader (the back office → orders, Z reports, daily payments and items, from the last loaded day up to yesterday):
+`POST /api/joya/beecomm/sync/start` → `src/services/beecommSync.js` → the admin's `POST /local-api/v1/beecomm/sync/start` with the
+user's admin rights in the `X-Joya-*` headers. Nothing runs in the browser and Joya keeps nothing: the admin runs the loader as a child
+process (one at a time, shared with its 06:00 cron job) and remembers the last runs; the card polls `GET /api/joya/beecomm/sync/state`
+every 4 s while a run goes on, shows the last loaded business day, the days a run loaded (or "nothing to load"), its seconds and the
+failed runs' reason, and reloads the freshness table when a run ends. When a run loaded new days, the 5-minute source cache is dropped.
+The button is disabled when the server has no Beecomm login settings (`BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` in the admin `.env`;
+the production server got them on 2026-11-22 — before that the owner's own machine did the nightly load). Admin side:
+`../local_api_readme.md` → "Beecomm update on demand"; tests `scripts/test_beecomm_sync.js`.
+
 Sales (`analytics.js`): summary vs the previous period with the change split into **volume** and **average spend**
 (ΔR = (C₂−C₁)·A₁ + (A₂−A₁)·C₂), daily, by shift, by dish, anomalies (same weekday, median ± 3 MAD and ≥ 20 %).
 Labor: hours from the Tabit clock rows (+ corrections), sales per labor hour; with payroll access the **labor cost

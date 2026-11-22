@@ -3,12 +3,12 @@ import dotenv from "dotenv";
 import passport from "passport";
 import cookieParser from "cookie-parser";
 import cron from "node-cron";
-import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { fetchTabitShift, fetchTabitRota } from "./modules/files.js";
 import { weekSunday } from "./uploads/tabitShift.js";
 import { syncTabitShiftEmployees } from "./modules/payroll.js";
+import * as beecommSync from "./modules/beecommSync.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -117,39 +117,25 @@ app.listen(PORT, () => {
   console.log(`Admin server running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
 
-  // Setup analoader cron job - runs every day at 6:00 AM
-  const projectRoot = join(__dirname, "../..");
-
+  // The Beecomm loader (analoader) every day at 06:00 Israel time — through modules/beecommSync.js, the same child
+  // process Joya's System page starts on demand, so the two never run together. The loader needs BCOM_BO_API_KEY and
+  // BCOM_BO_REFRESH_TOKEN in the .env (the back office login); without them it fails at once (the production server
+  // lacked them until 2026-11-22 and the owner's machine did the nightly load).
   cron.schedule(
     "0 6 * * *",
     () => {
-      console.log(
-        `[Cron] Starting analoader job at ${new Date().toISOString()}`,
-      );
-
-      // Execute the analoader script from project root context
-      exec(
-        `node ./scripts/server/analoader/index.js`,
-        {
-          cwd: projectRoot,
-          env: process.env,
-        },
-        (error, stdout, stderr) => {
-          if (error) {
-            console.error(`[Cron] Analoader error: ${error.message}`);
-            return;
-          }
-          if (stderr) {
-            console.error(`[Cron] Analoader stderr: ${stderr}`);
-          }
-          if (stdout) {
-            console.log(`[Cron] Analoader output: ${stdout}`);
-          }
-          console.log(
-            `[Cron] Analoader job completed at ${new Date().toISOString()}`,
-          );
-        },
-      );
+      console.log(`[Cron] Starting analoader job at ${new Date().toISOString()}`);
+      try {
+        beecommSync.start({
+          by: "cron",
+          onDone: (run) => {
+            if (run.ok) console.log(`[Cron] Analoader done in ${run.seconds}s: ${run.nothingToDo ? "nothing to load" : `${run.dates?.from || "?"} → ${run.dates?.to || "?"}`}`);
+            else console.error(`[Cron] Analoader failed after ${run.seconds}s: ${run.error}\n${run.lines.slice(-10).join("\n")}`);
+          },
+        });
+      } catch (error) {
+        console.error(`[Cron] Analoader error: ${error.message}`);
+      }
     },
     {
       scheduled: true,

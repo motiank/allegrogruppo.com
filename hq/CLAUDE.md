@@ -260,6 +260,13 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   admin rights in the `X-Joya-*` headers + `runs.json` (`JOYA_BANK_SYNC_DIR`, default `~/.joya-bank-sync`); routes `/joya/bank/sync/*`
   (chain admin). Joya stores nothing: the admin writes `bank_transactions` and the Drive cheque archive. README → "Bank update from the
   bank site". Tests `test/test_bank_extension.mjs` (in `npm test`). Needs an hq client build on deploy. Deployed 2026-11-22 (`3ebc271`).
+- **Beecomm update on demand** (2026-11-22, owner: "add the update button to the Beecomm as well — to initiate the update process on the
+  server"): card `client/BeecommUpdate.js` on the System page → `/joya/beecomm/sync/{state,start}` (chain admin) →
+  `src/services/beecommSync.js` → the admin's `/local-api/v1/beecomm/sync/*` (`admin/server/modules/beecommSync.js` runs the nightly
+  loader `scripts/server/analoader/index.js` as a child process, one at a time, shared with the admin's 06:00 cron). The card polls while
+  a run goes on and reloads the freshness table at its end. README → "Beecomm update on demand". Needs an hq client build on deploy.
+  Found the same day: the production server never loaded Beecomm (no `BCOM_BO_*` in its `.env`, the cron failed every night) — the
+  owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on.
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

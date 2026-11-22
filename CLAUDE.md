@@ -203,6 +203,15 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   must be watched: the site's `accountId` format and the exact JSON shape are confirmed only then. Tests `scripts/test_bank_sync.js`,
   `hq/test/test_bank_extension.mjs`. Deployed 2026-11-22 (`3ebc271`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner`
   restarted; `/bank/sync/plan` answered on the droplet). The owner must load `joya-extension/` in Chrome in place of the old one.
+- **Beecomm update on demand** (2026-11-22, owner: "add the update button to the Beecomm as well — to initiate the update process on
+  the server"): `admin/server/modules/beecommSync.js` runs the nightly Beecomm loader (`scripts/server/analoader/index.js`) as a child
+  process of the admin — one at a time, shared with the 06:00 cron job in `server.js` — and keeps the last runs in memory; Local Data
+  API `GET /beecomm/sync/state`, `POST /beecomm/sync/start` (admin only, `local_api_readme.md` → "Beecomm update on demand"); Joya's
+  System page card `hq/client/BeecommUpdate.js` (`hq/src/services/beecommSync.js`, `/api/joya/beecomm/sync/*`). The loader prints its
+  errors and exits 0, so the result is read from its output (`verdict`). Tests `node --test scripts/test_beecomm_sync.js`. Found the
+  same day: the production server never loaded Beecomm — its `.env` had no `BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` and the 06:00
+  job failed every night; the owner's own admin (port 3021) did the load, and stopped after 16/11. The owner put the two settings
+  on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`

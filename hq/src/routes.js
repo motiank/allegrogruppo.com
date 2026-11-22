@@ -30,6 +30,7 @@ const askUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 import { forecastWeek } from './services/demand.js';
 import * as legalSync from './services/legalSync.js';
 import * as bankSync from './services/bankSync.js';
+import * as beecommSync from './services/beecommSync.js';
 import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
@@ -348,6 +349,9 @@ r.post(
 );
 r.post('/joya/bank/sync/:id/finish', requireAdmin, h(async (req) => bankSync.finish(req.joya, req.params.id, { summary: req.body?.summary, error: req.body?.error })));
 r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.cancel(req.joya, req.params.id, req.body?.why)));
+// services/beecommSync.js: the System page's "update from Beecomm" button runs the admin's nightly loader on the server now.
+r.get('/joya/beecomm/sync/state', requireAdmin, h(async (req) => beecommSync.state(req.joya)));
+r.post('/joya/beecomm/sync/start', requireAdmin, h(async (req) => beecommSync.start(req.joya)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
 // Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank

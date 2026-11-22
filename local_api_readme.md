@@ -935,6 +935,27 @@ without `X-Joya-Admin: 1` is `403 forbidden`.
 Tests: `node --test scripts/test_bank_sync.js` (the mapping and the keys, no DB). Joya side: `hq/src/services/bankSync.js`,
 `/api/joya/bank/sync/*`, the card on the System page; the extension: `joya-extension/README.md`.
 
+### Beecomm update on demand — `/beecomm/sync/*` (admin only)
+
+Owner 2026-11-22: "add the update button to the Beecomm as well — to initiate the update process on the server". The nightly Beecomm
+loader (`scripts/server/analoader/index.js`: the back office → `bcom_cash`, `bcom_z_reports`, `bcom_orders`, `bcom_items_daily`,
+`bcom_payments_daily`, from the last loaded day up to yesterday) is started as a child process of the admin by `admin/server/modules/
+beecommSync.js` — the same module the admin's 06:00 (Israel time) cron job uses, so a button run and the nightly run never overlap. The
+loader needs `BCOM_BO_API_KEY` and `BCOM_BO_REFRESH_TOKEN` (the back office login) in the admin's `.env`. Every call without
+`X-Joya-Admin: 1` is `403 forbidden`.
+
+- `GET /beecomm/sync/state` → `{ configured, running, current, runs: [run…], loaded: { lastDay, loadedAt } }` — `configured` = the two
+  settings exist; `current` = the run going on (or null); `runs` = the last 6 runs, newest first, kept in memory (an admin restart
+  forgets them); `loaded` = `MAX(business_date)` / `MAX(updated_at)` of `bcom_orders`. A run: `{ id, by, startedAt, finishedAt, seconds,
+  state: running | done | failed, ok, dates: { from, to } (the days the loader asked for, from its "Using dates" line), nothingToDo
+  (already up to date), error, lastLine, lines (the last 40 output lines) }`. The loader prints its errors and exits 0, so the verdict
+  is read from its output (`verdict()`): "Main is don" = done, "Global error" / "must be set in .env" / "save failed" = failed.
+- `POST /beecomm/sync/start` → `202 { data: run }` (state running). `409 running` when a run is going on, `503 not_configured` without
+  the login settings. `X-Joya-User` is kept as `by`. A run longer than 30 minutes is killed.
+
+Tests: `node --test scripts/test_beecomm_sync.js` (the verdict and the refusal, no DB, nothing spawned). Joya side:
+`hq/src/services/beecommSync.js`, `/api/joya/beecomm/sync/*`, the card `hq/client/BeecommUpdate.js` on the System page.
+
 ## Data sources
 
 | Data | Where it comes from | Freshness |

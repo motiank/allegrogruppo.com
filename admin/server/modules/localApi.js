@@ -10,6 +10,7 @@ import { tabitMonthPayroll, savedPayrollFile } from "./payroll.js";
 import { parseFiles, recognizeUploads, importUploads } from "./files.js";
 import { dataFreshness } from "./dataFreshness.js";
 import * as bankSync from "./bankSync.js";
+import * as beecommSync from "./beecommSync.js";
 import { flushChequeArchive } from "./chequeArchive.js";
 import {
   bcomGetOrders,
@@ -540,6 +541,8 @@ const ENDPOINTS = [
   "GET /bank/sync/cheques?account=[&since=]  (admin)",
   "POST /bank/sync/transactions  JSON { account, rows: [site rows], from?, to? }  (admin)",
   "POST /bank/sync/cheque-image?account=&date=&reference=&amount=  image/jpeg body  (admin)",
+  "GET /beecomm/sync/state  (admin)",
+  "POST /beecomm/sync/start  (admin) — runs the nightly Beecomm loader now",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -1984,6 +1987,25 @@ const Router = () => {
       adminOnly(req);
       const data = await bankSync.fileChequeImage({ account: String(req.query.account || "").trim(), date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body);
       res.json({ data });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+
+  // ── Beecomm update on demand (beecommSync.js): the nightly loader, started from Joya's System page ──
+  // Admin only. The same child process as the 06:00 cron job; one at a time (409 running); 503 not_configured when the
+  // admin's .env lacks the back office login. See local_api_readme.md → "Beecomm update on demand".
+  get("/beecomm/sync/state", async (req) => {
+    adminOnly(req);
+    const s = await beecommSync.state();
+    return { data: s, meta: { loader: beecommSync.LOADER } };
+  });
+  router.post("/beecomm/sync/start", async (req, res) => {
+    try {
+      adminOnly(req);
+      const run = beecommSync.start({ by: String(req.get("X-Joya-User") || "") || "joya" });
+      console.log(`[beecomm-sync] run ${run.id} started by ${run.by}`);
+      res.status(202).json({ data: run });
     } catch (err) {
       syncError(req, res, err);
     }

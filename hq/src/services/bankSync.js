@@ -75,7 +75,7 @@ const trim = (v, n = 20000) => (v && typeof v === 'object' ? JSON.parse(JSON.str
 
 const adminHeaders = (access) => ({ 'X-Joya-Admin': '1', 'X-Joya-User': String(access?.username || '') });
 
-async function admin(path, { method = 'GET', access, json, raw, contentType, timeout = 180_000 } = {}) {
+export async function admin(path, { method = 'GET', access, json, raw, contentType, timeout = 180_000 } = {}) {
   let res;
   try {
     res = await fetch(`${apiBase()}${path}`, {
@@ -89,7 +89,7 @@ async function admin(path, { method = 'GET', access, json, raw, contentType, tim
   }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const code = res.status === 404 && body?.error?.code !== 'not_found' ? 'NOT_SUPPORTED' : res.status === 400 ? 'BAD_REQUEST' : res.status === 404 ? 'NOT_FOUND' : res.status === 403 ? 'FORBIDDEN' : body?.error?.code === 'not_loaded' ? 'NOT_LOADED' : 'UPSTREAM';
+    const code = res.status === 404 && body?.error?.code !== 'not_found' ? 'NOT_SUPPORTED' : res.status === 400 ? 'BAD_REQUEST' : res.status === 404 ? 'NOT_FOUND' : res.status === 403 ? 'FORBIDDEN' : res.status === 409 ? 'CONFLICT' : res.status === 503 || body?.error?.code === 'not_loaded' ? 'NOT_LOADED' : 'UPSTREAM';
     throw err(code, `Allegro API: ${res.status} ${body?.error?.message || res.statusText}`);
   }
   return { data: body?.data, meta: body?.meta || {} };
