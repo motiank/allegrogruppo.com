@@ -275,7 +275,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   = `src/services/standingOrders.js`, learned from the bank file's 515 / 469 lines (≥ 2 of the last 4 months → expected on the usual
   day with the last amount; real lines where the bank covers the day; `late` when the day passed without a line, never deducted).
   The chat's future-cheques answer shows a button to the page (`AskBox.js` `ChequesPage`, WRITE rule). README → "The שקלפ page".
-  Tests `test/test_standing_orders.mjs`. Needs an hq client build on deploy.
+  Tests `test/test_standing_orders.mjs`. Needs an hq client build on deploy. Deployed 2026-11-22 (`cc9b78d`: pull, hq build, `joya-hq` + `joya-runner` restarted).
 - **Payments** (תשלומים, owner 2026-11-07): a main-menu area for the chain admin — the planned bank transfers of a
   company in Joya's own table `joya_payments` (created on production 2026-11-07; `sql/add-joya.sql`). Page `/payments`
   (`client/pages/Payments.js`) = a read-only board (today / this week / 30 days / all, totals, "bank loaded up to") + the

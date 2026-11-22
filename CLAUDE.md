@@ -217,7 +217,7 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   cheque number, beneficiary, sum; move forward and backward month by month"): Joya menu "שיקים לפרעון" → `/cheques`
   (`hq/client/pages/Cheques.js`), data `hq/src/services/finance.js` `chequesMonth` (the chat's future-cheques data + the known bank
   payments of `hq/src/services/standingOrders.js`, learned from the stored bank file's standing-order lines 515 / 469: seen in ≥ 2 of
-  the last 4 months → expected on the usual day with the last amount). No admin change. `hq/README.md` → "The שקלפ page".
+  the last 4 months → expected on the usual day with the last amount). No admin change. `hq/README.md` → "The שקלפ page". Deployed 2026-11-22 (`cc9b78d`: pull, hq build, `joya-hq` + `joya-runner` restarted).
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
 - **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
   `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
