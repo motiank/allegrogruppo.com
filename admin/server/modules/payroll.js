@@ -9,6 +9,7 @@ import ShikImportXL, {
   detectShikRateConflicts,
 } from "./ShikImportXL.js";
 import { buildTlush, tlushToShikRows, tlushToMicRows } from "./tlush.js";
+import { realCompletionFromReports } from "./realCompletion.js";
 import { fetchTabitShift } from "./files.js";
 import {
   normalizeRoleWage,
@@ -1044,6 +1045,10 @@ export function fillTlushSheet(ws, employees) {
   let grandNetTotal = 0;
   let grandGrossTotal = 0;
   let employeeCount = 0;
+  // השלמה אמיתית (display only, not exported): a line per employee and a total, outside the net/gross totals.
+  let grandReal = 0;
+  let anyReal = false;
+  const REAL_FONT = { italic: true, color: { argb: "FF1565C0" } };
   for (const e of employees) {
     const comps = Array.isArray(e.components) ? e.components : [];
     if (comps.length === 0) continue;
@@ -1095,6 +1100,12 @@ export function fillTlushSheet(ws, employees) {
         bold: true,
       };
     }
+    const real = e.realCompletion == null || e.realCompletion === "" ? null : Number(e.realCompletion);
+    if (real != null && Number.isFinite(real)) {
+      ws.addRow({ label: "השלמה אמיתית (לא בייצוא)", payment: real }).font = REAL_FONT;
+      grandReal += real;
+      anyReal = true;
+    }
     grandNetTotal += netTotal;
     grandGrossTotal += grossTotal;
   }
@@ -1119,6 +1130,9 @@ export function fillTlushSheet(ws, employees) {
       label: 'סה"כ ברוטו כללי',
       payment: grandGrossTotal,
     }).font = { bold: true };
+  }
+  if (anyReal) {
+    ws.addRow({ label: 'סה"כ השלמה אמיתית (לא בייצוא)', payment: grandReal }).font = { ...REAL_FONT, bold: true };
   }
 }
 
@@ -1335,7 +1349,8 @@ async function tabitReportMonths(rest) {
   }));
 }
 
-// An update of a saved payroll from Tabit: copy each employee's מפרעה (in_advance, typed by hand) from the
+// An update of a saved payroll from Tabit: copy each employee's מפרעה (in_advance, typed by hand) and
+// השלמה אמיתית (real_completion, when typed by hand) from the
 // saved payroll rows into the new extract. One person = the saved rows with the same ID number (a person
 // renamed in Tabit gets a second employees record, and a month can have a saved row for each name), else the
 // same employee_id; the מפרעה comes from the row updated last. Returns the names of the saved people that the
@@ -1362,7 +1377,11 @@ async function keepSavedAdvance(rest, month, allRows) {
         raw = {};
       }
     }
-    people.set(personKey(r.employee_id, r.ID_nmbr), { name: r.name, in_advance: raw?.in_advance ?? null });
+    people.set(personKey(r.employee_id, r.ID_nmbr), {
+      name: r.name,
+      in_advance: raw?.in_advance ?? null,
+      real_completion: raw?.real_completion ?? null,
+    });
   }
   const matched = new Set();
   for (const row of allRows) {
@@ -1373,6 +1392,7 @@ async function keepSavedAdvance(rest, month, allRows) {
     if (!people.has(key) || matched.has(key)) continue;
     matched.add(key);
     row.in_advance = people.get(key).in_advance;
+    row.real_completion = people.get(key).real_completion;
   }
   return [...people].filter(([k]) => !matched.has(k)).map(([, p]) => p.name);
 }
@@ -2783,6 +2803,7 @@ const Router = () => {
           global: hasWrapper ? (raw.global ?? null) : null,
           netGross: hasWrapper ? (raw.netGross ?? null) : null,
           in_advance: hasWrapper ? (raw.in_advance ?? null) : null,
+          real_completion: hasWrapper ? (raw.real_completion ?? null) : null,
           work_dates:
             hasWrapper && Array.isArray(raw.work_dates) ? raw.work_dates : [],
           daily_breakdown:
@@ -2807,24 +2828,25 @@ const Router = () => {
     }
   });
 
-  // מפרעה typed in the final table → only payroll_data.in_advance of the saved row(s) of this person and month.
-  // Body { rest, month, name, ID_nmbr, in_advance }. The person: the employees record by name (the name the
+  // A value typed in the final table → only that field of payroll_data of the saved row(s) of this person and
+  // month: מפרעה (in_advance, empty → 0) and השלמה אמיתית (real_completion, empty → null = the calculated value).
+  // Body { rest, month, name, ID_nmbr, <field> }. The person: the employees record by name (the name the
   // table shows), else by ID number; all of the month's rows with that ID number are set (a person renamed in
   // Tabit can have a row under each name). { updated: 0 } = the month is not saved for this person yet — the
   // value is saved with the payroll.
-  router.post("/payroll-advance", async (req, res) => {
+  const savePayrollField = (field, emptyValue) => async (req, res) => {
     try {
       const rest = String(req.body?.rest || "").trim();
       const month = String(req.body?.month || "").trim();
       const name = String(req.body?.name || "").trim();
       const idNmbr = String(req.body?.ID_nmbr || "").trim();
-      const raw = req.body?.in_advance;
-      const value = raw === "" || raw == null ? 0 : Number(raw);
+      const raw = req.body?.[field];
+      const value = raw === "" || raw == null ? emptyValue : Number(raw);
       if (!rest) return res.status(400).json({ error: "missing rest" });
       if (!/^\d{4}-\d{2}$/.test(month))
         return res.status(400).json({ error: "month must be YYYY-MM" });
       if (!name && !idNmbr) return res.status(400).json({ error: "missing name" });
-      if (!Number.isFinite(value)) return res.status(400).json({ error: "in_advance must be a number" });
+      if (value != null && !Number.isFinite(value)) return res.status(400).json({ error: `${field} must be a number` });
 
       let emp = null;
       if (name) {
@@ -2847,7 +2869,7 @@ const Router = () => {
       // Only rows in the wrapped format ({ payroll_data, …, in_advance }) — see /payroll-load.
       const [r] = await executeSql(
         `UPDATE payroll p
-            SET p.payroll_data = JSON_SET(p.payroll_data, '$.in_advance', :value)
+            SET p.payroll_data = JSON_SET(p.payroll_data, '$.${field}', :value)
           WHERE p.rest = :rest AND p.month = :month
             AND JSON_CONTAINS_PATH(p.payroll_data, 'one', '$.payroll_data')
             AND (p.employee_id = :employee_id
@@ -2855,10 +2877,49 @@ const Router = () => {
                      (SELECT e.employee_id FROM employees e WHERE e.rest = :rest AND e.ID_nmbr = :personId)))`,
         { rest, month, value, employee_id: emp.employee_id, personId },
       );
-      res.json({ updated: r?.affectedRows || 0, in_advance: value });
+      res.json({ updated: r?.affectedRows || 0, [field]: value });
     } catch (err) {
-      console.error("payroll/payroll-advance error:", err);
+      console.error(`payroll/${field} save error:`, err);
       res.status(500).json({ error: err.message || "save failed" });
+    }
+  };
+  router.post("/payroll-advance", savePayrollField("in_advance", 0));
+  router.post("/payroll-real-completion", savePayrollField("real_completion", null));
+
+  // השלמה אמיתית calculated from the month's stored Tabit reports (realCompletion.js), per Tabit name:
+  // Body { rest, month } → { available, byName: { name: { creditTip, completion, total, tipHours, tips,
+  // noWageHours } } }. available false = no Tabit report for the month.
+  router.post("/real-completion", async (req, res) => {
+    try {
+      const rest = String(req.body?.rest || "").trim();
+      const month = String(req.body?.month || "").trim();
+      if (!rest || !MONTH_RE.test(month))
+        return res.status(400).json({ error: "rest and month (YYYY-MM) are required" });
+      const [rows] = await executeSql(
+        "SELECT app_id, report FROM tabit_shift_reports WHERE rest = :rest AND month = :month ORDER BY app_id",
+        { rest, month },
+      );
+      if (!rows || rows.length === 0) return res.json({ available: false, byName: {} });
+      const reports = rows.map((r) => ({ app: r.app_id, report: JSON.parse(r.report) }));
+      const empByName = await loadEmpByName(rest);
+      const MIN = Number(process.env.MIN_HOURLY_WAGE) || 35.4;
+      const wageFor = (name, role) => {
+        const e = empByName.get(String(name || "").trim());
+        if (!e) return null;
+        const re = e.rolesByName?.[role];
+        // a global (monthly) wage is not an hourly target
+        const type = (re && re.new_wage_type) || e.new_wage_type || "";
+        if (type.startsWith("global_")) return null;
+        const raw = re && re.wage != null && re.wage !== "" ? Number(re.wage) : e.wage != null ? Number(e.wage) : null;
+        if (raw == null || !Number.isFinite(raw)) return null;
+        return raw === -1 ? MIN : raw;
+      };
+      const byName = Object.fromEntries(realCompletionFromReports(reports, month, wageFor));
+      res.json({ available: true, byName });
+    } catch (err) {
+      if (err.code === "ER_NO_SUCH_TABLE") return res.json({ available: false, byName: {} });
+      console.error("payroll/real-completion error:", err);
+      res.status(500).json({ error: err.message || "real completion failed" });
     }
   });
 
@@ -2893,6 +2954,8 @@ const Router = () => {
           netGross: emp.netGross ?? null,
           // מפרעה — manual/script-filled advance, persisted on the payroll row.
           in_advance: emp.in_advance ?? null,
+          // השלמה אמיתית typed by hand; null = the value calculated from Tabit (/real-completion).
+          real_completion: emp.real_completion ?? null,
           work_dates: Array.isArray(emp.work_dates) ? emp.work_dates : [],
           daily_breakdown:
             emp.daily_breakdown && typeof emp.daily_breakdown === "object"
@@ -3039,6 +3102,7 @@ const Router = () => {
           global: c.emp.global ?? null,
           netGross: c.emp.netGross ?? null,
           in_advance: c.emp.in_advance ?? null,
+          real_completion: c.emp.real_completion ?? null,
           work_dates: Array.isArray(c.emp.work_dates) ? c.emp.work_dates : [],
           daily_breakdown:
             c.emp.daily_breakdown && typeof c.emp.daily_breakdown === "object"

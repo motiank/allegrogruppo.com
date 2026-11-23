@@ -1642,6 +1642,7 @@ const Shifts = () => {
           global: e.global ?? null,
           netGross: e.netGross ?? null,
           in_advance: e.in_advance ?? null,
+          real_completion: e.real_completion ?? null,
           work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
           daily_breakdown:
             e.daily_breakdown && typeof e.daily_breakdown === "object"
@@ -1763,6 +1764,60 @@ const Shifts = () => {
     }
   };
 
+  // השלמה אמיתית (real completion) = credit-card tips + the top-up of the tip-role hours to the wage,
+  // calculated by the server from the month's Tabit reports (/real-completion). Typed by hand like מפרעה:
+  // saved in the payroll (real_completion); empty = back to the calculated value. Display only — not exported.
+  const [realCalc, setRealCalc] = useState({ available: false, byName: {} });
+  const [realStatus, setRealStatus] = useState({});
+  useEffect(() => {
+    if (!selectedRestaurant || !/^\d{4}-\d{2}$/.test(month || "")) {
+      setRealCalc({ available: false, byName: {} });
+      return;
+    }
+    let off = false;
+    axios
+      .post("/admin/payroll/real-completion", { rest: selectedRestaurant, month }, { withCredentials: true })
+      .then((res) => !off && setRealCalc(res.data || { available: false, byName: {} }))
+      .catch(() => !off && setRealCalc({ available: false, byName: {} }));
+    return () => {
+      off = true;
+    };
+  }, [selectedRestaurant, month]);
+  const realCompletionCalc = (name) => realCalc.byName?.[name] || null;
+  const realCompletionOf = (emp) =>
+    emp?.real_completion != null && emp.real_completion !== ""
+      ? Number(emp.real_completion)
+      : (realCompletionCalc(emp?.name)?.total ?? null);
+  const setRealCompletion = (name, val) => {
+    setAllEmployees((prev) =>
+      prev.map((e) => (e.name === name ? { ...e, real_completion: val } : e)),
+    );
+    setRealStatus((prev) => ({ ...prev, [name]: null }));
+  };
+  const saveRealCompletion = async (name) => {
+    const emp = allEmployees.find((e) => e.name === name);
+    if (!emp || !month || !selectedRestaurant) return;
+    const raw = emp.real_completion;
+    const value = raw === "" || raw == null || !Number.isFinite(Number(raw)) ? null : Number(raw);
+    setRealStatus((prev) => ({ ...prev, [name]: "saving" }));
+    try {
+      const res = await axios.post(
+        "/admin/payroll/payroll-real-completion",
+        { rest: selectedRestaurant, month, name, ID_nmbr: emp.ID_nmbr ?? null, real_completion: value },
+        { withCredentials: true },
+      );
+      setAllEmployees((prev) =>
+        prev.map((e) => (e.name === name ? { ...e, real_completion: value } : e)),
+      );
+      setRealStatus((prev) => ({ ...prev, [name]: res.data?.updated > 0 ? "saved" : "later" }));
+    } catch (err) {
+      setRealStatus((prev) => ({
+        ...prev,
+        [name]: { error: err.response?.data?.error || err.message || "save failed" },
+      }));
+    }
+  };
+
   // Per-employee payload for the save-export endpoint. Built from
   // dedupedEmployees (not allEmployees) — two DB employee records sharing one
   // מס' עובד (e.g. a duplicated employee row under a different name) must
@@ -1781,6 +1836,7 @@ const Shifts = () => {
         global: e.global ?? null,
         netGross: e.netGross ?? null,
         in_advance: coerceAdvance(e.in_advance),
+        real_completion: e.real_completion ?? null,
         breaks: computeBreaks(e, (role) => isHourlyMinWage(empData, role)),
         work_dates: Array.isArray(e.work_dates) ? e.work_dates : [],
         daily_breakdown:
@@ -2021,6 +2077,9 @@ const Shifts = () => {
           .map((e) => ({
             name: e.name,
             employeeNumber: e.employeeNumber ?? "",
+            realCompletion: realCompletionOf(
+              allEmployees.find((x) => x.name === e.name) || { name: e.name },
+            ),
             mixedRates: !!e.mixedRates,
             excludedRateGroups: e.excludedRateGroups || [],
             components: (e.components || []).map((c) => ({
@@ -2285,6 +2344,7 @@ const Shifts = () => {
           notes: empNotes,
           capExcess,
           in_advance: emp.in_advance,
+          real_completion: emp.real_completion,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -2308,6 +2368,7 @@ const Shifts = () => {
           notes: i === 0 ? empNotes : null,
           capExcess,
           in_advance: i === 0 ? emp.in_advance : null,
+          real_completion: i === 0 ? emp.real_completion : null,
           empNumber,
           workdays: emp.workdays,
           global: emp.global,
@@ -3897,6 +3958,12 @@ const Shifts = () => {
               <th style={{ ...styles.th, ...styles.stickyTh }}>השלמה</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>נסיעות</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>מפרעה</th>
+              <th
+                style={{ ...styles.th, ...styles.stickyTh }}
+                title="טיפ אשראי + השלמה לשכר בשעות מלצר/בר/ראנר (מחושב מטאביט). ניתן לעריכה; ריק = הערך המחושב. לא מיוצא."
+              >
+                השלמה אמיתית
+              </th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>עובד גלובאלי</th>
               <th style={{ ...styles.th, ...styles.stickyTh }}>סה"כ</th>
             </tr>
@@ -3939,7 +4006,7 @@ const Shifts = () => {
               if (r.isGrandTotal) {
                 return (
                   <tr key={r.empKey + i}>
-                    <td style={nameCell} colSpan={15}>
+                    <td style={nameCell} colSpan={16}>
                       {r.role}
                     </td>
                     <td style={cell}>{fmtNum(r.total)}</td>
@@ -4071,6 +4138,66 @@ const Shifts = () => {
                         );
                       })()}
                       </>
+                    ) : (
+                      ""
+                    )}
+                  </td>
+                  <td style={cell}>
+                    {r.first && !r.isTotal ? (
+                      (() => {
+                        const calc = realCompletionCalc(r.name);
+                        const edited = r.real_completion != null && r.real_completion !== "";
+                        const st = realStatus[r.name];
+                        const [text, color, tip] = !st
+                          ? [null]
+                          : st === "saving"
+                            ? ["…", theme.textSecondary, "שומר…"]
+                            : st === "saved"
+                              ? ["✓", theme.success || "#2e7d32", "נשמר"]
+                              : st === "later"
+                                ? ["•", theme.textSecondary, "יישמר עם המשכורת (החודש עוד לא נשמר לעובד)"]
+                                : ["!", theme.error || "#e53935", st.error];
+                        return (
+                          <>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={edited ? r.real_completion : ""}
+                              placeholder={calc ? fmtNum(calc.total) : ""}
+                              onChange={(e) => setRealCompletion(r.name, e.target.value)}
+                              onBlur={() => saveRealCompletion(r.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                              }}
+                              style={{
+                                width: "72px",
+                                textAlign: "center",
+                                padding: "2px 4px",
+                                border: `1px solid ${edited ? theme.active || "#2196f3" : theme.border}`,
+                                borderRadius: "4px",
+                                backgroundColor: theme.surface,
+                                color: theme.text,
+                              }}
+                              title={
+                                (calc
+                                  ? `מחושב: טיפ אשראי ${fmtNum(calc.creditTip)} + השלמה ${fmtNum(calc.completion)} = ${fmtNum(calc.total)}` +
+                                    ` (${fmtNum(calc.tipHours)} שעות מלצר/בר/ראנר, טיפ ${fmtNum(calc.tips)})` +
+                                    (calc.noWageHours ? ` — ${fmtNum(calc.noWageHours)} שעות בלי שכר לא חושבו` : "")
+                                  : realCalc.available
+                                    ? "אין נתונים בטאביט לעובד הזה"
+                                    : "אין דוח טאביט לחודש הזה") +
+                                (edited ? " · הוזן ידנית — רוקנו את השדה כדי לחזור לערך המחושב" : "") +
+                                " · נשמר כשיוצאים מהשדה"
+                              }
+                            />
+                            {text && (
+                              <span title={tip} style={{ marginInlineStart: "4px", color, fontWeight: 600 }}>
+                                {text}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()
                     ) : (
                       ""
                     )}
