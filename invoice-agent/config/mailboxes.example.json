@@ -1,0 +1,11 @@
+[
+  {
+    "email": "main@example.com",
+    "main": true,
+    "login": "saved"
+  },
+  {
+    "email": "other@example.com",
+    "login": "ask"
+  }
+]

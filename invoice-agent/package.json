@@ -1,0 +1,26 @@
+{
+  "name": "invoice-agent",
+  "version": "0.1.0",
+  "description": "Finds invoices in Gmail, reads them with Claude (subscription login, no API key) and files them in Google Drive.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18.19" },
+  "scripts": {
+    "auth": "node src/authCli.js",
+    "scan": "node src/run.js",
+    "dry": "node src/run.js --dry-run",
+    "backfill": "node src/backfill.js",
+    "rematch": "node src/rematch.js",
+    "status": "node src/status.js",
+    "latest": "node src/latest.js",
+    "test": "node --test test/filing.test.js test/email.test.js test/process.test.js test/backfill.test.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "googleapis": "^170.0.0",
+    "node-html-parser": "^7.0.1",
+    "open": "^10.2.0",
+    "undici": "^6.29.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

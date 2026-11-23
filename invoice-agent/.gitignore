@@ -1,0 +1,7 @@
+node_modules/
+data/
+.env
+credentials.json
+config/companies.json
+config/targets.json
+config/mailboxes.json

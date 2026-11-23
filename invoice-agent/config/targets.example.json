@@ -1,0 +1,10 @@
+[
+  {
+    "name": "main",
+    "folderName": "Invoices"
+  },
+  {
+    "name": "owner",
+    "folderId": "<the id from the folder's link in Drive>"
+  }
+]
