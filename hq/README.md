@@ -536,6 +536,22 @@ scanned cheques that are in neither Hashavshevet nor Priority (`source` `archive
 a payment in THEIR statement that our books lack gets `archiveCheque` when a scanned cheque has that amount near that date — the
 writer says the payment happened and the cheque is not entered yet. Eval `ca-*`; tests in the repo root (`scripts/test_cheque_archive.js`).
 
+**The pictures as cards in the chat (owner 2026-11-23: "if I asked for cheque images, display them on a card list with the
+options to copy and share").** Under an answer, `client/ChequeCards.js` shows the scanned cheques of the answer as a card
+list: the picture (tap = full size in a dialog), the cheque number, the payee (an unsure reading in yellow with "(לא ודאי)"),
+the amount, the bank day and "לא בחשבשבת" when the books do not know it; 12 cards first, "הצג עוד" for the rest. Buttons on
+every card: **העתק** = the picture to the clipboard (as PNG; a browser that cannot copy pictures copies the caption and the
+link instead and says so), **שתף** = the phone's share sheet with the picture file (a browser without one downloads the
+file); the full-size dialog also has הורדה and פתח בחלון חדש. Which pictures: `lib/chequeCards.js` `chequeCards(calcs,
+question)` — every row of the answer's calcs that carries `imageId` (the cheque archive rows, the bank rows of
+`bank_transactions` / `bank_open_items` / the report's sections, the cheques file rows, `statement_compare`'s `archiveCheque`),
+each picture once, the archive's rows first — shown when the answer used calc `cheque_archive` (a cheque by its number, the
+work list, the cheques of a payee) or when the question asked for pictures in words (`PICTURE_WORDS`: תמונה, צילום, סרוק,
+picture, image, photo, scan); a plain bank question keeps its pictures behind the report page's 📷. The picture streams
+through `/api/joya/finance/cheque-image/:id` (chain admin), so copy and share need no Drive access. The writer says once
+"התמונות מוצגות למטה" and never writes a link (WRITE rules for the bank cheques and `cheque_archive`; PLAN rule "The scanned
+cheques": "תמונות השיקים של X" → `cheque_archive` with `q`). Tests `test/test_cheque_cards.mjs`; eval `ca-pictures-*`.
+
 **Fixed files in Drive (owner 2026-11-11: "merge into one table the Priority and Hashavshevet cheques, create an Excel on
 the Drive and provide the link — a fixed file that is updated all the time"; then: "no schedule and no service for that,
 upon demand: if I ask to see future cheques, Joya updates the file and provides the link").** `src/services/fixedSheets.js`:

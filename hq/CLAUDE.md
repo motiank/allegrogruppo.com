@@ -267,6 +267,13 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   a run goes on and reloads the freshness table at its end. README → "Beecomm update on demand". Needs an hq client build on deploy.
   Found the same day: the production server never loaded Beecomm (no `BCOM_BO_*` in its `.env`, the cron failed every night) — the
   owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+- **Cheque pictures as cards** (2026-11-23, owner: "if I asked for cheque images, display them on a card list with the options
+  to copy and share"): `client/ChequeCards.js` under the answer (`AskBox.js`), `lib/chequeCards.js` picks the pictures = every
+  calc row with `imageId` (now passed on the bank rows, the report's cheque rows, the cheques file rows and `archiveCheque`),
+  shown when calc `cheque_archive` ran or the question has picture words. Copy = the PNG to the clipboard (else caption + link),
+  Share = the share sheet with the file (else download), tap = full size. Prompt: PLAN "The scanned cheques" (the pictures of a
+  payee → `cheque_archive` q), WRITE ("התמונות מוצגות למטה", never a link). Tests `test/test_cheque_cards.mjs`; eval
+  `ca-pictures-*`. README → "The pictures as cards in the chat". Needs an hq client build on deploy.
 - **The שקלפ page** (2026-11-22, owner: "a convenient UX for the שקלפ … list forward the daily cheques or expenses like known bank
   payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day; move month by month"):
   menu item "שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month per view, a row per day, a card per

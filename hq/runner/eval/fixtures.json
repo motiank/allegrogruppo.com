@@ -2793,6 +2793,45 @@
       }
     },
     {
+      "key": "ca-pictures-payee",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תראה לי את תמונות השיקים של ציונוב מעיין",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "q": "ציונוב|ציונוב מעיין"
+          }
+        },
+        "noParams": {
+          "cheque_archive": [
+            "number"
+          ]
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
+      "key": "ca-pictures-en",
+      "kind": "ACCOUNTING",
+      "lang": "en",
+      "question": "Show me the scanned cheque images paid to ציונוב מעיין",
+      "expect": {
+        "calcs": [
+          "cheque_archive"
+        ],
+        "params": {
+          "cheque_archive": {
+            "q": "ציונוב|ציונוב מעיין"
+          }
+        },
+        "maxCalcs": 2
+      }
+    },
+    {
       "key": "l-story-he",
       "kind": "LEGAL",
       "lang": "he",

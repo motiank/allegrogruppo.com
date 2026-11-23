@@ -11,6 +11,7 @@ import { useT, Term } from './i18n/index.js';
 import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
 import { splitAnswer, cellNumber, cellTone, floorMoney } from '../lib/answerTables.js';
+import ChequeCards from './ChequeCards.js';
 
 const useStyles = createUseStyles((theme) => ({
   box: { border: `1px solid ${theme.border}`, borderRadius: 10, padding: '0.7rem 0.85rem', background: theme.surface, marginBottom: '0.7rem' },
@@ -403,6 +404,7 @@ export function Answer({ r, onChanged, head = true }) {
       <BankReconFiles r={r} classes={classes} />
       <ChequesPage r={r} classes={classes} />
       <LegalFiles r={r} classes={classes} />
+      <ChequeCards r={r} />
           {unverified.length ? (
             <div className={classes.warn}>
               ⚠ {t('joya.ask.unverified')} <Term>{unverified.join(', ')}</Term>

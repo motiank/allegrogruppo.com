@@ -111,7 +111,7 @@ export async function bankTransactions(companies, from, to, { q = null, side = n
       out.push({ company: co.label, companyKey: co.key, available: false });
       continue;
     }
-    const rows = res.rows.map((r) => ({ date: r.date, account: r.account, action: r.action, details: r.details, reference: r.reference, moneyIn: r.credit, moneyOut: r.debit, balance: r.balance, ...(r.payeeSource ? { payee: r.payee, payeeSource: r.payeeSource, ...(r.payeeRole ? { payeeRole: r.payeeRole } : {}), ...(r.payeePurpose ? { payeePurpose: r.payeePurpose } : {}) } : {}), ...(r.image ? { image: r.image } : {}), ...(r.event ? { event: r.event } : {}) }));
+    const rows = res.rows.map((r) => ({ date: r.date, account: r.account, action: r.action, details: r.details, reference: r.reference, moneyIn: r.credit, moneyOut: r.debit, balance: r.balance, ...(r.payeeSource ? { payee: r.payee, payeeSource: r.payeeSource, ...(r.payeeRole ? { payeeRole: r.payeeRole } : {}), ...(r.payeePurpose ? { payeePurpose: r.payeePurpose } : {}) } : {}), ...(r.image ? { image: r.image } : {}), ...(r.imageId ? { imageId: r.imageId } : {}), ...(r.event ? { event: r.event } : {}) }));
     const amount = (r) => r.moneyIn ?? r.moneyOut ?? 0;
     const sorted = order === 'date' ? rows : [...rows].sort((a, b) => amount(b) - amount(a));
     out.push({

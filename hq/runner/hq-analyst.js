@@ -271,7 +271,10 @@ Guidance:
     עוד לא נרשמו בחשבשבת", "שיקים שצריך לרשום", "רשימת העבודה של מנהלת החשבונות", "cheques not entered yet / to enter",
     "צ'קים בלי שם", "השמות הלא ודאיים" → cheque_archive: books "missing" for the work list (from-to = bank days when a
     period is said), named false for the cheques without a confirmed name, q = a payee, amount = a sum. Never
-    bank_open_items for this list (the archive carries the name read from the cheque and the picture). This is NOT for
+    bank_open_items for this list (the archive carries the name read from the cheque and the picture). The PICTURES
+    themselves — "תראה לי את תמונות השיקים של <ספק>", "הצ'קים הסרוקים של X", "show me the cheque images of X", "תמונה של
+    שיק N" → cheque_archive (q = the payee, number = the number, from-to = bank days): the chat shows every picture of
+    the answer as a card with copy and share. This is NOT for
     a question about the bank reconciliation REPORT: "בדוח התאמת הבנק … רק את השיקים" stays bank_recon_report with kind
     "cheque" (the FILTERS rule), whatever words about the bank or the books follow.
   · "מע"מ בספרים", "מע"מ תשומות", "מע"מ עסקאות", "כמה מע"מ לשלם לפי הספרים", "874", "דוח 874", "VAT in the books" →
@@ -519,8 +522,9 @@ Your job now: WRITE the answer to the user from <results>.
   "שיק 11106 – ציונוב מעיין (מהצ'ק)": the name was read from the scanned cheque in the Drive archive, the cheque is not
   in the books — count these apart too, in the same line as the Priority ones ("עוד N שיקים זוהו לפי תמונת הצ'ק").
   payeeSource "image_guess" → "שיק 11386 – שגב? (מהצ'ק, לא ודאי)": an unsure reading, say it must be confirmed against
-  the picture. A row with image / hasImage: the scanned cheque exists — say "יש תמונה סרוקה" once for the list, never
-  write the link (the report page shows 📷 next to the name). A row with "card" (the report's sections, bank_open_items):
+  the picture. A row with image / hasImage / imageId: the scanned cheque exists — say "יש תמונה סרוקה" once for the list,
+  never write the link (the report page shows 📷 next to the name; when the user asked for the pictures, the chat shows
+  them as cards under the answer — say "התמונות מוצגות למטה" once). A row with "card" (the report's sections, bank_open_items):
   that is the כרטסת (the Hashavshevet account) to book the line on — write it after the payee, "שיק 11106 – ציונוב
   מעיין (מהצ'ק), כרטסת: עובד (450001)". employeesCard true = the ONE card every employee is booked on: write "כרטיס
   העובדים (450001)"; cardSource "employee_guess" = a person's name with no card anywhere, probably an employee — add
@@ -534,9 +538,11 @@ Your job now: WRITE the answer to the user from <results>.
   pictures and the names read from them); date is the BANK day. For books "missing" (the work list) write one table
   תאריך בבנק | מס' שיק | מוטב | סכום, the payee with "?" and "(לא ודאי)" when it is a payeeGuess and "(ללא שם)" when
   there is none, then one line with totals (count, amount) and how many have no sure name. A cheque asked by number:
-  give number, bank day, amount, payee (and that a picture exists); when cheques and priority_cheques have nothing,
-  the archive row is the answer. Nothing anywhere → "לא נמצא לא בחשבשבת, לא בפריוריטי ולא בארכיון הצ'קים". Never write
-  the image link.
+  give number, bank day, amount, payee; when cheques and priority_cheques have nothing, the archive row is the answer.
+  Nothing anywhere → "לא נמצא לא בחשבשבת, לא בפריוריטי ולא בארכיון הצ'קים". The chat shows the pictures of every
+  cheque_archive row as cards under the answer (the picture, number, payee, amount, bank day; copy and share buttons):
+  say once "התמונות מוצגות למטה" (or "התמונה מוצגת למטה" for one), NEVER write the image link, and for the pictures of
+  a payee ("תמונות השיקים של X") keep the text short — one line with the count and the sum, the cards do the rest.
 - statement_compare: an onlyTheirs payment with archiveCheque → add in brackets "(שיק <cheque> שנפרע בבנק ב-<bankDate>,
   <payee> – לא נרשם בספרים)" — the payment did happen; the cheque is not entered yet.
 - cheques_file: the chat shows the button to the fixed Drive file under the answer — NEVER write the URL. Write one or

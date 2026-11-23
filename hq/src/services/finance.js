@@ -270,9 +270,9 @@ export async function bankReconReport(companies, p = {}) {
   // card = the כרטסת to book the line on (the admin's bankLineAccounts.js): "name (key)"; cardSource says where it came from
   // (books, name, employee, history, employee_guess, text); employeesCard = the one card every employee is booked on
   const cardOf = (x) => (x.counterAccount ? { card: `${x.counterName || ''} (${x.counterAccount})`.trim(), ...(x.counterSource ? { cardSource: x.counterSource } : {}), ...(x.counterEmployee ? { employeesCard: true } : {}) } : {});
-  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource, ...(x.payeeRole ? { payeeRole: x.payeeRole } : {}), ...(x.payeePurpose ? { payeePurpose: x.payeePurpose } : {}) } : {}), ...(x.imageId ? { hasImage: true } : {}), ...cardOf(x) });
+  const bankRow = (x) => ({ date: x.date, reference: x.reference, details: x.details, amount: x.amount, ageDays: x.ageDays, ...(x.payeeSource ? { payee: x.payee, payeeSource: x.payeeSource, ...(x.payeeRole ? { payeeRole: x.payeeRole } : {}), ...(x.payeePurpose ? { payeePurpose: x.payeePurpose } : {}) } : {}), ...(x.imageId ? { hasImage: true, imageId: x.imageId } : {}), ...cardOf(x) });
   const bookRow = (x) => ({ date: x.date, reference: x.reference, description: x.description, counter: x.counterName || x.counterAccount, amount: x.amount, ageDays: x.ageDays, ...(x.posted ? {} : { posted: false }), ...(x.counterEmployee ? { employeesCard: true } : {}) });
-  const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status, ...cardOf(x) });
+  const chequeRow = (x) => ({ chequeNo: x.chequeNo, payee: x.payee, dueDate: x.dueDate, amount: x.amount, clearedDate: x.clearedDate, daysAfterDue: x.daysAfterDue, status: x.status, ...(x.imageId ? { imageId: x.imageId } : {}), ...cardOf(x) });
   const top = (rows, by) => [...rows].sort((a, b) => Math.abs(b[by]) - Math.abs(a[by]));
   return result('bank_recon_report', params, await perCompany(companies, '/bank/report', params, (d) => {
     const f = d.filter?.active ? d.filter : null;
@@ -376,7 +376,7 @@ export async function statementCompare(companies, p = {}) {
           if (!cands.length) continue;
           const c = cands[0];
           used.add(c.cheque + '|' + c.date);
-          x.archiveCheque = { cheque: c.cheque, bankDate: c.date, payee: c.payee || c.payeeGuess || null, ...(c.payee ? {} : c.payeeGuess ? { unsure: true } : {}), inBooks: c.inBooks, image: c.image };
+          x.archiveCheque = { cheque: c.cheque, bankDate: c.date, payee: c.payee || c.payeeGuess || null, ...(c.payee ? {} : c.payeeGuess ? { unsure: true } : {}), inBooks: c.inBooks, image: c.image, imageId: c.imageId };
         }
         cmp.archiveHints = payments.filter((x) => x.archiveCheque).length;
       }
@@ -470,7 +470,7 @@ export function chequeTotals(rows, today) {
   return t;
 }
 
-const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, bankDate: x.bankDate ?? null, source: x.source, account: x.account, accountName: x.accountName, ...(x.payeeGuess ? { payeeGuess: x.payeeGuess } : {}), ...(x.image ? { image: x.image } : {}) });
+const mapChequeRow = (x) => ({ reference: x.cheque, payee: x.payee, amount: x.amount, dueDate: x.dueDate, issueDate: x.issueDate, state: x.state, bankDate: x.bankDate ?? null, source: x.source, account: x.account, accountName: x.accountName, ...(x.payeeGuess ? { payeeGuess: x.payeeGuess } : {}), ...(x.image ? { image: x.image } : {}), ...(x.imageId ? { imageId: x.imageId } : {}) });
 
 /**
  * The future-cheques report of one company (the chat calc and the fixed Drive file share it): the cheques of the window
@@ -661,7 +661,7 @@ export async function chequeArchive(companies, p = {}) {
   return result('cheque_archive', params, await perCompany(companies, '/cheques/archive', params, (d, m) => ({
     ...shown(d, limit, m.total), totals: m.totals, archive: m.archive, counts: m.counts, note: m.note,
   })), {
-    note: 'the cheque archive in Drive: the scanned front of every cheque the bank paid (Pasta Lina, from May 2025), one row per bank cheque line: cheque = the number, date = the BANK day (not the date written on the cheque), amount, payee = the confirmed name with payeeSource (image / image_handwriting = read from the picture; priority / journal / cheques = copied from those sources when it was filed), payeeGuess = an unsure reading (confirm it against the picture), inBooks = Hashavshevet knows the cheque today, account = the company account with exactly that name when there is one, image = the picture (the chat does not show pictures — say it exists). books "missing" = the cheques still to enter in Hashavshevet — the bookkeeper\'s work list; totals = count, amount, inBooks, named, guess, unnamed over the selection',
+    note: 'the cheque archive in Drive: the scanned front of every cheque the bank paid (Pasta Lina, from May 2025), one row per bank cheque line: cheque = the number, date = the BANK day (not the date written on the cheque), amount, payee = the confirmed name with payeeSource (image / image_handwriting = read from the picture; priority / journal / cheques = copied from those sources when it was filed), payeeGuess = an unsure reading (confirm it against the picture), inBooks = Hashavshevet knows the cheque today, account = the company account with exactly that name when there is one, image / imageId = the picture (the chat shows the pictures as cards under the answer, with copy and share — say once that they are shown below, never write a link). books "missing" = the cheques still to enter in Hashavshevet — the bookkeeper\'s work list; totals = count, amount, inBooks, named, guess, unnamed over the selection',
   });
 }
 
