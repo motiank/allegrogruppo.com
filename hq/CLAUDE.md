@@ -273,7 +273,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   shown when calc `cheque_archive` ran or the question has picture words. Copy = the PNG to the clipboard (else caption + link),
   Share = the share sheet with the file (else download), tap = full size. Prompt: PLAN "The scanned cheques" (the pictures of a
   payee → `cheque_archive` q), WRITE ("התמונות מוצגות למטה", never a link). Tests `test/test_cheque_cards.mjs`; eval
-  `ca-pictures-*`. README → "The pictures as cards in the chat". Needs an hq client build on deploy.
+  `ca-pictures-*`. README → "The pictures as cards in the chat". Needs an hq client build on deploy. Deployed 2026-11-23 (`c69f7c5`: pull, hq build, `joya-hq` + `joya-runner` restarted; `/api/version` serves the new build).
 - **The שקלפ page** (2026-11-22, owner: "a convenient UX for the שקלפ … list forward the daily cheques or expenses like known bank
   payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day; move month by month"):
   menu item "שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month per view, a row per day, a card per
