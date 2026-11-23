@@ -131,14 +131,15 @@
     return { rows, more: rows.length >= PAGE, raw: j };
   }
 
-  /** The rows of a window, splitting a part whose page came back full. */
-  async function transactionsOf(r, accountId, from, to, days, sum) {
+  /** The rows of a window, splitting a part whose page came back full. `report(from, to)` tells the status line the day it is on. */
+  async function transactionsOf(r, accountId, from, to, days, sum, report) {
     let rows = [];
     for (const part of dateParts(from, to, days)) {
       if (r.stop) break;
+      if (report) report(part.from, part.to);
       const p = await transactionsPart(r, accountId, part);
       sum.calls++;
-      if (p.more && days > 1) rows = rows.concat(await transactionsOf(r, accountId, part.from, part.to, Math.max(1, Math.floor(days / 2)), sum));
+      if (p.more && days > 1) rows = rows.concat(await transactionsOf(r, accountId, part.from, part.to, Math.max(1, Math.floor(days / 2)), sum, report));
       else rows = rows.concat(p.rows);
       await sleep(350);
     }
@@ -209,7 +210,7 @@
         let rows;
         try {
           prog('transactions', `${label} ${a.from} – ${a.to}`, { done: i, total: accounts.length });
-          rows = await transactionsOf(r, accountId, a.from, a.to, PART_DAYS, sum);
+          rows = await transactionsOf(r, accountId, a.from, a.to, PART_DAYS, sum, (day) => prog('transactions', `${label} · ${day}`, { done: i, total: accounts.length }));
         } catch (e) {
           if (e.message !== 'LOGIN') throw e;
           li = await relogin(r);
@@ -260,7 +261,7 @@
         };
         for (let k = 0; k < want.length && !r.stop; k++) {
           const ch = want[k];
-          prog('cheques', `${label} ${k + 1}/${want.length}`, { done: i, total: accounts.length });
+          prog('cheques', `${label} · ${ch.date} · ${k + 1}/${want.length}`, { done: i, total: accounts.length });
           try {
             const url = `/ServerServices/current-account/cheques/${encodeURIComponent(ch.reference)}?view=paying&originalEventDate=${compact(ch.date)}&chequeAmount=${encodeURIComponent(ch.amount)}&accountId=${encodeURIComponent(accountId)}&lang=he`;
             const j = await siteGet(r, url);
