@@ -21,7 +21,7 @@ import crypto from "crypto";
 import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import { norm } from "../uploads/workbook.js";
-import { addChequePayees, PAYEE_SOURCE } from "./chequePayees.js";
+import { addChequePayees, pickImage, PAYEE_SOURCE } from "./chequePayees.js";
 import { companyArchive, addChequeImage, archiveFolderOf } from "./chequeArchive.js";
 
 const require = createRequire(import.meta.url);
@@ -272,8 +272,14 @@ export async function importSiteRows(account, siteRows, { user = null, from = nu
 
 /**
  * The paid cheques of one account (stored rows, action code 493 / "שיק", money out) of the last `lookbackDays` days that
- * the Drive archive has no picture of (same cheque number and amount): [{ date, reference, amount }], newest first, at
- * most MAX_CHEQUES. `archive` says whether the archive could be read at all (no archive → nothing is asked).
+ * the Drive archive has NO scanned picture of yet: [{ date, reference, amount }], newest first, at most MAX_CHEQUES. So
+ * the extension downloads only the cheques missing from the archive, never one it already holds (owner 2026-11-23).
+ * "Already in the archive" is decided first by the cheque number + the line's bank day: the archive stores `date` as the
+ * bank day (the same `tx_date` the line has) and a cheque number clears on exactly one day, so number + date is a stable
+ * index — if a scan with that number and that day exists, the cheque is not fetched again. The line's amount is kept
+ * only as a safety net (the SAME test the bank reconciliation report uses to show the 📷, chequePayees.pickImage) for a
+ * scan whose stored day differs a little. `archive` says whether the archive could be read at all (no archive → nothing
+ * is asked) and how many lines it already covered (`archived`).
  */
 export async function chequesWithoutImage(account, { lookbackDays = CHEQUE_LOOKBACK_DAYS, since = null } = {}) {
   const acc = companyOfAccount(account);
@@ -289,18 +295,32 @@ export async function chequesWithoutImage(account, { lookbackDays = CHEQUE_LOOKB
       ORDER BY tx_date DESC, id DESC`,
     { account, from },
   );
-  const have = new Set(ar.cheques.filter((c) => c.imageId).map((c) => `${c.reference}|${Math.round(c.amount * 100)}`));
+  // the scanned cheques of the archive, grouped by cheque number (only rows that really have a picture)
+  const scansByNumber = new Map();
+  for (const c of ar.cheques) {
+    if (!c.imageId) continue;
+    if (!scansByNumber.has(c.reference)) scansByNumber.set(c.reference, []);
+    scansByNumber.get(c.reference).push(c);
+  }
   const seen = new Set();
   const cheques = [];
+  let archived = 0;
   for (const r of rows) {
     const ref = String(Number(r.reference));
-    const k = `${ref}|${Math.round(Number(r.debit) * 100)}`;
-    if (have.has(k) || seen.has(k)) continue;
+    const amount = r2(Number(r.debit));
+    const scans = scansByNumber.get(ref);
+    // the cheque number + the line's day is the index; the amount is the safety net (same as the report's 📷)
+    if (scans && (scans.some((c) => c.date === r.d) || pickImage(scans, amount))) {
+      archived++; // the archive already has this cheque's picture — do not fetch it again
+      continue;
+    }
+    const k = `${ref}|${Math.round(amount * 100)}`;
+    if (seen.has(k)) continue;
     seen.add(k);
-    cheques.push({ date: r.d, reference: ref, amount: r2(r.debit) });
+    cheques.push({ date: r.d, reference: ref, amount });
     if (cheques.length >= MAX_CHEQUES) break;
   }
-  return { account, from, cheques, archive: { configured: true, error: ar.error || null, cheques: ar.cheques.length }, checked: rows.length };
+  return { account, from, cheques, archive: { configured: true, error: ar.error || null, cheques: ar.cheques.length, archived }, checked: rows.length };
 }
 
 // the archive's own words for a name source (what the owner's machine wrote; chequeArchive.js reads both)
