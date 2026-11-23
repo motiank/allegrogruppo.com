@@ -1,6 +1,6 @@
 # CLAUDE.md — allegrogruppo.com
 
-The Allegro group's web systems. One repo, one root `package.json` (except `hq/` and `hash-sync/`), several separate services:
+The Allegro group's web systems. One repo, one root `package.json` (except `hq/`, `invoice-agent/` and `hash-sync/`), several separate services:
 
 | Service | Folder | Port | Production |
 |---|---|---|---|
@@ -9,9 +9,10 @@ The Allegro group's web systems. One repo, one root `package.json` (except `hq/`
 | Events pages (SSR, read-only) | `events/` | 3023 | events.allegrogruppo.com |
 | **Joya HQ** (the restaurants' AI headquarters) | `hq/` (own `package.json`, AI runner `hq/runner/`) | 4300 | https://hq.allegrogruppo.com — `joya-hq.service` + `joya-runner.service` |
 | Hashavshevet sync (SQL Server → MySQL `allegro_finance`, every company and year in one DB, no data dropped) | `hash-sync/` (own `package.json`; Windows install package: `npm run package:windows` → `dist/`, guide `windows/INSTALL.md`) | none (by hand so far; nightly Task Scheduler job on the Hashavshevet Windows server once the package is installed) | `allegro_finance` on the production MySQL server (loaded 2026-11-06, Pastalina 2025–2026); dev = local `allegro_finance_dev`; source = local SQL Server 2025 Express, DB `PastaLina`; passwords and tokens not copied |
+| Invoice agent (Gmail invoices → Google Drive, `claude -p`, no API key) | `invoice-agent/` (own `package.json`) | none (cron job every 15 minutes on the owner's machine, not on the server) | live since 2026-11-05; Google project `allegro-invoice-agent` (owner motiank@gmail.com, published, unverified); main mailbox accountant@allegrogruppo.com; folder not in git |
 
 Read the service's own docs first: `README.md` (repo), `local_api_readme.md` (the admin's Local Data API),
-`events/README.md`, `hq/CLAUDE.md` + `hq/README.md`, `hash-sync/README.md`.
+`events/README.md`, `hq/CLAUDE.md` + `hq/README.md`, `invoice-agent/README.md`, `hash-sync/README.md`.
 
 ## Language rules (always follow)
 
@@ -114,6 +115,100 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   card payments and coupon orders are refused (503). The admin top bar no longer shows/polls the order-system
   dropdown (`admin/client/components/Layout.js`). To reopen: set it to false, put the dropdown back, build, restart
   `allegro.service`.
+- **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
+  `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
+  (read only, loopback only, like the Local Data API). Its DB settings are `FINANCE_DB_*` in the root `.env` (default: the
+  admin's `DB_*` server, database `allegro_finance`). Test: `node --test scripts/test_finance_api.js` (local
+  `allegro_finance_dev` from `hash-sync/.env`; the mixed endpoints also read the production `allegro` DB). Deployed
+  2026-11-07 (`4a88e42`, `allegro-admin.service` restarted). Joya side built the same day (`hq/src/services/finance.js`,
+  chain admin only, in הנהלת חשבונות; `hq/README.md` → "The books"). Every number still carries the `not_validated` warning until the accountant checks it.
+- **Bank reconciliation report** (דוח התאמת בנק מפורט, 2026-11-07): admin menu "Bank reconciliation" (`/bank-recon`, admin role
+  only) → `GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx` (`admin/server/modules/bankRecon.js`,
+  Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page; `bankReconBehavior` there adds the collapsible
+  sections and the Google-Sheets-like column filters on פרטים / מוטב / חשבון נגדי, 2026-11-07). Reads `allegro_finance` only. Sections: open
+  bank lines, open book lines (cheques excluded), cheques cleared (paired by cheque number + amount, else Hashavshevet's
+  match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
+  Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07. Also in Joya HQ (page
+  `/accounting/bank-recon` + chat calc `bank_recon_report`) through the Finance API `GET /finance/bank/report[/accounts]`.
+  **Filters** (2026-11-13, owner: "supplier, cheque / type of movement, a specific name (prompt only) — best support in the API
+  to save AI tokens"): `shared/bankReconFilter.js` — `kind` (cheque, transfer, card, direct_debit, deposit, fee, authorities,
+  salary, other; every row gets one), `party` (account key or part of the name), `q`, `amount`, `sections`, `facets=1` on
+  `/admin/bank-recon/report` and `/finance/bank/report` (+ `/facets` for the pickers); the summary stays for the whole account,
+  `filtered[section]` = kept of all. Pickers "סוג תנועה" / "ספק / מוטב" on the admin page and Joya's page; the chat puts
+  the words in the calc params (planner rule "FILTERS of bank_recon_report"). Tests `scripts/test_bank_recon_filter.js` (no
+  DB), `scripts/test_bank_recon.js`; eval `f-bank-recon-filter-*`. Deployed 2026-11-13 (`c77cd4e`). The supplier picker is a
+  searchable list: each name shows its rows in the report and, in red brackets, its bank moves with no record in the books
+  (section 1; `facetsOf` → `bankOpen`). Deployed 2026-11-13 (`43c3a18`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
+  **Noise toggle** (2026-11-15, owner: "a noise cancellation toggle button: de facto cancelled cheques (older than 60 days), two
+  opposite moves with the same details (name and sum) on the books or the bank"): `shared/bankReconNoise.js` tags `noise.rule`
+  `reversal` (sections 1 and 2: two opposite rows, same payee / reference on the bank side, same counter account on the books
+  side, same amount, within 90 days); `report.noise` = counts per section. A cheque past due > 60 days and not cleared is NOT noise
+  (owner, same day: "those lines should be handled"): `todo.rule` `stale_cheque`, `report.todo`, a red "לטיפול" box, never hidden.
+  Deployed 2026-11-15 (`19fc9f0`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`). Filter
+  `noise=hide` (API, Joya calc param, planner rule "בלי רעשים"); the HTML starts with the noise rows hidden and a button shows
+  them (the summary always includes them); Excel column "רעש". On production 2026: 239 noise rows (24 bank, 134 books, 81 cheques).
+  Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`. Deployed 2026-11-15 (`62428e9`: pull, root build,
+  `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
+  **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
+  the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
+  read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
+  else the Priority cheque file = `priority` (2026-11-11), else the cheque archive in Drive = `image` / `image_guess` (2026-11-16), else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
+  **Cheque archive in Drive** (2026-11-16, owner: "load the index.json from the cheques folder in the drive and use it to extract names wherever
+  needed to reduce the 'לא נמצא בחשבשבת' cases" → "all" seven use cases): the owner's machine files the scanned front of every cheque the bank
+  paid in the Drive folder `CHEQUE_ARCHIVE_FOLDER` (default the owner's folder; `<company folder>/index.json` + `cheques/<payee>/<no>.jpg`; the
+  payee of a cheque the books and Priority do not know is READ FROM THE PICTURE — 336 of 1,358 on 2026-11-16, 17 unsure guesses). The admin reads
+  the index with the invoice agent's Google login (`admin/server/modules/chequeArchive.js`, 5-min cache, nothing stored; company by
+  `shared/finance_map.json` → `chequeArchive.folder`). Uses: (1) the cheque lookup's fourth source — `payeeSource` `image` (name read from the
+  picture, same number AND amount; shown "(מהצ'ק)") / `image_guess` ("? (מהצ'ק, לא ודאי)"), and `imageId` / `image` on EVERY cheque line that has a
+  scan — so the report (section 1, Excel column "תמונת הצ'ק", notes and `summary.bankOpen.cheques.image / imageGuess / withImage`), `/finance/bank/open`,
+  `/bank/suggestions`, the Local Data API stored rows and Joya's bank chat all get them; the 📷 link streams the picture through
+  `/admin/bank-recon/cheque-image/:id` (admin page) or `/finance/cheques/image/:id` → Joya `/api/joya/finance/cheque-image/:id` (only ids in the
+  index) and opens it in a modal over the report (close button, backdrop, Escape; "פתח בחלון חדש" inside; owner 2026-11-18 — `bankReconBehavior`
+  in `shared/bankReconHtml.js`, so the admin page, the print page and Joya's frame all do it); (2) Finance API `GET /finance/cheques/archive` (`books=missing` = the bookkeeper's work list: name, amount, bank day, picture, and the
+  account with that name) + Joya calc `cheque_archive`; (3) `/cheques/all` joins the scans and adds archive-only rows (`source` `archive`) — so Joya's
+  cheques file too; (4) Joya `statement_compare`: an onlyTheirs payment gets `archiveCheque` when a scanned cheque has that amount near that date;
+  (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12
+  guesses, 7 left. Tests `scripts/test_cheque_archive.js` (no DB), `test_cheque_payees.js`, `test_bank_recon.js`, `test_finance_api.js`
+  (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (`a046632`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet). On production that day, section 1 of 2026: 283 cheques named from the picture, 17 guesses, 19 missing (7 with a scan), 379 with a 📷.
+  **The card (כרטסת) next to every line** (2026-11-18, owner: "I want the card index number next to each line to improve the process; complete
+  every row. One card for all employees: make sure it is an employee by the admin's employees table or another way; no specific supplier or other
+  role → the employee card, marked by color"): `admin/server/modules/bankLineAccounts.js` gives every section-1 bank line `counterAccount` /
+  `counterName` / `counterSource` (`books`, `name` incl. `finance_map` `cardAliases`, `employee` = Priority's employees supplier 108 or the admin's
+  employee tables, `history` = past journal entries with that name, `employee_guess` = a person's name with no card, to check, `text` = the bank
+  text's past matches) / `counterBasis`, and `counterEmployee` for the one employees card (`finance_map` `employees.account` = 450001 "עובד");
+  sections 2 and 3 carry the books' own. Shown as a "כרטסת" column (blue = employees card, lighter + "?" = a guess, tooltip = why) in the page,
+  the Excel (3 columns, blue fill), `/finance/bank/open` (`meta.cards`), `/finance/bank/report` and Joya's chat (`card`, `cardSource`,
+  `employeesCard`; rule in `hq-analyst.js`). On the local copy, 2026 section 1: a card for 643 of 758 lines (147 employees, 38 guesses, 115 without a card). Tests
+  `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`. Deployed 2026-11-18 (`d2dad64`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted); on production that day, 2026 section 1: a card for 640 of 753 lines, 113 without.
+  **Only the period's rows** (2026-11-18, owner: "when I ask bank recon for 2026 it ignores the date and shows tons of data from 25"):
+  `tagOlder` (`shared/bankReconFilter.js`) marks `older` on open rows dated before `from` (open cheques by the cheque's date) and counts them
+  in `report.older`; filter `older=hide` drops them; the HTML page starts with them hidden behind a button, the Excel has a "לפני התקופה"
+  column, Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`; planner rule). The summary always
+  counts them. Tests `scripts/test_bank_recon_filter.js`, `test_bank_recon.js`.
+  **Section 3ג + Hashavshevet import file** (2026-11-18, owner: "the unpaid old cheques: a section 3ג of cheques over 60 days — cancelled (never
+  reached the beneficiary → delete) or rejected by the bank; export to Hashavshevet moves import Excel; checkboxes per row, select all, filters"):
+  the stale cheques (`todo.stale_cheque`) leave 3ב for `chequesStale` (`summary.chequesStale`, in the tie-out; `bounced` when an open "החזרת
+  שיק" bank line has the number and amount; `suggestedAction`); a cheque reversed by a plain journal entry counts as cancelled. Every section
+  has a selection mode ("בחירה": checkbox column, select all visible, count + sum, Excel of the chosen rows); 3ג exports the reversal moves
+  as Hashavshevet's import Excel (headers = its `ImportJournal` fields, defined name `jurnal`, text keys) or movein.dat (short method, cp1255,
+  5-digit references only) — `admin/server/modules/hashavshevetMoves.js`, `POST /admin/bank-recon/export`, Finance API `POST
+  /bank/report/export`, Joya `POST /api/joya/finance/export`. The move = Hashavshevet's own storno (negative amount on both sides, reference =
+  the cheque number); an import cannot set cheque_id, so the cheques module still lists the cheque until cancelled there. Format facts in
+  `finance_api_readme.md` → "What Hashavshevet imports". Tests `scripts/test_hashavshevet_moves.js` (no DB), `test_bank_recon.js`,
+  `test_bank_recon_filter.js`.
+- **System page in Joya HQ** (2026-11-18, owner: "a system option in the main menu which displays this data" — the last update date of the
+  bank, Hashavshevet and the rest): `admin/server/modules/dataFreshness.js` → Local Data API `GET /system/freshness` (read only: the
+  Hashavshevet copy — sync run, bank page, matches, journal, cheques, batches; the bank files; Tabit; Beecomm; the Drive indexes; the Priority
+  file — each with the last business date, the last load, rows, `state` ok / late / stale against an expected cadence, and Hebrew notes
+  that compare the sources) → Joya `/api/joya/system/freshness` → page `/system`, main-menu item "מערכת" (chain admin). Test
+  `scripts/test_data_freshness.js` (no DB). Needs an hq client build on deploy. **App update** (same day): every hq build has an id
+  (`hq/vite.config.js` → `__JOYA_BUILD__` + `prod/version.json`), `GET /api/version` serves it, the app checks hourly and offers a reload
+  dialog when the server's build differs (`hq/client/version.js`, `UpdateDialog.js`); the System page has an "עדכן אפליקציה" button.
+- **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
+  the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
+  and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own
+  table `joya_payments` (`hq/sql/add-joya.sql`, created on production 2026-11-07). `hq/README.md` → "Payments". The cash-flow
+  view will sit next to the payments board (owner). Deployed 2026-11-08 (`63218b2`, hq build, joya-hq + joya-runner restarted).
 - **Drive invoices against the books** (2026-11-08, owner): Finance API `GET /finance/invoices/drive-check`
   (`admin/server/modules/financeApi.js` + `invoiceDrive.js`, rules `shared/invoiceMatch.js`, `shared/finance_map.json` →
   `drive`): the admin reads the invoice agent's `index.json` files from the accountant's Google Drive with the agent's
@@ -212,107 +307,30 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   same day: the production server never loaded Beecomm — its `.env` had no `BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` and the 06:00
   job failed every night; the owner's own admin (port 3021) did the load, and stopped after 16/11. The owner put the two settings
   on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+- **Cheque pictures as cards in Joya's chat** (2026-11-23, owner: "if I asked for cheque images, display them on a card list with
+  the options to copy and share"): under an answer that used the cheque archive (a cheque by number, the work list, the cheques of
+  a payee) or asked for pictures in words, Joya shows the scanned cheques as cards (picture, number, payee, amount, bank day) with
+  Copy (PNG to the clipboard) and Share (the share sheet with the file) — `hq/client/ChequeCards.js`, `hq/lib/chequeCards.js`. No
+  admin change (the admin already serves `imageId` on every cheque line). `hq/README.md` → "The pictures as cards in the chat".
 - **The שקלפ page in Joya HQ** (2026-11-22, owner: "a convenient UX for the שקלפ: a page that lists forward the daily cheques or
   expenses like known bank payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day —
   cheque number, beneficiary, sum; move forward and backward month by month"): Joya menu "שיקים לפרעון" → `/cheques`
   (`hq/client/pages/Cheques.js`), data `hq/src/services/finance.js` `chequesMonth` (the chat's future-cheques data + the known bank
   payments of `hq/src/services/standingOrders.js`, learned from the stored bank file's standing-order lines 515 / 469: seen in ≥ 2 of
   the last 4 months → expected on the usual day with the last amount). No admin change. `hq/README.md` → "The שקלפ page". Deployed 2026-11-22 (`cc9b78d`: pull, hq build, `joya-hq` + `joya-runner` restarted).
-- **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
-- **Finance API** (2026-11-07): `GET /local-api/v1/finance/*` in the admin (`admin/server/modules/financeApi.js`, rules in
-  `shared/finance_map.json`, spec `finance_api_readme.md`) answers the 24 Pastalina finance use cases from `allegro_finance`
-  (read only, loopback only, like the Local Data API). Its DB settings are `FINANCE_DB_*` in the root `.env` (default: the
-  admin's `DB_*` server, database `allegro_finance`). Test: `node --test scripts/test_finance_api.js` (local
-  `allegro_finance_dev` from `hash-sync/.env`; the mixed endpoints also read the production `allegro` DB). Deployed
-  2026-11-07 (`4a88e42`, `allegro-admin.service` restarted). Joya side built the same day (`hq/src/services/finance.js`,
-  chain admin only, in הנהלת חשבונות; `hq/README.md` → "The books"). Every number still carries the `not_validated` warning until the accountant checks it.
-- **Bank reconciliation report** (דוח התאמת בנק מפורט, 2026-11-07): admin menu "Bank reconciliation" (`/bank-recon`, admin role
-  only) → `GET /admin/bank-recon/report?company=&account=&from=&to=&format=json|html|xlsx` (`admin/server/modules/bankRecon.js`,
-  Hebrew HTML in `shared/bankReconHtml.js`, shared by the server and the page; `bankReconBehavior` there adds the collapsible
-  sections and the Google-Sheets-like column filters on פרטים / מוטב / חשבון נגדי, 2026-11-07). Reads `allegro_finance` only. Sections: open
-  bank lines, open book lines (cheques excluded), cheques cleared (paired by cheque number + amount, else Hashavshevet's
-  match group) and cheques not cleared; "open" = no Hashavshevet match up to `to`. Summary ties to 0 on the local copy.
-  Test: `node --test scripts/test_bank_recon.js` (needs `FINANCE_DB_*`). Deployed 2026-11-07. Also in Joya HQ (page
-  `/accounting/bank-recon` + chat calc `bank_recon_report`) through the Finance API `GET /finance/bank/report[/accounts]`.
-  **Filters** (2026-11-13, owner: "supplier, cheque / type of movement, a specific name (prompt only) — best support in the API
-  to save AI tokens"): `shared/bankReconFilter.js` — `kind` (cheque, transfer, card, direct_debit, deposit, fee, authorities,
-  salary, other; every row gets one), `party` (account key or part of the name), `q`, `amount`, `sections`, `facets=1` on
-  `/admin/bank-recon/report` and `/finance/bank/report` (+ `/facets` for the pickers); the summary stays for the whole account,
-  `filtered[section]` = kept of all. Pickers "סוג תנועה" / "ספק / מוטב" on the admin page and Joya's page; the chat puts
-  the words in the calc params (planner rule "FILTERS of bank_recon_report"). Tests `scripts/test_bank_recon_filter.js` (no
-  DB), `scripts/test_bank_recon.js`; eval `f-bank-recon-filter-*`. Deployed 2026-11-13 (`c77cd4e`). The supplier picker is a
-  searchable list: each name shows its rows in the report and, in red brackets, its bank moves with no record in the books
-  (section 1; `facetsOf` → `bankOpen`). Deployed 2026-11-13 (`43c3a18`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
-  **Noise toggle** (2026-11-15, owner: "a noise cancellation toggle button: de facto cancelled cheques (older than 60 days), two
-  opposite moves with the same details (name and sum) on the books or the bank"): `shared/bankReconNoise.js` tags `noise.rule`
-  `reversal` (sections 1 and 2: two opposite rows, same payee / reference on the bank side, same counter account on the books
-  side, same amount, within 90 days); `report.noise` = counts per section. A cheque past due > 60 days and not cleared is NOT noise
-  (owner, same day: "those lines should be handled"): `todo.rule` `stale_cheque`, `report.todo`, a red "לטיפול" box, never hidden.
-  Deployed 2026-11-15 (`19fc9f0`: pull, root build, `allegro-admin`, hq build, `joya-hq` + `joya-runner`). Filter
-  `noise=hide` (API, Joya calc param, planner rule "בלי רעשים"); the HTML starts with the noise rows hidden and a button shows
-  them (the summary always includes them); Excel column "רעש". On production 2026: 239 noise rows (24 bank, 134 books, 81 cheques).
-  Tests `scripts/test_bank_recon_filter.js`, `scripts/test_bank_recon.js`. Deployed 2026-11-15 (`62428e9`: pull, root build,
-  `allegro-admin`, hq build, `joya-hq` + `joya-runner`).
-  **Cheque beneficiaries** (2026-11-07): every bank cheque line shown (report section 1, `/finance/bank/open`, `/bank/suggestions`,
-  the Local Data API `/bank/transactions/stored`, so also Joya's bank chat) gets `payee` / `payeeSource` from Hashavshevet at
-  read time (`admin/server/modules/chequePayees.js`: `cheques` by number + amount, else the journal entry with that reference and amount,
-  else the Priority cheque file = `priority` (2026-11-11), else the cheque archive in Drive = `image` / `image_guess` (2026-11-16), else `missing` = not in Hashavshevet yet). Test: `node --test scripts/test_cheque_payees.js`.
-  **Cheque archive in Drive** (2026-11-16, owner: "load the index.json from the cheques folder in the drive and use it to extract names wherever
-  needed to reduce the 'לא נמצא בחשבשבת' cases" → "all" seven use cases): the owner's machine files the scanned front of every cheque the bank
-  paid in the Drive folder `CHEQUE_ARCHIVE_FOLDER` (default the owner's folder; `<company folder>/index.json` + `cheques/<payee>/<no>.jpg`; the
-  payee of a cheque the books and Priority do not know is READ FROM THE PICTURE — 336 of 1,358 on 2026-11-16, 17 unsure guesses). The admin reads
-  the index with the invoice agent's Google login (`admin/server/modules/chequeArchive.js`, 5-min cache, nothing stored; company by
-  `shared/finance_map.json` → `chequeArchive.folder`). Uses: (1) the cheque lookup's fourth source — `payeeSource` `image` (name read from the
-  picture, same number AND amount; shown "(מהצ'ק)") / `image_guess` ("? (מהצ'ק, לא ודאי)"), and `imageId` / `image` on EVERY cheque line that has a
-  scan — so the report (section 1, Excel column "תמונת הצ'ק", notes and `summary.bankOpen.cheques.image / imageGuess / withImage`), `/finance/bank/open`,
-  `/bank/suggestions`, the Local Data API stored rows and Joya's bank chat all get them; the 📷 link streams the picture through
-  `/admin/bank-recon/cheque-image/:id` (admin page) or `/finance/cheques/image/:id` → Joya `/api/joya/finance/cheque-image/:id` (only ids in the
-  index) and opens it in a modal over the report (close button, backdrop, Escape; "פתח בחלון חדש" inside; owner 2026-11-18 — `bankReconBehavior`
-  in `shared/bankReconHtml.js`, so the admin page, the print page and Joya's frame all do it); (2) Finance API `GET /finance/cheques/archive` (`books=missing` = the bookkeeper's work list: name, amount, bank day, picture, and the
-  account with that name) + Joya calc `cheque_archive`; (3) `/cheques/all` joins the scans and adds archive-only rows (`source` `archive`) — so Joya's
-  cheques file too; (4) Joya `statement_compare`: an onlyTheirs payment gets `archiveCheque` when a scanned cheque has that amount near that date;
-  (5) a cheque by number plans `cheques` + `priority_cheques` + `cheque_archive`. On the local copy, 2026 section 1: 29 named from the picture, 12
-  guesses, 7 left. Tests `scripts/test_cheque_archive.js` (no DB), `test_cheque_payees.js`, `test_bank_recon.js`, `test_finance_api.js`
-  (`/cheques/archive`, `/cheques/image`); eval `ca-*`, `pc-*`. Deployed 2026-11-16 (`a046632`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; the agent's Google files were already on the droplet). On production that day, section 1 of 2026: 283 cheques named from the picture, 17 guesses, 19 missing (7 with a scan), 379 with a 📷.
-  **The card (כרטסת) next to every line** (2026-11-18, owner: "I want the card index number next to each line to improve the process; complete
-  every row. One card for all employees: make sure it is an employee by the admin's employees table or another way; no specific supplier or other
-  role → the employee card, marked by color"): `admin/server/modules/bankLineAccounts.js` gives every section-1 bank line `counterAccount` /
-  `counterName` / `counterSource` (`books`, `name` incl. `finance_map` `cardAliases`, `employee` = Priority's employees supplier 108 or the admin's
-  employee tables, `history` = past journal entries with that name, `employee_guess` = a person's name with no card, to check, `text` = the bank
-  text's past matches) / `counterBasis`, and `counterEmployee` for the one employees card (`finance_map` `employees.account` = 450001 "עובד");
-  sections 2 and 3 carry the books' own. Shown as a "כרטסת" column (blue = employees card, lighter + "?" = a guess, tooltip = why) in the page,
-  the Excel (3 columns, blue fill), `/finance/bank/open` (`meta.cards`), `/finance/bank/report` and Joya's chat (`card`, `cardSource`,
-  `employeesCard`; rule in `hq-analyst.js`). On the local copy, 2026 section 1: a card for 643 of 758 lines (147 employees, 38 guesses, 115 without a card). Tests
-  `scripts/test_bank_line_accounts.js` (no DB), `test_bank_recon.js`, `test_finance_api.js`. Deployed 2026-11-18 (`d2dad64`: pull, root build, `allegro-admin`, `joya-hq` + `joya-runner` restarted); on production that day, 2026 section 1: a card for 640 of 753 lines, 113 without.
-  **Only the period's rows** (2026-11-18, owner: "when I ask bank recon for 2026 it ignores the date and shows tons of data from 25"):
-  `tagOlder` (`shared/bankReconFilter.js`) marks `older` on open rows dated before `from` (open cheques by the cheque's date) and counts them
-  in `report.older`; filter `older=hide` drops them; the HTML page starts with them hidden behind a button, the Excel has a "לפני התקופה"
-  column, Joya's calc sends `older=hide` unless the user asks for everything open (`older: "show"`; planner rule). The summary always
-  counts them. Tests `scripts/test_bank_recon_filter.js`, `test_bank_recon.js`.
-  **Section 3ג + Hashavshevet import file** (2026-11-18, owner: "the unpaid old cheques: a section 3ג of cheques over 60 days — cancelled (never
-  reached the beneficiary → delete) or rejected by the bank; export to Hashavshevet moves import Excel; checkboxes per row, select all, filters"):
-  the stale cheques (`todo.stale_cheque`) leave 3ב for `chequesStale` (`summary.chequesStale`, in the tie-out; `bounced` when an open "החזרת
-  שיק" bank line has the number and amount; `suggestedAction`); a cheque reversed by a plain journal entry counts as cancelled. Every section
-  has a selection mode ("בחירה": checkbox column, select all visible, count + sum, Excel of the chosen rows); 3ג exports the reversal moves
-  as Hashavshevet's import Excel (headers = its `ImportJournal` fields, defined name `jurnal`, text keys) or movein.dat (short method, cp1255,
-  5-digit references only) — `admin/server/modules/hashavshevetMoves.js`, `POST /admin/bank-recon/export`, Finance API `POST
-  /bank/report/export`, Joya `POST /api/joya/finance/export`. The move = Hashavshevet's own storno (negative amount on both sides, reference =
-  the cheque number); an import cannot set cheque_id, so the cheques module still lists the cheque until cancelled there. Format facts in
-  `finance_api_readme.md` → "What Hashavshevet imports". Tests `scripts/test_hashavshevet_moves.js` (no DB), `test_bank_recon.js`,
-  `test_bank_recon_filter.js`.
-- **System page in Joya HQ** (2026-11-18, owner: "a system option in the main menu which displays this data" — the last update date of the
-  bank, Hashavshevet and the rest): `admin/server/modules/dataFreshness.js` → Local Data API `GET /system/freshness` (read only: the
-  Hashavshevet copy — sync run, bank page, matches, journal, cheques, batches; the bank files; Tabit; Beecomm; the Drive indexes; the Priority
-  file — each with the last business date, the last load, rows, `state` ok / late / stale against an expected cadence, and Hebrew notes
-  that compare the sources) → Joya `/api/joya/system/freshness` → page `/system`, main-menu item "מערכת" (chain admin). Test
-  `scripts/test_data_freshness.js` (no DB). Needs an hq client build on deploy. **App update** (same day): every hq build has an id
-  (`hq/vite.config.js` → `__JOYA_BUILD__` + `prod/version.json`), `GET /api/version` serves it, the app checks hourly and offers a reload
-  dialog when the server's build differs (`hq/client/version.js`, `UpdateDialog.js`); the System page has an "עדכן אפליקציה" button.
-- **Payments in Joya HQ** (תשלומים, 2026-11-07): a Joya main-menu area (chain admin) for the planned bank transfers — said in
-  the chat ("תשלם לאבי כהן 5,000 ₪ ב-15 בנובמבר", "כל חודש ב-10 …", "תזיז את תשלום #12 …"), listed today / this week / upcoming,
-  and marked paid only by a matching line of the uploaded bank file (`bank_transactions` via the Local Data API). Joya's own
-  table `joya_payments` (`hq/sql/add-joya.sql`, created on production 2026-11-07). `hq/README.md` → "Payments". The cash-flow
-  view will sit next to the payments board (owner). Deployed 2026-11-08 (`63218b2`, hq build, joya-hq + joya-runner restarted).
+- **Invoice agent: several mailboxes, several Drive folders, the latest invoices** (2026-11-22, owner). The agent runs on the
+  OWNER'S MACHINE (cron every 15 minutes), not on the server; its folder is not in git. `invoice-agent/config/`: `mailboxes.json`
+  (accountant@allegrogruppo.com = main, saved login; the owner's Gmail = `"login": "ask"`: read only by `npm run backfill`, with
+  an approval in the browser each time, its login is never kept — owner's decision), `targets.json` (`main` = `Invoices` in the
+  accountant's Drive; `owner` = the owner's own Drive folder `1liJwaBH…`, shared with accountant@ as editor), `companies.json`
+  (a company's `target` decides the folder: פסטה לינה, אלגרו גרופו, פרימיום איטליה, ג'ויה רום (`taxIdOnly`), אונו ורדה, ג'ויה אור
+  מסעדות → main; אן-קור, ניוראל לוגיק, ווסט פרונט, אבוקדו פלאנט → owner). `npm run rematch` moves a newly added company's
+  invoices out of `_unmatched`; `npm run latest` lists the newest FOUND. The 2-year backfill of the owner's Gmail ran 2026-11-20
+  (7,252 emails, 925 filed). Fixed the same day: an email too big for the model stopped every run since 2026-11-05.
+  **The latest invoices in Joya**: Finance API `GET /finance/invoices/drive-latest` (no company; `shared/invoiceLatest.js`,
+  `invoiceDrive.js` `listAllIndexes` + `INVOICE_DRIVE_EXTRA_FOLDERS`, default the owner's folder) → Joya calc `latest_invoices`
+  ("תראה לי את החשבוניות האחרונות": newest found first, by the found time in Israel time, not the invoice date). Tests
+  `node --test scripts/test_invoice_latest.js` (no DB), `scripts/test_finance_api.js`; eval `li-*`.
 - **Open — security problems in the admin login** (reported, not fixed): plaintext passwords in `users.json`, which
   is tracked in git; `POST /auth/login` and `GET /auth/login` return the password and authKey; `POST /auth/register`
   writes `users.json` without a login; the cookie key and a static IV are hardcoded; `getUserKey` logs the key.
