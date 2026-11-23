@@ -61,6 +61,25 @@ function contextJson(data, sent) {
   return JSON.stringify(out);
 }
 
+/**
+ * The picker choice as one plain sentence for the model (owner 2026-11-23: "tell Claude that the prompt refers to this
+ * restaurant or company unless it is specified differently"): the restaurant or company the question was asked with,
+ * by name, and the rule. Given to the planner and the writer as their own <scope> block, every turn.
+ */
+export function scopeLine(ctx) {
+  const scope = ctx?.request?.scope;
+  const names = (ids) => (ids || []).map((id) => ctx.locations?.find((l) => String(l.id) === String(id))?.name || String(id));
+  if (scope?.kind === 'LOCATION') {
+    const name = scope.location || names(scope.locationIds)[0];
+    return `The user asked this with the restaurant "${name}"${scope.company ? ` (company "${scope.company}")` : ''} chosen in the picker. The question is about THIS restaurant (locationIds ${JSON.stringify(scope.locationIds || [])}) unless the question itself names another restaurant, a company or all branches.`;
+  }
+  if (scope?.kind === 'COMPANY') {
+    return `The user asked this with the company "${scope.company || scope.companyKey || ''}" chosen in the picker. The question is about THIS company — its books, and all its restaurants together (locationIds ${JSON.stringify(scope.locationIds || [])}: ${names(scope.locationIds).join(', ')}) — unless the question itself names another company, a single restaurant or all branches.`;
+  }
+  return "No restaurant or company is chosen in the picker: the question is about all the user's restaurants unless it names one.";
+}
+const scopeBlock = (ctx) => ['<scope>', scopeLine(ctx), '</scope>'];
+
 const PREVIOUS_ANSWER_CHARS = 1500;
 const cut = (t) => (t.length > PREVIOUS_ANSWER_CHARS ? `${t.slice(0, PREVIOUS_ANSWER_CHARS)} …` : t);
 
@@ -73,6 +92,7 @@ export function planPrompt(ctx, live = null) {
     ...(!live || live.first ? historyBlock(ctx) : []),
     // a live session: the answer the user got for the previous message (the planner did not see it)
     ...(live?.previousAnswer ? ['<previous_answer>', cut(live.previousAnswer), '</previous_answer>'] : []),
+    ...scopeBlock(ctx),
     '<context>',
     contextJson(data, live?.sent),
     '</context>',
@@ -87,6 +107,7 @@ export function writePrompt(ctx, computed, plan, live = null) {
     '<request>',
     JSON.stringify({ question: ctx.request.question, contextKind: ctx.request.contextKind, today: ctx.today }),
     '</request>',
+    ...scopeBlock(ctx),
     '<context>',
     contextJson({ locations: ctx.locations, roles: ctx.roles, shifts: ctx.shifts, object: ctx.object }, live?.sent),
     '</context>',

@@ -1,6 +1,6 @@
 // The Joya runner with a fake model and a fake hub. Run: node joya/test/runner.test.js
 import assert from 'assert/strict';
-import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt, cleanPlan } from '../runner.js';
+import { handle, parseJsonObject, historyBlock, planPrompt, writePrompt, cleanPlan, scopeLine } from '../runner.js';
 import { unverifiedNumbers } from '../verify.js';
 import { ChatSessions } from '../session.js';
 
@@ -141,6 +141,24 @@ await t('chat history: in both prompts outside the context, oldest first; answer
 });
 
 console.log('number check');
+await t('the picker choice is a <scope> sentence in both prompts: the restaurant or company by name, or "all"', () => {
+  const locations = [{ id: 'r', name: 'פסטה לינה רעננה', company: 'פסטה לינה' }, { id: 'h', name: 'פסטה לינה הרצליה', company: 'פסטה לינה' }];
+  const base = { question: 'כמה מכרנו?', lang: 'he', contextKind: 'GENERAL' };
+  const loc = { request: { ...base, scope: { kind: 'LOCATION', location: 'פסטה לינה רעננה', locationIds: ['r'], company: 'פסטה לינה' } }, today: '2026-11-23', locations };
+  assert.match(scopeLine(loc), /restaurant "פסטה לינה רעננה" \(company "פסטה לינה"\)/);
+  assert.match(scopeLine(loc), /unless the question itself names another/);
+  const plan = planPrompt(loc);
+  assert.ok(plan.indexOf('<scope>') < plan.indexOf('<context>'), 'the scope comes before the context');
+  assert.ok(writePrompt(loc, { results: [] }, {}).includes('<scope>\nThe user asked this with the restaurant "פסטה לינה רעננה"'));
+  const co = { request: { ...base, scope: { kind: 'COMPANY', company: 'פסטה לינה', companyKey: 'pl', locationIds: ['r', 'h'] } }, today: '2026-11-23', locations };
+  assert.match(scopeLine(co), /company "פסטה לינה"/);
+  assert.ok(scopeLine(co).includes('פסטה לינה רעננה, פסטה לינה הרצליה'), 'the restaurants by name');
+  // a scope without the name (an older stored request): the name comes from context.locations
+  assert.match(scopeLine({ request: { ...base, scope: { kind: 'LOCATION', locationIds: ['h'] } }, locations }), /restaurant "פסטה לינה הרצליה"/);
+  assert.match(scopeLine({ request: base, locations }), /No restaurant or company is chosen/);
+  assert.match(scopeLine({}), /No restaurant or company is chosen/);
+});
+
 await t('rounded, thousands and percentages match; invented ones do not', () => {
   const r = { a: 48210.46, b: 0.123, c: 812, d: '2026-10-05', e: 12345 };
   assert.deepEqual(unverifiedNumbers('48,210 · 48,210.46 · 12.3% · 812 · 5.10.2026 · 12.3K', r), []);

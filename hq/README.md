@@ -320,8 +320,11 @@ fixtures `p-*` (kind `PAYMENTS`, context `contexts.json` → PAYMENTS with `paye
   several) or a company line (all its restaurants), and a page then covers those locations; for a manager the
   company lines are headings only.
 - A chat question carries the picker choice: `locationId`, or `companyKey` (kept in `joya_ai_requests.meta_json.scope`).
-  The runner sees it as `request.scope` and the planner uses it unless the question names other restaurants; a
-  calculation with no location of its own runs on it too (`scopeIds` in `ai.js` `compute`).
+  The runner sees it as `request.scope` (kind, the restaurant's / company's name, `locationIds`) and gives both the
+  planner and the writer a `<scope>` sentence every turn (`runner.js` `scopeLine`, owner 2026-11-23: "the prompt refers
+  to this restaurant or company unless it is specified differently"): the question is about that restaurant or company
+  unless it names another one or "all branches", and the answer names it in its first line. A calculation with no
+  location of its own runs on it too (`scopeIds` in `ai.js` `compute`).
 
 ## Replenishment — how the recommendation learns
 

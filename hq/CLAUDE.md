@@ -274,6 +274,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   Share = the share sheet with the file (else download), tap = full size. Prompt: PLAN "The scanned cheques" (the pictures of a
   payee → `cheque_archive` q), WRITE ("התמונות מוצגות למטה", never a link). Tests `test/test_cheque_cards.mjs`; eval
   `ca-pictures-*`. README → "The pictures as cards in the chat". Needs an hq client build on deploy. Deployed 2026-11-23 (`c69f7c5`: pull, hq build, `joya-hq` + `joya-runner` restarted; `/api/version` serves the new build).
+- **The picker scope in the prompts** (2026-11-23, owner: "tell Claude that the prompt refers to this restaurant or company
+  unless it is specified differently"): `runner/runner.js` `scopeLine(ctx)` → a `<scope>` block in the plan prompt (before
+  `<context>`) and the write prompt (after `<request>`), every turn, also in live sessions: the restaurant (`scope.location`,
+  new on `scopeOf` in `ai.js`) or company by name with its locationIds, and the rule; PLAN "Locations" rule and a WRITE rule
+  (name it in the first line). Test in `runner/test/runner.test.js`; eval `g-scope-*`. README → "Asking in words" (the picker).
 - **The שקלפ page** (2026-11-22, owner: "a convenient UX for the שקלפ … list forward the daily cheques or expenses like known bank
   payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day; move month by month"):
   menu item "שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month per view, a row per day, a card per

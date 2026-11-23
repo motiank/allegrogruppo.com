@@ -909,7 +909,7 @@ async function requestAccess(id) {
 async function scopeOf(access, r) {
   if (r.location_id != null) {
     const loc = (await listLocations(access)).find((l) => String(l.id) === String(r.location_id));
-    return { kind: 'LOCATION', locationIds: [String(r.location_id)], companyKey: loc?.company?.key ?? null };
+    return { kind: 'LOCATION', location: loc?.name ?? null, locationIds: [String(r.location_id)], company: loc?.company?.label ?? null, companyKey: loc?.company?.key ?? null };
   }
   const key = parseJson(r.meta_json)?.scope?.companyKey;
   if (key == null) return null;
