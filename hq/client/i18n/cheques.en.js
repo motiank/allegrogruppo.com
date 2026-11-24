@@ -7,6 +7,7 @@ export default {
   'joya.chq.prev': 'Previous month',
   'joya.chq.next': 'Next month',
   'joya.chq.thisMonth': 'This month',
+  'joya.chq.monthTotal': 'Month total',
   'joya.chq.sheet': 'Google Sheet in Drive',
   'joya.chq.sheetMaking': 'Making the sheet…',
   'joya.chq.company': 'Company',

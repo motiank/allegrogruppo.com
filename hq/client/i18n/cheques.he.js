@@ -7,6 +7,7 @@ export default {
   'joya.chq.prev': 'חודש קודם',
   'joya.chq.next': 'חודש הבא',
   'joya.chq.thisMonth': 'החודש',
+  'joya.chq.monthTotal': 'סה"כ החודש',
   'joya.chq.sheet': 'גיליון Google בדרייב',
   'joya.chq.sheetMaking': 'יוצר גיליון…',
   'joya.chq.company': 'חברה',

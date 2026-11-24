@@ -26,6 +26,7 @@ const useStyles = createUseStyles((theme) => ({
   num: { textAlign: 'end' },
   row: { cursor: 'pointer', '&:hover td': { background: 'rgba(127,127,127,0.08)' }, '&:active td': { background: 'rgba(127,127,127,0.14)' } },
   td: { padding: '0.55rem 0.35rem', height: 54, borderBottom: `1px solid ${theme.border}`, verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  footTd: { padding: '0.55rem 0.35rem', borderTop: `2px solid ${theme.border}`, fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' },
   past: { opacity: 0.6 },
   todayRow: { '& td:first-child': { boxShadow: `inset 3px 0 0 ${theme.primary}` } },
   date: { fontWeight: 650 },
@@ -151,6 +152,13 @@ export default function Cheques() {
   const go = (m, co = company) => setSp({ ...(co ? { company: co } : {}), month: m });
   const d = r.data;
   const open = openDay && d?.byDay?.find((x) => x.dueDate === openDay);
+  // the month total row: the column sums of the days shown, and the balance at the end of the month (the last day's)
+  const days = d?.byDay || [];
+  const monthChqAmt = days.reduce((s, x) => s + (x.amount || 0), 0);
+  const monthChqN = days.reduce((s, x) => s + (x.count || 0), 0);
+  const monthBank = sumOf(days.flatMap((x) => (x.payments || []).filter(isBank)));
+  const monthPlanned = sumOf(days.flatMap((x) => (x.payments || []).filter((p) => !isBank(p))));
+  const endBal = [...days].reverse().find((x) => x.balance)?.balance || null;
   // ‹ and › are bidi-mirrored glyphs — the browser already flips them in RTL. Do NOT swap them by dir too (that
   // double-flipped them, so the arrows pointed inward). prev = ‹, next = › in both directions; the flex order and the
   // glyph both mirror in RTL, so they always point outward.
@@ -245,6 +253,30 @@ export default function Cheques() {
                       );
                     })}
                   </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className={c.footTd}>{t('joya.chq.monthTotal')}</td>
+                      <td className={`${c.footTd} ${c.num}`}>
+                        {monthChqN ? (
+                          <>
+                            <span>{fmtILS(monthChqAmt)}</span>
+                            <span className={c.cnt}>{t('joya.chq.n', { n: monthChqN })}</span>
+                          </>
+                        ) : <span className={c.dim}>—</span>}
+                      </td>
+                      <td className={`${c.footTd} ${c.num}`}>
+                        {monthBank || monthPlanned ? (
+                          <>
+                            {monthBank ? <span>{fmtILS(monthBank)}</span> : null}
+                            {monthPlanned ? <span className={c.cnt}>+ {t('joya.chq.plannedShort')} {fmtILS(monthPlanned)}</span> : null}
+                          </>
+                        ) : <span className={c.dim}>—</span>}
+                      </td>
+                      <td className={`${c.footTd} ${c.num} ${endBal ? (endBal.kind === 'actual' ? c.green : c.red) : c.dim}`} title={endBal ? (endBal.kind === 'actual' ? t('joya.chq.balanceActual') : t('joya.chq.balanceExpected')) : undefined}>
+                        {endBal ? fmtILS(endBal.amount) : '—'}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             ) : null}
