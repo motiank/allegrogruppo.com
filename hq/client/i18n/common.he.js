@@ -152,6 +152,8 @@ export default {
   'joya.bankRecon.show': "הצג דוח",
   'joya.bankRecon.excel': "Excel",
   'joya.bankRecon.print': "פתח להדפסה",
+  'joya.bankRecon.sheet': "גיליון Google בדרייב",
+  'joya.bankRecon.sheetMaking': "יוצר גיליון…",
   'joya.bankRecon.range': "נתוני הבנק בחשבשבת: {from} עד {to} ({n} תנועות).",
   'joya.bankRecon.hint': "הדוח נבנה בשרת הניהול מספרי חשבשבת, לקריאה בלבד. \"פתוח\" = ללא התאמה בחשבשבת עד תאריך הסיום.",
   'joya.bankRecon.pick': "בחרו חשבון ותקופה ולחצו \"הצג דוח\".",

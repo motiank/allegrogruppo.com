@@ -5,6 +5,7 @@
 // The answer is written by the AI runner (hq/runner) from calculations the hub
 // ran with this user's access; those calculations are listed under the answer.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api, qs, ApiError } from './api.js';
 import { useT, Term } from './i18n/index.js';
@@ -320,7 +321,27 @@ function LegalFiles({ r, classes }) {
   );
 }
 
-/** The detailed bank reconciliation report of a bank_recon_report calc: per company, the full page and the Excel. */
+// Answers that open a dedicated tool/page instead of carrying the data: the bank reconciliation report and the future
+// cheques (שקלפ). toolHref returns the page route of such an answer (the first company's), else null. The Excel and the
+// Drive Google Sheet are made ON the tool now (owner 2026-11-24), not in the chat.
+const openedTools = new Set(); // answer ids already opened as a tool this session — open once, not again on re-render
+function toolHref(r) {
+  const calcs = r?.calcs || [];
+  const recon = calcs.find((c) => c.calc === 'bank_recon_report');
+  const page = recon && (recon.result?.companies || []).find((x) => x.downloads)?.downloads?.page;
+  if (page) return page;
+  const chq = calcs.find((c) => c.calc === 'cheques' && c.params?.state === 'future' && c.result?.companies?.length);
+  if (chq) {
+    const x = (chq.result.companies || []).find((y) => y.available !== false && y.companyKey);
+    if (x) {
+      const month = String(chq.result.params?.from || chq.params?.from || '').slice(0, 7);
+      return `/cheques?company=${encodeURIComponent(x.companyKey)}${/^\d{4}-\d{2}$/.test(month) ? `&month=${month}` : ''}`;
+    }
+  }
+  return null;
+}
+
+/** The bank reconciliation report of a bank_recon_report calc: per company, a button that OPENS the report page (the tool). */
 function BankReconFiles({ r, classes }) {
   const { t } = useT();
   const rows = (r.calcs || []).filter((c) => c.calc === 'bank_recon_report').flatMap((c) => c.result?.companies || []);
@@ -335,7 +356,6 @@ function BankReconFiles({ r, classes }) {
         <a className={classes.fileBtn} href={x.downloads.page}>
           {t('joya.ask.file.bankReconPage')}
         </a>
-        <FileButton href={x.downloads.xlsx} label={t('joya.ask.file.bankReconXlsx')} classes={classes} />
       </div>
     ));
 }
@@ -367,8 +387,20 @@ export function Answer({ r, onChanged, head = true }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const { t } = useT();
+  const navigate = useNavigate();
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  // a bank-reco / שקלפ answer opens its tool directly (owner 2026-11-24). Only a FRESH answer (just asked) and once —
+  // viewing the chat history or re-rendering never navigates.
+  useEffect(() => {
+    if (r.status !== 'ANSWERED' || openedTools.has(r.id)) return;
+    const href = toolHref(r);
+    if (!href) return;
+    const fresh = r.createdAt && Date.now() - new Date(r.createdAt).getTime() < 90000;
+    if (!fresh) return;
+    openedTools.add(r.id);
+    navigate(href);
+  }, [r.id, r.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (what) => {
     setBusy(true);
     setErr(null);

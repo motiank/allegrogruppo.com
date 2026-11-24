@@ -95,6 +95,7 @@ export default function BankRecon() {
   const [party, setParty] = useState(sp.get('party') || '');
   // the chat's extra filters (text, amount, sections): shown as a chip, cleared with one click
   const [extra, setExtra] = useState({ q: sp.get('q') || '', amount: sp.get('amount') || '', sections: sp.get('sections') || '' });
+  const [sheet, setSheet] = useState({ busy: false, error: null });
   const [shown, setShown] = useState(null); // { company, account, from, to } of the report in the frame
 
   const companies = accounts.data?.companies || [];
@@ -123,6 +124,19 @@ export default function BankRecon() {
 
   // the kinds and the parties of the shown report (the whole report, not the filtered one)
   const facets = useLoad(() => (shown ? api(`/finance/bank-recon/facets${qs(shown)}`) : Promise.resolve(null)), [shown]);
+
+  // "גיליון Google בדרייב": build the report Excel as a Google Sheet in the owner's Drive and open it (generated on click)
+  const makeSheet = async () => {
+    if (!ready || sheet.busy) return;
+    setSheet({ busy: true, error: null });
+    try {
+      const out = await api('/finance/bank-recon/sheet', { method: 'POST', body: { company, account, from, to, ...filters } });
+      setSheet({ busy: false, error: null });
+      if (out?.url) window.open(out.url, '_blank', 'noopener');
+    } catch (e) {
+      setSheet({ busy: false, error: e });
+    }
+  };
 
   return (
     <Page title={t('joya.bankRecon.title')} back="/accounting">
@@ -172,7 +186,9 @@ export default function BankRecon() {
               <a href={ready ? `/api/joya/finance/bank-recon${query}&format=html` : undefined} target="_blank" rel="noreferrer">
                 <Btn small disabled={!ready}>{t('joya.bankRecon.print')}</Btn>
               </a>
+              <Btn small disabled={!ready || sheet.busy} onClick={makeSheet}>{sheet.busy ? t('joya.bankRecon.sheetMaking') : t('joya.bankRecon.sheet')}</Btn>
             </div>
+            {sheet.error && <ErrorBox error={sheet.error} />}
           </div>
           {shown && (
             <div className={c.picker}>

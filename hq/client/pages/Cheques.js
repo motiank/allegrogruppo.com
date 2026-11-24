@@ -134,7 +134,20 @@ export default function Cheques() {
   const month = /^\d{4}-\d{2}$/.test(sp.get('month') || '') ? sp.get('month') : thisMonth;
   const company = sp.get('company') || '';
   const [openDay, setOpenDay] = useState(null);
+  const [sheet, setSheet] = useState({ busy: false, error: null });
   const r = useLoad(() => api(`/cheques/month${qs({ company: company || undefined, month })}`), [company, month]);
+  // "גיליון Google בדרייב": rebuild the fixed cheques Google Sheet in the owner's Drive now and open it (on click)
+  const makeSheet = async () => {
+    if (sheet.busy) return;
+    setSheet({ busy: true, error: null });
+    try {
+      const out = await api('/cheques/sheet', { method: 'POST', body: {} });
+      setSheet({ busy: false, error: null });
+      if (out?.url) window.open(out.url, '_blank', 'noopener');
+    } catch (e) {
+      setSheet({ busy: false, error: e });
+    }
+  };
   const go = (m, co = company) => setSp({ ...(co ? { company: co } : {}), month: m });
   const d = r.data;
   const open = openDay && d?.byDay?.find((x) => x.dueDate === openDay);
@@ -145,13 +158,16 @@ export default function Cheques() {
       title={t('joya.chq.title')}
       sub={d ? (d.lastBankDay ? t('joya.chq.sub', { company: d.company?.label, day: fmtDay(d.lastBankDay) }) : t('joya.chq.subNoBank', { company: d.company?.label })) : null}
       actions={
-        d?.companies?.length > 1 ? (
-          <Select value={d.company?.key || ''} onChange={(e) => go(month, e.target.value)} aria-label={t('joya.chq.company')}>
-            {d.companies.map((x) => (
-              <option key={x.key} value={x.key}>{x.label}</option>
-            ))}
-          </Select>
-        ) : null
+        <>
+          {d?.companies?.length > 1 ? (
+            <Select value={d.company?.key || ''} onChange={(e) => go(month, e.target.value)} aria-label={t('joya.chq.company')}>
+              {d.companies.map((x) => (
+                <option key={x.key} value={x.key}>{x.label}</option>
+              ))}
+            </Select>
+          ) : null}
+          <Btn small disabled={sheet.busy} onClick={makeSheet}>{sheet.busy ? t('joya.chq.sheetMaking') : t('joya.chq.sheet')}</Btn>
+        </>
       }
     >
       <div className={c.bar}>
@@ -162,6 +178,7 @@ export default function Cheques() {
       </div>
       {r.loading && !d ? <Loading /> : null}
       {r.error ? <ErrorBox error={r.error} /> : null}
+      {sheet.error ? <ErrorBox error={sheet.error} /> : null}
       {d && !d.available ? <Empty>{t('joya.chq.notAvailable', { reason: d.reason })}</Empty> : null}
       {d?.available ? (
         <>

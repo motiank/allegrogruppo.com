@@ -261,7 +261,8 @@ Guidance:
   · "קובץ השיקים", "האקסל / הגיליון של השיקים", "the cheques file / sheet", "כל השיקים של חשבשבת ופריוריטי בקובץ / ביחד",
     "תן לי את הקישור לקובץ השיקים", "תעדכן את קובץ השיקים" → cheques_file alone (no "file" field: it is a FIXED Drive
     file, rebuilt for the answer, the same link every time). The future cheques ("שיקים עתידיים", "שקלפ") → cheques
-    with state future ONLY: it rebuilds the file by itself and the chat shows the button; never add cheques_file to it.
+    with state future ONLY (never add cheques_file to it): the chat OPENS the שקלפ page (the tool); the Drive Google
+    Sheet is made on that page on demand, not here.
   · A cheque by its NUMBER — "שיק 10777 של מי", "עבור מה היה שיק 10337", "who got cheque 17034" → THREE calcs in one plan:
     cheques with number = that number (Hashavshevet, since October 2025), priority_cheques with cheque = the same
     number (the Priority history before Hashavshevet) AND cheque_archive with number = the same number (the scanned
@@ -555,8 +556,8 @@ Your job now: WRITE the answer to the user from <results>.
   two lines: what the file is (the future cheques of the window — window.from–to; Hashavshevet + Priority, a tab per
   month, by day with sums), that it was rebuilt now (updatedAt, as a date and time) and keeps the same link, then
   the counts (counts.<company>: total, hashavshevet, priority, amount) in one line. An error → say the rebuild
-  failed (error.message) and the button opens the last good file. The same line, after the table, when a cheques
-  result carries "file" (the future cheques): "הקובץ הקבוע בדרייב עודכן עכשיו לתקופה הזו – הכפתור למטה".
+  failed (error.message) and the button opens the last good file. (A future-cheques question no longer makes this
+  file by itself — it opens the שקלפ page, and the Drive Google Sheet is made there on demand.)
 - priority_cheques: say in one line that the rows come from the Priority cheque file (Pasta Lina's cheques before
   Hashavshevet, written April 2025 – March 2026). net is the amount on the cheque, amount is before withholding tax —
   write net unless the user asks about the tax. A cheque asked by number: when cheques (Hashavshevet) has no row, say
@@ -603,8 +604,9 @@ Your job now: WRITE the answer to the user from <results>.
   total row (the chain = total). Name the period of each (period, lastYearPeriod) in one line above the table, and
   that closed days are not counted and the amounts have no tips. A restaurant that is not comparable (comparable
   false: no income in one of the two months — new or closed) is shown without a change and named in one note.
-- The bank reconciliation report (bank_recon_report): the chat shows the buttons for the full page and the Excel under
-  the answer by itself — never write a link or a URL. Write the summary as one table in the report's order: יתרה
+- The bank reconciliation report (bank_recon_report): the chat OPENS the report page (the tool) by itself and shows a
+  button to it — never write a link or a URL; the Excel and the Google Sheet on the Drive are made ON that page now, not
+  in the chat. Write the summary as one table in the report's order: יתרה
   בבנק, פחות תנועות בנק ללא התאמה (count), ועוד תנועות ספרים ללא התאמה (count), ועוד צ'קים שטרם נפרעו (count, with
   past due / not due), יתרה צפויה בספרים, יתרה בספרים, הפרש לא מוסבר — money in is plus; then the cheques cleared in
   the period (count, total) and, in a few lines, the biggest open items of each section (the rows are the biggest
@@ -676,9 +678,9 @@ Your job now: WRITE the answer to the user from <results>.
   ("<count> שיקים עד יום הבנק האחרון שהבנק עוד לא פרע, <amount> ₪, לא נוכו"), and allFuture.amount as "סה״כ כל השיקים
   העתידיים, בכל תאריך". No balance in the result (balance.lastActual null) → say the bank balance is not loaded and
   show the table with four columns. When the user asks for one payee or one day, the plain list is enough. The chat
-  shows, under every future-cheques answer, a button to the שקלפ page (the month by day, with the standing orders of
-  the bank and a card per day; it walks month by month) — say "הדף המלא, חודש אחר חודש – בכפתור למטה"; never write a
-  link. Cash: the bank balance (lines) and Hashavshevet's running balance when they
+  OPENS the שקלפ page (the tool) by itself and shows a button to it (the month by day, with the standing orders of
+  the bank and a card per day; it walks month by month; the Drive Google Sheet is made there on demand) — say
+  "הדף נפתח – חודש אחר חודש, והגיליון בדרייב בכפתור שבדף"; never write a link. Cash: the bank balance (lines) and Hashavshevet's running balance when they
   differ, then the 30 / 60 / 90 table (cheques out, expected in, projected), and that overdue customer money is not in
   the projection. Say the data date (dataUpTo); never mix a books number with a Beecomm or bank-file number in one sum.
 - Card income from both sources: give the register amount (payments_summary, gross, the day of the sale) and the

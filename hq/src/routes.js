@@ -36,6 +36,8 @@ import { addDays } from './lib/recommend.js';
 import logger from '../lib/log.js';
 import { clearCache as clearAllegroCache, get as allegroGet, postFiles, apiBase } from '../lib/allegro.js';
 import { financeBankAccounts, financeBankReport, financeBankReportFile, financeBankReportFacets, financeBankReportExport, financeChequeImage, systemFreshness, legal as legalApi, legalFile } from './services/source.js';
+import { uploadWorkbook } from './services/sheets.js';
+import { refreshFixedSheet } from './services/fixedSheets.js';
 
 const RESTAURANTS = createRequire(import.meta.url)('../../shared/restaurants.json');
 
@@ -247,6 +249,22 @@ r.get(
   }),
 );
 
+// the "גיליון Google בדרייב" button on the bank-recon page (owner 2026-11-24: open the tool, and give a link to a Google
+// Sheet on the Drive — generated on click): the admin's report Excel (the current filters) is uploaded to the owner's
+// Drive folder as a Google Sheet with the invoice agent's login, and its link is returned. Nothing is stored in Joya.
+r.post(
+  '/joya/finance/bank-recon/sheet',
+  requireAdmin,
+  h(async (req) => {
+    const b = req.body || {};
+    const p = { company: b.company, account: b.account, from: b.from, to: b.to, kind: b.kind, party: b.party, q: b.q, amount: b.amount, sections: b.sections, noise: b.noise };
+    const file = await financeBankReportFile(p, 'xlsx');
+    const name = `התאמת בנק ${p.account || ''} ${p.from || ''}–${p.to || ''} · Joya`.replace(/\s+/g, ' ').trim();
+    const sheet = await uploadWorkbook(name, file.buffer);
+    return { url: sheet.url, name: sheet.name, id: sheet.id };
+  }),
+);
+
 // the scanned cheque behind a 📷 link of the report (the HTML's relative "cheque-image/<id>" lands here): streamed from the
 // admin's Finance API, which reads the Drive archive with the invoice agent's login — the Joya user needs no Drive access
 // the report page's selection mode posts its export to the relative "export" — next to /joya/finance/bank-recon that is
@@ -363,6 +381,12 @@ r.get('/joya/payments', requireAdmin, h(async (req) => payments.list(req.joya, {
 r.get('/joya/payments/payees', requireAdmin, h(async (req) => ({ payees: await payments.payees(req.query.company || null) })));
 // the שקלפ page (pages/Cheques.js, owner 2026-11-22): one month of cheques, known bank payments and planned payments by day
 r.get('/joya/cheques/month', requireAdmin, h(async (req) => fin.chequesMonth(req.joya, { companyKey: req.query.company || null, month: req.query.month || null })));
+// the "גיליון Google בדרייב" button on the שקלפ page (owner 2026-11-24): rebuild the fixed cheques Google Sheet now
+// (the same file and link every time) and return its link — generated on click, not on every chat question
+r.post('/joya/cheques/sheet', requireAdmin, h(async (req) => {
+  const rec = await refreshFixedSheet('cheques', { by: req.joya?.username, from: req.body?.from || null, to: req.body?.to || null });
+  return { url: rec.url, name: rec.name, updatedAt: rec.updatedAt, rows: rec.rows };
+}));
 r.post('/joya/payments', requireAdmin, h(async (req) => paymentOp(req, { ...(req.body || {}), op: 'add' })));
 r.patch(
   '/joya/payments/:id',

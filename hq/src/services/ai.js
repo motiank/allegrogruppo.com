@@ -536,17 +536,10 @@ export const CALCS = {
   },
   cheques: {
     params: '{ companyKeys?, state?: "future" | "due" | "cleared" | "not_cleared", from?, to? (due dates), account?, q?: "part of the payee", number?: "a cheque number, or several comma-separated", limit? }',
-    about: 'issued cheques (שיקים): payee, amount, due date, state, with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number. state future = the cheques to be paid (שיקים לפרעון, שקלפ): Hashavshevet AND the Priority history together (source per row), and WITHOUT from/to the window is the owner\'s default — the START OF THIS MONTH to the end of the third month ahead (leave the dates out unless the user says a period); the days of the window also carry the bank balance at the end of each day (balance.kind actual = the bank\'s real closing balance up to the last bank day; expected = after it, the last real balance minus the day\'s unpaid cheques and Joya\'s planned payments) and a balance summary (lastActual, expectedEnd, lowest); the fixed cheques file in Drive is rebuilt too and its button is shown under the answer. Other states (cleared = matched to the bank; not_cleared = due and not matched) are Hashavshevet only; returned cheques are not available yet',
-    run: async (a, p) => {
-      const out = await finCalc(fin.cheques)(a, p);
-      // the owner asked to SEE the future cheques → Joya also refreshes the fixed Drive file and gives the link
-      if (p?.state === 'future' && !p?.export && a.isAdmin) {
-        const f = await fixedSheets.refreshForAnswer('cheques', { by: a.username, from: out.params?.from, to: out.params?.to });
-        out.fixedFile = f.fixedFile;
-        out.file = { name: f.name, window: f.window ?? null, updatedAt: f.updatedAt ?? null, rows: f.rows ?? null, counts: f.counts ?? null, error: f.error ?? null, note: 'the fixed cheques file in Drive (the future cheques of this window only, a tab per month) was rebuilt for this answer; the chat shows its button under the answer — do not write the link' };
-      }
-      return out;
-    },
+    about: 'issued cheques (שיקים): payee, amount, due date, state, with totals per state and byDay = the cheques grouped by due date with each day\'s count and sum; number = one cheque by its number. state future = the cheques to be paid (שיקים לפרעון, שקלפ): Hashavshevet AND the Priority history together (source per row), and WITHOUT from/to the window is the owner\'s default — the START OF THIS MONTH to the end of the third month ahead (leave the dates out unless the user says a period); the days of the window also carry the bank balance at the end of each day (balance.kind actual = the bank\'s real closing balance up to the last bank day; expected = after it, the last real balance minus the day\'s unpaid cheques and Joya\'s planned payments) and a balance summary (lastActual, expectedEnd, lowest); the chat shows a button that OPENS the שקלפ page (the tool) — the Drive Google Sheet is built there on demand, not here. Other states (cleared = matched to the bank; not_cleared = due and not matched) are Hashavshevet only; returned cheques are not available yet',
+    // the future cheques (שקלפ) answer opens the שקלפ page (the button under the answer); the Drive Google Sheet is made
+    // on demand by the page's "גיליון Google בדרייב" button, not on every chat question (owner 2026-11-24)
+    run: finCalc(fin.cheques),
   },
   cheques_file: {
     params: '{ from?, to? (the window of the file; without them the start of this month → the end of the third month ahead) }',

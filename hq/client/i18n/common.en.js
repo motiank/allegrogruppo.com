@@ -151,6 +151,8 @@ export default {
   'joya.bankRecon.show': "Show report",
   'joya.bankRecon.excel': "Excel",
   'joya.bankRecon.print': "Open for printing",
+  'joya.bankRecon.sheet': "Google Sheet in Drive",
+  'joya.bankRecon.sheetMaking': "Making the sheet…",
   'joya.bankRecon.range': "Bank data in Hashavshevet: {from} to {to} ({n} lines).",
   'joya.bankRecon.hint': "The report is built by the admin server from the Hashavshevet books, read only. \"Open\" = no match in Hashavshevet up to the end date. The report is in Hebrew.",
   'joya.bankRecon.pick': "Pick an account and a period and press \"Show report\".",
