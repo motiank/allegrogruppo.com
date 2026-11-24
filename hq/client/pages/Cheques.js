@@ -127,7 +127,7 @@ function DayCard({ d, c, t }) {
 export default function Cheques() {
   const theme = useTheme();
   const c = useStyles(theme);
-  const { t, lang, dir } = useT();
+  const { t, lang } = useT();
   const [sp, setSp] = useSearchParams();
   const today = localToday();
   const thisMonth = today.slice(0, 7);
@@ -151,8 +151,11 @@ export default function Cheques() {
   const go = (m, co = company) => setSp({ ...(co ? { company: co } : {}), month: m });
   const d = r.data;
   const open = openDay && d?.byDay?.find((x) => x.dueDate === openDay);
-  const back = dir === 'rtl' ? '›' : '‹';
-  const fwd = dir === 'rtl' ? '‹' : '›';
+  // ‹ and › are bidi-mirrored glyphs — the browser already flips them in RTL. Do NOT swap them by dir too (that
+  // double-flipped them, so the arrows pointed inward). prev = ‹, next = › in both directions; the flex order and the
+  // glyph both mirror in RTL, so they always point outward.
+  const back = '‹';
+  const fwd = '›';
   return (
     <Page
       title={t('joya.chq.title')}
