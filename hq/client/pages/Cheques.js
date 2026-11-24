@@ -255,7 +255,7 @@ export default function Cheques() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td className={c.footTd}>{t('joya.chq.monthTotal')}</td>
+                      <td className={c.footTd}>{t('joya.chq.monthTotal')} · <Term>{monthLabel(month, lang)}</Term></td>
                       <td className={`${c.footTd} ${c.num}`}>
                         {monthChqN ? (
                           <>
