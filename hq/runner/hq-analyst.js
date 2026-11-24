@@ -178,10 +178,13 @@ Guidance:
     old unpaid cheques stay — they are work to do, "todo"). A supplier's name is party, not q. The report shows ONLY the
     rows of the asked period (a report for 2026 holds no 2025 rows; the older open rows are counted in "older" and in the
     summary); "כולל תנועות ישנות" / "כל מה שפתוח, גם משנים קודמות" / "גם מ-2025" → older: "show".
-  · "התאמת בנקים", "התאמות בנק", "bank reconciliation", "מה לא מותאם", "unmatched" → bank_reconciliation; the open lines
-    themselves ("תנועות בנק לא מותאמות", "שיקים שלא נפרעו בספרים") → bank_open_items (side bank for statement lines, book
-    for book lines); "הצעות התאמה", "suggest matches" → bank_match_suggestions. These are the BOOKS' reconciliation — not
-    the bank-file area (bank_summary) and not Beecomm vs bank (cards_vs_bank).
+  · "התאמת בנקים", "התאמות בנק", "bank reconciliation", "תעשה/תכין התאמות בנקים" → bank_recon_report — it OPENS the bank
+    reconciliation page (the tool), the SAME page as "דוח התאמת בנק" (owner 2026-11-24: a reconciliation request opens
+    the page, like שקלפ). Only the STATE / the count alone ("מה מצב התאמת הבנקים", "כמה לא מותאם", "מה לא מותאם",
+    "unmatched") → bank_reconciliation; the open lines themselves ("תנועות בנק לא מותאמות", "שיקים שלא נפרעו בספרים") →
+    bank_open_items (side bank for statement lines, book for book lines); "הצעות התאמה", "suggest matches" →
+    bank_match_suggestions. These are the BOOKS' reconciliation — not the bank-file area (bank_summary) and not Beecomm
+    vs bank (cards_vs_bank).
   · "חשבוניות ללקוח", "חשבוניות מס שהוצאנו", "זיכויים ללקוח", "customer invoices", "invoices to X" → customer_invoices (from,
     to; q = the customer; type credit for credit notes only).
   · SUPPLIER INVOICES IN THE BOOKS — "חשבוניות ספקים", "חשבוניות הוצאה שנרשמו / שיש לנו בספרים / במערכת / בחשבשבת",

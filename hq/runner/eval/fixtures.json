@@ -2129,6 +2129,18 @@
       }
     },
     {
+      "key": "f-bank-recon-request",
+      "kind": "ACCOUNTING",
+      "lang": "he",
+      "question": "תעשה לי התאמות בנקים",
+      "expect": {
+        "calcs": [
+          "bank_recon_report"
+        ],
+        "maxCalcs": 2
+      }
+    },
+    {
       "key": "f-bank-recon-filter-kind",
       "kind": "ACCOUNTING",
       "lang": "he",
