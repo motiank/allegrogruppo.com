@@ -24,9 +24,9 @@
     "user_id": 3,
     "id": 3,
     "email": "moria",
-    "password": "moremix",
-    "authKey": "f7e48cc46d691c91da5076b43386c14e",
-    "role": "restMngr",
+    "password": "mr1456",
+    "authKey": "45cf22e4b18f8c552727ec5eb710badd",
+    "role": "accountant",
     "restaurants": [
       "*"
     ],
