@@ -100,6 +100,11 @@ export const CSS = `
 .bank-recon tr.older td{color:#777;background:#fafafa}
 .bank-recon tr.sub td{background:#f7f7f7;font-style:italic;color:#555}
 .bank-recon .empty{color:#666;font-style:italic;padding:6px 0}
+.bank-recon .br-find{position:sticky;top:0;z-index:5;background:#fffbe6;border:1px solid #e6d98a;padding:8px 12px;margin:10px 0;border-radius:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bank-recon .br-find label{font-weight:700;font-size:13px}
+.bank-recon .br-find input{flex:1;min-width:200px;padding:6px 8px;border:1px solid #bbb;border-radius:4px;font-size:14px}
+.bank-recon .br-find .br-find-count{color:#555;font-size:12px}
+.bank-recon .br-find .x{cursor:pointer;color:#555;border:none;background:none;font-size:16px;line-height:1}
 .bank-recon .filter{background:#e8f0fe;border:1px solid #a9c4f5;padding:8px 12px;margin:10px 0;border-radius:4px}
 .bank-recon .noisebox{background:#fff4e5;border:1px solid #f0c27a;padding:8px 12px;margin:10px 0;border-radius:4px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
 .bank-recon .noisebox button{padding:4px 12px;border:1px solid #b36b00;background:#fff;color:#7a4a00;border-radius:4px;cursor:pointer;font-weight:700;font:inherit}
@@ -428,12 +433,18 @@ function chequesStaleTable(r) {
 // The report body (a <div class="bank-recon">…</div>), for embedding in a page that already has the CSS.
 // opts.imageHref(row) = the link of a cheque's scanned picture (default: "cheque-image/<imageId>" next to the report);
 // opts.exportHref = where the selection mode posts its export (default: the relative "export").
+// a free-text box above section 1 that filters EVERY section while typing, by reference, amount or beneficiary
+// (bankReconBehavior wires it). It sits above section 1 and stays visible (sticky) while scrolling the sections.
+function findBar() {
+  return `<div class="br-find"><label for="brFind">חיפוש בכל הסעיפים:</label><input id="brFind" type="search" class="br-find-input" placeholder="אסמכתא, סכום או מוטב…" autocomplete="off" aria-label="חיפוש בכל הסעיפים לפי אסמכתא, סכום או מוטב"><button type="button" class="x" title="נקה" aria-label="נקה">✕</button><span class="br-find-count"></span></div>`;
+}
+
 export function renderBankReconBody(report, opts = {}) {
   const hideNoise = Boolean(report.noise?.count) && report.filter?.noise !== "hide"; // the noise rows start hidden; the button shows them
   const hideOlder = Boolean(report.older?.count) && report.filter?.older !== "hide"; // so do the rows dated before the period
   // data-export = where the selection mode posts (default: the relative "export" next to the report; the admin page passes its own)
   const attrs = ` data-export="${esc(opts.exportHref || "export")}" data-company="${esc(report.company?.code || "")}" data-account="${esc(report.account?.key || "")}" data-from="${esc(report.from || "")}" data-to="${esc(report.to || "")}"`;
-  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}${hideOlder ? " older-off" : ""}"${attrs}>${header(report)}${filterBox(report)}${olderBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}${chequesStaleTable(report)}</div>`;
+  return `<div class="bank-recon${hideNoise ? " noise-off" : ""}${hideOlder ? " older-off" : ""}"${attrs}>${header(report)}${filterBox(report)}${olderBox(report)}${noiseBox(report)}${todoBox(report)}${notes(report)}${summary(report)}${findBar()}${bankOpenTable(report, opts)}${bookOpenTable(report)}${bookFutureTable(report)}${chequesClearedTable(report)}${chequesOpenTable(report)}${chequesStaleTable(report)}</div>`;
 }
 
 // A complete standalone HTML page.
@@ -472,6 +483,9 @@ export function bankReconBehavior(root) {
 
   // 2. column filters
   var closePanels = function () { Array.prototype.forEach.call(root.querySelectorAll(".br-panel"), function (p) { p.parentNode.removeChild(p); }); };
+  // the free-text find box (above section 1): its normalised value, shared by every section's apply()
+  var findQuery = "";
+  var brNorm = function (s) { return String(s == null ? "" : s).toLowerCase().replace(/[,\s‎‏]/g, ""); };
   Array.prototype.forEach.call(root.querySelectorAll("table"), function (table) {
     var tbody = table.tBodies[0];
     var ths = table.tHead ? table.tHead.rows[0].cells : [];
@@ -481,13 +495,33 @@ export function bankReconBehavior(root) {
     var valueOf = function (r, i) { var c = r.cells[i]; var t = c ? (c.getAttribute("data-f") != null ? c.getAttribute("data-f") : c.textContent).trim() : ""; return t || EMPTY; };
     var noiseRows = rows.filter(function (r) { return r.classList.contains("noise"); }).length;
     var olderRows = rows.filter(function (r) { return r.classList.contains("older"); }).length;
+    // the columns the free-text find looks in: reference (אסמכתא / מס' צ'ק), beneficiary (מוטב / חשבון נגדי) and amount
+    // (סכום). The summary table is never searched.
+    var findCols = [];
+    if (!table.classList.contains("summary")) {
+      Array.prototype.forEach.call(ths, function (th, i) {
+        var t = th.textContent;
+        if (t.indexOf("אסמכתא") >= 0 || t.indexOf("מס") >= 0 || t.indexOf("מוטב") >= 0 || t.indexOf("חשבון נגדי") >= 0 || t.indexOf("סכום") >= 0) findCols.push(i);
+      });
+    }
+    var matchFind = function (r) {
+      for (var k = 0; k < findCols.length; k++) {
+        var c = r.cells[findCols[k]];
+        if (!c) continue;
+        var df = c.getAttribute("data-f"), dv = c.getAttribute("data-v");
+        if (brNorm(df != null ? df : c.textContent).indexOf(findQuery) >= 0) return true;
+        if (dv != null && brNorm(dv).indexOf(findQuery) >= 0) return true;
+      }
+      return false;
+    };
     var apply = function () {
       var cols = Object.keys(active);
       var hideNoise = root.classList.contains("noise-off") && noiseRows > 0;
       var hideOlder = root.classList.contains("older-off") && olderRows > 0;
+      var fActive = Boolean(findQuery) && findCols.length > 0;
       var shown = 0, sum = 0, hasSum = false;
       rows.forEach(function (r) {
-        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); }) && !(hideNoise && r.classList.contains("noise")) && !(hideOlder && r.classList.contains("older"));
+        var ok = cols.every(function (i) { return active[i].has(valueOf(r, Number(i))); }) && !(hideNoise && r.classList.contains("noise")) && !(hideOlder && r.classList.contains("older")) && (!fActive || matchFind(r));
         r.classList.toggle("hid", !ok);
         if (ok) {
           shown++;
@@ -496,7 +530,7 @@ export function bankReconBehavior(root) {
         }
       });
       var line = tbody.querySelector("tr.filtered");
-      if (!cols.length && !hideNoise && !hideOlder) { if (line) line.parentNode.removeChild(line); }
+      if (!cols.length && !hideNoise && !hideOlder && !fActive) { if (line) line.parentNode.removeChild(line); }
       else {
         if (!line) {
           line = document.createElement("tr");
@@ -506,7 +540,7 @@ export function bankReconBehavior(root) {
           line.appendChild(td);
           tbody.insertBefore(line, tbody.querySelector("tr.total"));
         }
-        line.firstChild.textContent = (cols.length ? "מסונן: " : hideOlder ? "רק מהתקופה: " : "ללא רעשים: ") + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "") + (hideNoise ? " (רעשים מוסתרים: " + fmt(noiseRows, 0) + ")" : "") + (hideOlder ? " (מלפני התקופה מוסתרות: " + fmt(olderRows, 0) + ")" : "");
+        line.firstChild.textContent = (cols.length || fActive ? "מסונן: " : hideOlder ? "רק מהתקופה: " : "ללא רעשים: ") + fmt(shown, 0) + " מתוך " + fmt(rows.length, 0) + " שורות" + (hasSum ? ", סכום " + fmt(sum, 2) : "") + (hideNoise ? " (רעשים מוסתרים: " + fmt(noiseRows, 0) + ")" : "") + (hideOlder ? " (מלפני התקופה מוסתרות: " + fmt(olderRows, 0) + ")" : "");
       }
       Array.prototype.forEach.call(ths, function (th, i) { var b = th.querySelector(".flt"); if (b) b.classList.toggle("on", Boolean(active[i])); });
     };
@@ -585,6 +619,24 @@ export function bankReconBehavior(root) {
     table.__brApply = apply;
     if (noiseRows || olderRows) apply(); // the noise rows and the older rows start hidden: show the count line at once
   });
+
+  // 2b. the free-text find box above section 1: while typing it filters every section by reference, amount or beneficiary
+  var findInput = root.querySelector(".br-find-input");
+  if (findInput) {
+    var findCount = root.querySelector(".br-find-count");
+    var runFind = function () {
+      findQuery = brNorm(findInput.value.trim());
+      Array.prototype.forEach.call(root.querySelectorAll("table"), function (t) { if (t.__brApply) t.__brApply(); });
+      if (findCount) {
+        var shown = 0;
+        if (findQuery) Array.prototype.forEach.call(root.querySelectorAll("table[data-section] tbody tr"), function (tr) { if (!tr.classList.contains("total") && !tr.classList.contains("filtered") && !tr.classList.contains("hid")) shown++; });
+        findCount.textContent = findQuery ? "נמצאו " + fmt(shown, 0) + " שורות" : "";
+      }
+    };
+    findInput.addEventListener("input", runFind);
+    var clearBtn = root.querySelector(".br-find .x");
+    if (clearBtn) clearBtn.addEventListener("click", function () { findInput.value = ""; runFind(); findInput.focus(); });
+  }
   // 3. the noise toggle (the rows with the class "noise": de facto cancelled cheques, entry + cancellation pairs)
   var tog = root.querySelector(".noise-tog");
   if (tog) {
