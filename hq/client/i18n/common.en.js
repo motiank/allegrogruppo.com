@@ -171,7 +171,7 @@ export default {
   'joya.bankRecon.partyLegend': "The number = the supplier's rows in the report; in red brackets = its bank moves with no record in the books (section 1).",
   'joya.bankRecon.filterHint': "The admin server filters; the summary stays for the whole account and the sections show only the matching rows. A search by name or free text is done in the chat.",
   'joya.ask.file.bankReconXlsx': "Bank reconciliation report (Excel)",
-  'joya.ask.file.bankReconPage': "Open the full report",
+  'joya.ask.file.bankReconPage': "Reopen the report",
   'joya.nav.areas': 'Work areas',
   'joya.nav.overview': 'Chain overview',
   'joya.nav.workspace': 'Restaurant workspace',

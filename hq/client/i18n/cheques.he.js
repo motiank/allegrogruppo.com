@@ -40,7 +40,7 @@ export default {
   'joya.chq.known': 'הוראות קבע מוכרות ({n})',
   'joya.chq.knownLine': 'יום {day} בחודש · {sum} · נראה {months} חודשים (אחרון {last})',
   'joya.chq.balanceHint': 'יתרה ירוקה = היתרה האמיתית בסוף היום לפי הבנק. יתרה אדומה = צפויה: היתרה האחרונה פחות השיקים, הוראות הקבע והתשלומים של כל יום אחרי כן (ללא הכנסות ותנועות אחרות).',
-  'joya.ask.file.chequesPage': '📅 דף שיקים לפרעון',
+  'joya.ask.file.chequesPage': '📅 פתיחה חוזרת של דף השיקים',
   'joya.ask.cheq.title': 'תמונות השיקים ({n})',
   'joya.ask.cheq.shownOf': 'מוצגות {shown} מתוך {n}',
   'joya.ask.cheq.more': 'הצג עוד {n}',

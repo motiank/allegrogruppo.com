@@ -40,7 +40,7 @@ export default {
   'joya.chq.known': 'Known standing orders ({n})',
   'joya.chq.knownLine': 'day {day} of the month · {sum} · seen {months} months (last {last})',
   'joya.chq.balanceHint': 'Green balance = the real closing balance of the day at the bank. Red = expected: the last real balance minus the cheques, standing orders and payments of every later day (no income or other movements).',
-  'joya.ask.file.chequesPage': '📅 Cheques due page',
+  'joya.ask.file.chequesPage': '📅 Reopen the cheques page',
   'joya.ask.cheq.title': 'Cheque pictures ({n})',
   'joya.ask.cheq.shownOf': '{shown} of {n} shown',
   'joya.ask.cheq.more': 'Show {n} more',

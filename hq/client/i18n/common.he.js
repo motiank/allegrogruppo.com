@@ -172,7 +172,7 @@ export default {
   'joya.bankRecon.partyLegend': "המספר = שורות של הספק בדוח; באדום בסוגריים = תנועות בנק שאין להן רישום בספרים (סעיף 1).",
   'joya.bankRecon.filterHint': "הסינון נעשה בשרת הניהול; הסיכום נשאר לכל החשבון, והסעיפים מציגים רק את השורות שעברו את הסינון. חיפוש לפי שם או טקסט חופשי – בצ'אט.",
   'joya.ask.file.bankReconXlsx': "דוח התאמת בנק (Excel)",
-  'joya.ask.file.bankReconPage': "פתח את הדוח המלא",
+  'joya.ask.file.bankReconPage': "פתיחה חוזרת של הדוח",
   'joya.nav.areas': 'אזורי עבודה',
   'joya.nav.overview': 'סקירת הרשת',
   'joya.nav.workspace': 'סביבת עבודה של הסניף',
