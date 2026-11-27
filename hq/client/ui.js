@@ -419,7 +419,7 @@ const useDataTableStyles = createUseStyles((theme) => ({
     width: '100%',
     fontSize: '0.8rem',
     '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' },
-    '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
+    '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0, overflowWrap: 'normal' }, // a header keeps its words whole
     '& tr:last-child td': { borderBottom: 0 },
     '& td.num, & th.num': { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
     '& tfoot td': { fontWeight: 700, borderTop: `2px solid ${theme.border}` },
