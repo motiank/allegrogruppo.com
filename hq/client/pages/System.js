@@ -6,7 +6,7 @@ import React from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
-import { Page, Card, Btn, Badge, Loading, ErrorBox, useLoad, fmtDay, fmtWhen } from '../ui.js';
+import { DataTable, Page, Card, Btn, Badge, Loading, ErrorBox, useLoad, fmtDay, fmtWhen } from '../ui.js';
 import { BUILD, checkForUpdate, reloadApp } from '../version.js';
 import LegalUpdate from '../LegalUpdate.js';
 import BankUpdate from '../BankUpdate.js';
@@ -19,7 +19,7 @@ const useStyles = createUseStyles((theme) => ({
   th: { textAlign: 'start', fontWeight: 650, color: theme.textSecondary, padding: '0.35rem 0.4rem', borderBottom: `1px solid ${theme.border}`, whiteSpace: 'nowrap' },
   td: { padding: '0.4rem 0.4rem', borderBottom: `1px solid ${theme.border}`, verticalAlign: 'top' },
   num: { whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
-  detail: { color: theme.textSecondary, fontSize: '0.78rem', maxWidth: 420 },
+  detail: { color: theme.textSecondary, fontSize: '0.78rem' },
   err: { color: '#f2a3a8', fontSize: '0.78rem' },
   age: { color: theme.textSecondary, fontSize: '0.74rem', display: 'block' },
   wrap: { overflowX: 'auto' },
@@ -59,7 +59,7 @@ function AppVersion({ c }) {
 export default function System() {
   const theme = useTheme();
   const c = useStyles(theme);
-  const { t, lang } = useT();
+  const { t, lang, dir } = useT();
   const r = useLoad(() => api('/system/freshness'), []);
   const label = (x) => (lang === 'en' && x.labelEn ? x.labelEn : x.label);
   const age = (x) => (x.ageDays == null ? '' : x.ageDays === 0 ? t('joya.system.today') : t('joya.system.ago', { n: x.ageDays }));
@@ -84,45 +84,22 @@ export default function System() {
           ) : null}
           {r.data.groups.map((g) => (
             <Card key={g.key} title={label(g)}>
-              <div className={c.wrap}>
-                <table className={c.table}>
-                  <thead>
-                    <tr>
-                      <th className={c.th}>{t('joya.system.col.source')}</th>
-                      <th className={c.th}>{t('joya.system.col.lastDate')}</th>
-                      <th className={c.th}>{t('joya.system.col.lastUpdate')}</th>
-                      <th className={c.th}>{t('joya.system.col.count')}</th>
-                      <th className={c.th}>{t('joya.system.col.state')}</th>
-                      <th className={c.th}>{t('joya.system.col.detail')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.items.map((x) => (
-                      <tr key={x.key}>
-                        <td className={c.td}>{label(x)}</td>
-                        <td className={`${c.td} ${c.num}`}>
-                          {x.lastDate ? fmtDay(x.lastDate) : '—'}
-                          {x.lastDate ? <span className={c.age}>{age(x)}</span> : null}
-                        </td>
-                        <td className={`${c.td} ${c.num}`}>
-                          {x.lastUpdate ? fmtWhen(x.lastUpdate) : '—'}
-                          {!x.lastDate && x.lastUpdate ? <span className={c.age}>{age(x)}</span> : null}
-                        </td>
-                        <td className={`${c.td} ${c.num}`}>{x.count == null ? '—' : Number(x.count).toLocaleString('en-US')}</td>
-                        <td className={c.td}>
-                          <Badge tone={TONE[x.state] || 'muted'} title={x.expectedDays != null ? t('joya.system.expected', { n: x.expectedDays }) : undefined}>
-                            {t(`joya.system.state.${x.state}`)}
-                          </Badge>
-                        </td>
-                        <td className={`${c.td} ${c.detail}`}>
-                          {x.detail || ''}
-                          {x.error ? <div className={c.err}>{x.error}</div> : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {/* ui.js DataTable: wrapping cells, a card list on a narrow screen (owner 2026-11-28: no horizontal scroll) */}
+              <DataTable
+                dir={dir}
+                head={[t('joya.system.col.source'), t('joya.system.col.lastDate'), t('joya.system.col.lastUpdate'), t('joya.system.col.count'), t('joya.system.col.state'), t('joya.system.col.detail')]}
+                rows={g.items.map((x) => ({
+                  key: x.key,
+                  cells: [
+                    { node: label(x) },
+                    { num: true, node: <>{x.lastDate ? fmtDay(x.lastDate) : '—'}{x.lastDate ? <span className={c.age}>{age(x)}</span> : null}</> },
+                    { num: true, node: <>{x.lastUpdate ? fmtWhen(x.lastUpdate) : '—'}{!x.lastDate && x.lastUpdate ? <span className={c.age}>{age(x)}</span> : null}</> },
+                    { num: true, node: x.count == null ? '—' : Number(x.count).toLocaleString('en-US') },
+                    { node: <Badge tone={TONE[x.state] || 'muted'} title={x.expectedDays != null ? t('joya.system.expected', { n: x.expectedDays }) : undefined}>{t(`joya.system.state.${x.state}`)}</Badge> },
+                    { className: c.detail, node: <>{x.detail || ''}{x.error ? <div className={c.err}>{x.error}</div> : null}</> },
+                  ],
+                }))}
+              />
             </Card>
           ))}
           <p className={c.note}>{t('joya.system.legend')}</p>

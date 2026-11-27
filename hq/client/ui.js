@@ -24,13 +24,14 @@ export const tones = {
 
 const useStyles = createUseStyles((theme) => ({
   root: { minHeight: '100vh', background: theme.background, color: theme.text },
-  header: { padding: '0.7rem 1rem 0.6rem', borderBottom: `1px solid ${theme.border}`, maxWidth: 1100, margin: '0 auto' },
+  // the full window width with a small margin (owner 2026-11-28: "use the full window width with small margin")
+  header: { padding: '0.7rem 0.9rem 0.6rem', borderBottom: `1px solid ${theme.border}`, margin: 0 },
   back: { background: 'none', border: 0, color: theme.textSecondary, padding: 0, marginBottom: '0.35rem', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'inherit' },
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: '1.1rem', fontWeight: 650 },
   sub: { marginTop: '0.2rem', fontSize: '0.78rem', color: theme.textSecondary },
   actions: { display: 'flex', gap: '0.4rem', flexWrap: 'wrap' },
-  main: { padding: '0.9rem 1rem 2.5rem', maxWidth: 1100, margin: '0 auto' },
+  main: { padding: '0.9rem 0.9rem 2.5rem', margin: 0, minWidth: 0 },
   card: { border: `1px solid ${theme.border}`, borderRadius: 10, padding: '0.75rem 0.9rem', marginBottom: '0.65rem', background: theme.surface, minWidth: 0 },
   clickable: { cursor: 'pointer', '&:hover': { borderColor: theme.primary } },
   cardTitle: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', fontSize: '0.92rem', fontWeight: 600, marginBottom: '0.45rem' },
@@ -401,5 +402,118 @@ export function statusTone(s) {
       LOW: 'muted',
       INFO: 'muted',
     }[s] || 'muted'
+  );
+}
+
+// ── a table that never scrolls sideways (owner 2026-11-28: "avoid the horizontal scroll bar across the system; in a table
+// hide columns or move to a card list") ──────────────────────────────────────────────────────────────────────────────
+// The cells wrap (numbers never); when the table is STILL wider than its box — many columns, a phone — the same rows are
+// shown as a card list: the first cell is the card's title, the other cells are label: value lines. It goes back to a
+// table when the box grows enough. head: [node], rows: [{ key, cells: [{ node, className?, num?, title? }], className? }],
+// foot: a row shown as the last card / table foot.
+const useDataTableStyles = createUseStyles((theme) => ({
+  wrap: { overflowX: 'hidden', margin: '0.5rem 0 0.2rem', border: `1px solid ${theme.border}`, borderRadius: 8, minWidth: 0 },
+  measuring: { visibility: 'hidden', position: 'absolute', insetInlineStart: 0, top: 0, pointerEvents: 'none' },
+  table: {
+    borderCollapse: 'collapse',
+    width: '100%',
+    fontSize: '0.8rem',
+    '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', verticalAlign: 'top', whiteSpace: 'normal', overflowWrap: 'anywhere' },
+    '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
+    '& tr:last-child td': { borderBottom: 0 },
+    '& td.num, & th.num': { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+    '& tfoot td': { fontWeight: 700, borderTop: `2px solid ${theme.border}` },
+    '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
+    '&[dir=ltr] th, &[dir=ltr] td': { textAlign: 'left' },
+  },
+  cards: { display: 'grid', gap: '0.45rem', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', padding: '0.45rem' },
+  card: { border: `1px solid ${theme.border}`, borderRadius: 8, padding: '0.45rem 0.6rem', background: theme.surface, minWidth: 0, fontSize: '0.8rem' },
+  cardHead: { fontWeight: 700, marginBottom: '0.3rem', overflowWrap: 'anywhere' },
+  line: { display: 'flex', justifyContent: 'space-between', gap: '0.6rem', padding: '0.1rem 0', '& > span:first-child': { color: theme.textSecondary, flex: '0 1 auto' }, '& > span:last-child': { textAlign: 'end', minWidth: 0, overflowWrap: 'anywhere' } },
+  num: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  foot: { gridColumn: '1 / -1', background: theme.background },
+}));
+
+export function DataTable({ head = [], rows = [], foot = null, dir, className, cardsBelow = null }) {
+  const theme = useTheme();
+  const c = useDataTableStyles(theme);
+  const wrapRef = React.useRef(null);
+  const tableRef = React.useRef(null);
+  const [cards, setCards] = React.useState(false);
+  const needed = React.useRef(0); // the table's natural width when it last overflowed
+  React.useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return undefined;
+    const check = () => {
+      const w = wrap.clientWidth;
+      const tbl = tableRef.current;
+      if (!cards) {
+        if (tbl && tbl.scrollWidth > w + 1) {
+          needed.current = tbl.scrollWidth;
+          setCards(true);
+        }
+      } else if (w >= needed.current + 1) setCards(false);
+    };
+    check();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null;
+    ro?.observe(wrap);
+    return () => ro?.disconnect();
+  }, [cards, rows, head]);
+  const cellClass = (cell) => [cell?.className, cell?.num ? 'num' : ''].filter(Boolean).join(' ') || undefined;
+  const table = (
+    <table ref={tableRef} className={c.table} dir={dir}>
+      <thead>
+        <tr>
+          {head.map((h, k) => (
+            <th key={k} className={h && typeof h === 'object' && 'node' in h ? cellClass(h) : undefined}>{h && typeof h === 'object' && 'node' in h ? h.node : h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, j) => (
+          <tr key={r.key ?? j} className={r.className}>
+            {r.cells.map((cell, k) => (
+              <td key={k} className={cellClass(cell)} title={cell?.title}>{cell?.node}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+      {foot ? (
+        <tfoot>
+          <tr className={foot.className}>
+            {foot.cells.map((cell, k) => (
+              <td key={k} className={cellClass(cell)} title={cell?.title}>{cell?.node}</td>
+            ))}
+          </tr>
+        </tfoot>
+      ) : null}
+    </table>
+  );
+  const label = (k) => { const h = head[k]; return h && typeof h === 'object' && 'node' in h ? h.node : h; };
+  const asCard = (r, j, isFoot) => (
+    <div key={r.key ?? (isFoot ? 'foot' : j)} className={`${c.card} ${isFoot ? c.foot : ''} ${r.className || ''}`} dir={dir}>
+      <div className={c.cardHead}>{r.cells[0]?.node}</div>
+      {r.cells.slice(1).map((cell, k) => (
+        <div key={k} className={c.line}>
+          <span>{label(k + 1)}</span>
+          <span className={`${cell?.num ? c.num : ''} ${cell?.className || ''}`} title={cell?.title}>{cell?.node}</span>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <div ref={wrapRef} className={`${c.wrap} ${className || ''}`} style={{ position: 'relative' }}>
+      {cards ? (
+        <>
+          <div className={c.cards}>
+            {rows.map((r, j) => asCard(r, j, false))}
+            {foot ? asCard(foot, rows.length, true) : null}
+          </div>
+          {cardsBelow}
+        </>
+      ) : (
+        table
+      )}
+    </div>
   );
 }

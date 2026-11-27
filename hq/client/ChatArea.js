@@ -15,11 +15,12 @@ import { useWindowDrop, DropOverlay, useUploads, UploadCard } from './FileDrop.j
 const ACCOUNTING_AREA = 5; // src/services/ai.js AREAS
 
 const useStyles = createUseStyles((theme) => ({
-  start: { minHeight: 'calc(100vh - 190px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 680, margin: '0 auto', width: '100%' },
+  // the full window width (owner 2026-11-28); the intro block stays centred in it
+  start: { minHeight: 'calc(100vh - 190px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', margin: '0 auto', width: '100%', minWidth: 0 },
   startTitle: { fontSize: '1.25rem', fontWeight: 650, textAlign: 'center', margin: '0 0 0.4rem' },
   intro: { fontSize: '0.84rem', color: theme.textSecondary, textAlign: 'center', margin: '0 0 1rem', lineHeight: 1.55 },
   note: { fontSize: '0.7rem', color: theme.textSecondary, textAlign: 'center', marginTop: '0.7rem', lineHeight: 1.5 },
-  list: { maxWidth: 820, margin: '0 auto', paddingBottom: 110 },
+  list: { margin: 0, paddingBottom: 110, minWidth: 0 },
   card: { position: 'relative', border: `1px solid ${theme.border}`, borderRadius: 12, background: theme.surface, padding: '0.7rem 0.85rem 0.8rem', marginBottom: '0.75rem' },
   cardHead: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem' },
   cardTitle: { flex: 1, minWidth: 0, fontSize: '0.92rem', fontWeight: 650, lineHeight: 1.45, overflowWrap: 'anywhere' },
@@ -64,7 +65,7 @@ const useStyles = createUseStyles((theme) => ({
     borderTop: `1px solid ${theme.border}`,
     padding: '0.55rem 1rem calc(0.55rem + env(safe-area-inset-bottom))',
   },
-  dockInner: { maxWidth: 820, margin: '0 auto' },
+  dockInner: { margin: 0 },
   // the field and the send button
   composer: { position: 'relative' },
   row: { display: 'flex', alignItems: 'flex-end', gap: '0.45rem' },

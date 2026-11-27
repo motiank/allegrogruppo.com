@@ -72,7 +72,8 @@ export const CSS = `
 .bank-recon .meta span{margin-left:18px;white-space:nowrap}
 .bank-recon table{border-collapse:collapse;width:100%;margin:6px 0 10px}
 .bank-recon th,.bank-recon td{border:1px solid #c9c9c9;padding:4px 7px;text-align:right;vertical-align:top}
-.bank-recon th{background:#eef1f5;font-weight:700;white-space:nowrap}
+.bank-recon th{background:#eef1f5;font-weight:700}
+.bank-recon td{overflow-wrap:anywhere}
 .bank-recon td.num,.bank-recon th.num{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
 .bank-recon td.neg{color:#b00020}
 .bank-recon td.missing{color:#b00020;font-style:italic}

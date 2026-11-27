@@ -10,7 +10,7 @@ import { useT } from '../i18n/index.js';
 const useStyles = createUseStyles((theme) => ({
   note: { fontSize: '0.82rem', color: theme.textSecondary, margin: '0 0 0.6rem', lineHeight: 1.5 },
   coHead: { fontSize: '0.85rem', color: theme.textSecondary, margin: '0.9rem 0.2rem 0.3rem', fontWeight: 600 },
-  code: { display: 'block', direction: 'ltr', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', background: theme.background, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '0.4rem 0.5rem', margin: '0.3rem 0 0.7rem', overflowX: 'auto', whiteSpace: 'nowrap' },
+  code: { display: 'block', direction: 'ltr', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', background: theme.background, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '0.4rem 0.5rem', margin: '0.3rem 0 0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' },
   sub: { fontSize: '0.76rem', color: theme.textSecondary, marginTop: '0.15rem' },
   num: { borderTop: `1px solid ${theme.border}`, padding: '0.45rem 0' },
   numHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' },

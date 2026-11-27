@@ -733,6 +733,14 @@ row "bank-site <account> <from>..<to>". Not yet: the transaction status file (th
 the payee read from the cheque picture is still a separate step. Admin side: `../local_api_readme.md` → "Bank update from the bank site".
 Tests: `test/test_bank_extension.mjs` (the extension's pure helpers), admin `scripts/test_bank_sync.js`.
 
+**Layout: the full width, no sideways scroll** (2026-11-28, owner: "use the full window width with small margin; avoid the
+horizontal scroll bar across the system; in a table hide columns or move to a card list"): the shell (`ui.js` Page), the banner and
+the chat (`ChatArea.js`) have no `maxWidth` any more — a 0.9rem margin only. `ui.js` `DataTable({ head, rows, foot, dir })` is the
+one table component: the cells wrap (numbers and `num` cells never), and when the table is still wider than its box (many columns,
+a phone) the same rows show as a card list — the first cell is the card's title, the other cells are "label: value" lines — and it
+goes back to a table when the box is wide enough (a ResizeObserver). Used by the chat's answer tables (`AskBox.js`, the Excel link
+stays) and the System page. The bank reconciliation report (the admin's HTML in a frame) lets its headers and text cells wrap too.
+
 **Beecomm through the browser** (2026-11-28, owner: "support the update Beecomm through the Joya extension" — Beecomm's gateway refuses
 the server's address since about 25/11): the Beecomm card gets a second button, "עדכן דרך הדפדפן", in a Chrome with the extension
 (1.1+). The extension asks Joya for the plan (`POST /api/joya/beecomm/sync/ext/plan` → the admin's loader in plan mode: the exact

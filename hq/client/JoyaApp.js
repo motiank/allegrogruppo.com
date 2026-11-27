@@ -60,7 +60,7 @@ const useStyles = createUseStyles((theme) => ({
   item: { display: 'block', width: '100%', padding: '0.55rem 1rem', background: 'none', border: 0, color: theme.text, fontSize: '0.9rem', textAlign: 'start', cursor: 'pointer', fontFamily: 'inherit', '&:hover': { background: 'rgba(255,255,255,0.05)' } },
   itemOn: { color: theme.primary, fontWeight: 650 },
   sep: { height: 1, margin: '0.6rem 0', background: theme.border },
-  bannerWrap: { maxWidth: 1100, margin: '0 auto', padding: '0.6rem 1rem 0' },
+  bannerWrap: { margin: 0, padding: '0.6rem 0.9rem 0' },
 }));
 
 // The main menu: the areas, each a chat (pages/Area.js); Bank and Payments (pages/Payments.js: the board of planned bank

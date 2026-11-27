@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { createUseStyles, useTheme } from 'react-jss';
 import { api, qs, ApiError } from './api.js';
 import { useT, Term } from './i18n/index.js';
-import { Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
+import { DataTable, Btn, Badge, Details, Pre, ErrorBox, fmtWhen, TextArea, SourceLine } from './ui.js';
 import { useJoya } from './context.js';
 import { splitAnswer, cellNumber, cellTone, floorMoney } from '../lib/answerTables.js';
 import ChequeCards from './ChequeCards.js';
@@ -19,17 +19,19 @@ const useStyles = createUseStyles((theme) => ({
   head: { fontSize: '0.88rem', fontWeight: 650, marginBottom: '0.45rem' },
   q: { fontSize: '0.84rem', fontWeight: 600, marginTop: '0.6rem' },
   a: { fontSize: '0.86rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginTop: '0.25rem' },
-  tableWrap: { overflowX: 'auto', margin: '0.5rem 0 0.2rem', border: `1px solid ${theme.border}`, borderRadius: 8 },
+  tableWrap: { margin: '0.5rem 0 0.2rem' },
+  // a cell the writer marked 🟢 / 🔴 (a real / expected bank balance, owner 2026-11-12); numbers align like the text
+  // (owner 2026-11-04) — the table itself is ui.js DataTable since 2026-11-28 (wrapping cells, a card list when too wide)
+  ok: { color: '#1e7b34', fontWeight: 600 },
+  bad: { color: '#c0392b', fontWeight: 600 },
   table: {
     borderCollapse: 'collapse',
     width: '100%',
     fontSize: '0.8rem',
-    '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start', whiteSpace: 'nowrap' },
+    '& th, & td': { padding: '0.35rem 0.55rem', borderBottom: `1px solid ${theme.border}`, textAlign: 'start' },
     '& th': { fontWeight: 650, background: theme.background, position: 'sticky', top: 0 },
     '& tr:last-child td': { borderBottom: 0 },
-    // numbers align like the text: right in Hebrew, left only in English (owner 2026-11-04)
     '& td.num': { fontVariantNumeric: 'tabular-nums' },
-    // a cell the writer marked 🟢 / 🔴 (a real / expected bank balance, owner 2026-11-12)
     '& td.ok': { color: '#1e7b34', fontWeight: 600 },
     '& td.bad': { color: '#c0392b', fontWeight: 600 },
     '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
@@ -173,33 +175,21 @@ function AnswerBody({ r, classes }) {
       </div>
     ) : (
       <div key={i}>
-        <div className={classes.tableWrap}>
-          <table className={classes.table} dir={dir}>
-            <thead>
-              <tr>
-                {b.header.map((h, k) => (
-                  <th key={k}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {b.rows.map((row, j) => (
-                <tr key={j}>
-                  {row.map((c, k) => {
-                    const tone = cellTone(c);
-                    const text = tone ? tone.text : c;
-                    const cls = [cellNumber(text) ? 'num' : '', tone?.tone || ''].filter(Boolean).join(' ') || undefined;
-                    return (
-                      <td key={k} className={cls}>
-                        {cellNumber(text) ? <Term>{text}</Term> : text}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* wraps its cells; a table still wider than the chat becomes a card list (ui.js DataTable, owner 2026-11-28) */}
+        <DataTable
+          dir={dir}
+          className={classes.tableWrap}
+          head={b.header}
+          rows={b.rows.map((row, j) => ({
+            key: j,
+            cells: row.map((c) => {
+              const tone = cellTone(c);
+              const text = tone ? tone.text : c;
+              const num = cellNumber(text);
+              return { node: num ? <Term>{text}</Term> : text, num, className: tone?.tone ? classes[tone.tone] : undefined };
+            }),
+          }))}
+        />
         <a className={classes.excel} href={`/api/joya/ai/requests/${r.id}/tables/${b.index}.xlsx`} download>
           ⬇ {t('joya.ask.downloadExcel')}
         </a>

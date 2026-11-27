@@ -22,7 +22,9 @@ Rules for this folder:
   the admin session.
 - Keep the five kinds of data apart (source, recommendation, manager edit, approved decision, execution).
 - Every string in both `client/i18n/*.he.js` and `*.en.js` (same keys). Hebrew is the default; RTL; phone first,
-  boxes not tables. The main menu has three chat areas (stock and purchasing, manpower, performance).
+  boxes not tables. **The full window width with a small margin, and no horizontal scroll bar anywhere** (owner
+  2026-11-28): no `maxWidth` on the shell or the chat; a table is `ui.js` `DataTable` (cells wrap, numbers never; a table
+  still wider than its box becomes a card list by itself) — never a `nowrap` table in an `overflowX: auto` box. The main menu has three chat areas (stock and purchasing, manpower, performance).
 - Numbers the AI shows come from `src/services/ai.js` calculations, never from the model. After a prompt change
   (`runner/hq-analyst.js`) run `npm run eval`. Model calls go through `claude -p` (subscription), never an API key.
 - SQL: single-quoted strings (ANSI_QUOTES-safe). Logger: pino (`lib/log.js`).
