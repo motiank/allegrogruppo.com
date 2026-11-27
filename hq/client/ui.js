@@ -425,6 +425,9 @@ const useDataTableStyles = createUseStyles((theme) => ({
     '& tfoot td': { fontWeight: 700, borderTop: `2px solid ${theme.border}` },
     '&[dir=rtl] th, &[dir=rtl] td': { textAlign: 'right' },
     '&[dir=ltr] th, &[dir=ltr] td': { textAlign: 'left' },
+    // while measuring: the narrowest the table can be WITHOUT breaking words (min-content); set and removed in one layout pass
+    '&.measure': { width: 'min-content' },
+    '&.measure th, &.measure td': { overflowWrap: 'normal' },
   },
   cards: { display: 'grid', gap: '0.45rem', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', padding: '0.45rem' },
   card: { border: `1px solid ${theme.border}`, borderRadius: 8, padding: '0.45rem 0.6rem', background: theme.surface, minWidth: 0, fontSize: '0.8rem' },
@@ -444,12 +447,18 @@ export function DataTable({ head = [], rows = [], foot = null, dir, className, c
   React.useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return undefined;
+    const NARROW = 600; // below this, a table of 5+ columns is a card list whatever its words
     const check = () => {
       const w = wrap.clientWidth;
       const tbl = tableRef.current;
       if (!cards) {
-        if (tbl && tbl.scrollWidth > w + 1) {
-          needed.current = tbl.scrollWidth;
+        if (!tbl) return;
+        // the table's width with whole words (min-content): wider than the box = it could only fit by cutting words
+        tbl.classList.add('measure');
+        const minW = tbl.offsetWidth;
+        tbl.classList.remove('measure');
+        if (minW > w + 1 || (head.length >= 5 && w < NARROW)) {
+          needed.current = Math.max(minW, head.length >= 5 ? NARROW : 0);
           setCards(true);
         }
       } else if (w >= needed.current + 1) setCards(false);
