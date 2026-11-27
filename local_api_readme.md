@@ -959,7 +959,12 @@ loader needs `BCOM_BO_API_KEY` and `BCOM_BO_REFRESH_TOKEN` (the back office logi
   (already up to date), error, lastLine, lines (the last 40 output lines) }`. The loader prints its errors and exits 0, so the verdict
   is read from its output (`verdict()`): "Main is don" = done, "Global error" / "must be set in .env" / "save failed" = failed.
 - `POST /beecomm/sync/start` → `202 { data: run }` (state running). `409 running` when a run is going on, `503 not_configured` without
-  the login settings. `X-Joya-User` is kept as `by`. A run longer than 30 minutes is killed.
+  the login settings, `503 disabled` when `BEECOMM_SYNC=off`. `X-Joya-User` is kept as `by`. A run longer than 30 minutes is killed.
+- **`BEECOMM_SYNC=off`** in the admin's `.env` (2026-11-28, owner: "disable the update from the admin and delete the cron on the server"):
+  Beecomm's API gateway answers `403 Forbidden` to every call from the production server's address since about 25/11 (the same code and
+  login work from the owner's machine), so the nightly load runs on the owner's machine (crontab 06:30 + 13:30). With the setting the
+  admin schedules no 06:00 job, `state` carries `disabled: true` (Joya's card explains and greys the button) and `start` refuses.
+  Remove the setting and restart `allegro-admin` when Beecomm allows the address.
 
 Tests: `node --test scripts/test_beecomm_sync.js` (the verdict and the refusal, no DB, nothing spawned). Joya side:
 `hq/src/services/beecommSync.js`, `/api/joya/beecomm/sync/*`, the card `hq/client/BeecommUpdate.js` on the System page.

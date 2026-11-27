@@ -3,7 +3,7 @@
 //   node --test scripts/test_beecomm_sync.js
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verdict, configured, start } from "../admin/server/modules/beecommSync.js";
+import { verdict, configured, disabled, start } from "../admin/server/modules/beecommSync.js";
 
 const GOOD = `dir name /x/sqldumper
 Using dates: 16/11/2026 to 21/11/2026
@@ -51,5 +51,19 @@ test("configured() needs both settings; start() refuses without them, before spa
   } finally {
     if (saved.k != null) process.env.BCOM_BO_API_KEY = saved.k;
     if (saved.t != null) process.env.BCOM_BO_REFRESH_TOKEN = saved.t;
+  }
+});
+
+test("BEECOMM_SYNC=off switches the load off: disabled(), start() refuses with 503 disabled", () => {
+  assert.equal(disabled({}), false);
+  assert.equal(disabled({ BEECOMM_SYNC: "on" }), false);
+  for (const v of ["off", "0", "false", "no", " OFF "]) assert.equal(disabled({ BEECOMM_SYNC: v }), true, v);
+  const saved = process.env.BEECOMM_SYNC;
+  process.env.BEECOMM_SYNC = "off";
+  try {
+    assert.throws(() => start({ by: "test" }), (e) => e.status === 503 && e.code === "disabled" && /owner's machine/.test(e.message));
+  } finally {
+    if (saved == null) delete process.env.BEECOMM_SYNC;
+    else process.env.BEECOMM_SYNC = saved;
   }
 });

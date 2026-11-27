@@ -314,6 +314,16 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   same day: the production server never loaded Beecomm — its `.env` had no `BCOM_BO_API_KEY` / `BCOM_BO_REFRESH_TOKEN` and the 06:00
   job failed every night; the owner's own admin (port 3021) did the load, and stopped after 16/11. The owner put the two settings
   on the droplet on 2026-11-22 and ran the loader by hand (16–21/11 loaded); the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+  **Beecomm blocks the droplet** (found 2026-11-28; every run since 26/11 and the owner-request run of 25/11 05:01 failed `save failed:
+  Request failed with status code 403`, the loader prints `Error: { message: 'Forbidden' }`): the Google login token is fine on the server, but
+  Beecomm's API gateway (`x-amzn-errortype: ForbiddenException`, CloudFront) refuses every cube call from 157.245.241.116 — the same code and
+  settings work from the owner's machine. Probably a firewall rule against hosting providers / non-Israeli traffic. 25–27/11 were loaded from
+  the owner's machine (`cd scripts && node server/analoader/index.js` — the loader reads `../.env`, so start it in `scripts/`). Owner's choice 2026-11-28: the
+  nightly job is back on the OWNER'S MACHINE — crontab `30 6,13 * * *` (06:30 Israel time, a second try at 13:30 if the machine was off; log
+  `~/logs/beecomm-loader.log`); the droplet's 04:00 job and the Joya button keep failing until Beecomm allows the server's address. Then (owner, same day: "disable the
+  update from the admin and delete the cron on the server"): `BEECOMM_SYNC=off` in the droplet's root `.env` — the admin schedules no
+  06:00 job (`beecommSync.disabled()` in `server.js`), `/beecomm/sync/start` answers `503 disabled`, Joya's card says why and greys the
+  button (`joya.beecommSync.disabled`). To go back to the server: remove the setting, restart `allegro-admin`, delete the owner's crontab line.
 - **Cheque pictures as cards in Joya's chat** (2026-11-23, owner: "if I asked for cheque images, display them on a card list with
   the options to copy and share"): under an answer that used the cheque archive (a cheque by number, the work list, the cheques of
   a payee) or asked for pictures in words, Joya shows the scanned cheques as cards (picture, number, payee, amount, bank day) with

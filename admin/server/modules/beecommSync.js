@@ -9,6 +9,9 @@
 // "Main is don" = it went through; "Global error" / "must be set in .env" / "Error getting dates" = failed; "Nothing to
 // process" = already up to date. Needs BCOM_BO_API_KEY + BCOM_BO_REFRESH_TOKEN in the admin's .env (the back office
 // login); without them the loader stops at once, so start() refuses before spawning.
+// BEECOMM_SYNC=off in the .env switches the whole thing off on this server (owner 2026-11-28: Beecomm's API gateway refuses
+// every call from the droplet's address since ~25/11 — 403 Forbidden — while the same code works from the owner's machine,
+// so the nightly job runs there, crontab 06:30 + 13:30): the 06:00 cron is not scheduled and start() answers 503 disabled.
 import { spawn } from "child_process";
 import crypto from "crypto";
 import path from "path";
@@ -27,6 +30,9 @@ let current = null;
 
 /** Whether the admin has the back office login the loader needs (names only, never the values). */
 export const configured = (env = process.env) => Boolean(env.BCOM_BO_API_KEY && env.BCOM_BO_REFRESH_TOKEN);
+/** BEECOMM_SYNC=off (or 0 / false / no): the Beecomm load is switched off on this server — no cron, no button. */
+export const disabled = (env = process.env) => /^(off|0|false|no)$/i.test(String(env.BEECOMM_SYNC || "").trim());
+export const DISABLED_MESSAGE = "the Beecomm update is switched off on this server (BEECOMM_SYNC=off): Beecomm refuses the server's address, so the nightly load runs on the owner's machine";
 
 /** What the loader's output says: { ok, dates: { from, to } | null, nothingToDo, error } — exported for the tests. */
 export function verdict(output, exitCode) {
@@ -59,7 +65,7 @@ const publicRun = (r) => r && { id: r.id, by: r.by, startedAt: r.startedAt, fini
 
 /** For the System page: the run going on (if any), the last runs, the loaded days, whether the login is configured. */
 export async function state() {
-  return { configured: configured(), running: Boolean(current), current: publicRun(current), runs: runs.map(publicRun), loaded: await loaded() };
+  return { configured: configured(), disabled: disabled(), running: Boolean(current), current: publicRun(current), runs: runs.map(publicRun), loaded: await loaded() };
 }
 
 /**
@@ -67,6 +73,7 @@ export async function state() {
  * `onDone(run)` is called when the child exits (the cron job logs there). The run's `promise` resolves to the finished run.
  */
 export function start({ by = null, onDone = null } = {}) {
+  if (disabled()) throw err(503, "disabled", DISABLED_MESSAGE);
   if (current) throw err(409, "running", `a Beecomm update started at ${current.startedAt} by ${current.by || "?"} is still running`);
   if (!configured()) throw err(503, "not_configured", "BCOM_BO_API_KEY and BCOM_BO_REFRESH_TOKEN are missing in the admin's .env — the Beecomm back office login");
   const run = { id: `${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`, by, startedAt: new Date().toISOString(), finishedAt: null, state: "running", ok: null, dates: null, nothingToDo: false, error: null, lines: [], output: "" };

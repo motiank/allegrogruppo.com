@@ -70,10 +70,10 @@ export default function BeecommUpdate({ onDone }) {
     return r.error || t('joya.beecommSync.state.failed');
   };
   return (
-    <Card title={t('joya.beecommSync.title')} right={<Btn small kind="primary" onClick={start} disabled={busy || running || state?.configured === false}>{running ? t('joya.beecommSync.busy') : t('joya.beecommSync.button')}</Btn>}>
+    <Card title={t('joya.beecommSync.title')} right={<Btn small kind="primary" onClick={start} disabled={busy || running || state?.configured === false || state?.disabled}>{running ? t('joya.beecommSync.busy') : t('joya.beecommSync.button')}</Btn>}>
       <div className={c.row}>
         {state?.loaded?.lastDay ? <span>{t('joya.beecommSync.loadedUpTo', { day: fmtDay(state.loaded.lastDay), when: state.loaded.loadedAt ? fmtWhen(state.loaded.loadedAt) : '' })}</span> : null}
-        {state?.configured === false ? <span className={c.err}>{t('joya.beecommSync.notConfigured')}</span> : null}
+        {state?.disabled ? <span className={c.err}>{t('joya.beecommSync.disabled')}</span> : state?.configured === false ? <span className={c.err}>{t('joya.beecommSync.notConfigured')}</span> : null}
       </div>
       {cur ? (
         <>
@@ -82,7 +82,7 @@ export default function BeecommUpdate({ onDone }) {
         </>
       ) : null}
       {error ? <div className={c.err}>{String(error.message || error)}</div> : null}
-      <p className={c.note}>{t('joya.beecommSync.hint')}</p>
+      <p className={c.note}>{t(state?.disabled ? 'joya.beecommSync.hintDisabled' : 'joya.beecommSync.hint')}</p>
       {state?.runs?.length ? (
         <ul className={c.list}>
           {state.runs.slice(0, 4).map((r) => (

@@ -120,8 +120,10 @@ app.listen(PORT, () => {
   // The Beecomm loader (analoader) every day at 06:00 Israel time — through modules/beecommSync.js, the same child
   // process Joya's System page starts on demand, so the two never run together. The loader needs BCOM_BO_API_KEY and
   // BCOM_BO_REFRESH_TOKEN in the .env (the back office login); without them it fails at once (the production server
-  // lacked them until 2026-11-22 and the owner's machine did the nightly load).
-  cron.schedule(
+  // lacked them until 2026-11-22 and the owner's machine did the nightly load). BEECOMM_SYNC=off = not scheduled at all
+  // (owner 2026-11-28: Beecomm refuses the server's address, the owner's machine runs the nightly job).
+  if (beecommSync.disabled()) console.log("[Cron] Analoader NOT scheduled: BEECOMM_SYNC=off (the nightly Beecomm load runs on the owner's machine)");
+  else cron.schedule(
     "0 6 * * *",
     () => {
       console.log(`[Cron] Starting analoader job at ${new Date().toISOString()}`);
@@ -143,7 +145,7 @@ app.listen(PORT, () => {
     },
   );
 
-  console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
+  if (!beecommSync.disabled()) console.log("[Cron] Analoader scheduled to run daily at 6:00 AM");
 
   // The invoice agent's Drive invoices against the books (owner 2026-11-08): every morning the admin matches this
   // year's invoices of every company that has a Drive folder (shared/finance_map.json drive) and writes the flag
