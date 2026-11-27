@@ -61,5 +61,14 @@
     "authKey": "325f77287e5941394c217913d966acc6",
     "role": "admin",
     "status": "active"
+  },
+  {
+    "user_id": 7,
+    "id": 7,
+    "email": "nofar",
+    "password": "nb37266",
+    "authKey": "c09b0ffb100c7169edbe06ef6e668f4f",
+    "role": "admin",
+    "status": "active"
   }
 ]
