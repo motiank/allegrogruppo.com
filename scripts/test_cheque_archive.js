@@ -40,7 +40,7 @@ test("an index row becomes one record: number, absolute amount, where the name c
   assert.equal(normalizeEntry({ reference: "10201", amount: -5, payee: "  ", payeeSource: "image", payeeGuess: " שם " }).guess, "שם");
   assert.equal(driveImageUrl("A1"), "https://drive.google.com/file/d/A1/view");
   assert.equal(driveImageUrl(null), null);
-  assert.deepEqual(archiveCounts(rows), { total: 7, named: 5, fromImage: 3, guess: 1, unnamed: 1, withImage: 7, bySource: { priority: 1, image_handwriting: 1, image: 2, none: 2, journal: 1 } });
+  assert.deepEqual(archiveCounts(rows), { total: 7, named: 5, fromImage: 3, guess: 1, unnamed: 1, withImage: 7, noImage: 0, bySource: { priority: 1, image_handwriting: 1, image: 2, none: 2, journal: 1 } });
 });
 
 test("the archive belongs to the company whose finance_map folder it is", () => {
@@ -105,4 +105,18 @@ test("mergeCheques: the picture joins a known cheque, an unknown scanned cheque 
   // without an archive nothing changes
   const r0 = mergeCheques({ hash, priority, bank, today: "2026-11-07" });
   assert.deepEqual(r0.counts, { total: 2, hashavshevet: 1, priority: 1, both: 0, archive: 0, bankPaid: 1, withImage: 0 });
+});
+
+test("a placeholder row (the bank has no picture; owner 2026-11-28): not a scan, not in the work list, counted apart", () => {
+  const rows = normalizeIndex({ cheques: [
+    { date: "2025-11-17", reference: "13759", amount: -1290, payee: "ספק", payeeSource: "פריוריטי", party_folder: "ספק", name: "13759", files: {}, noImage: true, noImageAt: "2026-11-28T10:00:00Z", noImageReason: "0 bytes" },
+    { date: "2025-11-17", reference: "13760", amount: -500, payee: "", payeeSource: "image", party_folder: "x", name: "13760", files: { front: { id: "F1", path: "cheques/x/13760.jpg" } }, noImage: true },
+  ] });
+  assert.deepEqual([rows[0].noImage, rows[0].imageId, rows[0].noImageAt], [true, null, "2026-11-28T10:00:00Z"]);
+  assert.equal(rows[1].noImage, false, "a row with a picture is never a placeholder, whatever the flag says");
+  assert.deepEqual(searchArchive(rows, {}).rows.map((r) => r.reference), ["13760"], "placeholders are left out of a search");
+  assert.deepEqual(searchArchive(rows, { noImage: true }).rows.map((r) => r.reference), ["13759", "13760"]);
+  const counts = archiveCounts(rows);
+  assert.deepEqual([counts.total, counts.noImage, counts.withImage, counts.named, counts.bySource], [2, 1, 1, 0, { none: 1 }]);
+  assert.equal(pickImage([rows[0]], 1290), null, "a placeholder has no picture to pick");
 });

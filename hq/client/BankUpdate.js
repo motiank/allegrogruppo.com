@@ -84,13 +84,20 @@ export default function BankUpdate() {
   const canRun = ext && bankReady();
   const line = () => {
     if (!prog) return null;
-    if (prog.phase === 'done') return t('joya.bankSync.phase.done', { rows: prog.summary?.newRows ?? 0, images: prog.summary?.images ?? 0, accounts: prog.summary?.accounts ?? 0 });
+    if (prog.phase === 'done') {
+      const s = t('joya.bankSync.phase.done', { rows: prog.summary?.newRows ?? 0, images: prog.summary?.images ?? 0, accounts: prog.summary?.accounts ?? 0 });
+      // cheques the bank itself has no picture of — found in this run only (a placeholder keeps them out of the next runs)
+      return prog.summary?.imagesEmpty ? `${s} · ${t('joya.bankSync.empty', { n: prog.summary.imagesEmpty })}` : s;
+    }
     if (/tab was closed/.test(prog.text || '')) return t('joya.bankSync.tabClosed');
     const key = `joya.bankSync.phase.${prog.phase}`;
     const s = t(key, { text: prog.text || '' });
     return s === key ? prog.text : s;
   };
-  const accLine = (a) => t('joya.bankSync.account', { account: a.companyLabel || a.account, rows: a.newRows || 0, images: a.images || 0 }) + (a.imageErrors ? ` · ${t('joya.bankSync.imageErrors', { n: a.imageErrors })}` : '');
+  const accLine = (a) =>
+    t('joya.bankSync.account', { account: a.companyLabel || a.account, rows: a.newRows || 0, images: a.images || 0 }) +
+    (a.imagesEmpty ? ` · ${t('joya.bankSync.empty', { n: a.imagesEmpty })}` : '') +
+    (a.imageErrors ? ` · ${t('joya.bankSync.imageErrors', { n: a.imageErrors })}` : '');
   return (
     <Card
       title={t('joya.bankSync.title')}

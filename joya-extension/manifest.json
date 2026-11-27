@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joya Update — נט המשפט + בנק הפועלים",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive, and the new bank moves and cheque pictures from the Bank Hapoalim business site into the admin. Works only when started from the Joya HQ System page, after you log in to the site yourself.",
   "permissions": ["tabs"],
   "host_permissions": [

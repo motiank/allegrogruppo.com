@@ -142,7 +142,7 @@ ssh -L 3021:localhost:3021 user@server   # then call http://localhost:3021/local
 | `GET /bank/transactions/stored?from=&to=[&company=][&account=][&q=][&side=credit\|debit][&group=none\|day\|action\|details]` | Bank account transactions (uploaded bank files), per row, per day with the closing balance, or summed per action | `bank_transactions` |
 | `GET /bank/events?from=&to=[&company=][&account=][&type=transfer\|authorization\|cheque_cancel\|government][&status=active\|cancelled\|all][&q=]` | The bank's transaction status file (orders given on the bank site: transfers with the payee's bank account and submitter, standing-order authorizations, cheque cancellations) | `bank_events` |
 | `GET /system/freshness` | How fresh every data source is: the Hashavshevet copy, the bank files, Tabit, Beecomm, the Drive indexes, the fixed files — last business date, last load, rows, state; for Joya's "System" page (2026-11-18) | all of them, read only |
-| `GET /bank/sync/plan`, `GET /bank/sync/cheques`, `POST /bank/sync/transactions`, `POST /bank/sync/cheque-image` | The bank update from the bank site (the Joya browser extension through Joya HQ, 2026-11-22): what to fetch, the site's rows → stored, the paid cheques without a picture, a cheque picture → the Drive archive. Admin only (`X-Joya-Admin: 1`) | `bank_transactions`, `file_uploads`, the Drive cheque archive |
+| `GET /bank/sync/plan`, `GET /bank/sync/cheques`, `POST /bank/sync/transactions`, `POST /bank/sync/cheque-image`, `POST /bank/sync/cheque-no-image` | The bank update from the bank site (the Joya browser extension through Joya HQ, 2026-11-22): what to fetch, the site's rows → stored, the paid cheques without a picture, a cheque picture → the Drive archive. Admin only (`X-Joya-Admin: 1`) | `bank_transactions`, `file_uploads`, the Drive cheque archive |
 
 ¹ Filled by the daily loader plus a one-off backfill (see [Data sources](#data-sources)). On a DB where the table hasn't been created, the endpoint answers `503 not_loaded`.
 
@@ -931,6 +931,14 @@ without `X-Joya-Admin: 1` is `403 forbidden`.
   priority, else `missing` → folder `_unknown`; the name is read from the picture in a later step, as before). A cheque that already has
   a picture is `skipped` (nothing uploaded). Errors: `400 bad_request` (missing date / number / amount, not a picture), `404 not_found`
   (an account not configured, a company without an archive folder).
+- `POST /bank/sync/cheque-no-image` JSON `{ account, date, reference, amount, reason? }` → `{ ok, skipped?, noImage, name, folder, payee,
+  payeeSource }` (2026-11-28, owner: "these cheques are empty on the bank site as well — use a placeholder and don't retry"): the bank
+  site has NO picture of this paid cheque (the cheque service gives no picture link, or the link answers an empty body — 0 bytes of
+  JSON; 24 Pasta Lina cheques of November 2025 were like that on every run). A PLACEHOLDER row goes into the archive's `index.json`
+  (`chequeArchive.js` `addChequeNoImage`: the same row as a filed cheque, no file, `noImage: true`, `noImageAt`, `noImageReason`,
+  the payee from the books / Priority as the folder name of a future scan). `GET /bank/sync/cheques` treats it as covered (counted in
+  `meta.archive.noImage`), so the site is never asked again; the archive readers (the report's 📷, `/finance/cheques/archive`, the
+  cheques file) see no picture. A cheque that already has a picture or a placeholder is `skipped`. Same errors as `cheque-image`.
 
 Tests: `node --test scripts/test_bank_sync.js` (the mapping and the keys, no DB). Joya side: `hq/src/services/bankSync.js`,
 `/api/joya/bank/sync/*`, the card on the System page; the extension: `joya-extension/README.md`.

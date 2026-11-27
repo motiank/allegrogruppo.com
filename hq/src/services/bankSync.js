@@ -199,6 +199,17 @@ export async function chequeImage(access, id, { account, date, reference, amount
   }
 }
 
+/** The bank site has no picture of this cheque (owner 2026-11-28): the admin writes a placeholder, so it is not asked again. */
+export async function chequeNoImage(access, id, { account, date, reference, amount, reason }) {
+  const { runs, r } = load(id);
+  if (r.state !== 'open') throw err('CONFLICT', 'this update run is closed');
+  const a = accountOf(r, account);
+  const out = (await admin('/bank/sync/cheque-no-image', { method: 'POST', access, json: { account, date, reference, amount, reason: reason || null } })).data;
+  if (!out.skipped) a.imagesEmpty = (a.imagesEmpty || 0) + 1;
+  save(runs);
+  return out;
+}
+
 /** The extension is done (or stopped / failed): the run is closed with its summary; the admin writes its archive index now. */
 export async function finish(access, id, { summary, error } = {}) {
   const { runs, r } = load(id);

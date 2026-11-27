@@ -19,6 +19,7 @@ export default {
   'joya.bankSync.failed': '{n} פריטים לא הצליחו (הראשון: {first})',
   'joya.bankSync.account': '{account}: {rows} תנועות חדשות · {images} תמונות צ׳קים',
   'joya.bankSync.imageErrors': '{n} תמונות נכשלו',
+  'joya.bankSync.empty': '{n} צ׳קים בלי תמונה בבנק (נרשמו, לא יורדו שוב)',
   'joya.bankSync.state.open': 'בהורדה',
   'joya.bankSync.state.done': 'הושלם',
   'joya.bankSync.state.failed': 'נכשל',

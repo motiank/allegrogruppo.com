@@ -13,7 +13,9 @@
 //                         the row_key formula is the same, and on top of it a row that an older Excel upload already
 //                         stored (same account, day, action code, reference, debit, credit — the texts may differ a little
 //                         between the file and the JSON) is not stored again;
-//   chequesWithoutImage() the paid cheques of the stored rows that the Drive cheque archive has no picture of yet;
+//   chequesWithoutImage() the paid cheques of the stored rows that the Drive cheque archive has no picture of yet
+//                         (a placeholder row = the bank has no picture — not asked again; owner 2026-11-28);
+//   markChequeNoImage()   writes that placeholder when the site's picture link answered nothing;
 //   fileChequeImage()     one cheque picture → the Drive archive (chequeArchive.js addChequeImage), named by the books.
 // The transaction status file (סטטוס עסקאות, bank_events) is not fetched from the site yet: its page was not mapped
 // (plan().events.supported = false); the Upload page still takes that file.
@@ -22,7 +24,7 @@ import { createRequire } from "module";
 import { executeSql, getDbPool } from "../sources/dbpool.js";
 import { norm } from "../uploads/workbook.js";
 import { addChequePayees, pickImage, PAYEE_SOURCE } from "./chequePayees.js";
-import { companyArchive, addChequeImage, archiveFolderOf } from "./chequeArchive.js";
+import { companyArchive, addChequeImage, addChequeNoImage, archiveFolderOf } from "./chequeArchive.js";
 
 const require = createRequire(import.meta.url);
 const RESTAURANTS = require("../../../shared/restaurants.json");
@@ -295,23 +297,27 @@ export async function chequesWithoutImage(account, { lookbackDays = CHEQUE_LOOKB
       ORDER BY tx_date DESC, id DESC`,
     { account, from },
   );
-  // the scanned cheques of the archive, grouped by cheque number (only rows that really have a picture)
+  // the scanned cheques of the archive, grouped by cheque number: rows that really have a picture, and the placeholder
+  // rows of cheques the bank itself has no picture of (owner 2026-11-28: "use a placeholder and don't retry")
   const scansByNumber = new Map();
   for (const c of ar.cheques) {
-    if (!c.imageId) continue;
+    if (!c.imageId && !c.noImage) continue;
     if (!scansByNumber.has(c.reference)) scansByNumber.set(c.reference, []);
     scansByNumber.get(c.reference).push(c);
   }
   const seen = new Set();
   const cheques = [];
   let archived = 0;
+  let noImage = 0;
   for (const r of rows) {
     const ref = String(Number(r.reference));
     const amount = r2(Number(r.debit));
     const scans = scansByNumber.get(ref);
     // the cheque number + the line's day is the index; the amount is the safety net (same as the report's 📷)
-    if (scans && (scans.some((c) => c.date === r.d) || pickImage(scans, amount))) {
-      archived++; // the archive already has this cheque's picture — do not fetch it again
+    const hit = scans && (scans.find((c) => c.date === r.d) || pickImage(scans.filter((c) => c.imageId), amount) || scans.find((c) => c.noImage && Math.abs(c.amount - amount) < 0.011));
+    if (hit) {
+      if (hit.noImage) noImage++; // the bank has no picture of this cheque — do not ask the site again
+      else archived++; // the archive already has this cheque's picture — do not fetch it again
       continue;
     }
     const k = `${ref}|${Math.round(amount * 100)}`;
@@ -320,7 +326,29 @@ export async function chequesWithoutImage(account, { lookbackDays = CHEQUE_LOOKB
     cheques.push({ date: r.d, reference: ref, amount });
     if (cheques.length >= MAX_CHEQUES) break;
   }
-  return { account, from, cheques, archive: { configured: true, error: ar.error || null, cheques: ar.cheques.length, archived }, checked: rows.length };
+  return { account, from, cheques, archive: { configured: true, error: ar.error || null, cheques: ar.cheques.length, archived, noImage }, checked: rows.length };
+}
+
+/**
+ * The bank site has NO picture of this paid cheque (its picture link answered nothing; the bank's own page shows nothing
+ * either — owner 2026-11-28): a placeholder row goes into the archive index so the next update does not ask again.
+ * The payee is looked up like for a picture (the folder name of a future scan). Returns { ok, skipped?, noImage, name, folder, payee, payeeSource }.
+ */
+export async function markChequeNoImage({ account, date, reference, amount, reason }) {
+  const acc = companyOfAccount(account);
+  if (!acc) throw Object.assign(new Error(`account ${account} is not configured`), { status: 404, code: "not_found" });
+  const code = financeCodeOf(acc.company);
+  if (!code || !archiveFolderOf(code)) throw Object.assign(new Error(`no cheque archive is configured for ${acc.company}`), { status: 404, code: "not_found" });
+  const day = dayOf(date);
+  const ref = /^\d+$/.test(String(reference || "").trim()) ? String(Number(reference)) : null;
+  const amt = r2(Math.abs(Number(amount)));
+  if (!day || !ref || !(amt > 0)) throw Object.assign(new Error("date, reference and amount are required"), { status: 400, code: "bad_request" });
+  const row = { details: "שיק", reference: ref, amount: -amt };
+  await addChequePayees([row], { company: code, bankAccounts: [account] });
+  const source = row.payeeSource === PAYEE_SOURCE.image || row.payeeSource === PAYEE_SOURCE.imageGuess ? PAYEE_SOURCE.missing : row.payeeSource || PAYEE_SOURCE.missing;
+  const payee = source === PAYEE_SOURCE.missing ? "" : row.payee || "";
+  const out = await addChequeNoImage(code, { date: day, reference: ref, amount: -amt, payee, payeeSource: ARCHIVE_WORD[source] || "חסר" }, reason);
+  return { ok: true, ...out, payee: payee || null, payeeSource: source };
 }
 
 // the archive's own words for a name source (what the owner's machine wrote; chequeArchive.js reads both)

@@ -366,6 +366,7 @@ r.post(
   express.raw({ type: ['image/jpeg', 'image/png', 'application/octet-stream'], limit: '6mb' }),
   h(async (req) => bankSync.chequeImage(req.joya, req.params.id, { account: req.query.account, date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body, req.get('content-type'))),
 );
+r.post('/joya/bank/sync/:id/cheque-no-image', requireAdmin, h(async (req) => bankSync.chequeNoImage(req.joya, req.params.id, req.body || {})));
 r.post('/joya/bank/sync/:id/finish', requireAdmin, h(async (req) => bankSync.finish(req.joya, req.params.id, { summary: req.body?.summary, error: req.body?.error })));
 r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.cancel(req.joya, req.params.id, req.body?.why)));
 // services/beecommSync.js: the System page's "update from Beecomm" button runs the admin's nightly loader on the server now.

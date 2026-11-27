@@ -298,6 +298,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   must be watched: the site's `accountId` format and the exact JSON shape are confirmed only then. Tests `scripts/test_bank_sync.js`,
   `hq/test/test_bank_extension.mjs`. Deployed 2026-11-22 (`3ebc271`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner`
   restarted; `/bank/sync/plan` answered on the droplet). The owner must load `joya-extension/` in Chrome in place of the old one.
+  **Cheques the bank has no picture of** (2026-11-28, owner: "these cheques are empty on the bank site as well — use a placeholder and
+  don't retry; show how many were empty the first time"): 24 Pasta Lina cheques of 2–17/11/2025 answered "not a picture (application/json,
+  0 bytes)" on every run (the same since the hand run of 2026-11-15). Now the extension posts them to `/bank/sync/cheque-no-image`
+  (through Joya) → a PLACEHOLDER row in the archive's `index.json` (`noImage: true`, `chequeArchive.js` `addChequeNoImage`);
+  `chequesWithoutImage` treats it as covered (`archive.noImage`), the archive readers see no picture (not in the work list, no 📷); the
+  run's `imagesEmpty` is shown in the card ("N צ׳קים בלי תמונה בבנק") on the run that found them only. Extension 1.0.2 (reload it).
+  Tests `scripts/test_cheque_archive.js`, `hq/test/test_bank_extension.mjs`.
 - **Beecomm update on demand** (2026-11-22, owner: "add the update button to the Beecomm as well — to initiate the update process on
   the server"): `admin/server/modules/beecommSync.js` runs the nightly Beecomm loader (`scripts/server/analoader/index.js`) as a child
   process of the admin — one at a time, shared with the 06:00 cron job in `server.js` — and keeps the last runs in memory; Local Data

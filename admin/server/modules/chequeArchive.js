@@ -6,6 +6,10 @@
 // A row: rowId, date (the bank day), reference (the cheque number), amount (minus = money out), details ("שיק"),
 // payee, payeeSource ("פריוריטי" | "פקודת יומן" | "מודול צ'קים" | "image" | "image_handwriting" | "חסר"), payeeGuess
 // (an unsure reading of the image), party_folder, name, files.front { id, path }, reviewed.
+// A PLACEHOLDER row (owner 2026-11-28: "these cheques are empty on the bank site as well — use a placeholder and don't
+// retry"): the same row with no file and `noImage: true` (+ noImageAt, noImageReason) — the bank site itself has no
+// picture of that cheque (its picture link answers 0 bytes). The bank update does not ask the site for it again; the
+// archive readers treat it as no picture (no 📷, not in the bookkeeper's work list).
 //
 // Owner 2026-11-16: "load the index.json from the cheques folder in the drive and use it to extract names wherever
 // needed to reduce the 'לא נמצא בחשבשבת' cases". This module reads the index with the invoice agent's Google login
@@ -67,6 +71,8 @@ export function normalizeEntry(e) {
     imageId: e?.files?.front?.id || null,
     imagePath: e?.files?.front?.path || null,
     reviewed: e?.reviewed || null,
+    noImage: !e?.files?.front?.id && Boolean(e?.noImage), // the bank has no picture of this cheque (a placeholder row)
+    noImageAt: e?.noImageAt || null,
   };
 }
 
@@ -254,6 +260,43 @@ export async function addChequeImage(companyCode, entry, buffer, mimeType = "ima
 }
 
 /**
+ * Writes a PLACEHOLDER row for a cheque the bank site has no picture of (owner 2026-11-28: the picture link answers
+ * 0 bytes, and the bank's own page shows nothing — "use a placeholder and don't retry"): the same row as a filed
+ * cheque, no file, `noImage: true`, `noImageAt`, `noImageReason`. The bank update (bankSync.js chequesWithoutImage)
+ * treats it as covered, so the site is not asked again. A row that already has a picture or a placeholder is skipped.
+ * Returns { skipped?, noImage: true, name, folder }.
+ */
+export async function addChequeNoImage(companyCode, entry, reason = "") {
+  const why = driveUnavailable();
+  if (why) throw new Error(why);
+  const folder = archiveFolderOf(companyCode);
+  if (!folder) throw new Error(`no cheque archive folder is configured for ${companyCode}`);
+  const run = async () => {
+    const b = await batchOf(folder);
+    const cheques = b.index.cheques;
+    const key = entryKey(entry.date, entry.reference, entry.amount);
+    let row = cheques.find((c) => entryKey(c.date, c.reference, c.amount) === key);
+    if (row?.files?.front?.id) return { skipped: true, hasImage: true, name: row.name, folder: row.party_folder };
+    if (row?.noImage) return { skipped: true, noImage: true, name: row.name, folder: row.party_folder };
+    const party = safeName(entry.payee) || "_unknown";
+    if (!row) {
+      row = { date: entry.date, reference: String(entry.reference), amount: Number(entry.amount), details: "שיק", payee: entry.payee || "", payeeSource: entry.payeeSource || "חסר", party_folder: party, name: String(entry.reference), files: {} };
+      cheques.push(row);
+    }
+    row.noImage = true;
+    row.noImageAt = new Date().toISOString();
+    row.noImageReason = String(reason || "").slice(0, 200);
+    row.filedBy = "admin";
+    b.dirty++;
+    scheduleWrite(b);
+    return { noImage: true, name: row.name, folder: party };
+  };
+  const p = writing.then(run, run);
+  writing = p.catch(() => {});
+  return p;
+}
+
+/**
  * The archive records of cheque numbers (strings or ints) of one company, keyed by the number as a plain string
  * (numbers not in the archive are absent). The caller picks by amount: 23 numbers were used twice.
  * @returns {Promise<{ byNumber: Map<string, object[]>, error: string|null }>}
@@ -278,14 +321,16 @@ const sameAmount = (a, b) => Math.abs(a - b) < 0.01;
 /**
  * Search the records (pure; AND of every filter given): number = cheque number(s), q = part of the payee (or the
  * guess / folder), amount = one or several amounts (±0.01), from / to on the bank day, named = true (a confirmed
- * name) | false (no confirmed name: guess or nothing), hasImage.
+ * name) | false (no confirmed name: guess or nothing), hasImage. Placeholder rows (noImage) are left out unless
+ * `noImage: true` asks for them.
  * @returns {{ rows: object[], total: number, totals: { count: number, amount: number } }}  rows = the page, totals over every match
  */
-export function searchArchive(cheques, { number = null, q = null, amount = null, from = null, to = null, named = null, limit = 100, offset = 0 } = {}) {
+export function searchArchive(cheques, { number = null, q = null, amount = null, from = null, to = null, named = null, noImage = false, limit = 100, offset = 0 } = {}) {
   const numbers = number == null || number === "" ? null : new Set((Array.isArray(number) ? number : String(number).split(",")).map(chequeNo).filter(Boolean));
   const amounts = amount == null || amount === "" ? null : (Array.isArray(amount) ? amount : String(amount).split(",")).map((a) => Math.abs(Number(a))).filter((a) => Number.isFinite(a));
   const words = q ? norm(q).split(/\s+/).filter(Boolean) : [];
   const matches = (cheques || []).filter((c) => {
+    if (c.noImage && !noImage) return false;
     if (numbers && !numbers.has(c.reference)) return false;
     if (amounts && !amounts.some((a) => sameAmount(a, c.amount))) return false;
     if (from && (!c.date || c.date < from)) return false;
@@ -304,9 +349,13 @@ export function searchArchive(cheques, { number = null, q = null, amount = null,
 
 /** Counts of one archive (pure): how many names come from where. */
 export function archiveCounts(cheques) {
-  const out = { total: 0, named: 0, fromImage: 0, guess: 0, unnamed: 0, withImage: 0, bySource: {} };
+  const out = { total: 0, named: 0, fromImage: 0, guess: 0, unnamed: 0, withImage: 0, noImage: 0, bySource: {} };
   for (const c of cheques || []) {
     out.total++;
+    if (c.noImage) {
+      out.noImage++; // a placeholder: the bank has no picture — not a scan, not a name
+      continue;
+    }
     if (c.payee) out.named++;
     if (c.fromImage) out.fromImage++;
     if (!c.payee && c.guess) out.guess++;

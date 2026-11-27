@@ -40,6 +40,9 @@ Not covered yet: closed cases, and cases that are not in the archive's list at a
    the site for each one (`/ServerServices/current-account/cheques/<number>?view=paying&originalEventDate=…&chequeAmount=…`)
    and hands the front picture to Joya → the admin files it in Drive (`<company>/cheques/<payee or _unknown>/<number>.jpg`
    + `index.json`), the payee from the books / Priority; the name is read from the picture later, as before.
+   A cheque the bank itself has no picture of (no picture link, or the link answers an empty body — the bank's own page shows
+   nothing either; owner 2026-11-28) gets a PLACEHOLDER row in the archive (`POST …/cheque-no-image`) and is never asked again;
+   the run counts them (`imagesEmpty`) and the card says how many, the first time only.
 5. Done: the System page shows per account the new rows and the pictures. If the bank session ends in the middle (the
    site logs out after some minutes), the extension asks you to log in again and continues.
 

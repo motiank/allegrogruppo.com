@@ -19,6 +19,7 @@ export default {
   'joya.bankSync.failed': '{n} items failed (first: {first})',
   'joya.bankSync.account': '{account}: {rows} new moves · {images} cheque pictures',
   'joya.bankSync.imageErrors': '{n} pictures failed',
+  'joya.bankSync.empty': '{n} cheques with no picture at the bank (noted, not asked again)',
   'joya.bankSync.state.open': 'downloading',
   'joya.bankSync.state.done': 'done',
   'joya.bankSync.state.failed': 'failed',

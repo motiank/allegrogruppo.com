@@ -50,3 +50,13 @@ test('siteAccounts and matchesAccount read the account list in its possible shap
   assert.deepEqual(accountDigits('12-584-136663'), { branch: '584', number: '136663' });
   assert.deepEqual(siteAccounts(null), []);
 });
+
+test('noPictureReason: the bank has no picture (no link, an empty answer) vs an error to report and retry', () => {
+  const { noPictureReason } = sandbox.self.joyaBank;
+  assert.equal(noPictureReason(null, null), 'the site has no picture link');
+  assert.match(noPictureReason('/x', { ok: false, error: 'not a picture (application/json; charset=UTF-8, 0 bytes)' }), /empty .*0 bytes/);
+  assert.match(noPictureReason('/x', { ok: false, error: 'not a picture (text/plain, 120 bytes)' }), /empty/);
+  assert.equal(noPictureReason('/x', { ok: false, error: 'not a picture (application/octet-stream, 40000 bytes)' }), null, 'a big body of another type is an error, not "no picture"');
+  assert.equal(noPictureReason('/x', { ok: false, error: 'the site sent a page, not a picture' }), null, 'a page = logged out');
+  assert.equal(noPictureReason('/x', { ok: false, status: 0, error: 'Failed to fetch' }), null);
+});

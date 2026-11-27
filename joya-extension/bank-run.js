@@ -155,10 +155,27 @@
     return li;
   }
 
+  /**
+   * Why the bank has NO picture of a cheque (pure): the cheque service gave no picture link, or the link answered an
+   * empty / non-picture body (the site's "no image": 0 bytes of JSON). Returns the reason, or null when it is another
+   * error (the fetch failed, a page = logged out) that should be reported and tried again next time.
+   */
+  function noPictureReason(link, img) {
+    if (!link) return 'the site has no picture link';
+    const e = String(img?.error || '');
+    if (/page, not a picture/.test(e)) return null;
+    const m = /^not a picture \((.*), (\d+) bytes\)$/.exec(e);
+    if (!m) return null;
+    const bytes = Number(m[2]);
+    if (bytes === 0 || (/json|text/i.test(m[1]) && bytes < 2048)) return `the site's picture answer is empty (${m[1]}, ${bytes} bytes)`;
+    return null;
+  }
+
   /** The work of one run; `r` = { port, stop, tabId, last }. Always tells Joya how it ended. */
   async function update(r, { runId, plan }) {
     const accounts = plan?.accounts || [];
-    const sum = { runId, accounts: accounts.length, newRows: 0, rows: 0, images: 0, imagesSkipped: 0, failed: [], calls: 0, siteAccounts: null, accountIds: {}, stopped: false };
+    // imagesEmpty = cheques the bank itself has no picture of (owner 2026-11-28: a placeholder is filed, never asked again)
+    const sum = { runId, accounts: accounts.length, newRows: 0, rows: 0, images: 0, imagesSkipped: 0, imagesEmpty: 0, failed: [], calls: 0, siteAccounts: null, accountIds: {}, stopped: false };
     const prog = (phase, text, extra = {}) => say(r, phase, text, { job: 'bank', summary: sum, ...extra });
 
     const close = async (why) => {
@@ -171,7 +188,7 @@
       }
       if (why) prog('error', sum.newRows || sum.images ? `${why} — ${sum.newRows} rows and ${sum.images} pictures were kept` : why);
       else if (sum.stopped) prog('stopped', 'stopped');
-      else prog('done', `${sum.newRows} new rows, ${sum.images} cheque pictures`);
+      else prog('done', `${sum.newRows} new rows, ${sum.images} cheque pictures${sum.imagesEmpty ? `, ${sum.imagesEmpty} cheques with no picture at the bank` : ''}`);
     };
 
     try {
@@ -267,13 +284,22 @@
             const j = await siteGet(r, url);
             const list = Array.isArray(j?.list) ? j.list : Array.isArray(j) ? j : [];
             const link = list[0]?.imageFrontLink || list[0]?.frontImageLink || null;
-            if (!link) {
-              sum.failed.push(`cheque ${ch.reference} (${ch.date}): the site has no picture`);
-              continue;
-            }
-            const img = await bankAsk(r.tabId, { cmd: 'bytes', url: link });
+            const img = link ? await bankAsk(r.tabId, { cmd: 'bytes', url: link }) : null;
             if (!img?.ok) {
               if (img?.error && /page, not a picture/.test(img.error)) throw new Error('LOGIN');
+              const empty = noPictureReason(link, img);
+              if (empty) {
+                // the bank has no picture of this cheque (its own page shows nothing either): a placeholder in the
+                // archive, so the next update does not ask again; counted, not a failure
+                await settleUpload();
+                try {
+                  const out = await toJoya(r, `/bank/sync/${runId}/cheque-no-image`, { json: { account: a.account, date: ch.date, reference: ch.reference, amount: ch.amount, reason: empty } });
+                  if (!out?.skipped) sum.imagesEmpty++;
+                } catch (e) {
+                  sum.failed.push(`cheque ${ch.reference} (${ch.date}): no picture at the bank, placeholder not filed: ${String(e.message || e).slice(0, 100)}`);
+                }
+                continue;
+              }
               sum.failed.push(`cheque ${ch.reference} (${ch.date}): ${img?.error || 'no picture'}`);
               continue;
             }
@@ -298,5 +324,5 @@
     return close('');
   }
 
-  self.joyaBank = { update, dateParts, accountIdFor, siteAccounts, matchesAccount, accountDigits };
+  self.joyaBank = { update, dateParts, accountIdFor, siteAccounts, matchesAccount, accountDigits, noPictureReason };
 })();

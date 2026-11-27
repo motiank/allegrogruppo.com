@@ -725,6 +725,9 @@ to `POST /api/joya/bank/sync/:id/transactions`; Joya passes them to the admin's 
 store a move twice. Then, per account, `GET /api/joya/bank/sync/:id/cheques` = the paid cheques whose picture the Drive cheque archive
 lacks (the admin decides, the rows just stored count), the extension fetches each front picture from the site and
 `POST /api/joya/bank/sync/:id/cheque-image` files it in Drive through the admin (payee from the books / Priority, else `_unknown`).
+A cheque the bank itself has no picture of (2026-11-28, owner: "these cheques are empty on the bank site as well — use a placeholder
+and don't retry") goes to `POST /api/joya/bank/sync/:id/cheque-no-image` → the admin's placeholder row in the archive index; the next
+runs skip it, and the card's "done" line and the account line say "N צ׳קים בלי תמונה בבנק" for the run that found them (`imagesEmpty`).
 `finish` / `cancel` close the run; the card shows the last runs per account (new rows, pictures, errors) and the Upload history gets a
 row "bank-site <account> <from>..<to>". Not yet: the transaction status file (the transfers' payees) — still uploaded on the Upload page;
 the payee read from the cheque picture is still a separate step. Admin side: `../local_api_readme.md` → "Bank update from the bank site".

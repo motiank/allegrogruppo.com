@@ -541,6 +541,7 @@ const ENDPOINTS = [
   "GET /bank/sync/cheques?account=[&since=]  (admin)",
   "POST /bank/sync/transactions  JSON { account, rows: [site rows], from?, to? }  (admin)",
   "POST /bank/sync/cheque-image?account=&date=&reference=&amount=  image/jpeg body  (admin)",
+  "POST /bank/sync/cheque-no-image  JSON { account, date, reference, amount, reason? }  (admin: the bank has no picture — a placeholder, not asked again)",
   "GET /beecomm/sync/state  (admin)",
   "POST /beecomm/sync/start  (admin) — runs the nightly Beecomm loader now",
 ];
@@ -1986,6 +1987,19 @@ const Router = () => {
     try {
       adminOnly(req);
       const data = await bankSync.fileChequeImage({ account: String(req.query.account || "").trim(), date: req.query.date, reference: req.query.reference, amount: req.query.amount }, req.body);
+      res.json({ data });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+
+  // the bank site has no picture of a paid cheque (its picture link answers 0 bytes; owner 2026-11-28: "use a placeholder
+  // and don't retry"): a placeholder row in the archive index, so the next update does not ask the site again
+  router.post("/bank/sync/cheque-no-image", express.json({ limit: "64kb" }), async (req, res) => {
+    try {
+      adminOnly(req);
+      const b = req.body || {};
+      const data = await bankSync.markChequeNoImage({ account: String(b.account || "").trim(), date: b.date, reference: b.reference, amount: b.amount, reason: b.reason });
       res.json({ data });
     } catch (err) {
       syncError(req, res, err);
