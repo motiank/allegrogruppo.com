@@ -49,12 +49,29 @@ Not covered yet: closed cases, and cases that are not in the archive's list at a
 Not covered yet: the transaction status file (סטטוס עסקאות — the transfers' payees); upload it on the Upload page.
 The payee read from the cheque picture is still a separate step.
 
+## The Beecomm update
+
+Beecomm's API gateway refuses the production server's address (403 Forbidden since about 25/11/2026), while a browser in Israel
+gets through. So (owner 2026-11-28) the extension can do the Beecomm calls:
+
+1. Joya HQ → System → "עדכן דרך הדפדפן" on the Beecomm card (a Chrome with this extension, version 1.1+). No tab opens and
+   there is no login: the server mints a one-hour Beecomm token from its own back-office login.
+2. The extension asks Joya for the plan (`POST /api/joya/beecomm/sync/ext/plan`): the admin runs its loader in "plan" mode, which
+   only records the requests the nightly load would make (Z reports, orders, items per day, payments per branch per day) for the
+   days after the last loaded one, and returns them with the token. "Nothing to load" ends the run at once.
+3. The extension POSTs every request to Beecomm from this browser (`beecomm-run.js`; a 401/403 once → a fresh token from Joya) and
+   hands each answer to Joya → the admin keeps it for the replay (`…/answer`).
+4. `…/finish`: the admin runs the same loader in "replay" mode on the answers — the same saving code as the nightly job — and the
+   run shows in the card's list as "דרך הדפדפן". Nothing is saved on this computer. Stop in the middle = nothing is loaded.
+
 ## Install (once per computer)
 
 1. Copy the folder `joya-extension/` to the computer (or use the repo's folder).
 2. Chrome → `chrome://extensions` → turn on "Developer mode" → "Load unpacked" → choose the folder. (If the old
    `legal-extension` is still loaded, remove it first — this one replaces it.)
-3. Reload the Joya HQ page. The System page now shows the two update cards.
+3. Reload the Joya HQ page. The System page now shows the update cards (legal, bank, and the browser button on the Beecomm card).
+   After every "reload" of the extension in `chrome://extensions`, refresh the Joya page too — an open page keeps a dead link to
+   the old extension and the buttons do nothing (the cards say so after 6 seconds).
 
 ## Files
 

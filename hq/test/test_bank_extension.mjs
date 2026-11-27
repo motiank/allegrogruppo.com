@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../joya-extension/bank-run.js');
 const sandbox = { self: {}, say() {}, toJoya() {}, tabInfo() {}, ask() {}, sleep() {}, chrome: {}, console };
 vm.runInNewContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
+const beecommFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../joya-extension/beecomm-run.js');
+vm.runInNewContext(fs.readFileSync(beecommFile, 'utf8'), sandbox, { filename: beecommFile });
 // the helpers' objects come from the sandbox realm (another Object prototype) — compare plain copies
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const { accountIdFor, matchesAccount } = sandbox.self.joyaBank;
@@ -59,4 +61,19 @@ test('noPictureReason: the bank has no picture (no link, an empty answer) vs an 
   assert.equal(noPictureReason('/x', { ok: false, error: 'not a picture (application/octet-stream, 40000 bytes)' }), null, 'a big body of another type is an error, not "no picture"');
   assert.equal(noPictureReason('/x', { ok: false, error: 'the site sent a page, not a picture' }), null, 'a page = logged out');
   assert.equal(noPictureReason('/x', { ok: false, status: 0, error: 'Failed to fetch' }), null);
+});
+
+test('beecomm-run: the Beecomm job loads next to the bank job, asks Joya for the plan and reports nothingToDo', async () => {
+  assert.equal(typeof sandbox.self.joyaBeecomm?.update, 'function');
+  const said = [];
+  const asked = [];
+  const r = { stop: false };
+  const sb = { ...sandbox, say: (_r, phase, text, extra) => said.push({ phase, text, ...plain(extra || {}) }), toJoya: async (_r, p, body) => { asked.push(p); return { nothingToDo: true, dates: { from: '2026-11-27', to: '2026-11-27' } }; }, sleep: async () => {} };
+  vm.runInNewContext(fs.readFileSync(beecommFile, 'utf8'), sb, { filename: beecommFile });
+  await sb.self.joyaBeecomm.update(r, {});
+  assert.deepEqual(asked, ['/beecomm/sync/ext/plan']);
+  assert.equal(said[0].phase, 'plan');
+  assert.equal(said[said.length - 1].phase, 'done');
+  assert.equal(said[said.length - 1].nothingToDo, true);
+  assert.equal(said[said.length - 1].job, 'beecomm');
 });

@@ -2,8 +2,25 @@
 import axios from 'axios';
 import moment from 'moment';
 import zlib from 'zlib';
+import crypto from 'crypto';
+import fs from 'fs';
+import nodePath from 'path';
 
 const BCOM_CUBE_URL = 'https://20cs5hma71.execute-api.eu-west-1.amazonaws.com/prod/api';
+
+// Two transports besides the network (2026-11-28, owner: "support the update Beecomm through the Joya extension" —
+// Beecomm's gateway refuses the production server's address, so the user's browser does the fetching):
+//   BCOM_CUBE_PLAN=<file>  plan mode: every cube request is appended to the file as one JSON line { key, path, payload }
+//                          and answered with an empty result — nothing is fetched, nothing is saved (index.js skips the
+//                          saves too). The admin runs this to learn what the extension must fetch.
+//   BCOM_CUBE_REPLAY=<dir> replay mode: every cube request is answered from <dir>/<key>.json (what the extension
+//                          fetched); a missing file is an error. No Google login call in either mode.
+// The key is the same in both: a hash of the path and the payload (keys sorted).
+const CUBE_PLAN = process.env.BCOM_CUBE_PLAN || '';
+const CUBE_REPLAY = process.env.BCOM_CUBE_REPLAY || '';
+const stable = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}' : Array.isArray(v) ? '[' + v.map(stable).join(',') + ']' : JSON.stringify(v === undefined ? null : v));
+/** The replay key of one cube request (pure): sha1 of path + the payload with sorted keys, 24 hex chars. */
+const cubeKey = (path, payload) => crypto.createHash('sha1').update(path + '\n' + stable(payload)).digest('hex').slice(0, 24);
 
 const bcom_rest_map = {
   '64251a17042cbcc5928813fd': [
@@ -121,6 +138,7 @@ let cachedToken = null;
 // Exchange the backoffice (Firebase) refresh token for a short-lived access token.
 // The refresh token is taken from the backoffice.beecommcloud.com securetoken request.
 async function getBcomAccessToken() {
+  if (CUBE_PLAN || CUBE_REPLAY) return 'replay'; // no network in these modes
   if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token;
   const { BCOM_BO_API_KEY, BCOM_BO_REFRESH_TOKEN } = process.env;
   if (!BCOM_BO_API_KEY || !BCOM_BO_REFRESH_TOKEN) {
@@ -136,6 +154,15 @@ async function getBcomAccessToken() {
 }
 
 async function postCube(path, payload, accessToken) {
+  if (CUBE_PLAN) {
+    fs.appendFileSync(CUBE_PLAN, JSON.stringify({ key: cubeKey(path, payload), path, payload }) + '\n');
+    return { rows: [], orders: [] };
+  }
+  if (CUBE_REPLAY) {
+    const file = nodePath.join(CUBE_REPLAY, cubeKey(path, payload) + '.json');
+    if (!fs.existsSync(file)) throw new Error(`no replayed answer for ${path} (${payload?.action || '?'}, key ${cubeKey(path, payload)})`);
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  }
   const { data } = await axios.post(
     `${BCOM_CUBE_URL}/${path}`,
     { ...payload, token: `Bearer ${accessToken}` },
@@ -364,5 +391,5 @@ function getRecord(row) {
 
 // callAmazonApi();
 export default bcomApiLoad;
-export { getRecord, getBcomAccessToken, bcomGetPaymentsByDay, bcomGetOrders, bcomGetExceptions, bcomGetOrdersWithExceptions, bcomGetZReports,
+export { BCOM_CUBE_URL, cubeKey, getRecord, getBcomAccessToken, bcomGetPaymentsByDay, bcomGetOrders, bcomGetExceptions, bcomGetOrdersWithExceptions, bcomGetZReports,
   bcomGetItems, bcomGetItemsByDay };

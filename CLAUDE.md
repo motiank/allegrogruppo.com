@@ -324,6 +324,13 @@ The same droplet also runs the owner's tradewit services — leave those alone. 
   update from the admin and delete the cron on the server"): `BEECOMM_SYNC=off` in the droplet's root `.env` — the admin schedules no
   06:00 job (`beecommSync.disabled()` in `server.js`), `/beecomm/sync/start` answers `503 disabled`, Joya's card says why and greys the
   button (`joya.beecommSync.disabled`). To go back to the server: remove the setting, restart `allegro-admin`, delete the owner's crontab line.
+  **Beecomm through the Joya extension** (2026-11-28, owner: "support the update Beecomm through the Joya extension"): the loader got two
+  transports — `BCOM_CUBE_PLAN=<file>` records every cube request (`cubeKey` = sha1 of path + sorted payload) and saves nothing,
+  `BCOM_CUBE_REPLAY=<dir>` answers from `<key>.json`. Admin `beecommSync.js` `extPlan` (plan run + a 1-hour token from the server's refresh
+  token) / `extAnswer` / `extToken` / `extFinish` (a normal run, `via: "extension"`, allowed with `BEECOMM_SYNC=off`) / `extCancel`, Local
+  Data API `POST /beecomm/sync/ext/*`; Joya pass-through `/api/joya/beecomm/sync/ext/*`; extension `joya-extension/beecomm-run.js` (job
+  `beecomm`, no tab, no login; version 1.1.0, host permission for the cube API); card button "עדכן דרך הדפדפן". Tests
+  `scripts/test_beecomm_sync.js`, `hq/test/test_bank_extension.mjs`. Needs an hq client build on deploy; the owner reloads the extension.
 - **Cheque pictures as cards in Joya's chat** (2026-11-23, owner: "if I asked for cheque images, display them on a card list with
   the options to copy and share"): under an answer that used the cheque archive (a cheque by number, the work list, the cheques of
   a payee) or asked for pictures in words, Joya shows the scanned cheques as cards (picture, number, payee, amount, bank day) with

@@ -6,8 +6,9 @@
 //      icon sends; the site answers with a short-lived address of the file) and hands the PDF to the Joya page;
 //   4. tells Joya it is done. Nothing is saved on this computer.
 //   job 'bank' (bank-run.js) — the Bank Hapoalim business site: the new moves and the new cheque pictures.
+//   job 'beecomm' (beecomm-run.js) — Beecomm's API, fetched from this browser with the server's token (no tab, no login).
 // One run at a time in this browser, whichever job; every progress message carries its `job`.
-importScripts('bank-run.js');
+importScripts('bank-run.js', 'beecomm-run.js');
 const COURT = 'https://securesso.court.gov.il/Ngcs.Web.Secured/';
 const START = COURT + 'PersonalAreaPage.aspx';
 const CHUNK = 700 * 1024; // pieces small enough for any upload limit on the way
@@ -21,14 +22,14 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((m) => {
     if (m.type === 'ping') return;
     if (m.type === 'uploaded') { const p = pending.get(m.reqId); if (p) { pending.delete(m.reqId); p(m); } return; }
-    const job = m.job === 'bank' ? 'bank' : 'legal';
+    const job = m.job === 'bank' ? 'bank' : m.job === 'beecomm' ? 'beecomm' : 'legal';
     if (m.type === 'status') return port.postMessage({ type: 'progress', job, phase: run && run.job === job ? 'running' : 'idle', text: run && run.job === job ? run.last : '' });
     if (m.type === 'stop') { if (run && run.job === job) run.stop = true; return; }
     if (m.type === 'start') {
       if (run) return port.postMessage({ type: 'progress', job, phase: 'error', text: `an update (${run.job}) is already running in this browser` });
       run = { port, stop: false, last: '', job };
       const r = run;
-      const work = job === 'bank' ? self.joyaBank.update(r, m) : update(r, m);
+      const work = job === 'bank' ? self.joyaBank.update(r, m) : job === 'beecomm' ? self.joyaBeecomm.update(r, m) : update(r, m);
       work.catch((e) => say(r, 'error', String(e.message || e))).finally(() => { if (run === r) run = null; });
     }
   });

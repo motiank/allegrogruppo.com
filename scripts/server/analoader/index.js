@@ -16,6 +16,8 @@ import { saveItems } from "./bcom_items.js";
 import { savePayments } from "./bcom_payments.js";
 
 const src_path = "/home/moti/dataSrc/algro";
+// BCOM_CUBE_PLAN (bcom_api_loader.js): only record the Beecomm requests — fetch nothing, save nothing, no dump.
+const planOnly = Boolean(process.env.BCOM_CUBE_PLAN);
 
 const csv_fields = [
   "הנחה",
@@ -104,6 +106,7 @@ class App {
       // The same API rows also go, in full, to bcom_z_reports (Z details: payments, VAT, refunds...).
       const zSaves = [];
       const dalPush = async (src, rows) => {
+        if (planOnly) return;
         zSaves.push(
           saveZDetails(rows).catch((e) => console.log(`bcom_z_reports save failed: ${e.message}`)),
         );
@@ -127,14 +130,16 @@ class App {
       await Promise.all(zSaves);
       // Order headers of the same range → bcom_orders (after the Zs, which give each order its business day).
       try {
-        const saved = await saveOrders(await bcomGetOrders(dates));
+        const orders = await bcomGetOrders(dates);
+        const saved = planOnly ? 0 : await saveOrders(orders);
         console.log(`bcom_orders: ${saved} orders saved`);
       } catch (e) {
         console.log(`bcom_orders save failed: ${e.message}`);
       }
       // Dish sales per business day → bcom_items_daily.
       try {
-        const saved = await saveItems(await bcomGetItemsByDay(dates));
+        const items = await bcomGetItemsByDay(dates);
+        const saved = planOnly ? 0 : await saveItems(items);
         console.log(`bcom_items_daily: ${saved} dish rows saved`);
       } catch (e) {
         console.log(`bcom_items_daily save failed: ${e.message}`);
@@ -144,16 +149,16 @@ class App {
       try {
         const payEnd = moment(dates.endDate, "DD/MM/YYYY");
         const payStart = moment.max(moment(dates.startDate, "DD/MM/YYYY"), payEnd.clone().subtract(13, "days"));
-        const saved = await savePayments(
-          await bcomGetPaymentsByDay({ startDate: payStart.format("DD/MM/YYYY"), endDate: dates.endDate }),
-        );
+        const payments = await bcomGetPaymentsByDay({ startDate: payStart.format("DD/MM/YYYY"), endDate: dates.endDate });
+        const saved = planOnly ? 0 : await savePayments(payments);
         console.log(`bcom_payments_daily: ${saved} payment rows saved`);
       } catch (e) {
         console.log(`bcom_payments_daily save failed: ${e.message}`);
       }
       // await gglSheetLoader(ontopo, dates);
       // await gglSheetLoader(astrateg, dates);
-      await this.flush();
+      if (planOnly) console.log("Plan only: the requests were recorded, nothing was saved.");
+      else await this.flush();
       console.log(
         `Main is don ${moment().diff(this.start_time, "seconds")} sec.`,
       );

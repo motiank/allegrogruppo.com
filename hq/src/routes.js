@@ -372,6 +372,12 @@ r.post('/joya/bank/sync/:id/cancel', requireAdmin, h(async (req) => bankSync.can
 // services/beecommSync.js: the System page's "update from Beecomm" button runs the admin's nightly loader on the server now.
 r.get('/joya/beecomm/sync/state', requireAdmin, h(async (req) => beecommSync.state(req.joya)));
 r.post('/joya/beecomm/sync/start', requireAdmin, h(async (req) => beecommSync.start(req.joya)));
+// through the Joya extension (2026-11-28): the browser fetches Beecomm's answers, the admin loads them
+r.post('/joya/beecomm/sync/ext/plan', requireAdmin, h(async (req) => beecommSync.extPlan(req.joya)));
+r.post('/joya/beecomm/sync/ext/:id/answer', requireAdmin, express.json({ limit: '80mb' }), h(async (req) => beecommSync.extAnswer(req.joya, req.params.id, req.body || {})));
+r.post('/joya/beecomm/sync/ext/:id/token', requireAdmin, h(async (req) => beecommSync.extToken(req.joya, req.params.id)));
+r.post('/joya/beecomm/sync/ext/:id/finish', requireAdmin, h(async (req) => beecommSync.extFinish(req.joya, req.params.id)));
+r.post('/joya/beecomm/sync/ext/:id/cancel', requireAdmin, h(async (req) => beecommSync.extCancel(req.joya, req.params.id)));
 
 // ---------------------------------------------------------------- payments (תשלומים): the planned bank transfers
 // Joya's own table (services/payments.js), chain admin only. The page reads the board and confirms an unclear bank

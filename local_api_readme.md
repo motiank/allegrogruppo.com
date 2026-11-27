@@ -965,8 +965,20 @@ loader needs `BCOM_BO_API_KEY` and `BCOM_BO_REFRESH_TOKEN` (the back office logi
   login work from the owner's machine), so the nightly load runs on the owner's machine (crontab 06:30 + 13:30). With the setting the
   admin schedules no 06:00 job, `state` carries `disabled: true` (Joya's card explains and greys the button) and `start` refuses.
   Remove the setting and restart `allegro-admin` when Beecomm allows the address.
+- **Through the Joya extension** (2026-11-28, owner: "support the update Beecomm through the Joya extension"): the user's browser does the
+  Beecomm calls, the server does everything else. `POST /beecomm/sync/ext/plan` runs the loader in PLAN mode (`BCOM_CUBE_PLAN`: it
+  records every cube request it would make — Z reports, orders, items per day, payments per branch per day — fetches nothing, saves
+  nothing) and mints a 1-hour Beecomm access token from the server's refresh token → `{ id, dates, cubeUrl, token, requests: [{ key, path,
+  payload }], count }`, or `{ nothingToDo: true, dates }`; `409 running`, `503 not_configured`, `413 too_many` (> 2,500 requests ≈ 3
+  months: load the gap by hand), `500 plan_failed`, `502 token_failed`. The extension POSTs each request to `<cubeUrl>/<path>` with the
+  token and hands each answer to `POST /beecomm/sync/ext/:id/answer` JSON `{ key, data }` (kept as `<tmp>/<key>.json`; the admin's
+  global body limit is 20 MB); `POST …/token` gives a fresh token for a long run; `POST …/finish` (every key answered, else `400
+  incomplete`) runs the loader in REPLAY mode (`BCOM_CUBE_REPLAY`) on the answers — the same saving code as the nightly job — as a normal
+  run with `via: "extension"` (`202 { data: run }`; `BEECOMM_SYNC=off` does not stop this path); `POST …/cancel` drops the answers. The
+  key is `cubeKey(path, payload)` of `bcom_api_loader.js` (sha1 of the path and the payload with sorted keys); a plan nobody finished is
+  dropped after 2 hours. The refresh token never leaves the server. Joya: `/api/joya/beecomm/sync/ext/*`, extension `beecomm-run.js`.
 
-Tests: `node --test scripts/test_beecomm_sync.js` (the verdict and the refusal, no DB, nothing spawned). Joya side:
+Tests: `node --test scripts/test_beecomm_sync.js` (the verdict, the refusals, the replay key and the plan file; no DB, nothing spawned). Joya side:
 `hq/src/services/beecommSync.js`, `/api/joya/beecomm/sync/*`, the card `hq/client/BeecommUpdate.js` on the System page.
 
 ## Data sources

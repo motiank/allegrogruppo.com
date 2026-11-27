@@ -267,6 +267,10 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   a run goes on and reloads the freshness table at its end. README → "Beecomm update on demand". Needs an hq client build on deploy.
   Found the same day: the production server never loaded Beecomm (no `BCOM_BO_*` in its `.env`, the cron failed every night) — the
   owner's machine did it at 06:00; the settings were added to the droplet on 2026-11-22 and the server loads from then on. Deployed 2026-11-22 (`cc69f61`: pull, hq build, `allegro-admin`, `joya-hq` + `joya-runner` restarted; `/beecomm/sync/state` answered on the droplet).
+  **2026-11-28:** Beecomm's gateway refuses the server's address (403), so the server's load is off (`BEECOMM_SYNC=off`, the card says so,
+  the owner's machine runs the nightly job) and the card got "עדכן דרך הדפדפן": the extension (1.1+) fetches Beecomm's answers in the
+  browser with a one-hour token from the server and the admin loads them (`/api/joya/beecomm/sync/ext/*`, README → "Beecomm through the
+  browser"). The card listens to window messages with job `beecomm` like the bank card.
 - **Cheque pictures as cards** (2026-11-23, owner: "if I asked for cheque images, display them on a card list with the options
   to copy and share"): `client/ChequeCards.js` under the answer (`AskBox.js`), `lib/chequeCards.js` picks the pictures = every
   calc row with `imageId` (now passed on the bank rows, the report's cheque rows, the cheques file rows and `archiveCheque`),

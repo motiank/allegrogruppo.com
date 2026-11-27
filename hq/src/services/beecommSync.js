@@ -23,3 +23,22 @@ export async function state(access) {
 export async function start(access) {
   return (await admin('/beecomm/sync/start', { method: 'POST', access, json: {}, timeout: 20_000 })).data;
 }
+
+// ── through the Joya extension (owner 2026-11-28: Beecomm refuses the server's address; the user's browser fetches) ──
+// Thin pass-throughs to the admin's /beecomm/sync/ext/*: the plan (requests + a 1-hour token), every Beecomm answer,
+// a fresh token, finish (the admin loads the answers), cancel. Joya keeps nothing.
+export async function extPlan(access) {
+  return (await admin('/beecomm/sync/ext/plan', { method: 'POST', access, json: {}, timeout: 240_000 })).data;
+}
+export async function extAnswer(access, id, body) {
+  return (await admin(`/beecomm/sync/ext/${encodeURIComponent(id)}/answer`, { method: 'POST', access, json: body || {}, timeout: 120_000 })).data;
+}
+export async function extToken(access, id) {
+  return (await admin(`/beecomm/sync/ext/${encodeURIComponent(id)}/token`, { method: 'POST', access, json: {}, timeout: 30_000 })).data;
+}
+export async function extFinish(access, id) {
+  return (await admin(`/beecomm/sync/ext/${encodeURIComponent(id)}/finish`, { method: 'POST', access, json: {}, timeout: 30_000 })).data;
+}
+export async function extCancel(access, id) {
+  return (await admin(`/beecomm/sync/ext/${encodeURIComponent(id)}/cancel`, { method: 'POST', access, json: {}, timeout: 30_000 })).data;
+}

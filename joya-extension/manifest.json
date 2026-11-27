@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Joya Update — נט המשפט + בנק הפועלים",
-  "version": "1.0.2",
-  "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive, and the new bank moves and cheque pictures from the Bank Hapoalim business site into the admin. Works only when started from the Joya HQ System page, after you log in to the site yourself.",
+  "name": "Joya Update — נט המשפט + בנק הפועלים + ביקום",
+  "version": "1.1.0",
+  "description": "Brings new court papers from נט המשפט into the Joya HQ legal archive, the new bank moves and cheque pictures from the Bank Hapoalim business site into the admin, and the Beecomm sales data (fetched from this browser with the server's login). Works only when started from the Joya HQ System page.",
   "permissions": ["tabs"],
   "host_permissions": [
     "https://securesso.court.gov.il/*",
     "https://*.s3.il-central-1.amazonaws.com/*",
     "https://biz2.bankhapoalim.co.il/*",
     "https://www.bankhapoalim.biz/*",
-    "https://login.bankhapoalim.co.il/*"
+    "https://login.bankhapoalim.co.il/*",
+    "https://20cs5hma71.execute-api.eu-west-1.amazonaws.com/*"
   ],
   "background": { "service_worker": "background.js" },
   "content_scripts": [

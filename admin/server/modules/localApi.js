@@ -544,6 +544,11 @@ const ENDPOINTS = [
   "POST /bank/sync/cheque-no-image  JSON { account, date, reference, amount, reason? }  (admin: the bank has no picture — a placeholder, not asked again)",
   "GET /beecomm/sync/state  (admin)",
   "POST /beecomm/sync/start  (admin) — runs the nightly Beecomm loader now",
+  "POST /beecomm/sync/ext/plan  (admin) — what the Joya extension must fetch from Beecomm: { id, dates, cubeUrl, token, requests } | { nothingToDo }",
+  "POST /beecomm/sync/ext/:id/answer  JSON { key, data }  (admin) — one Beecomm answer, kept for the replay",
+  "POST /beecomm/sync/ext/:id/token  (admin) — a fresh 1-hour Beecomm token",
+  "POST /beecomm/sync/ext/:id/finish  (admin) — every answer in: the loader runs on them (a run, via extension)",
+  "POST /beecomm/sync/ext/:id/cancel  (admin)",
 ];
 
 // ── daily labor cost ─────────────────────────────────────────────────────
@@ -2020,6 +2025,49 @@ const Router = () => {
       const run = beecommSync.start({ by: String(req.get("X-Joya-User") || "") || "joya" });
       console.log(`[beecomm-sync] run ${run.id} started by ${run.by}`);
       res.status(202).json({ data: run });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+
+  // through the Joya extension (beecommSync.js → "through the Joya extension"): the browser fetches, the server saves
+  router.post("/beecomm/sync/ext/plan", async (req, res) => {
+    try {
+      adminOnly(req);
+      res.json({ data: await beecommSync.extPlan({ by: String(req.get("X-Joya-User") || "") || "joya" }) });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  router.post("/beecomm/sync/ext/:id/answer", express.json({ limit: "80mb" }), async (req, res) => {
+    try {
+      adminOnly(req);
+      res.json({ data: beecommSync.extAnswer(req.params.id, req.body?.key, req.body?.data) });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  router.post("/beecomm/sync/ext/:id/token", async (req, res) => {
+    try {
+      adminOnly(req);
+      res.json({ data: await beecommSync.extToken(req.params.id) });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  router.post("/beecomm/sync/ext/:id/finish", async (req, res) => {
+    try {
+      adminOnly(req);
+      const run = beecommSync.extFinish(req.params.id, { by: String(req.get("X-Joya-User") || "") || "joya" });
+      res.status(202).json({ data: run });
+    } catch (err) {
+      syncError(req, res, err);
+    }
+  });
+  router.post("/beecomm/sync/ext/:id/cancel", async (req, res) => {
+    try {
+      adminOnly(req);
+      res.json({ data: beecommSync.extCancel(req.params.id) });
     } catch (err) {
       syncError(req, res, err);
     }

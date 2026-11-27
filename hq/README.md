@@ -733,6 +733,16 @@ row "bank-site <account> <from>..<to>". Not yet: the transaction status file (th
 the payee read from the cheque picture is still a separate step. Admin side: `../local_api_readme.md` → "Bank update from the bank site".
 Tests: `test/test_bank_extension.mjs` (the extension's pure helpers), admin `scripts/test_bank_sync.js`.
 
+**Beecomm through the browser** (2026-11-28, owner: "support the update Beecomm through the Joya extension" — Beecomm's gateway refuses
+the server's address since about 25/11): the Beecomm card gets a second button, "עדכן דרך הדפדפן", in a Chrome with the extension
+(1.1+). The extension asks Joya for the plan (`POST /api/joya/beecomm/sync/ext/plan` → the admin's loader in plan mode: the exact
+Beecomm requests of the missing days + a one-hour token minted on the server), POSTs each request to Beecomm from the browser, hands
+every answer to `…/ext/:id/answer`, and `…/ext/:id/finish` makes the admin load them with the same loader (replay mode; the run
+shows "דרך הדפדפן"). `src/services/beecommSync.js` is a pass-through; the progress comes as window messages with job `beecomm`
+(`client/BeecommUpdate.js`). The server's own button stays (grey while `BEECOMM_SYNC=off`). Admin side: `../local_api_readme.md` →
+"Beecomm update on demand" → "Through the Joya extension". Tests: `test/test_bank_extension.mjs` (the Beecomm job in the sandbox), admin
+`scripts/test_beecomm_sync.js`.
+
 **Beecomm update on demand** (owner 2026-11-22: "add the update button to the Beecomm as well — to initiate the update process on the
 server"): a card "עדכון מביקום (מכירות)" on the System page (`client/BeecommUpdate.js`). The button starts, on the server, the admin's
 nightly Beecomm loader (the back office → orders, Z reports, daily payments and items, from the last loaded day up to yesterday):

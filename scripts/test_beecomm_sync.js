@@ -3,7 +3,8 @@
 //   node --test scripts/test_beecomm_sync.js
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verdict, configured, disabled, start } from "../admin/server/modules/beecommSync.js";
+import { verdict, configured, disabled, start, parsePlan, extAnswer, extFinish } from "../admin/server/modules/beecommSync.js";
+import { cubeKey } from "../scripts/server/analoader/bcom_api_loader.js";
 
 const GOOD = `dir name /x/sqldumper
 Using dates: 16/11/2026 to 21/11/2026
@@ -66,4 +67,22 @@ test("BEECOMM_SYNC=off switches the load off: disabled(), start() refuses with 5
     if (saved == null) delete process.env.BEECOMM_SYNC;
     else process.env.BEECOMM_SYNC = saved;
   }
+});
+
+test("through the extension: the replay key ignores key order, the plan file is read once per key, unknown plans are refused", () => {
+  const a = cubeKey("zReports/cube", { action: "createZPOSReport", filter: { startDate: "24/11/2026", branches: ["x"] } });
+  const b = cubeKey("zReports/cube", { filter: { branches: ["x"], startDate: "24/11/2026" }, action: "createZPOSReport" });
+  assert.equal(a, b, "the same request in another key order has the same key");
+  assert.match(a, /^[0-9a-f]{24}$/);
+  assert.notEqual(a, cubeKey("orders/cube", { action: "createZPOSReport", filter: { startDate: "24/11/2026", branches: ["x"] } }), "the path is part of the key");
+  assert.notEqual(a, cubeKey("zReports/cube", { action: "createZPOSReport", filter: { startDate: "25/11/2026", branches: ["x"] } }));
+  const plan = parsePlan(`{"key":"k1","path":"zReports/cube","payload":{"action":"a"}}
+not json
+{"key":"k1","path":"zReports/cube","payload":{"action":"a"}}
+{"key":"k2","path":"orders/cube","payload":{"action":"b"}}
+{"path":"orders/cube","payload":{}}
+`);
+  assert.deepEqual(plan.map((q) => q.key), ["k1", "k2"], "one request per key, bad lines dropped");
+  assert.throws(() => extAnswer("nope", "k1", {}), (e) => e.status === 404 && e.code === "not_found");
+  assert.throws(() => extFinish("nope"), (e) => e.status === 404);
 });
