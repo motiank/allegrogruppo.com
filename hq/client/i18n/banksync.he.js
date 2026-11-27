@@ -8,6 +8,7 @@ export default {
   'joya.bankSync.oldExt': 'גרסת התוסף ({version}) לא כוללת את עדכון הבנק – טענו מחדש את התוסף מהתיקייה joya-extension.',
   'joya.bankSync.fromDay': 'מ-{day}',
   'joya.bankSync.fromStart': 'מההתחלה',
+  'joya.bankSync.noAnswer': 'התוסף לא ענה. אם טענתם מחדש את התוסף, רעננו את הדף הזה (F5) ולחצו שוב על "עדכן מהבנק".',
   'joya.bankSync.tabClosed': 'לשונית הבנק נסגרה – העדכון נעצר. מה שכבר נשמר נשאר; אפשר ללחוץ שוב על "עדכן מהבנק".',
   'joya.bankSync.phase.login': 'ממתין לכניסה שלך לאתר הבנק בלשונית שנפתחה',
   'joya.bankSync.phase.accounts': 'קורא את רשימת החשבונות באתר',

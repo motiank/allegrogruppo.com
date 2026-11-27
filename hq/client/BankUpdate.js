@@ -34,6 +34,7 @@ export default function BankUpdate() {
   const [prog, setProg] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const heard = React.useRef(false); // a progress message came since the last start (else the page's extension link is dead)
 
   const load = React.useCallback(() => api('/bank/sync/state').then(setState).catch(() => {}), []);
 
@@ -43,6 +44,7 @@ export default function BankUpdate() {
       const m = ev.data;
       if (m.type === 'hello') return setExt(m.version || extVersion());
       if (m.type !== 'progress' || (m.job && m.job !== 'bank')) return;
+      heard.current = true;
       setProg(m);
       if (m.phase === 'idle') return setBusy(false);
       if (['done', 'error', 'stopped'].includes(m.phase)) { setBusy(false); load(); }
@@ -70,8 +72,17 @@ export default function BankUpdate() {
       const p = await api('/bank/sync/plan');
       setPlan(p);
       const run = await api('/bank/sync/start', { method: 'POST', body: { plan: p } });
+      heard.current = false;
       window.postMessage({ source: 'joya-page', type: 'start', job: 'bank', runId: run.id, plan: p }, window.location.origin);
       load();
+      // the extension answers within a second; nothing after 6 s = the page's link to it is dead (2026-11-28: the owner
+      // reloaded the extension and the open Joya page kept the old, dead connection — no bank tab opened, no message)
+      setTimeout(() => {
+        if (heard.current) return;
+        setError(new Error(t('joya.bankSync.noAnswer')));
+        setBusy(false);
+        api(`/bank/sync/${run.id}/cancel`, { method: 'POST', body: { why: 'the extension did not answer' } }).then(load).catch(() => {});
+      }, 6000);
     } catch (e) {
       setError(e);
       setBusy(false);
@@ -84,6 +95,7 @@ export default function BankUpdate() {
   const canRun = ext && bankReady();
   const line = () => {
     if (!prog) return null;
+    if (prog.phase === 'error' && /context invalidated/i.test(prog.text || '')) return t('joya.bankSync.noAnswer');
     if (prog.phase === 'done') {
       const s = t('joya.bankSync.phase.done', { rows: prog.summary?.newRows ?? 0, images: prog.summary?.images ?? 0, accounts: prog.summary?.accounts ?? 0 });
       // cheques the bank itself has no picture of — found in this run only (a placeholder keeps them out of the next runs)

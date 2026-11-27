@@ -8,6 +8,7 @@ export default {
   'joya.bankSync.oldExt': 'The extension version ({version}) has no bank update – load the extension again from the joya-extension folder.',
   'joya.bankSync.fromDay': 'from {day}',
   'joya.bankSync.fromStart': 'from the start',
+  'joya.bankSync.noAnswer': 'The extension did not answer. If you reloaded the extension, refresh this page (F5) and press the update button again.',
   'joya.bankSync.tabClosed': 'The bank tab was closed – the update stopped. What was already stored stays; you can press the update button again.',
   'joya.bankSync.phase.login': 'Waiting for your login to the bank site in the tab that opened',
   'joya.bankSync.phase.accounts': 'Reading the account list on the site',
