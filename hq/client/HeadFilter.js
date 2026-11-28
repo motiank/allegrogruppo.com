@@ -14,12 +14,12 @@ const useStyles = createUseStyles((theme) => ({
   btn: { border: 0, background: 'none', color: theme.textSecondary, cursor: 'pointer', fontSize: '0.7rem', padding: '0 0.15rem', lineHeight: 1, fontFamily: 'inherit', '&:hover': { color: theme.text } },
   on: { color: theme.primary, fontWeight: 700 },
   backdrop: { position: 'fixed', inset: 0, zIndex: 60, background: 'transparent' },
-  panel: { position: 'fixed', zIndex: 61, width: 300, maxWidth: 'calc(100vw - 16px)', background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxShadow: '0 6px 24px rgba(0,0,0,.35)', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 400, textAlign: 'start', whiteSpace: 'normal' },
+  panel: { position: 'fixed', zIndex: 61, width: 340, maxWidth: 'calc(100vw - 16px)', background: theme.surface, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxShadow: '0 6px 24px rgba(0,0,0,.35)', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 400, textAlign: 'start', whiteSpace: 'normal' },
   title: { fontWeight: 650, marginBottom: '0.35rem' },
   row: { display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.12rem 0', cursor: 'pointer', '& input': { margin: 0 }, '& span:nth-child(2)': { flex: 1, minWidth: 0, overflowWrap: 'anywhere' } },
   count: { color: theme.textSecondary, fontSize: '0.74rem', whiteSpace: 'nowrap' },
   all: { borderBottom: `1px solid ${theme.border}`, paddingBottom: '0.3rem', marginBottom: '0.2rem' },
-  list: { maxHeight: 260, overflowY: 'auto', margin: '0.2rem 0 0.4rem' },
+  list: { maxHeight: 260, overflowY: 'auto', margin: '0.2rem 0 0.4rem', paddingInlineEnd: '0.3rem' },
   foot: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' },
   dates: { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.35rem 0.5rem', alignItems: 'center', margin: '0.3rem 0 0.5rem' },
   presets: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: '0.4rem' },
@@ -32,7 +32,7 @@ const MAX_LIST = 400;
 function panelPos(btn) {
   const r = btn?.getBoundingClientRect();
   if (!r) return { top: 60, left: 8 };
-  const width = 300;
+  const width = 340;
   const left = Math.max(8, Math.min(r.left + r.width / 2 - width / 2, window.innerWidth - width - 8));
   return { top: Math.min(r.bottom + 4, window.innerHeight - 200), left };
 }
