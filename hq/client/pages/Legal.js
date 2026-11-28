@@ -379,7 +379,7 @@ export default function Legal() {
   const a = AREAS.legal;
   const suggestions = Array.from({ length: a.suggestions }, (_, i) => t(`joya.area.legal.s${i + 1}`));
   return (
-    <Page tabs={<Tabs tabs={TABS.map((k) => [k, t(`joya.legal.tab.${k}`)])} value={tab} onChange={(k) => setSp(k === 'ask' ? {} : { tab: k }, { replace: true })} />}>
+    <Page sticky tabs={<Tabs tabs={TABS.map((k) => [k, t(`joya.legal.tab.${k}`)])} value={tab} onChange={(k) => setSp(k === 'ask' ? {} : { tab: k }, { replace: true })} />}>
       {tab === 'ask' ? <ChatArea key="legal" contextId={a.id} locationId={j.locationId} title={t('joya.area.askTitle')} intro={t('joya.area.legal.intro')} suggestions={suggestions} /> : null}
       {tab === 'cases' ? <CaseList classes={c} t={t} /> : null}
       {tab === 'hearings' ? <Hearings classes={c} t={t} /> : null}

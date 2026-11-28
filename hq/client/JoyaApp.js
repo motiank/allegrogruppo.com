@@ -1,7 +1,7 @@
 // Joya Headquarter — the app shell (its own service, hq/).
 // Shell: a top bar (menu, title, location picker), the demo-data banner, and the
 // routes of the four main areas plus the headquarters functions.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useT, LANGS } from './i18n/index.js';
@@ -95,6 +95,17 @@ function Shell() {
   const signOut = () => fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).then(() => window.location.assign('/'));
 
   useEffect(() => setOpen(false), [where.pathname]);
+  // the top bar's height, as a CSS variable, so a page header that sticks (Page sticky) sits right under it
+  const barRef = useRef(null);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return undefined;
+    const set = () => document.documentElement.style.setProperty('--joya-bar', `${el.offsetHeight}px`);
+    set();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(set) : null;
+    ro?.observe(el);
+    return () => { ro?.disconnect(); document.documentElement.style.removeProperty('--joya-bar'); };
+  }, []);
 
   if (j.loading) return <Loading />;
   if (j.error) {
@@ -117,7 +128,7 @@ function Shell() {
   return (
     <div style={{ minHeight: '100vh', background: theme.background, color: theme.text }}>
       <UpdateDialog />
-      <div className={c.bar}>
+      <div ref={barRef} className={c.bar}>
         <div className={c.barStart}>
           <button className={c.iconBtn} onClick={() => setOpen(true)} aria-label={t('menu.open')} aria-expanded={open}>
             ☰

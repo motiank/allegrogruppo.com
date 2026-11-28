@@ -26,6 +26,8 @@ const useStyles = createUseStyles((theme) => ({
   root: { minHeight: '100vh', background: theme.background, color: theme.text },
   // the full window width with a small margin (owner 2026-11-28: "use the full window width with small margin")
   header: { padding: '0.7rem 0.9rem 0.6rem', borderBottom: `1px solid ${theme.border}`, margin: 0 },
+  // a header that stays under the app's top bar while the page scrolls (owner 2026-11-28, the legal page)
+  stuck: { position: 'sticky', top: 'var(--joya-bar, 0px)', zIndex: 15, background: theme.background },
   back: { background: 'none', border: 0, color: theme.textSecondary, padding: 0, marginBottom: '0.35rem', cursor: 'pointer', fontSize: '0.8rem', fontFamily: 'inherit' },
   titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' },
   title: { margin: 0, fontSize: '1.1rem', fontWeight: 650 },
@@ -94,14 +96,14 @@ export function useJoyaStyles() {
   return useStyles(theme);
 }
 
-export function Page({ title, sub, back, actions, tabs, children }) {
+export function Page({ title, sub, back, actions, tabs, sticky, children }) {
   const c = useJoyaStyles();
   const navigate = useNavigate();
   const { t } = useT();
   return (
     <div className={c.root}>
       {title || back || actions || tabs ? (
-      <header className={c.header}>
+      <header className={`${c.header} ${sticky ? c.stuck : ''}`}>
         {back ? (
           <button className={c.back} onClick={() => (typeof back === 'string' ? navigate(back) : navigate(-1))}>
             {t('joya.back')}
