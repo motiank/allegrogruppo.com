@@ -278,7 +278,7 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   calc row with `imageId` (now passed on the bank rows, the report's cheque rows, the cheques file rows and `archiveCheque`),
   shown when calc `cheque_archive` ran or the question has picture words — since 2026-11-28 (owner: "when displaying bank pages add
   the cheque image when applicable") shown under EVERY answer with pictures, and the שקלפ page shows a thumbnail on a paid cheque
-  line (`ChequeThumb`). Copy = the PNG to the clipboard (else caption + link),
+  line (`ChequeThumb`, icon mode = the small 📷 of the recon page). Copy = the PNG to the clipboard (else caption + link),
   Share = the share sheet with the file (else download), tap = full size. Prompt: PLAN "The scanned cheques" (the pictures of a
   payee → `cheque_archive` q), WRITE ("התמונות מוצגות למטה", never a link). Tests `test/test_cheque_cards.mjs`; eval
   `ca-pictures-*`. README → "The pictures as cards in the chat". Needs an hq client build on deploy. Deployed 2026-11-23 (`c69f7c5`: pull, hq build, `joya-hq` + `joya-runner` restarted; `/api/version` serves the new build).
@@ -287,6 +287,11 @@ Built (all committed, `main` 747f140, deployed to the droplet — services `joya
   `<context>`) and the write prompt (after `<request>`), every turn, also in live sessions: the restaurant (`scope.location`,
   new on `scopeOf` in `ai.js`) or company by name with its locationIds, and the rule; PLAN "Locations" rule and a WRITE rule
   (name it in the first line). Test in `runner/test/runner.test.js`; eval `g-scope-*`. README → "Asking in words" (the picker).
+- **The bank lines page** (תנועות בנק, 2026-11-28, owner: "a small 📷 icon in the details column as on the bank reconciliation page; a
+  bank page with filters by name (details), type of action and an extended date filter; totals of the in and out columns when filtered"):
+  menu item → `/bank/lines` (`client/pages/BankLines.js`, chain admin) ← `GET /joya/bank/lines` (`src/services/bank.js` `bankLines` over
+  the admin's stored bank rows; `lib/bankLines.js` facets / filters / totals). README → "The bank lines page". Tests
+  `test/test_bank_lines.mjs`. Needs an hq client build on deploy.
 - **The שקלפ page** (2026-11-22, owner: "a convenient UX for the שקלפ … list forward the daily cheques or expenses like known bank
   payments (הוראות קבע) by date; a click on the date opens a card with the cheques and orders of that day; move month by month"):
   menu item "שיקים לפרעון" → `/cheques` (`client/pages/Cheques.js`, chain admin): one month per view, a row per day, a card per

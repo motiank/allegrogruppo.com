@@ -16,6 +16,7 @@ const useStyles = createUseStyles((theme) => ({
   presets: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.6rem' },
   q: { flex: '1 1 220px', minWidth: 0 },
   date: { width: 'auto', flex: '0 1 150px' },
+  sel: { flex: '0 1 230px', minWidth: 160, '& select': { width: '100%' } },
   sum: { display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.86rem', margin: '0 0 0.5rem', alignItems: 'center' },
   sumVal: { fontWeight: 650 },
   in: { color: '#3fb950' },
@@ -126,15 +127,19 @@ export default function BankLines() {
         <Input className={c.date} type="date" value={from} max={to} onChange={(e) => e.target.value && set({ from: e.target.value })} aria-label={t('joya.bl.fromDay')} />
         <Input className={c.date} type="date" value={to} min={from} onChange={(e) => e.target.value && set({ to: e.target.value })} aria-label={t('joya.bl.toDay')} />
         <Input className={c.q} value={text} onChange={(e) => setText(e.target.value)} placeholder={t('joya.bl.search')} dir="auto" aria-label={t('joya.bl.search')} />
-        <Select value={action} onChange={(e) => set({ action: e.target.value })} aria-label={t('joya.bl.action')}>
-          <option value="">{t('joya.bl.allActions')}</option>
-          {(d?.actions || []).map((a) => <option key={a.action} value={a.action}>{a.action} ({a.count})</option>)}
-        </Select>
-        <Select value={side} onChange={(e) => set({ side: e.target.value })} aria-label={t('joya.bl.side')}>
-          <option value="">{t('joya.bl.side.all')}</option>
-          <option value="in">{t('joya.bl.side.in')}</option>
-          <option value="out">{t('joya.bl.side.out')}</option>
-        </Select>
+        <span className={c.sel}>
+          <Select value={action} onChange={(e) => set({ action: e.target.value })} aria-label={t('joya.bl.action')}>
+            <option value="">{t('joya.bl.allActions')}</option>
+            {(d?.actions || []).map((a) => <option key={a.action} value={a.action}>{a.action} ({a.count})</option>)}
+          </Select>
+        </span>
+        <span className={c.sel}>
+          <Select value={side} onChange={(e) => set({ side: e.target.value })} aria-label={t('joya.bl.side')}>
+            <option value="">{t('joya.bl.side.all')}</option>
+            <option value="in">{t('joya.bl.side.in')}</option>
+            <option value="out">{t('joya.bl.side.out')}</option>
+          </Select>
+        </span>
         {filtered ? <Btn small onClick={() => set({ q: '', action: '', side: '' })}>{t('joya.bl.clear')}</Btn> : null}
       </div>
       {r.loading && !d ? <Loading /> : null}

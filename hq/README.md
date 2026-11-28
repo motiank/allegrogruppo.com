@@ -539,7 +539,20 @@ scanned cheques that are in neither Hashavshevet nor Priority (`source` `archive
 a payment in THEIR statement that our books lack gets `archiveCheque` when a scanned cheque has that amount near that date — the
 writer says the payment happened and the cheque is not entered yet. Eval `ca-*`; tests in the repo root (`scripts/test_cheque_archive.js`).
 
-**The picture on a cheque line of the שקלפ page** (2026-11-28, same wish): a paid cheque of the month that has a scan shows a small
+**The bank lines page — תנועות בנק** (2026-11-28, owner: "a small 📷 icon in the details column, as on the bank reconciliation page;
+a bank page with the ability to filter by name (details), type of action and an extended date filter; a total to the in and out
+columns when filtered"): menu item "תנועות בנק" → `/bank/lines` (`client/pages/BankLines.js`, chain admin). `GET /api/joya/bank/lines?
+company=&from=&to=&q=&action=&side=` (`src/services/bank.js` `bankLines`) reads every stored bank row of the window from the admin
+(`/bank/transactions/stored`), counts the action types over the window (`lib/bankLines.js` `actionFacets` — the picker shows every
+type with its count even while one is chosen), narrows by `q` (every word, in the action / details / payee / purpose / reference),
+`action` (exactly) and `side` (in | out), and returns `totals` (count, moneyIn, moneyOut, net of the narrowed rows), `windowTotals`
+and at most 3,000 rows (newest first). The page: preset windows (this month, last month, 3 months, this year, last year, all), two
+date pickers, the search box (400 ms), the action and direction pickers, "נקה סינון"; a summary line (rows, in, out, net, "מסונן"); the
+table (`ui.js` DataTable) with the 📷 in the details column (`ChequeThumb` icon mode — the picture in a dialog with copy / share) and
+the payee under the details ("לטובת: …" / "מאת: …"); a foot row "סה״כ" / "סה״כ מסונן" with the in and out sums and the net. The filters
+live in the URL. Tests `test/test_bank_lines.mjs`.
+
+**The picture on a cheque line of the שקלפ page** (2026-11-28, same wish; since the same day a small 📷 icon next to the payee, like the recon page): a paid cheque of the month that has a scan shows a small
 thumbnail in the day's card (`client/ChequeCards.js` `ChequeThumb`; the day rows of `chequesByDay` carry `imageId` and `bankDate`);
 tap = the full picture in a dialog with copy / share. The bank reconciliation page keeps its 📷.
 
