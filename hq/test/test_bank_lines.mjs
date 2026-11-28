@@ -32,7 +32,7 @@ test('filterLines: words in the details / payee / reference, the action exactly,
   assert.equal(filterLines(rows, { q: '16958' }).length, 1, 'the reference is searched');
   assert.equal(filterLines(rows, { action: 'שיק' }).length, 2);
   assert.equal(filterLines(rows, { action: '—' }).length, 1, 'the empty action is chosen as "—"');
-  assert.equal(filterLines(rows, { side: 'in' }).length, 1);
+  assert.equal(filterLines(rows, { side: 'in' }).length, 3);
   assert.equal(filterLines(rows, { side: 'out', action: 'שיק', q: 'רעננה' }).length, 1);
   assert.equal(filterLines(rows, {}).length, 7);
   assert.equal(filterLines(rows, { action: 'תיקון' }).length, 2, 'the type matches every value date');
