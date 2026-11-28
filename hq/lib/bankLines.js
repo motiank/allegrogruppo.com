@@ -4,6 +4,8 @@
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const norm = (s) => String(s ?? '').trim();
+/** The action TYPE of a row: the bank's action without its value-date suffix ("תיקון (תאריך ערך: 11/11)" → "תיקון"); empty = "—". */
+export const actionKey = (action) => norm(action).replace(/\s*\(תאריך ערך:[^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim() || '—';
 
 /** The sums of a list: { count, moneyIn, moneyOut, net } (net = in − out). */
 export function totalsOf(rows) {
@@ -20,7 +22,7 @@ export function totalsOf(rows) {
 export function actionFacets(rows) {
   const by = new Map();
   for (const r of rows || []) {
-    const k = norm(r.action) || '—';
+    const k = actionKey(r.action);
     if (!by.has(k)) by.set(k, { action: k, count: 0, moneyIn: 0, moneyOut: 0 });
     const f = by.get(k);
     f.count++;
@@ -35,7 +37,7 @@ export function filterLines(rows, { q = null, action = null, side = null } = {})
   const words = norm(q).toLowerCase().split(/\s+/).filter(Boolean);
   const act = norm(action);
   return (rows || []).filter((r) => {
-    if (act && (norm(r.action) || '—') !== act) return false;
+    if (act && actionKey(r.action) !== act) return false;
     if (side === 'in' && !(Number(r.moneyIn) > 0)) return false;
     if (side === 'out' && !(Number(r.moneyOut) > 0)) return false;
     if (words.length) {

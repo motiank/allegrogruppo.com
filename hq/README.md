@@ -545,7 +545,7 @@ columns when filtered"): menu item "תנועות בנק" → `/bank/lines` (`cli
 company=&from=&to=&q=&action=&side=` (`src/services/bank.js` `bankLines`) reads every stored bank row of the window from the admin
 (`/bank/transactions/stored`), counts the action types over the window (`lib/bankLines.js` `actionFacets` — the picker shows every
 type with its count even while one is chosen), narrows by `q` (every word, in the action / details / payee / purpose / reference),
-`action` (exactly) and `side` (in | out), and returns `totals` (count, moneyIn, moneyOut, net of the narrowed rows), `windowTotals`
+`action` (the type = the bank's action without its value-date suffix, `actionKey`) and `side` (in | out), and returns `totals` (count, moneyIn, moneyOut, net of the narrowed rows), `windowTotals`
 and at most 3,000 rows (newest first). The page: preset windows (this month, last month, 3 months, this year, last year, all), two
 date pickers, the search box (400 ms), the action and direction pickers, "נקה סינון"; a summary line (rows, in, out, net, "מסונן"); the
 table (`ui.js` DataTable) with the 📷 in the details column (`ChequeThumb` icon mode — the picture in a dialog with copy / share) and

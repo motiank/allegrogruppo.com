@@ -10,17 +10,20 @@ const rows = [
   { date: '2026-11-04', action: 'מקס איט פיננסי', details: 'מקס', reference: '1', moneyIn: 12000.25 },
   { date: '2026-11-05', action: 'שיק', details: 'שיק 16958', reference: '16958', moneyOut: 2000 },
   { date: '2026-11-05', action: '', details: 'עמלה', reference: '', moneyOut: 10 },
+  { date: '2026-11-06', action: 'תיקון (תאריך ערך: 05/11)', details: 'תיקון', reference: '', moneyIn: 100 },
+  { date: '2026-11-07', action: 'תיקון (תאריך ערך: 06/11)', details: 'תיקון', reference: '', moneyIn: 50 },
 ];
 
 test('totalsOf sums in and out and the net', () => {
-  assert.deepEqual(totalsOf(rows), { count: 5, moneyIn: 12000.25, moneyOut: 15301.5, net: -3301.25 });
+  assert.deepEqual(totalsOf(rows), { count: 7, moneyIn: 12150.25, moneyOut: 15301.5, net: -3151.25 });
   assert.deepEqual(totalsOf([]), { count: 0, moneyIn: 0, moneyOut: 0, net: 0 });
 });
 
 test('actionFacets: most frequent first, the empty action is "—"', () => {
   const f = actionFacets(rows);
-  assert.deepEqual(f.map((x) => [x.action, x.count]), [['שיק', 2], ['העברה מהבנק', 1], ['מקס איט פיננסי', 1], ['—', 1]]);
+  assert.deepEqual(f.map((x) => [x.action, x.count]), [['שיק', 2], ['תיקון', 2], ['העברה מהבנק', 1], ['מקס איט פיננסי', 1], ['—', 1]], 'the value-date suffix does not split a type');
   assert.equal(f[0].moneyOut, 10291);
+  assert.equal(f[1].moneyIn, 150);
 });
 
 test('filterLines: words in the details / payee / reference, the action exactly, the side', () => {
@@ -31,6 +34,7 @@ test('filterLines: words in the details / payee / reference, the action exactly,
   assert.equal(filterLines(rows, { action: '—' }).length, 1, 'the empty action is chosen as "—"');
   assert.equal(filterLines(rows, { side: 'in' }).length, 1);
   assert.equal(filterLines(rows, { side: 'out', action: 'שיק', q: 'רעננה' }).length, 1);
-  assert.equal(filterLines(rows, {}).length, 5);
+  assert.equal(filterLines(rows, {}).length, 7);
+  assert.equal(filterLines(rows, { action: 'תיקון' }).length, 2, 'the type matches every value date');
   assert.deepEqual(totalsOf(filterLines(rows, { action: 'שיק' })), { count: 2, moneyIn: 0, moneyOut: 10291, net: -10291 });
 });
