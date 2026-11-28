@@ -24,7 +24,7 @@ Rules for this folder:
 - Every string in both `client/i18n/*.he.js` and `*.en.js` (same keys). Hebrew is the default; RTL; phone first,
   boxes not tables. **The full window width with a small margin, and no horizontal scroll bar anywhere** (owner
   2026-11-28): no `maxWidth` on the shell or the chat; a table is `ui.js` `DataTable` (cells wrap, numbers never; a table
-  still wider than its box becomes a card list by itself) — never a `nowrap` table in an `overflowX: auto` box. The main menu has three chat areas (stock and purchasing, manpower, performance).
+  still wider than its box becomes a card list by itself) — never a `nowrap` table in an `overflowX: auto` box. A page header that must stay in view while the page scrolls (the legal page's tabs, owner 2026-11-28) takes `Page sticky`: it sits under the app's top bar, whose height the shell publishes as the CSS variable `--joya-bar`. The main menu has three chat areas (stock and purchasing, manpower, performance).
 - Numbers the AI shows come from `src/services/ai.js` calculations, never from the model. After a prompt change
   (`runner/hq-analyst.js`) run `npm run eval`. Model calls go through `claude -p` (subscription), never an API key.
 - SQL: single-quoted strings (ANSI_QUOTES-safe). Logger: pino (`lib/log.js`).
