@@ -1,7 +1,7 @@
 // Joya Headquarter — the app shell (its own service, hq/).
 // Shell: a top bar (menu, title, location picker), the demo-data banner, and the
 // routes of the four main areas plus the headquarters functions.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useT, LANGS } from './i18n/index.js';
@@ -95,16 +95,16 @@ function Shell() {
   const signOut = () => fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).then(() => window.location.assign('/'));
 
   useEffect(() => setOpen(false), [where.pathname]);
-  // the top bar's height, as a CSS variable, so a page header that sticks (Page sticky) sits right under it
-  const barRef = useRef(null);
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return undefined;
+  // the top bar's height, as a CSS variable, so a page header that sticks (Page sticky) sits right under it.
+  // A callback ref: the bar appears only after the loading screen, so a one-time effect would miss it.
+  const barWatch = useRef(null);
+  const barRef = useCallback((el) => {
+    barWatch.current?.disconnect();
+    barWatch.current = null;
+    if (!el) return document.documentElement.style.removeProperty('--joya-bar');
     const set = () => document.documentElement.style.setProperty('--joya-bar', `${el.offsetHeight}px`);
     set();
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(set) : null;
-    ro?.observe(el);
-    return () => { ro?.disconnect(); document.documentElement.style.removeProperty('--joya-bar'); };
+    if (typeof ResizeObserver === 'function') { barWatch.current = new ResizeObserver(set); barWatch.current.observe(el); }
   }, []);
 
   if (j.loading) return <Loading />;
