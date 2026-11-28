@@ -79,9 +79,8 @@ function DayCard({ d, c, t }) {
           {cheques.map((x, i) => (
             <div key={`${x.reference}-${i}`} className={c.line}>
               <span className={c.no}><Term>{x.reference ?? '—'}</Term></span>
-              <span className={c.payee} dir="auto">{x.payee || '—'}</span>
+              <span className={c.payee} dir="auto">{x.payee || '—'}{x.imageId ? <> <ChequeThumb row={x} icon /></> : null}</span>
               <span className={c.amt}>{fmtILS(x.amount)}</span>
-              {x.imageId ? <ChequeThumb row={x} /> : null}
               {x.paid ? <Badge tone="ok">{t('joya.chq.paid')}</Badge> : null}
               {x.source === 'priority' ? <Badge tone="muted">{t('joya.chq.priority')}</Badge> : null}
             </div>

@@ -20,6 +20,8 @@ import beecommSyncHe from './beecommsync.he.js';
 import beecommSyncEn from './beecommsync.en.js';
 import chequesHe from './cheques.he.js';
 import chequesEn from './cheques.en.js';
+import bankLinesHe from './banklines.he.js';
+import bankLinesEn from './banklines.en.js';
 
-export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe, ...paymentsHe, ...legalHe, ...bankSyncHe, ...beecommSyncHe, ...chequesHe };
-export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn, ...paymentsEn, ...legalEn, ...bankSyncEn, ...beecommSyncEn, ...chequesEn };
+export const joyaHe = { ...commonHe, ...ordersHe, ...staffingHe, ...mgmtHe, ...dataHe, ...paymentsHe, ...legalHe, ...bankSyncHe, ...beecommSyncHe, ...chequesHe, ...bankLinesHe };
+export const joyaEn = { ...commonEn, ...ordersEn, ...staffingEn, ...mgmtEn, ...dataEn, ...paymentsEn, ...legalEn, ...bankSyncEn, ...beecommSyncEn, ...chequesEn, ...bankLinesEn };

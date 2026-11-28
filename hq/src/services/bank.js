@@ -249,3 +249,28 @@ export async function cardsVsBank(companies, locationsOf, from, to) {
     companies: out,
   };
 }
+
+// ── the bank lines page (owner 2026-11-28: filters by name, action type and an extended date window; totals of in / out) ──
+import { companiesOf, resolveCompany } from './payments.js';
+import { totalsOf, actionFacets, filterLines } from '../../lib/bankLines.js';
+
+const LINES_MAX = 3000; // rows sent to the page at most (newest first); the totals count every matching row
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The stored bank lines of one company in a window, for the page: every row of the window is read from the admin, the
+ * action facets are counted over the window (so the picker shows every type even while one is chosen), then q / action /
+ * side narrow the rows; totals = the narrowed rows (what the page shows at the bottom), windowTotals = the whole window.
+ */
+export async function bankLines(access, { companyKey = null, from, to, q = null, action = null, side = null } = {}) {
+  if (!DAY.test(String(from || '')) || !DAY.test(String(to || ''))) throw Object.assign(new Error('from and to must be YYYY-MM-DD'), { code: 'BAD_REQUEST' });
+  if (from > to) throw Object.assign(new Error('from is after to'), { code: 'BAD_REQUEST' });
+  const companies = await companiesOf(access);
+  const co = await resolveCompany(access, companyKey);
+  const base = { companies, company: co, from, to, filter: { q: q || null, action: action || null, side: side || null } };
+  const res = await sourceBank(co.key, from, to, { group: 'none' });
+  if (!res.available) return { ...base, available: false, reason: res.reason, rows: [], actions: [], totals: totalsOf([]), windowTotals: totalsOf([]) };
+  const all = res.rows.map((r) => ({ date: r.date, account: r.account, actionCode: r.actionCode ?? null, action: r.action, details: r.details, reference: r.reference, moneyIn: r.credit, moneyOut: r.debit, balance: r.balance, ...(r.payeeSource ? { payee: r.payee, payeeSource: r.payeeSource, ...(r.payeeRole ? { payeeRole: r.payeeRole } : {}), ...(r.payeePurpose ? { payeePurpose: r.payeePurpose } : {}) } : {}), ...(r.imageId ? { imageId: r.imageId } : {}), ...(r.event ? { event: { payee: r.event.payee, payeeAccount: r.event.payeeAccount, submittedBy: r.event.submittedBy, status: r.event.status } } : {}) }));
+  const rows = filterLines(all, { q, action, side });
+  return { ...base, available: true, accounts: res.accounts, actions: actionFacets(all), windowTotals: totalsOf(all), totals: totalsOf(rows), count: rows.length, shown: Math.min(rows.length, LINES_MAX), rows: rows.slice(0, LINES_MAX) };
+}

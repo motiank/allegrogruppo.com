@@ -30,6 +30,7 @@ const askUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 import { forecastWeek } from './services/demand.js';
 import * as legalSync from './services/legalSync.js';
 import * as bankSync from './services/bankSync.js';
+import { bankLines } from './services/bank.js';
 import * as beecommSync from './services/beecommSync.js';
 import * as fin from './services/finance.js';
 import { addDays } from './lib/recommend.js';
@@ -355,6 +356,8 @@ r.post('/joya/legal/sync/:id/finish', requireAdmin, h(async (req) => legalSync.f
 // ---------------------------------------------------------------- bank update (the bank site → the admin)
 // services/bankSync.js: the same browser extension brings the bank's moves and the new cheque pictures through the open
 // Joya page; Joya passes them to the admin's Local Data API (/bank/sync/*), which stores them at once. Chain admin only.
+// the bank lines page (pages/BankLines.js, owner 2026-11-28): the stored bank rows of a window with filters and totals
+r.get('/joya/bank/lines', requireAdmin, h(async (req) => bankLines(req.joya, { companyKey: req.query.company || null, from: req.query.from, to: req.query.to, q: req.query.q || null, action: req.query.action || null, side: req.query.side || null })));
 r.get('/joya/bank/sync/state', requireAdmin, h(async () => bankSync.state()));
 r.get('/joya/bank/sync/plan', requireAdmin, h(async (req) => bankSync.plan(req.joya)));
 r.post('/joya/bank/sync/start', requireAdmin, h(async (req) => bankSync.start({ by: req.joya.username, plan: req.body?.plan })));

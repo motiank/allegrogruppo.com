@@ -242,6 +242,8 @@ export default function ChequeCards({ r }) {
 
 const useThumbStyles = createUseStyles((theme) => ({
   thumb: { display: 'inline-flex', alignItems: 'center', border: `1px solid ${theme.border}`, borderRadius: 6, background: '#000', padding: 0, cursor: 'zoom-in', width: 64, height: 28, overflow: 'hidden', flex: '0 0 auto', '& img': { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } },
+  // the small 📷 of the bank reconciliation page (owner 2026-11-28: "a small icon in the details column, as on the recon page")
+  icon: { display: 'inline-block', border: 0, background: 'none', padding: '0 0.15rem', cursor: 'zoom-in', fontSize: '0.95em', lineHeight: 1, verticalAlign: 'middle', opacity: 0.85, '&:hover': { opacity: 1 } },
 }));
 
 /**
@@ -249,7 +251,7 @@ const useThumbStyles = createUseStyles((theme) => ({
  * applicable"): tap = the full picture in a dialog with copy / share. Nothing when the row has no imageId.
  * row: any row with imageId (+ reference / cheque / number, payee, amount, bankDate / date).
  */
-export function ChequeThumb({ row }) {
+export function ChequeThumb({ row, icon = false }) {
   const theme = useTheme();
   const classes = useStyles(theme);
   const th = useThumbStyles(theme);
@@ -260,9 +262,13 @@ export function ChequeThumb({ row }) {
   const caption = cardCaption(card, { cheque: t('joya.ask.cheq.cheque'), unsure: ' ?', fmtAmount: fmtILS, fmtDate: fmtDay });
   return (
     <>
-      <button type="button" className={th.thumb} onClick={(e) => { e.stopPropagation(); setOpen(true); }} title={t('joya.ask.cheq.openFull')} aria-label={t('joya.ask.cheq.openFull')}>
-        <img src={imageUrl(card.imageId)} alt={caption} loading="lazy" decoding="async" />
-      </button>
+      {icon ? (
+        <button type="button" className={th.icon} onClick={(e) => { e.stopPropagation(); setOpen(true); }} title={t('joya.ask.cheq.openFull')} aria-label={t('joya.ask.cheq.openFull')}>📷</button>
+      ) : (
+        <button type="button" className={th.thumb} onClick={(e) => { e.stopPropagation(); setOpen(true); }} title={t('joya.ask.cheq.openFull')} aria-label={t('joya.ask.cheq.openFull')}>
+          <img src={imageUrl(card.imageId)} alt={caption} loading="lazy" decoding="async" />
+        </button>
+      )}
       {open ? (
         <Modal title={caption} onClose={() => setOpen(false)}>
           <img className={classes.full} src={imageUrl(card.imageId)} alt={caption} />
