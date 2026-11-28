@@ -607,7 +607,7 @@ export function chequesByDay(rows, { balances = null, payments = [], today = nul
     const d = day(c.dueDate || 'no date');
     d.count += 1;
     d.amount = r2(d.amount + (Number(c.amount) || 0));
-    d.cheques.push({ reference: c.reference ?? null, payee: c.payee || c.accountName || null, amount: c.amount, ...(c.bankDate ? { paid: true } : {}), ...(c.source && c.source !== 'hashavshevet' ? { source: c.source } : {}) });
+    d.cheques.push({ reference: c.reference ?? null, payee: c.payee || c.accountName || null, amount: c.amount, ...(c.bankDate ? { paid: true, bankDate: c.bankDate } : {}), ...(c.source && c.source !== 'hashavshevet' ? { source: c.source } : {}), ...(c.imageId ? { imageId: c.imageId } : {}) });
   }
   for (const p of payments) {
     const d = day(p.date);

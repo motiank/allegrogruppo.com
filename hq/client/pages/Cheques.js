@@ -13,6 +13,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api, qs } from '../api.js';
 import { useT, Term } from '../i18n/index.js';
 import { Page, Card, Btn, Badge, Select, Modal, Loading, Empty, ErrorBox, useLoad, fmtILS, fmtDay } from '../ui.js';
+import { ChequeThumb } from '../ChequeCards.js';
 
 const useStyles = createUseStyles((theme) => ({
   bar: { display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' },
@@ -80,6 +81,7 @@ function DayCard({ d, c, t }) {
               <span className={c.no}><Term>{x.reference ?? '—'}</Term></span>
               <span className={c.payee} dir="auto">{x.payee || '—'}</span>
               <span className={c.amt}>{fmtILS(x.amount)}</span>
+              {x.imageId ? <ChequeThumb row={x} /> : null}
               {x.paid ? <Badge tone="ok">{t('joya.chq.paid')}</Badge> : null}
               {x.source === 'priority' ? <Badge tone="muted">{t('joya.chq.priority')}</Badge> : null}
             </div>

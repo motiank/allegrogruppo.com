@@ -4,10 +4,10 @@
 //
 // A picture is any row of a calc result that carries `imageId` (the Drive id of the scanned front, served by Joya at
 // /api/joya/finance/cheque-image/:id) — the cheque archive rows, the bank rows (bank_transactions, bank_open_items, the
-// report's sections), the cheques file rows and statement_compare's archiveCheque all carry it. The cards are shown when
-// the answer used the cheque archive (calc cheque_archive — the archive IS the pictures: a cheque by its number, the
-// work list, the pictures of a payee) or when the question asked for pictures in words; a plain bank question keeps its
-// pictures behind the report page's 📷 as before.
+// report's sections), the cheques file rows and statement_compare's archiveCheque all carry it. Since 2026-11-28 (owner:
+// "when displaying bank pages — add the cheque image when applicable") EVERY picture in an answer is a card: a bank list, the
+// future cheques of the month, the report's cheque rows — not only the archive calc or a question with picture words. The
+// archive's rows come first (the surest names).
 
 /** Words that ask for the pictures themselves, in Hebrew or English. */
 export const PICTURE_WORDS = /תמונ|צילומ|צילום|סרוק|סריק|picture|image|photo|scan/i;
@@ -60,15 +60,12 @@ export function cardsOfResult(result, calc, out = [], seen = new Set(), depth = 
 }
 
 /**
- * The cards to show under an answer: [] when the answer is not about the pictures.
+ * The cards to show under an answer: every picture its calcs carry ([] when there is none).
  * @param {Array<{calc:string, result?:object, error?:any}>} calcs the request's calcs (as the client gets them)
- * @param {string} [question] the user's question — picture words make every picture in the results a card
+ * @param {string} [_question] the user's question (kept for the callers; since 2026-11-28 the pictures show either way)
  */
-export function chequeCards(calcs, question = '') {
+export function chequeCards(calcs, _question = '') {
   const list = Array.isArray(calcs) ? calcs : [];
-  const archive = list.some((c) => c?.calc === 'cheque_archive' && c.result && !c.error);
-  const asked = PICTURE_WORDS.test(String(question || ''));
-  if (!archive && !asked) return [];
   const out = [];
   const seen = new Set();
   // the archive's rows first (they carry the surest names), then the pictures of the other calcs

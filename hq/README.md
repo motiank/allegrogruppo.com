@@ -539,6 +539,10 @@ scanned cheques that are in neither Hashavshevet nor Priority (`source` `archive
 a payment in THEIR statement that our books lack gets `archiveCheque` when a scanned cheque has that amount near that date — the
 writer says the payment happened and the cheque is not entered yet. Eval `ca-*`; tests in the repo root (`scripts/test_cheque_archive.js`).
 
+**The picture on a cheque line of the שקלפ page** (2026-11-28, same wish): a paid cheque of the month that has a scan shows a small
+thumbnail in the day's card (`client/ChequeCards.js` `ChequeThumb`; the day rows of `chequesByDay` carry `imageId` and `bankDate`);
+tap = the full picture in a dialog with copy / share. The bank reconciliation page keeps its 📷.
+
 **The pictures as cards in the chat (owner 2026-11-23: "if I asked for cheque images, display them on a card list with the
 options to copy and share").** Under an answer, `client/ChequeCards.js` shows the scanned cheques of the answer as a card
 list: the picture (tap = full size in a dialog), the cheque number, the payee (an unsure reading in yellow with "(לא ודאי)"),
@@ -548,8 +552,9 @@ link instead and says so), **שתף** = the phone's share sheet with the picture
 file); the full-size dialog also has הורדה and פתח בחלון חדש. Which pictures: `lib/chequeCards.js` `chequeCards(calcs,
 question)` — every row of the answer's calcs that carries `imageId` (the cheque archive rows, the bank rows of
 `bank_transactions` / `bank_open_items` / the report's sections, the cheques file rows, `statement_compare`'s `archiveCheque`),
-each picture once, the archive's rows first — shown when the answer used calc `cheque_archive` (a cheque by its number, the
-work list, the cheques of a payee) or when the question asked for pictures in words (`PICTURE_WORDS`: תמונה, צילום, סרוק,
+each picture once, the archive's rows first — since 2026-11-28 (owner: "when displaying bank pages — add the cheque image when
+applicable") shown under EVERY answer that has pictures: a bank list, the report's cheque rows, the future cheques of the month
+already paid, not only calc `cheque_archive` or a question with picture words (`PICTURE_WORDS` stays exported: תמונה, צילום, סרוק,
 picture, image, photo, scan); a plain bank question keeps its pictures behind the report page's 📷. The picture streams
 through `/api/joya/finance/cheque-image/:id` (chain admin), so copy and share need no Drive access. The writer says once
 "התמונות מוצגות למטה" and never writes a link (WRITE rules for the bank cheques and `cheque_archive`; PLAN rule "The scanned

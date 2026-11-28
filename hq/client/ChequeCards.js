@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { createUseStyles, useTheme } from 'react-jss';
 import { useT, Term } from './i18n/index.js';
 import { Btn, Modal, fmtILS, fmtDay } from './ui.js';
-import { chequeCards, cardCaption } from '../lib/chequeCards.js';
+import { chequeCards, cardCaption, cardOf } from '../lib/chequeCards.js';
 
 const FIRST = 12; // cards shown before "show all"
 const STEP = 24;
@@ -237,5 +237,38 @@ export default function ChequeCards({ r }) {
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+const useThumbStyles = createUseStyles((theme) => ({
+  thumb: { display: 'inline-flex', alignItems: 'center', border: `1px solid ${theme.border}`, borderRadius: 6, background: '#000', padding: 0, cursor: 'zoom-in', width: 64, height: 28, overflow: 'hidden', flex: '0 0 auto', '& img': { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } },
+}));
+
+/**
+ * The scanned cheque of ONE line as a small thumbnail (owner 2026-11-28: "when displaying bank pages — add the cheque image when
+ * applicable"): tap = the full picture in a dialog with copy / share. Nothing when the row has no imageId.
+ * row: any row with imageId (+ reference / cheque / number, payee, amount, bankDate / date).
+ */
+export function ChequeThumb({ row }) {
+  const theme = useTheme();
+  const classes = useStyles(theme);
+  const th = useThumbStyles(theme);
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const card = useMemo(() => cardOf(row, 'line'), [row]);
+  if (!card) return null;
+  const caption = cardCaption(card, { cheque: t('joya.ask.cheq.cheque'), unsure: ' ?', fmtAmount: fmtILS, fmtDate: fmtDay });
+  return (
+    <>
+      <button type="button" className={th.thumb} onClick={(e) => { e.stopPropagation(); setOpen(true); }} title={t('joya.ask.cheq.openFull')} aria-label={t('joya.ask.cheq.openFull')}>
+        <img src={imageUrl(card.imageId)} alt={caption} loading="lazy" decoding="async" />
+      </button>
+      {open ? (
+        <Modal title={caption} onClose={() => setOpen(false)}>
+          <img className={classes.full} src={imageUrl(card.imageId)} alt={caption} />
+          <Actions card={card} classes={classes} full />
+        </Modal>
+      ) : null}
+    </>
   );
 }

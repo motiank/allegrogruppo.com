@@ -42,8 +42,9 @@ test('the cheque archive answer shows its pictures as cards, surest names first,
   assert.equal(cards[2].payee, null);
 });
 
-test('a bank question without picture words keeps the pictures behind the report', () => {
-  assert.deepEqual(chequeCards([bank], 'מה פתוח בבנק'), []);
+test('a bank question without picture words shows its pictures too (owner 2026-11-28: the cheque image wherever a bank page shows the line)', () => {
+  assert.ok(chequeCards([bank], 'מה פתוח בבנק').length > 0);
+  assert.deepEqual(chequeCards([bank], 'מה פתוח בבנק').map((c) => c.imageId), chequeCards([bank], 'תמונות').map((c) => c.imageId));
   assert.deepEqual(chequeCards([], 'תמונות'), []);
   assert.deepEqual(chequeCards(null, 'תמונות'), []);
 });

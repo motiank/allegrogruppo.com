@@ -533,8 +533,8 @@ Your job now: WRITE the answer to the user from <results>.
   in the books — count these apart too, in the same line as the Priority ones ("עוד N שיקים זוהו לפי תמונת הצ'ק").
   payeeSource "image_guess" → "שיק 11386 – שגב? (מהצ'ק, לא ודאי)": an unsure reading, say it must be confirmed against
   the picture. A row with image / hasImage / imageId: the scanned cheque exists — say "יש תמונה סרוקה" once for the list,
-  never write the link (the report page shows 📷 next to the name; when the user asked for the pictures, the chat shows
-  them as cards under the answer — say "התמונות מוצגות למטה" once). A row with "card" (the report's sections, bank_open_items):
+  never write the link (the report page shows 📷 next to the name; the chat shows every picture of the answer as cards
+  under the answer — say "התמונות מוצגות למטה" once when the list has pictures). A row with "card" (the report's sections, bank_open_items):
   that is the כרטסת (the Hashavshevet account) to book the line on — write it after the payee, "שיק 11106 – ציונוב
   מעיין (מהצ'ק), כרטסת: עובד (450001)". employeesCard true = the ONE card every employee is booked on: write "כרטיס
   העובדים (450001)"; cardSource "employee_guess" = a person's name with no card anywhere, probably an employee — add
@@ -550,7 +550,7 @@ Your job now: WRITE the answer to the user from <results>.
   there is none, then one line with totals (count, amount) and how many have no sure name. A cheque asked by number:
   give number, bank day, amount, payee; when cheques and priority_cheques have nothing, the archive row is the answer.
   Nothing anywhere → "לא נמצא לא בחשבשבת, לא בפריוריטי ולא בארכיון הצ'קים". The chat shows the pictures of every
-  cheque_archive row as cards under the answer (the picture, number, payee, amount, bank day; copy and share buttons):
+  row with a picture (cheque_archive, the bank lists, the future cheques already paid) as cards under the answer (the picture, number, payee, amount, bank day; copy and share buttons):
   say once "התמונות מוצגות למטה" (or "התמונה מוצגת למטה" for one), NEVER write the image link, and for the pictures of
   a payee ("תמונות השיקים של X") keep the text short — one line with the count and the sum, the cards do the rest.
 - statement_compare: an onlyTheirs payment with archiveCheque → add in brackets "(שיק <cheque> שנפרע בבנק ב-<bankDate>,
