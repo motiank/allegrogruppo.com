@@ -437,13 +437,16 @@ const useDataTableStyles = createUseStyles((theme) => ({
   foot: { gridColumn: '1 / -1', background: theme.background },
 }));
 
-export function DataTable({ head = [], rows = [], foot = null, dir, className, cardsBelow = null }) {
+export function DataTable({ head = [], rows = [], foot = null, dir, className, cardsBelow = null, onModeChange = null }) {
   const theme = useTheme();
   const c = useDataTableStyles(theme);
   const wrapRef = React.useRef(null);
   const tableRef = React.useRef(null);
   const [cards, setCards] = React.useState(false);
   const needed = React.useRef(0); // the table's natural width when it last overflowed
+  React.useEffect(() => {
+    onModeChange?.(cards);
+  }, [cards]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return undefined;

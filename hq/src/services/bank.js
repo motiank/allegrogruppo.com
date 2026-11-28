@@ -254,7 +254,7 @@ export async function cardsVsBank(companies, locationsOf, from, to) {
 import { companiesOf, resolveCompany } from './payments.js';
 import { totalsOf, actionFacets, filterLines } from '../../lib/bankLines.js';
 
-const LINES_MAX = 3000; // rows sent to the page at most (newest first); the totals count every matching row
+const LINES_MAX = 20000; // rows sent to the page at most (newest first; the page filters in the browser since 2026-11-28); the totals count every matching row
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**

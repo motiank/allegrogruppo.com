@@ -38,3 +38,15 @@ test('filterLines: words in the details / payee / reference, the action exactly,
   assert.equal(filterLines(rows, { action: 'תיקון' }).length, 2, 'the type matches every value date');
   assert.deepEqual(totalsOf(filterLines(rows, { action: 'שיק' })), { count: 2, moneyIn: 0, moneyOut: 10291, net: -10291 });
 });
+
+test('nameKey / nameFacets / set filters (the header filters, owner 2026-11-28)', async () => {
+  const { nameKey, nameFacets } = await import('../lib/bankLines.js');
+  assert.equal(nameKey(rows[0]), 'עיריית רעננה', 'the payee first');
+  assert.equal(nameKey({ details: 'לטובת: אבי כהן' }), 'אבי כהן', 'the bank prefix is dropped from the details');
+  assert.equal(nameKey({ details: '' }), '—');
+  assert.equal(nameKey({ event: { payee: 'ספק' } }), 'ספק');
+  assert.deepEqual(nameFacets(rows).slice(0, 2).map((f) => [f.name, f.count]), [['תיקון', 2], ['אבי כהן', 1]]);
+  assert.equal(filterLines(rows, { actions: new Set(['שיק', 'תיקון']) }).length, 4);
+  assert.equal(filterLines(rows, { actions: ['שיק'], names: new Set(['עיריית רעננה']) }).length, 1);
+  assert.equal(filterLines(rows, { actions: new Set(), names: [] }).length, 7, 'an empty set is no filter');
+});

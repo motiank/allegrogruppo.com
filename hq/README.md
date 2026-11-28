@@ -546,11 +546,17 @@ company=&from=&to=&q=&action=&side=` (`src/services/bank.js` `bankLines`) reads 
 (`/bank/transactions/stored`), counts the action types over the window (`lib/bankLines.js` `actionFacets` — the picker shows every
 type with its count even while one is chosen), narrows by `q` (every word, in the action / details / payee / purpose / reference),
 `action` (the type = the bank's action without its value-date suffix, `actionKey`) and `side` (in | out), and returns `totals` (count, moneyIn, moneyOut, net of the narrowed rows), `windowTotals`
-and at most 3,000 rows (newest first). The page: preset windows (this month, last month, 3 months, this year, last year, all), two
-date pickers, the search box (400 ms), the action and direction pickers, "נקה סינון"; a summary line (rows, in, out, net, "מסונן"); the
-table (`ui.js` DataTable) with the 📷 in the details column (`ChequeThumb` icon mode — the picture in a dialog with copy / share) and
-the payee under the details ("לטובת: …" / "מאת: …"); a foot row "סה״כ" / "סה״כ מסונן" with the in and out sums and the net. The filters
-live in the URL. Tests `test/test_bank_lines.mjs`.
+and at most 3,000 rows (newest first). The page (since the owner's same-day correction "the filter in the table head like we did on bank recon; remove the current
+filter"): the filters are in the column headers — `client/HeadFilter.js`: a ▼ in the header opens a panel like the report's (a search
+box, "(בחר הכל)", the column's values with counts as checkboxes, אישור / נקה סינון / ביטול; the panel is fixed-positioned so the table
+box does not cut it); the date header = preset windows (this month, last month, 3 months, this year, last year, all) and two date
+pickers (the window is read again from the server); the action type and the name (`lib/bankLines.js` `actionKey` = the bank's
+action without its value-date suffix, `nameKey` = the payee, else the details text) are filtered in the browser over the window's
+rows (`filterLines` with sets, `actionFacets` / `nameFacets` counted over the window); on a phone (card list) the three filters sit
+above the cards. A summary line (window, rows, זכות, חובה, net, "מסונן", "נקה סינון"); the table (`ui.js` DataTable) with the 📷 in the
+details column (`ChequeThumb` icon mode — the picture in a dialog with copy / share) and
+the payee under the details ("לטובת: …" / "מאת: …"); a foot row "סה״כ" / "סה״כ מסונן" with the זכות and חובה sums and the net. The window
+and the picks live in the URL (`actions`, `names`, joined by "|"). Tests `test/test_bank_lines.mjs`.
 
 **The picture on a cheque line of the שקלפ page** (2026-11-28, same wish; since the same day a small 📷 icon next to the payee, like the recon page): a paid cheque of the month that has a scan shows a small
 thumbnail in the day's card (`client/ChequeCards.js` `ChequeThumb`; the day rows of `chequesByDay` carry `imageId` and `bankDate`);
